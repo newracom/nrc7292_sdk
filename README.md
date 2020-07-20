@@ -24,4 +24,4 @@ git clone https://github.com/newracom/nrc7292_sdk.git
 ```
 
 ### Get the detailed user guide
-Please refer to [UG-7292-004-Standalone SDK.pdf](https://github.com/newracom/nrc7292_sdk/blob/master/package/standalone/doc/UG-7292-004-Standalone SDK.pdf) in doc directory. 
+Please refer to [UG-7292-004-Standalone SDK.pdf](https://github.com/newracom/nrc7292_sdk/blob/master/package/standalone/doc/UG-7292-004-Standalone%20SDK.pdf) in doc directory. 
