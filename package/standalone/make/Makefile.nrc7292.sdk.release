@@ -1,0 +1,186 @@
+ALIAS = lib
+
+#// --------------------------------------------------
+#// 3rd party library
+#// --------------------------------------------------
+
+# wpa_supplicant/hostapd
+CONFIG_WPA_SUPP	= n
+CONFIG_SOFT_AP		= n
+
+CONFIG_FREERTOS	= y
+CONFIG_LWIP		= y
+CONFIG_MBEDTLS	= y
+
+#// --------------------------------------------------
+#// Alias Generated From system_info
+#// --------------------------------------------------
+TOP					=	.
+SYSTEM				=	nrc7292
+STANDARD			=	11ah
+CPU					=	ARM_CM0
+PREFIX				=	arm-none-eabi-
+TARGET				=	standalone_xip
+DEFINE				=	-DNRC7292
+DEFINE				+=	-DNRC7292_STANDALONE_XIP
+DEFINE				+=	-DCACHE_XIP
+DEFINE				+=	-DSF_WRITABLE
+DEFINE				+=	-DSDK_SYSTEM_NAME=\"$(SYSTEM)\"
+DEFINE				+=	-DSDK_TARGET_NAME=\"$(TARGET)\"
+OUTPUT				=	$(SYSTEM)_$(TARGET)_$(APP_NAME)
+
+#// -------------------------------------------------
+#// Features
+#// --------------------------------------------------
+DEFINE				+=	-DINCLUDE_STANDALONE
+DEFINE				+=	-DINCLUDE_TRACE_ALWAYS
+
+DEFINE				+=	-DINCLUDE_TRACE_VERBOSE
+DEFINE				+=	-DINCLUDE_TRACE_INFO
+DEFINE				+=	-DINCLUDE_TRACE_ERROR
+DEFINE				+=	-DINCLUDE_TRACE_ASSERT
+DEFINE				+=	-DINCLUDE_UMAC
+DEFINE				+=	-DINCLUDE_S1G_CONFIG
+DEFINE				+=	-DINCLUDE_S1G_HOOK
+DEFINE				+=	-DINCLUDE_LMAC_DEBUG
+
+#//-------------------------------------------------
+#// Configuration
+#//--------------------------------------------------
+DEFINE				+=	-DSTANDARD_11AH
+DEFINE				+=	-DLMAC_CONFIG_11AH=1
+
+DEFINE 				+=	-DLMAC_CONFIG_FREERTOS=1
+DEFINE				+=	-DLMAC_CONFIG_NAN=0
+DEFINE				+=	-DLMAC_CONFIG_BUFFER_SIZE=512
+DEFINE				+=	-DLMAC_CONFIG_DL_DESCRIPTOR=32
+DEFINE 				+=	-DLMAC_CONFIG_POOL_0_NUM=45
+DEFINE 				+=	-DLMAC_CONFIG_POOL_0_RESERVED_NUM=4
+DEFINE 				+=	-DLMAC_CONFIG_POOL_1_NUM=36
+DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM0=8
+DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM1=8
+DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM2=8
+DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM3=9
+#// --------------------------------------------------
+#// Common Tool
+#// --------------------------------------------------
+CC					=	$(PREFIX)g++
+AS					=	$(PREFIX)g++
+AR					=	$(PREFIX)ar
+CP					=	$(PREFIX)objcopy
+OD					=	$(PREFIX)objdump
+SZ					=	$(PREFIX)size
+NM					=	$(PREFIX)nm
+ST					=	$(PREFIX)strip
+READELF				=	$(PREFIX)readelf
+#// --------------------------------------------------
+
+#// --------------------------------------------------
+#// Common Path
+#// --------------------------------------------------
+OUT_PATH			=	out/$(SYSTEM)/$(TARGET)/$(APP_NAME)
+OBJ_PATH			=	$(OUT_PATH)/objs
+
+LIB_PATH			=	lib
+LIB_MODEM_PATH		=	$(LIB_PATH)/modem
+LIB_MODEM_INC_PATH		=	$(LIB_MODEM_PATH)/inc
+
+SYSTEM_INC_PATH	= $(LIB_MODEM_INC_PATH)/system
+WLAN_INC_PATH		= $(LIB_MODEM_INC_PATH)/wlan
+HAL_INC_PATH		= $(LIB_MODEM_INC_PATH)/hal
+HOST_INC_PATH		= $(LIB_MODEM_INC_PATH)/host
+UTIL_INC_PATH		= $(LIB_MODEM_INC_PATH)/util
+UMAC_INC_PATH		= $(LIB_MODEM_INC_PATH)/umac
+
+#// --------------------------------------------------
+#// Include Path
+#// --------------------------------------------------
+INCLUDE += -I$(LIB_MODEM_PATH)
+INCLUDE	+= -I$(LIB_MODEM_INC_PATH)
+INCLUDE	+= -I$(SYSTEM_INC_PATH)
+INCLUDE	+= -I$(WLAN_INC_PATH)
+INCLUDE	+= -I$(HAL_INC_PATH)
+INCLUDE	+= -I$(HOST_INC_PATH)
+INCLUDE	+= -I$(UTIL_INC_PATH)
+INCLUDE	+= -I$(UMAC_INC_PATH)
+
+
+include make/configure-in.os
+#// --------------------------------------------------
+#// Specific LD File
+#// --------------------------------------------------
+LD_CM_FILE_NAME	= cmx_common.ld
+LD_FILE_NAME		= cmx_single_huge_7291s1.ld
+LD_CM_FILE			= $(LIB_MODEM_PATH)/$(LD_CM_FILE_NAME)
+LD_FILE				= $(LIB_MODEM_PATH)/$(LD_FILE_NAME)
+
+#// --------------------------------------------------
+#// System/Target Dependent Define
+#// --------------------------------------------------
+# PRO_FPGA : 2STA platform and no RF
+DEFINE	+= -DCONFIG_OS_FREERTOS -DPRO_FPGA
+DEFINE	+= -DconfigTOTAL_HEAP_SIZE=419840
+
+#// --------------------------------------------------
+#// APP Core
+#// --------------------------------------------------
+SDK_DIR 	=  sdk
+SDK_INC	= $(SDK_DIR)/inc
+SDK_APPS	= $(SDK_DIR)/apps
+SDK_WIFI_COMMON = $(SDK_APPS)/wifi_common
+
+ifneq ($(findstring ATCMD,$(APP_NAME)),ATCMD)
+PROJECT_FOLDER = $(APP_NAME)
+else
+PROJECT_FOLDER = atcmd
+endif
+
+SDK_PROJECT = $(SDK_APPS)/$(PROJECT_FOLDER)
+
+INCLUDE += -I$(SDK_WIFI_COMMON)
+INCLUDE += -I$(SDK_PROJECT)
+INCLUDE	+= -I$(SDK_INC)
+
+VPATH += $(SDK_PROJECT):$(SDK_WIFI_COMMON)
+
+DEFINE += -DNRC_USER_APP
+
+include $(SDK_PROJECT)/Makefile
+include $(SDK_PROJECT)/.config
+
+#// --------------------------------------------------
+#// Build Information
+#// --------------------------------------------------
+PWD := $(shell pwd)
+UNAME := "$(shell uname -a)"
+TIMEFMT := --format="- %e Seconds"
+#// --------------------------------------------------
+
+#// --------------------------------------------------
+#// Bulid Flag
+#// --------------------------------------------------
+ARCH_FLAGS	= -mcpu=cortex-m0 -mthumb
+SYS_FLAGS	= --specs=nosys.specs
+
+CPPFLAGS = --std=gun++1y -Wno-literal-suffix -fpermissive -fno-rtti
+CPPFLAGS = $(INCLUDE) $(ARCH_FLAGS) $(DEFINE)
+
+CFLAGS 	+= -x none -Werror -Wall -Wno-unused-value -Wno-unused-variable -Wno-unused-but-set-variable -Wno-unused-function
+CFLAGS	+= -fno-common -fno-exceptions -gdwarf-2 -ffunction-sections -fdata-sections
+CFLAGS	+= -Os
+CFLAGS	+= $(INCLUDE) $(ARCH_FLAGS) $(DEFINE)
+
+LFLAGS	= -nostartfiles -Wl,--gc-sections
+LFLAGS	+= $(ARCH_FLAGS) $(SYS_FLAGS)
+LFLAGS	+= -L$(LIB_PATH) -Os -Wl,-Map=$(OUT_PATH)/$(OUTPUT).map
+LFLAGS	+= -gdwarf-2
+LFLAGS	+= -T$(LD_FILE)
+
+CPFLAGS	= -O binary
+ODFLAGS = -S -C --demangle
+ASFLAGS	=
+NMFLAGS	= -S --demangle --size-sort -s -r
+#// --------------------------------------------------
+
+include make/Makefile.feature.lib
+include make/Makefile.common

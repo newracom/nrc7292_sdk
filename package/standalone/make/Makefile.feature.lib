@@ -1,0 +1,211 @@
+#// --------------------------------------------------
+#// LIB
+#// LWIP
+#// --------------------------------------------------
+LWIP_BASE		= $(LIB_PATH)/lwip
+LWIP_SRC_BASE	= $(LWIP_BASE)/$(LWIP_VERSION)/src
+LWIP_PORT		= $(LWIP_BASE)/port
+LWIP_INC		= $(LWIP_SRC_BASE)/include
+LWIP_CORE		= $(LWIP_SRC_BASE)/core
+LWIP_API		= $(LWIP_SRC_BASE)/api
+LWIP_NETIF		= $(LWIP_SRC_BASE)/netif
+LWIP_APPS_SRC	= $(LWIP_SRC_BASE)/apps
+LWIP_IPV4		= $(LWIP_CORE)/ipv4
+LWIP_APPS_PORT	= $(LWIP_PORT)/apps
+LWIP_PING		= $(LWIP_APPS_PORT)/ping
+LWIP_IPERF		= $(LWIP_APPS_PORT)/lwiperf
+LWIP_DHCPS		= $(LWIP_APPS_PORT)/dhcpserver
+
+INCLUDE += -I$(LWIP_INC)
+INCLUDE += -I$(LWIP_PORT)
+INCLUDE += -I$(LWIP_PING)
+INCLUDE += -I$(LWIP_IPERF)
+INCLUDE += -I$(LWIP_DHCPS)
+
+ifeq ($(CONFIG_LWIP), y)
+	VPATH	+= $(LWIP_NETIF)
+	VPATH	+= $(LWIP_CORE)
+	VPATH	+= $(LWIP_NETIF)
+	VPATH	+= $(LWIP_API)
+	VPATH	+= $(LWIP_IPV4)
+	VPATH	+= $(LWIP_PORT)
+	VPATH	+= $(LWIP_PING)
+	VPATH	+= $(LWIP_IPERF)
+	VPATH	+= $(LWIP_DHCPS)
+	include $(LWIP_SRC_BASE)/lwip.make
+	DEFINE	+= -DNRC_LWIP
+endif #CONFIG_LWIP
+
+#// --------------------------------------------------
+#// LIB
+#// mbedtls
+#// --------------------------------------------------
+MBEDTLS_BASE	= $(LIB_PATH)/mbedtls
+MBEDTLS_INC	= $(MBEDTLS_BASE)/include
+MBEDTLS_SRC	= $(MBEDTLS_BASE)/library
+MBEDTLS_PORT	= $(MBEDTLS_BASE)/port
+MBEDTLS_PORT_CONFIG	= $(MBEDTLS_PORT)/configs
+
+INCLUDE	+= -I$(MBEDTLS_BASE)
+INCLUDE	+= -I$(MBEDTLS_INC)
+INCLUDE	+= -I$(MBEDTLS_SRC)
+INCLUDE	+= -I$(MBEDTLS_PORT)
+INCLUDE	+= -I$(MBEDTLS_PORT_CONFIG)
+
+DEFINE += -DMBEDTLS_CONFIG_FILE=\"config-nrc-basic.h\"
+DEFINE	+= -DSUPPORT_MBEDTLS
+
+ifeq ($(CONFIG_MBEDTLS), y)
+	VPATH	+= $(MBEDTLS_BASE)
+	VPATH	+= $(MBEDTLS_SRC)
+	VPATH	+= $(MBEDTLS_PORT)
+	VPATH	+= $(MBEDTLS_INC)
+	VPATH	+= $(MBEDTLS_PORT_CONFIG)
+	include $(MBEDTLS_BASE)/mbedtls.make
+	DEFINE	+= -DNRC_MBEDTLS
+endif #CONFIG_MBEDTLS
+
+#// --------------------------------------------------
+#// LIB
+#//	WPA_SUPPLICANT
+#// --------------------------------------------------
+WPA_SUPP_ROOT		= $(LIB_PATH)/hostap
+WPA_SUPP_PATH	= $(shell find $(WPA_SUPP_ROOT) -type d \
+					-not -path $(WPA_SUPP_ROOT)/hostapd -not -path $(WPA_SUPP_ROOT)/wlantest)
+
+INCLUDE	+= $(addprefix -I,$(WPA_SUPP_PATH))
+include $(WPA_SUPP_ROOT)/wpa_supplicant/FreeRTOS.config
+
+ifeq ($(CONFIG_WPA_SUPP), y)
+	include $(WPA_SUPP_ROOT)/wpa_supplicant/FreeRTOS.make
+	CSRCS	+= $(notdir $(WPA_SUPP_CSRCS))
+	SRCS	+= $(notdir $(WPA_SUPP_CPPSRCS))
+	VPATH	+= $(WPA_SUPP_PATH)
+	MAC_ADDR_SEED	= $(shell git config user.name | sed -e 's/ /_/g')
+	DEFINE	+= -DINCLUDE_WPA_SUPP -DMAC_ADDR_SEED=\"$(MAC_ADDR_SEED)\"
+endif # CONFIG_WPA_SUPP
+
+#// --------------------------------------------------
+#// LIB
+#// COAP
+#// --------------------------------------------------
+COAP_BASE	= $(LIB_PATH)/libcoap
+COAP_SRC	= $(COAP_BASE)/src
+COAP_APPS	= $(COAP_BASE)/apps
+COAP_INC	= $(COAP_BASE)/include
+COAP_INC_COAP2	= $(COAP_INC)/coap2
+COAP_EXAMPLES	= $(COAP_BASE)/examples
+
+INCLUDE	+= -I$(COAP_INC)
+INCLUDE	+= -I$(COAP_APPS)
+INCLUDE	+= -I$(COAP_INC_COAP2)
+INCLUDE	+= -I$(COAP_EXAMPLES)
+
+ifeq ($(CONFIG_COAP), y)
+	VPATH	+= $(COAP_BASE)
+	VPATH	+= $(COAP_SRC)
+	VPATH	+= $(COAP_APPS)
+	VPATH	+= $(COAP_EXAMPLES)
+	include $(COAP_BASE)/libcoap.make
+	DEFINE	+= -DNRC_LIBCOAP
+endif #CONFIG_COAP
+
+#// --------------------------------------------------
+#// LIB
+#// cJSON
+#// --------------------------------------------------
+CJSON_BASE	= $(LIB_PATH)/cJSON
+INCLUDE	+= -I$(CJSON_BASE)
+
+ifeq ($(CONFIG_CJSON), y)
+	VPATH	+= $(CJSON_BASE)
+	include $(CJSON_BASE)/cjson.make
+endif #CONFIG_CJSON
+
+#// --------------------------------------------------
+#// LIB
+#// paho.mqtt.embedded-c
+#// --------------------------------------------------
+MQTT_BASE	= $(LIB_PATH)/paho.mqtt
+MQTT_PKT_SRCS	= $(MQTT_BASE)/MQTTPacket/src
+MQTT_CNT_SRCS	= $(MQTT_BASE)/MQTTClient-C/src
+
+INCLUDE	+= -I$(MQTT_PKT_SRCS)
+INCLUDE	+= -I$(MQTT_CNT_SRCS)
+
+ifeq ($(CONFIG_MQTT), y)
+	VPATH	+= $(MQTT_PKT_SRCS)
+	VPATH	+= $(MQTT_CNT_SRCS)
+	include $(MQTT_BASE)/mqtt.make
+	DEFINE	+= -DMQTT_TASK
+endif #CONFIG_MQTT
+
+#// --------------------------------------------------
+#// LIB
+#// Mini-XML
+#// --------------------------------------------------
+MXML_BASE	= $(LIB_PATH)/mxml
+INCLUDE	+= -I$(MXML_BASE)
+
+ifeq ($(CONFIG_MXML), y)
+	VPATH	+= $(MXML_BASE)
+	include $(MXML_BASE)/mxml.make
+endif #CONFIG_MXML
+
+#// --------------------------------------------------
+#// LIB
+#// AWS (Amazon Web Service)
+#// --------------------------------------------------
+AWS_IOT_BASE	= $(LIB_PATH)/aws_iot
+IOT_CLIENT_DIR	= $(AWS_IOT_BASE)
+PLATFORM_DIR	= $(IOT_CLIENT_DIR)/platform/freertos
+PLATFORM_COMMON_DIR	= $(PLATFORM_DIR)/common
+PLATFORM_NETWORK_DIR	= $(PLATFORM_DIR)/mbedtls
+IOT_CLIENT_SRC_DIR	= $(IOT_CLIENT_DIR)/src
+IOT_CLIENT_INC_DIR	= $(IOT_CLIENT_DIR)/include
+IOT_CLIENT_EXTERNAL_LIB_DIR	= $(IOT_CLIENT_DIR)/external_libs
+IOT_CLIENT_JSMN_DIR	= $(IOT_CLIENT_EXTERNAL_LIB_DIR)/jsmn
+
+INCLUDE	+= -I$(IOT_CLIENT_DIR)
+INCLUDE	+= -I$(PLATFORM_DIR)
+INCLUDE	+= -I$(PLATFORM_COMMON_DIR)
+INCLUDE	+= -I$(PLATFORM_NETWORK_DIR)
+INCLUDE	+= -I$(IOT_CLIENT_SRC_DIR)
+INCLUDE	+= -I$(IOT_CLIENT_INC_DIR)
+INCLUDE	+= -I$(IOT_CLIENT_EXTERNAL_LIB_DIR)
+INCLUDE	+= -I$(IOT_CLIENT_JSMN_DIR)
+
+ifeq ($(CONFIG_AWS), y)
+	VPATH	+= $(IOT_CLIENT_DIR)
+	VPATH	+= $(PLATFORM_DIR)
+	VPATH	+= $(PLATFORM_COMMON_DIR)
+	VPATH	+= $(PLATFORM_NETWORK_DIR)
+	VPATH	+= $(IOT_CLIENT_SRC_DIR)
+	VPATH	+= $(IOT_CLIENT_INC_DIR)
+	VPATH	+=$(IOT_CLIENT_EXTERNAL_LIB_DIR)
+	VPATH	+= $(IOT_CLIENT_JSMN_DIR)
+	include $(AWS_IOT_BASE)/aws_iot.make
+	DEFINE += -DNRC_AWS
+
+	# Logging level control
+	#LOG_FLAGS	+= -DENABLE_IOT_DEBUG
+	#LOG_FLAGS	+= -DENABLE_IOT_TRACE
+	LOG_FLAGS	+= -DENABLE_IOT_INFO
+	LOG_FLAGS	+= -DENABLE_IOT_WARN
+	LOG_FLAGS	+= -DENABLE_IOT_ERROR
+
+	DEFINE	+= $(LOG_FLAGS)
+endif #CONFIG_AWS
+
+#// --------------------------------------------------
+#// LIB
+#// Tinycbor (Tiny Concise Binary Object Representation)
+#// --------------------------------------------------
+TINYCBOR_BASE	= $(LIB_PATH)/tinycbor
+TINYCBOR_SRC	= $(TINYCBOR_BASE)/src
+INCLUDE	+= -I$(TINYCBOR_SRC)
+
+ifeq ($(CONFIG_TINYCBOR), y)
+	VPATH	+= $(TINYCBOR_BASE):$(TINYCBOR_SRC)
+	include $(TINYCBOR_BASE)/tinycbor.make
+endif #CONFIG_TINYCBOR

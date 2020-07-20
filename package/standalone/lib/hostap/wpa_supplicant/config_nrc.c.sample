@@ -1,0 +1,35 @@
+#include "includes.h"
+
+/**
+ * Sample to create AP
+ *
+const char* wlan0_conf = "\n\
+{\n\
+	ssid=\"ap_nrc\"\n\
+	mode=2\n\
+	pairwise=NONE\n\
+	group=GTK_NOT_USED \n\
+	key_mgmt=NONE\n\
+	frequency=5805\n\
+}";
+
+ *
+ */
+
+/*
+ * Sample to create STA
+ *
+
+const char* wlan1_conf = "\n\
+	{\n\
+	ssid=\"halow_nrc\"\n\
+	key_mgmt=NONE\n\
+}";
+
+ */
+
+const char* wlan0_conf = NULL;
+const char* wlan1_conf = NULL;
+const char* global_conf = "\n\
+COUNTRY=US"
+;

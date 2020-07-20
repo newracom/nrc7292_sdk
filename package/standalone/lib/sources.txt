@@ -1,0 +1,9 @@
+#net80211
+ - https://github.com/freebsd/freebsd.git
+ - branch : remotes/origin/release/11.1.0
+
+#lwip : 2.0.3 released version
+ - http://download.savannah.nongnu.org/releases/lwip/
+
+ tr6260 - TR6260_sdio_sdk4.0-2019-0614
+ - received from telink for maskrom library
