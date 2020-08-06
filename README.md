@@ -2,13 +2,20 @@
 
 ## Notice
 ### Release roadmap
+- v1.3.1 (2020.08.05)
 - v1.3.0 (2020.07.19)
 
 ### Latest release
-- [NRC7292_Standalone_SDK_v1.3.0](https://github.com/newracom/nrc7292_sdk/releases/tag/v1.3.0)
+- [NRC7292_Standalone_SDK_v1.3.1](https://github.com/newracom/nrc7292_sdk/releases/tag/v1.3.1)
 
 ### Release package contents
 - standalone
+  - doc
+  - lib
+  - make
+  - sdk
+  - tools
+- standalone_kr_mic
   - doc
   - lib
   - make
