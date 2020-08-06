@@ -1,0 +1,21 @@
+#
+# Test ID : AT-TC-WIFI-03
+#
+# Test Case : Status
+#
+# Test Configuration
+#
+#  - Testbed AP
+#
+#  - STAUT
+#
+
+ECHO "Step 1"
+AT+WMCS?
+
+ECHO "Step 2"
+AT+WTSF?
+
+ECHO "Step 3"
+AT+WRXSIG?
+AT+WRXSIG=10

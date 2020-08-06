@@ -1,0 +1,37 @@
+#
+# Test ID : AT-TC-SOCKET-04
+#
+# Test Case : TCP Server Socket
+#
+# Test Configuration
+#
+#  - Testbed AP
+#    - TCP Client
+#
+#  - STAUT
+#    - TCP Server
+#      - Port : 60000
+#
+
+ECHO "Step 1"
+AT+SOPEN="tcp",60000
+AT+SLIST?
+
+ECHO "Step 2"
+AT+WIPADDR?
+ECHO "Run TCP client."
+ECHO " - server_port : 60000"
+HOLD
+
+WAIT 1s
+
+ECHO "Step 3"
+LOOP 3 5
+AT+SSEND=1,16
+DATA 16
+WAIT 1s
+
+ECHO "Step 4"
+AT+SCLOSE=1
+AT+SCLOSE=0
+AT+SLIST?

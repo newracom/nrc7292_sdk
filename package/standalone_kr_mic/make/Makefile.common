@@ -1,0 +1,73 @@
+#// --------------------------------------------------
+#//	Build
+#// --------------------------------------------------
+
+LIB_NAME	= Modem
+LIB_FULL_NAME   = $(LIB_MODEM_PATH)/lib$(LIB_NAME).a
+LIB_FLAG	+= -L$(LIB_MODEM_PATH) -Wl,--whole-archive -l$(LIB_NAME) -Wl,--no-whole-archive
+
+OBJS	+= $(patsubst %.S,$(OBJ_PATH)/%.S.o,$(ASRCS))
+OBJS	+= $(patsubst %.c,$(OBJ_PATH)/%.c.o,$(CSRCS))
+OBJS	+= $(patsubst %.cpp,$(OBJ_PATH)/%.o,$(SRCS))
+
+DEPS	:= $(patsubst %.S,$(OBJ_PATH)/%.S.d,$(ASRCS))
+DEPS	+= $(patsubst %.c,$(OBJ_PATH)/%.c.d,$(CSRCS))
+DEPS	+= $(patsubst %.cpp,$(OBJ_PATH)/%.d,$(SRCS))
+
+print_CFLAGS := $(CFLAGS)
+
+.SUFFIXES : .o .cpp .c .S
+-include $(DEPS)
+.PHONY : all firmware
+.DEFAULT_GOAL := firmware
+
+all: firmware
+
+firmware: $(OUT_PATH) $(OBJ_PATH) $(OBJS)
+	@echo "Link Script : $(LD_FILE)"
+	@echo "Linking $(OUT_PATH)/$(OUTPUT).elf"
+ifneq ($(findstring lib, $(ALIAS)), )
+	@echo "Linking library : $(LIB_FULL_NAME)"
+	@$(CC) $(LFLAGS) -o $(OUT_PATH)/$(OUTPUT).elf $(OBJS) $(LIB_FLAG)
+else
+	@$(CC) $(LFLAGS) -o $(OUT_PATH)/$(OUTPUT).elf $(OBJS)
+endif
+	@echo "generating $(OUT_PATH)/$(OUTPUT).bin"
+	@$(CP) $(CPFLAGS) $(OUT_PATH)/$(OUTPUT).elf -R.xip -R.rom $(OUT_PATH)/$(OUTPUT).bin
+	@$(CP) $(CPFLAGS) $(OUT_PATH)/$(OUTPUT).elf -j .rom $(OUT_PATH)/$(OUTPUT)-rom.bin
+	@echo "generating $(OUT_PATH)/xip.bin"
+	@$(CP) $(CPFLAGS) $(OUT_PATH)/$(OUTPUT).elf -j .xip $(OUT_PATH)/xip.bin
+	@echo "generating $(OUT_PATH)/$(OUTPUT).lst"
+	@$(OD) $(ODFLAGS) $(OUT_PATH)/$(OUTPUT).elf > $(OUT_PATH)/$(OUTPUT).lst
+	@echo "generating $(OUT_PATH)/$(OUTPUT).nm"
+	@$(NM) $(NMFLAGS) $(OUT_PATH)/$(OUTPUT).elf > $(OUT_PATH)/$(OUTPUT).nm
+	@$(READELF) -a $(OUT_PATH)/$(OUTPUT).elf > $(OUT_PATH)/$(OUTPUT)_readelf.txt
+	@$(SZ) $(OUT_PATH)/$(OUTPUT).elf
+
+$(OBJ_PATH)/%.o:%.cpp
+	@echo "compile $<"
+	@$(CC) -E -MMD $(CFLAGS) $(CPPFLAGS) -c $< -o $@.i
+	@$(CC) -MMD $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+$(OBJ_PATH)/%.c.o:%.c
+	@echo "compile $<"
+	@$(CC) -MMD $(CFLAGS) -c $< -o $@
+
+$(OBJ_PATH)/%.S.o:%.S
+	@ $(if $(print_CFLAGS),echo "CFLAGS: $(print_CFLAGS)" $(eval print_CFLAGS:=))
+	@echo "compile $<"
+	@$(AS) -MMD $(CFLAGS) $(ASFLAGS) -c $< -o $@
+
+$(OUT_PATH):
+	@mkdir -p $@
+
+$(OBJ_PATH):
+	@mkdir -p $@
+
+clean:
+	@rm -rf $(OUT_PATH)
+	@echo clean all
+
+cppcheck:
+	@cppcheck --quiet -D__BYTE_ORDER=__LITTLE_ENDIAN --enable=warning performace --template=gcc --library=$(PWD)/make/cppcheck.cfg $(DEFINE) $(INCLUDE) $(PWD) -i$(PWD)/lib -i$(PWD)/apps -ios_except.c -ihal_lmac_test.c
+#// --------------------------------------------------

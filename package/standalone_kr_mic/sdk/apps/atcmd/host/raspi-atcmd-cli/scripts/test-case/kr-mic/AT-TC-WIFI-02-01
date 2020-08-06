@@ -1,0 +1,56 @@
+#
+# Test ID : AT-TC-WIFI-02-01
+#
+# Test Case : SoftAP - Open & DHCP off
+#
+# Test Configuration
+#
+#  - APUT
+#    - Country : KR
+#	 - Channel : 927MHz (2M BW)
+#    - Security : Open
+#    - SSID : halow_atcmd_open
+#    - IP : 192.168.200.1
+#    - DHCP Server : Off
+#
+#  - Testbed STA
+#    - IP : 192.168.200.11
+#
+
+ECHO "Step 1"
+ATZ
+WAIT 5s
+AT
+
+ECHO "Step 2"
+AT+WCOUNTRY?
+AT+WCOUNTRY="KR"
+AT+WCOUNTRY?
+
+ECHO "Step 3"
+AT+WSOFTAP?
+AT+WSOFTAP=927,"halow_atcmd_open"
+AT+WSOFTAP?
+
+ECHO "Step 4"
+AT+WIPADDR?
+AT+WIPADDR="192.168.200.1","255.255.255.0","192.168.200.1"
+AT+WIPADDR?
+
+ECHO "Step 5"
+AT+WSOFTAP?
+
+ECHO "Step 6"
+ECHO "Connect STA in open mode."
+ECHO " - Country : KR"
+ECHO " - Channel : 927MHz (2M BW)"
+ECHO " - Security : Open"
+ECHO " - SSID : halow_atcmd_open"
+ECHO " - AP IP : 192.168.200.1"
+ECHO " - STA IP : 192.168.200.11"
+ECHO " - DHCP Client : Off"
+HOLD
+
+ECHO "Step 7"
+AT+WPING="192.168.200.11"
+

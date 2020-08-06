@@ -1,0 +1,38 @@
+#
+# Test ID : AT-TC-SOCKET-02
+#
+# Test Case : UDP Socket
+#
+# Test Configuration
+#
+#  - Testbed AP
+#    - UDP Server
+#      - IP : 192.168.200.1
+#      - Port : 50000
+#
+#  - STAUT
+#    - UDP Client
+#      - Port : 60000
+#
+
+ECHO "Step 1"
+ECHO "Run UDP server."
+ECHO " - IP : 192.168.200.1"
+ECHO " - Port : 50000"
+HOLD
+
+ECHO "Step 2"
+AT+SOPEN="udp",60000
+AT+SLIST?
+
+WAIT 1s
+
+ECHO "Step 3"
+LOOP 3 5
+AT+SSEND=0,"192.168.200.1",50000,16
+DATA 16
+WAIT 1s
+
+ECHO "Step 4"
+AT+SCLOSE=0
+AT+SLIST?

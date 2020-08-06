@@ -1,0 +1,40 @@
+#
+# Test ID : AT-TC-WIFI-01
+#
+# Test Case : Configuration
+#
+# Test Configuration
+#
+#  - Testbed AP
+#
+#  - STAUT
+#    - Country Code : KR
+#    - Tx Power : 17
+#    - Rate Control : enable
+#    - Timeout
+#      - WSCAN : 0
+#      - WCONN : 0
+#      - WDISCONN : 0
+#
+
+ECHO "Step 1"
+AT+WMACADDR?
+AT+WCOUNTRY?
+AT+WTXPOWER?
+AT+WRATECTRL?
+AT+WTIMEOUT?
+
+ECHO "Step 2"
+AT+WCOUNTRY="KR"
+AT+WTXPOWER=17
+AT+WRATECTRL=1
+AT+WTIMEOUT="WSCAN",0
+AT+WTIMEOUT="WCONN",0
+AT+WTIMEOUT="WDISCONN",0
+
+ECHO "Step 3"
+AT+WMACADDR?
+AT+WCOUNTRY?
+AT+WTXPOWER?
+AT+WRATECTRL?
+AT+WTIMEOUT?

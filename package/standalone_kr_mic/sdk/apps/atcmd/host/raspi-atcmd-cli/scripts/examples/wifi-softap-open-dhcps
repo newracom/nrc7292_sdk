@@ -1,0 +1,10 @@
+
+ATZ
+ECHO "Software Reset ..."
+WAIT 5s
+
+AT+WSOFTAP=918.5,"halow_softap_open"
+#AT+WIPADDR="192.168.50.1","255.255.255.0","192.168.50.1"
+AT+WDHCPS
+AT+WSOFTAP?
+

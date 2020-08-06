@@ -1,0 +1,33 @@
+#
+# Test ID : AT-TC-BASIC-02
+#
+# Test Case : GPIO Configuration & Value
+#
+# Test Configuration
+#
+#  - Testbed AP
+#
+#  - STAUT
+#
+
+ECHO "Step 1"
+AT+GPIOCONF?
+
+ECHO "Step 2"
+AT+GPIOVAL?
+
+ECHO "Step 3"
+AT+GPIOCONF=8,1,1
+AT+GPIOCONF?=8
+
+ECHO "Step 4"
+AT+GPIOVAL=8,0
+AT+GPIOVAL?=8
+
+ECHO "Step 5"
+AT+GPIOVAL=8,1
+AT+GPIOVAL?=8
+
+ECHO "Step 6"
+AT+GPIOCONF=8,0,0
+AT+GPIOCONF?=8
