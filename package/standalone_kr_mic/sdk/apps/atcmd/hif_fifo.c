@@ -214,6 +214,16 @@ void _hif_fifo_delete (_hif_fifo_t *fifo)
 	}
 }
 
+void _hif_fifo_reset (_hif_fifo_t *fifo)
+{
+	if (fifo)
+	{
+		fifo->cnt = 0;
+		fifo->push_idx = 0;
+		fifo->pop_idx = 0;
+	}
+}
+
 char *_hif_fifo_push_addr (_hif_fifo_t *fifo, int offset)
 {
 	int buf_idx = (fifo->push_idx + offset) % fifo->size;
@@ -228,27 +238,6 @@ char *_hif_fifo_pop_addr (_hif_fifo_t *fifo, int offset)
 	return &fifo->buffer[buf_idx];
 }
 
-#if 0
-int _hif_fifo_free_size (_hif_fifo_t *fifo)
-{
-	int push_idx = fifo->push_idx % fifo->size;
-	int pop_idx = fifo->pop_idx % fifo->size;
-	int free_size = fifo->size - push_idx + pop_idx;
-
-	if (push_idx < pop_idx)
-		free_size -= fifo->size;
-
-	if (free_size == fifo->size)
-		_hif_info("push=%u pop=%u\n", push_idx, pop_idx);
-
-	return free_size;
-}
-
-int _hif_fifo_fill_size (_hif_fifo_t *fifo)
-{
-	return fifo->size - _hif_fifo_free_size(fifo);
-}
-#else
 int _hif_fifo_free_size (_hif_fifo_t *fifo)
 {
 	return fifo->size - fifo->cnt;
@@ -258,7 +247,6 @@ int _hif_fifo_fill_size (_hif_fifo_t *fifo)
 {
 	return fifo->cnt;
 }
-#endif
 
 bool _hif_fifo_empty (_hif_fifo_t *fifo)
 {

@@ -418,10 +418,6 @@ static void _lwip_socket_task (void *arg)
 
 		if (ret > 0)
 			_lwip_socket_log("SOCK_TASK: ret=%d\n", ret);
-
-//		atcmd_trace_func_call(ATCMD_TRACE_FUNC_SELECT_DONE);
-//		taskYIELD();
-//		atcmd_trace_func_return(ATCMD_TRACE_FUNC_SELECT_DONE);
 	}
 }
 

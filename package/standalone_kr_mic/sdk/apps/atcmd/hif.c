@@ -329,6 +329,8 @@ void _hif_rx_resume_isr (void)
 
 /********************************************************************************************/
 
+/* #define CONFIG_HIF_FIFO_STATIC */
+
 #ifdef CONFIG_HIF_FIFO_STATIC
 static char g_nrc_hif_trx_fifo[CONFIG_HIF_RXFIFO_SIZE + CONFIG_HIF_TXFIFO_SIZE];
 #endif

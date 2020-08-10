@@ -29,191 +29,6 @@
 
 /**********************************************************************************************/
 
-extern const char *str_log_type[];
-extern const char c_log_type[];
-
-static int _atcmd_basic_log_get (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-		{
-			int type;
-			char buf[60];
-			int len;
-			int i;
-
-			for (len = 0, i = 0 ; i < ATCMD_LOG_TYPE_NUM ; i++)
-			{
-				type = 1 << i;
-
-				if (ATCMD_LOG_VALID(type))
-				{
-					len += snprintf(&buf[len], sizeof(buf) - len, "%s=%d ",
-									str_log_type[i], !!ATCMD_LOG_STATUS(type));
-				}
-			}
-
-			buf[len - 1] = '\0';
-
-			ATCMD_LOG_INFO("LOG", "%s", "%s", buf);
-
-			return 0;
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static int _atcmd_basic_log_set (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-			ATCMD_LOG_HELP("AT+LOG={reset}");
-			ATCMD_LOG_HELP("AT+LOG={r|i|e|d|h|t}");
-			ATCMD_LOG_HELP("AT+LOG={resp|info|event|data|help|trace}");
-			break;
-
-		case 1:
-		{
-			char *param = NULL;
-			int type;
-			int i;
-
-			param = argv[0];
-			strupr(param);
-
-			if (strcmp(param, "RESET") == 0)
-			{
-				ATCMD_LOG_RESET();
-				break;
-			}
-
-			for (i = 0 ; i < ATCMD_LOG_TYPE_NUM ; i++)
-			{
-				switch (strlen(param))
-				{
-					case 1:
-						if (*param != c_log_type[i])
-							continue;
-						break;
-
-					default:
-						if (strcmp(param, str_log_type[i]) != 0)
-							continue;
-				}
-
-				type = 1 << i;
-
-				if (!!ATCMD_LOG_STATUS(type))
-					ATCMD_LOG_DISABLE(type);
-				else
-					ATCMD_LOG_ENABLE(type);
-
-				_atcmd_info("LOG_%s: %s", str_log_type[i],
-							ATCMD_LOG_STATUS(type) ? "enable" : "disable");
-
-				break;
-			}
-
-			if (i < ATCMD_LOG_TYPE_NUM)
-				break;
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static atcmd_info_t g_atcmd_basic_log =
-{
-	.list.next = NULL,
-	.list.prev = NULL,
-
-	.group = ATCMD_GROUP_BASIC,
-
-	.cmd = "LOG",
-	.id = ATCMD_BASIC_LOG,
-
-	.handler[ATCMD_HANDLER_RUN] = NULL,
-	.handler[ATCMD_HANDLER_GET] = _atcmd_basic_log_get,
-	.handler[ATCMD_HANDLER_SET] = _atcmd_basic_log_set,
-};
-
-/**********************************************************************************************/
-
-static int _atcmd_basic_mode_get (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-			ATCMD_LOG_INFO("MODE", "%d", "%d", atcmd_mode_get());
-			break;
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static int _atcmd_basic_mode_set (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-			ATCMD_LOG_HELP("AT+MODE={0|1|2}");
-			ATCMD_LOG_HELP("  0: terminal only");
-			ATCMD_LOG_HELP("  1: host only");
-			ATCMD_LOG_HELP("  2: terminal & host");
-			break;
-
-		case 1:
-		{
-			int mode = atoi(argv[0]);
-
-			switch (mode)
-			{
-				case ATCMD_MODE_NORMAL:
-				case ATCMD_MODE_TERMINAL:
-#ifdef CONFIG_ATCMD_HOST_MODE
-				case ATCMD_MODE_HOST:
-#endif
-					atcmd_mode_set(mode);
-					return ATCMD_SUCCESS;
-			}
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static atcmd_info_t g_atcmd_basic_mode =
-{
-	.list.next = NULL,
-	.list.prev = NULL,
-
-	.group = ATCMD_GROUP_BASIC,
-
-	.cmd = "MODE",
-	.id = ATCMD_BASIC_MODE,
-
-	.handler[ATCMD_HANDLER_RUN] = NULL,
-	.handler[ATCMD_HANDLER_GET] = _atcmd_basic_mode_get,
-	.handler[ATCMD_HANDLER_SET] = _atcmd_basic_mode_set,
-};
-
-/**********************************************************************************************/
-
 static int _atcmd_basic_version_get (int argc, char *argv[])
 {
 	switch (argc)
@@ -308,110 +123,6 @@ static int _atcmd_basic_uart_get (int argc, char *argv[])
 	return ATCMD_SUCCESS;
 }
 
-/* #define CONFIG_ATCMD_UART_SET_BIT_PARAMS	*/
-
-#ifdef CONFIG_ATCMD_UART_SET_BIT_PARAMS
-static int _atcmd_basic_uart_set (int argc, char *argv[])
-{
-	char *param_baudrate = NULL;
-	char *param_data_bits = NULL;
-	char *param_stop_bits = NULL;
-	char *param_parity = NULL;
-	char *param_hfc = "0";
-
-	switch (_hif_get_type())
-	{
-		case _HIF_TYPE_UART:
-		case _HIF_TYPE_UART_HFC:
-			break;
-
-		default:
-			return ATCMD_ERROR_NOTSUPP;
-	}
-
-	switch (argc)
-	{
-		case 0:
-			ATCMD_LOG_HELP("AT+UART=<baudrate>,<data_bits>,<stop_bits>,<parity>[,<HFC>]");
-			break;
-
-		case 5:
-			param_hfc = argv[4];
-
-		case 4:
-		{
-			_hif_uart_t uart;
-
-			param_baudrate = argv[0];
-			param_data_bits = argv[1];
-			param_stop_bits = argv[2];
-			param_parity = argv[3];
-
-			uart.channel = 2;
-			uart.baudrate = atoi(param_baudrate);
-			uart.data_bits = atoi(param_data_bits);
-			uart.stop_bits = atoi(param_stop_bits);
-			uart.parity = atoi(param_parity);
-			uart.hfc = UART_HFC_DISABLE;
-
-			if (param_hfc)
-			{
-				switch (atoi(param_hfc))
-				{
-					case 0: uart.hfc = UART_HFC_DISABLE; break;
-					case 1: uart.hfc = UART_HFC_ENABLE;	break;
-
-					default:
-						return ATCMD_ERROR_INVAL;
-				}
-			}
-
-			if (!_hif_uart_baudrate_valid(uart.baudrate, uart.hfc))
-				return ATCMD_ERROR_INVAL;
-
-			switch (atoi(param_data_bits))
-			{
-				case 5: uart.data_bits = UART_DB5; break;
-				case 6: uart.data_bits = UART_DB6; break;
-				case 7: uart.data_bits = UART_DB7; break;
-				case 8: uart.data_bits = UART_DB8; break;
-
-				default:
-					return ATCMD_ERROR_INVAL;
-			}
-
-			switch (atoi(param_stop_bits))
-			{
-				case 1: uart.stop_bits = UART_SB1; break;
-				case 2: uart.stop_bits = UART_SB2; break;
-
-				default:
-					return ATCMD_ERROR_INVAL;
-			}
-
-			switch (atoi(param_parity))
-			{
-				case 0: uart.parity = UART_PB_NONE;	break;
-				case 1:	uart.parity = UART_PB_ODD; break;
-				case 2: uart.parity = UART_PB_EVEN; break;
-
-				default:
-					return ATCMD_ERROR_INVAL;
-			}
-
-			if (_hif_uart_change(&uart) != 0)
-				return ATCMD_ERROR_FAIL;
-
-			break;
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-#else
 static int _atcmd_basic_uart_set (int argc, char *argv[])
 {
 	char *param_baudrate = NULL;
@@ -475,7 +186,6 @@ static int _atcmd_basic_uart_set (int argc, char *argv[])
 
 	return ATCMD_SUCCESS;
 }
-#endif
 
 static atcmd_info_t g_atcmd_basic_uart =
 {
@@ -1179,13 +889,6 @@ static atcmd_group_t g_atcmd_group_basic =
 
 static atcmd_info_t *g_atcmd_basic[] =
 {
-
-#ifdef CONFIG_ATCMD_DEBUG
-	&g_atcmd_basic_log,
-#endif
-
-/*	&g_atcmd_basic_mode, */
-
 	&g_atcmd_basic_version,
 	&g_atcmd_basic_uart,
 	&g_atcmd_basic_gpio_config,
@@ -1211,12 +914,15 @@ int atcmd_basic_enable (void)
 			return -1;
 	}
 
+#ifdef CONFIG_ATCMD_DEBUG
+	atcmd_info_print(&g_atcmd_group_basic);
+#endif
+
 	return 0;
 }
 
 void atcmd_basic_disable (void)
 {
-	int err = 0;
 	int i;
 
 	for (i = 0 ; g_atcmd_basic[i] ; i++)

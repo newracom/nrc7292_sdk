@@ -40,6 +40,7 @@
 #include <endian.h>
 #include <pthread.h>
 #include <sys/ioctl.h>
+#include <sys/time.h>
 #include <arpa/inet.h>
 
 #include <getopt.h>

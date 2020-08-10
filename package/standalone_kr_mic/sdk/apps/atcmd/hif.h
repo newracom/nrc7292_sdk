@@ -34,9 +34,6 @@
 /* #define CONFIG_HIF_DEBUG */
 /* #define CONFIG_HIF_LOOPBACK */
 
-#define CONFIG_HIF_FIFO_MUTEX
-/* #define CONFIG_HIF_FIFO_STATIC */
-
 #define CONFIG_HIF_RX_TASK_PRIORITY			2
 #define CONFIG_HIF_RX_TASK_STACK_SIZE		4096
 #define CONFIG_HIF_RX_TASK_SUSPEND_TIME		1000 // msec
@@ -114,6 +111,8 @@ typedef struct
 
 typedef struct
 {
+#define CONFIG_HIF_FIFO_MUTEX
+
 	uint32_t size;
 	uint32_t cnt;
 
@@ -186,6 +185,7 @@ extern bool _hif_fifo_mutex_give_isr (_hif_fifo_t *fifo);
 #endif
 extern _hif_fifo_t *_hif_fifo_create (char *buffer, int size, bool mutex);
 extern void _hif_fifo_delete (_hif_fifo_t *fifo);
+extern void _hif_fifo_reset (_hif_fifo_t *fifo);
 extern char *_hif_fifo_push_addr (_hif_fifo_t *fifo, int offset);
 extern char *_hif_fifo_pop_addr (_hif_fifo_t *fifo, int offset);
 extern int _hif_fifo_free_size (_hif_fifo_t *fifo);

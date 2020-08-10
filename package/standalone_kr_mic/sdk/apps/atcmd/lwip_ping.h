@@ -46,9 +46,6 @@
 #define _lwip_ping_debug(fmt, ...)			/*_lwip_ping_printf(fmt, ##__VA_ARGS__) */
 #define _lwip_ping_log(fmt, ...)			/*_lwip_ping_printf(fmt, ##__VA_ARGS__) */
 
-/* #define _LWIP_PING_TASK_RUN */
-#define _LWIP_PING_INFO_STATIC
-
 /**********************************************************************************************/
 
 /* #define IP_HLEN_MAX			(IP_HLEN + 16) */

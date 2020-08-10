@@ -632,8 +632,6 @@ static void _hif_uart_tx_isr (void)
 
 static void _hif_uart_isr (int vector)
 {
-/*	unsigned long flags = system_irq_save(); */
-
 	if (g_hif_uart.channel > 0)
 	{
 		static volatile uint32_t status;
@@ -652,8 +650,6 @@ static void _hif_uart_isr (int vector)
 			_hif_uart_tx_isr();
 #endif
 	}
-
-/*	system_irq_restore(flags); */
 }
 
 /*********************************************************************************************/
@@ -1002,16 +998,36 @@ int _hif_uart_change (_hif_uart_t *new)
 				_hif_info("UART Change: channel %d can not use hardware flow control.\n", new->channel);
 			else
 			{
+				if (old.hfc == UART_HFC_DISABLE)
+	   				_hif_uart_dma_unregister();
+
 				_hif_uart_disable();
 
 				if (_hif_uart_enable(new) == 0)
 				{
-					_hif_info("UART Change: success\n");
+					int ret = 0;
 
-					return 0;
+					if (new->hfc == UART_HFC_DISABLE)
+					{
+						_hif_fifo_reset(g_hif_uart_rx_fifo);
+						_hif_fifo_reset(g_hif_uart_tx_fifo);
+
+						ret = _hif_uart_dma_register(new->channel, g_hif_uart_rx_fifo, g_hif_uart_tx_fifo);
+					}
+
+					if (ret == 0)
+					{
+						_hif_info("UART Change: success\n");
+						return 0;
+					}
+
+					_hif_uart_disable();
 				}
 
 				_hif_uart_enable(&old);
+
+				if (old.hfc == UART_HFC_DISABLE)
+					_hif_uart_dma_register(old.channel, g_hif_uart_rx_fifo, g_hif_uart_tx_fifo);
 			}
 		}
 	}

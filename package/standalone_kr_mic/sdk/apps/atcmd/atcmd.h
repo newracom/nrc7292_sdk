@@ -37,7 +37,7 @@
 
 #define ATCMD_VER_MAJOR			(1)
 #define ATCMD_VER_MINOR			(13)
-#define ATCMD_VER_REVISION		(0)
+#define ATCMD_VER_REVISION		(1)
 
 /**********************************************************************************************/
 
@@ -50,13 +50,16 @@
 /* #define CONFIG_ATCMD_DEBUG */
 #endif
 
-/* #define CONFIG_ATCMD_HOST_MODE */		/* if enabled, atcmd_host.c file is needed. */
-/* #define CONFIG_ATCMD_HOST_PROMPT */
+#ifndef CONFIG_ATCMD_TEST
+/* #define CONFIG_ATCMD_TEST */
+#endif
+
+#ifndef CONFIG_ATCMD_USER
+/* #define CONFIG_ATCMD_USER */
+#endif
 
 /* #define CONFIG_ATCMD_WELCOME_MESSAGE */
-
 /* #define CONFIG_ATCMD_PREFIX_CHECK */
-
 /* #define CONFIG_ATCMD_TRXBUF_STATIC */
 
 #define CONFIG_ATCMD_DATA_LEN_MAX			(4 * 1024)
@@ -93,6 +96,7 @@
 #define ATCMD_STR_PARAM_SIZE(len)		(1 + len + 1 + 1)
 
 /**********************************************************************************************/
+
 enum ATCMD_ERROR
 {
 	ATCMD_SEND_DATA = -1,
@@ -113,9 +117,7 @@ enum ATCMD_CFG
 {
 	ATCMD_CFG_MIN = 0,
 
-	ATCMD_CFG_TERMINAL = ATCMD_CFG_MIN,
-	ATCMD_CFG_HOST,
-	ATCMD_CFG_PROMPT,
+	ATCMD_CFG_PROMPT = ATCMD_CFG_MIN,
 	ATCMD_CFG_ECHO,
 	ATCMD_CFG_HISTORY,
 	ATCMD_CFG_LOWERCASE,
@@ -125,19 +127,6 @@ enum ATCMD_CFG
 	ATCMD_CFG_MAX = ATCMD_CFG_NUM - 1,
 
 	ATCMD_CFG_LIMIT = (32 - 1)
-};
-
-enum ATCMD_MODE
-{
-#define ATCMD_MODE_NONE		-1
-
-	ATCMD_MODE_NORMAL = 0,
-	ATCMD_MODE_TERMINAL,
-#ifdef CONFIG_ATCMD_HOST_MODE
-	ATCMD_MODE_HOST,
-#endif
-
-	ATCMD_MODE_NUM
 };
 
 enum ATCMD_TYPE
@@ -223,9 +212,13 @@ enum ATCMD_ID
 
 /* 	ATCMD_GROUP_TEST
  *************************/
-	ATCMD_TEST_IPERF,
-	ATCMD_TEST_ADDBA,
-	ATCMD_TEST_DELBA,
+	ATCMD_TEST_MIN,
+	ATCMD_TEST_MAX = ATCMD_TEST_MIN + 100,
+
+/* 	ATCMD_GROUP_USER
+ *************************/
+	ATCMD_USER_MIN,
+	ATCMD_USER_MAX = ATCMD_USER_MIN + 100,
 };
 
 enum ATCMD_KEY
@@ -294,59 +287,33 @@ typedef struct
 
 /**********************************************************************************************/
 
-#define ATCMD_LOG_TYPE_MAX		6
-#define ATCMD_LOG_TYPE_NUM		ATCMD_LOG_TYPE_MAX
-
-#define ATCMD_LOG_TYPE_CHAR		{ 'R', 'H', 'T', 'I', 'E', 'D' }
-#define ATCMD_LOG_TYPE_STR		{ "RETURN", "HELP", "TRACE", "INFO", "EVENT", "DEBUG" }
-
 enum ATCMD_LOG_TYPE
 {
-	ATCMD_LOG_TYPE_RETURN = (1 << 0),
-	ATCMD_LOG_TYPE_HELP = (1 << 1),
-	ATCMD_LOG_TYPE_TRACE = (1 << 2),
-	ATCMD_LOG_TYPE_INFO = (1 << 3),
-	ATCMD_LOG_TYPE_EVENT = (1 << 4),
-	ATCMD_LOG_TYPE_DEBUG = (1 << 5),
+	ATCMD_LOG_TYPE_RETURN = 0,
+	ATCMD_LOG_TYPE_INFO,
+	ATCMD_LOG_TYPE_EVENT,
+	ATCMD_LOG_TYPE_HELP,
 
-	ATCMD_LOG_TYPE_ALL = ~0,
-
-	ATCMD_LOG_TYPE_TERMINAL = ATCMD_LOG_TYPE_ALL,
-	ATCMD_LOG_TYPE_HOST = (ATCMD_LOG_TYPE_RETURN | ATCMD_LOG_TYPE_INFO | ATCMD_LOG_TYPE_EVENT),
-	ATCMD_LOG_TYPE_NORMAL = (ATCMD_LOG_TYPE_HOST | ATCMD_LOG_TYPE_HELP),
+	ATCMD_LOG_TYPE_MAX,
 };
 
-extern bool ATCMD_LOG_VALID (int type);
-extern void ATCMD_LOG_RESET (void);
-extern void ATCMD_LOG_ENABLE (int type);
-extern void ATCMD_LOG_DISABLE (int type);
-extern int ATCMD_LOG_STATUS (int type);
-
-extern int ATCMD_LOG_PRINT (int type, const char *fmt1, const char *fmt2, ...);
-extern int ATCMD_LOG_SNPRINT (int type, char *buf, int len,
-								const char *fmt1, const char *fmt2, ...);
-extern int ATCMD_LOG_VSNPRINT (int type, char *buf, int len,
-								const char *fmt1, const char *fmt2, va_list ap);
+extern int ATCMD_LOG_PRINT (int type, const char *fmt, ...);
+extern int ATCMD_LOG_SNPRINT (int type, char *buf, int len, const char *fmt, ...);
+extern int ATCMD_LOG_VSNPRINT (int type, char *buf, int len, const char *fmt, va_list ap);
 
 #define ATCMD_LOG_RETURN(cmd, ret)	atcmd_transmit_return(cmd, ret)
 
 #define ATCMD_LOG_HELP(fmt, ...)	\
-		ATCMD_LOG_PRINT(ATCMD_LOG_TYPE_HELP, fmt, fmt, ##__VA_ARGS__)
-
-#define ATCMD_LOG_TRACE(name, fmt1, fmt2, ...)	\
-		ATCMD_LOG_PRINT(ATCMD_LOG_TYPE_TRACE, name ":" fmt1, name ": " fmt2, ##__VA_ARGS__)
+		ATCMD_LOG_PRINT(ATCMD_LOG_TYPE_HELP, fmt, ##__VA_ARGS__)
 
 #define ATCMD_LOG_INFO(name, fmt1, fmt2, ...)	\
-		ATCMD_LOG_PRINT(ATCMD_LOG_TYPE_INFO, name ":" fmt1, name ": " fmt2, ##__VA_ARGS__)
+		ATCMD_LOG_PRINT(ATCMD_LOG_TYPE_INFO, name ":" fmt1, ##__VA_ARGS__)
 
 #define ATCMD_LOG_EVENT(name, fmt1, fmt2, ...)	\
-		ATCMD_LOG_PRINT(ATCMD_LOG_TYPE_EVENT, name ":" fmt1, name ": " fmt2, ##__VA_ARGS__)
+		ATCMD_LOG_PRINT(ATCMD_LOG_TYPE_EVENT, name ":" fmt1, ##__VA_ARGS__)
 
 #define ATCMD_LOG_RXD(name, buf, len, fmt1, fmt2, ...)	\
-		ATCMD_LOG_SNPRINT(ATCMD_LOG_TYPE_EVENT, buf, len, name ":" fmt1, name ": " fmt2, ##__VA_ARGS__)
-
-#define ATCMD_LOG_DEBUG(fmt, ...)	\
-		ATCMD_LOG_PRINT(ATCMD_LOG_TYPE_DEBUG, fmt, fmt, ##__VA_ARGS__)
+		ATCMD_LOG_SNPRINT(ATCMD_LOG_TYPE_EVENT, buf, len, name ":" fmt1, ##__VA_ARGS__)
 
 /**********************************************************************************************/
 
@@ -354,10 +321,7 @@ extern int ATCMD_LOG_VSNPRINT (int type, char *buf, int len,
 #include "atcmd_wifi.h"
 #include "atcmd_socket.h"
 #include "atcmd_test.h"
-
-#ifdef CONFIG_ATCMD_HOST_MODE
-#include "atcmd_host.h"
-#endif
+#include "atcmd_user.h"
 
 #define CONFIG_ATCMD_CLI 	0 /* 0:disable 1:enable */
 #include "atcmd_cli.h"
@@ -371,17 +335,16 @@ extern int atcmd_param_to_ulong (char *param, unsigned long *val);
 extern char *atcmd_param_to_str (const char *param, char *str, int len);
 extern char *atcmd_str_to_param (const char *str, char *param, int len);
 
-extern enum ATCMD_MODE atcmd_mode_get (void);
-extern int atcmd_mode_set (enum ATCMD_MODE mode);
-
 extern void ATCMD_DATA_MODE_ENABLE (atcmd_socket_t *socket, uint32_t len,
 									uint32_t timeout, bool sync);
 extern void ATCMD_DATA_MODE_DISABLE (void);
 
+extern void atcmd_group_print (void);
 extern atcmd_group_t *atcmd_group_search (enum ATCMD_GROUP_ID id);
 extern int atcmd_group_register (atcmd_group_t *group);
 extern int atcmd_group_unregister (enum ATCMD_GROUP_ID id);
 
+extern void atcmd_info_print (atcmd_group_t *group);
 extern atcmd_info_t *atcmd_search (atcmd_group_t *group, enum ATCMD_ID id);
 extern int atcmd_info_register (enum ATCMD_GROUP_ID gid, atcmd_info_t *info);
 extern void atcmd_info_unregister (enum ATCMD_GROUP_ID gid, enum ATCMD_ID id);
@@ -398,9 +361,6 @@ extern void atcmd_disable (void);
 
 extern int atcmd_user_register (const char *cmd, int id, atcmd_handler_t handler[]);
 extern int atcmd_user_unregister (int id);
-
-extern void atcmd_dump_hex_print (const void *buf, size_t len, bool ascii);
-extern void atcmd_dump_hex_print_terminal (const void *buf, size_t len, bool ascii);
 
 /**********************************************************************************************/
 #endif /* #ifndef __NRC_ATCMD_H__ */

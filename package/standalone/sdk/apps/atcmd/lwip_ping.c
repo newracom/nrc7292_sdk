@@ -346,6 +346,8 @@ _lwip_ping_done:
 
 /**********************************************************************************************/
 
+/* #define _LWIP_PING_TASK_RUN */
+
 #ifdef _LWIP_PING_TASK_RUN
 
 static void _lwip_ping_task (void *pvParameters)
@@ -381,6 +383,8 @@ static void _lwip_ping_task_delete (_lwip_ping_info_t *info)
 #endif /* #ifdef _LWIP_PING_TASK_RUN */
 
 /**********************************************************************************************/
+
+#define _LWIP_PING_INFO_STATIC
 
 #ifdef _LWIP_PING_INFO_STATIC
 static _lwip_ping_info_t g_lwip_ping_info;

@@ -132,7 +132,6 @@ static int atcmd_cli_trace_info_print(void)
 	const char *str_func[ATCMD_TRACE_FUNC_NUM] =
 	{
 		[ATCMD_TRACE_FUNC_SELECT] = "select",
-		[ATCMD_TRACE_FUNC_SELECT_DONE] = "select_done",
 		[ATCMD_TRACE_FUNC_SEND] = "send",
 		[ATCMD_TRACE_FUNC_SENDTO] = "sendto",
 		[ATCMD_TRACE_FUNC_RECV] = "recv",

@@ -27,15 +27,11 @@
 #include "hif.h"
 #include "atcmd.h"
 
-#define CONFIG_ATCMD_USER
-
 /*******************************************************************************************/
 
 static uint32_t g_atcmd_config = 0;
 static const char *str_atcmd_config[ATCMD_CFG_NUM] =
 {
-	"ATCMD_CFG_TERMINAL",
-	"ATCMD_CFG_HOST",
 	"ATCMD_CFG_PROMPT",
 	"ATCMD_CFG_ECHO",
 	"ATCMD_CFG_HISTORY",
@@ -75,14 +71,6 @@ static void atcmd_config_print (void)
 	}
 }
 
-#define ATCMD_TERMINAL_ENABLE()			atcmd_config_enable(ATCMD_CFG_TERMINAL)
-#define ATCMD_TERMINAL_DISABLE()		atcmd_config_disable(ATCMD_CFG_TERMINAL)
-#define ATCMD_TERMINAL_IS_ENABLED()		atcmd_config_status(ATCMD_CFG_TERMINAL)
-
-#define ATCMD_HOST_ENABLE()				atcmd_config_enable(ATCMD_CFG_HOST)
-#define ATCMD_HOST_DISABLE()			atcmd_config_disable(ATCMD_CFG_HOST)
-#define ATCMD_HOST_IS_ENABLED()			atcmd_config_status(ATCMD_CFG_HOST)
-
 #define ATCMD_PROMPT_ENABLE()			atcmd_config_enable(ATCMD_CFG_PROMPT)
 #define ATCMD_PROMPT_DISABLE()			atcmd_config_disable(ATCMD_CFG_PROMPT)
 #define ATCMD_PROMPT_IS_ENABLED()		atcmd_config_status(ATCMD_CFG_PROMPT)
@@ -102,116 +90,6 @@ static void atcmd_config_print (void)
 #define ATCMD_LINEFEED_ENABLE()			atcmd_config_enable(ATCMD_CFG_LINEFEED)
 #define ATCMD_LINEFEED_DISABLE()		atcmd_config_disable(ATCMD_CFG_LINEFEED)
 #define ATCMD_LINEFEED_IS_ENABLED()		atcmd_config_status(ATCMD_CFG_LINEFEED)
-
-/*******************************************************************************************/
-
-static const char *str_atcmd_mode[ATCMD_MODE_NUM] =
-{
-	"ATCMD_MODE_NORMAL",
-	"ATCMD_MODE_TERMINAL",
-#ifdef CONFIG_ATCMD_HOST_MODE
-	"ATCMD_MODE_HOST"
-#endif
-};
-
-static bool atcmd_mode_is_valid (enum ATCMD_MODE mode)
-{
-	switch (mode)
-	{
-		case ATCMD_MODE_NORMAL:
-		case ATCMD_MODE_TERMINAL:
-#ifdef CONFIG_ATCMD_HOST_MODE
-		case ATCMD_MODE_HOST:
-#endif
-			return true;
-
-		default:
-			return false;
-	}
-}
-
-enum ATCMD_MODE atcmd_mode_get (void)
-{
-	bool terminal = atcmd_config_status(ATCMD_CFG_TERMINAL);
-	bool host = atcmd_config_status(ATCMD_CFG_HOST);
-
-	if (terminal & host)
-		return ATCMD_MODE_NORMAL;
-	else if (terminal & !host)
-		return ATCMD_MODE_TERMINAL;
-#ifdef CONFIG_ATCMD_HOST_MODE
-	else if (!terminal && host)
-		return ATCMD_MODE_HOST;
-#endif
-	else
-		return ATCMD_MODE_NONE;
-}
-
-static int atcmd_history_enable (void);
-static void atcmd_history_disable (void);
-
-int atcmd_mode_set (enum ATCMD_MODE mode)
-{
-	if (!atcmd_mode_is_valid(mode))
-		return -EINVAL;
-
-	if (atcmd_mode_get() == mode)
-		return 0;
-
-	_atcmd_info("Set Mode: %s\n", str_atcmd_mode[mode]);
-
-	ATCMD_LOG_DISABLE(ATCMD_LOG_TYPE_ALL);
-
-	switch (mode)
-	{
-		case ATCMD_MODE_NORMAL:
-			atcmd_config_enable(ATCMD_CFG_TERMINAL);
-			atcmd_config_enable(ATCMD_CFG_HOST);
-			atcmd_config_disable(ATCMD_CFG_PROMPT);
-			atcmd_config_disable(ATCMD_CFG_ECHO);
-			atcmd_config_disable(ATCMD_CFG_HISTORY);
-			atcmd_config_disable(ATCMD_CFG_LOWERCASE);
-			atcmd_config_enable(ATCMD_CFG_LINEFEED);
-
-			ATCMD_LOG_ENABLE(ATCMD_LOG_TYPE_NORMAL);
-			break;
-
-		case ATCMD_MODE_TERMINAL:
-			atcmd_config_enable(ATCMD_CFG_TERMINAL);
-			atcmd_config_disable(ATCMD_CFG_HOST);
-			atcmd_config_enable(ATCMD_CFG_PROMPT);
-			atcmd_config_enable(ATCMD_CFG_ECHO);
-			atcmd_config_enable(ATCMD_CFG_HISTORY);
-			atcmd_config_enable(ATCMD_CFG_LOWERCASE);
-			atcmd_config_enable(ATCMD_CFG_LINEFEED);
-
-			ATCMD_LOG_ENABLE(ATCMD_LOG_TYPE_TERMINAL);
-			break;
-
-#ifdef CONFIG_ATCMD_HOST_MODE
-		case ATCMD_MODE_HOST:
-			atcmd_config_disable(ATCMD_CFG_TERMINAL);
-			atcmd_config_enable(ATCMD_CFG_HOST);
-			atcmd_config_disable(ATCMD_CFG_PROMPT);
-			atcmd_config_disable(ATCMD_CFG_ECHO);
-			atcmd_config_disable(ATCMD_CFG_HISTORY);
-			atcmd_config_disable(ATCMD_CFG_LOWERCASE);
-			atcmd_config_enable(ATCMD_CFG_LINEFEED);
-
-			ATCMD_LOG_ENABLE(ATCMD_LOG_TYPE_HOST);
-#endif
-
-		default:
-			return -EINVAL;
-	}
-
-	if (ATCMD_HISTORY_IS_ENABLED())
-		atcmd_history_enable();
-	else
-		atcmd_history_disable();
-
-	return 0;
-}
 
 /*******************************************************************************************/
 
@@ -687,27 +565,6 @@ static int atcmd_history_pop (char **cmd, int **cnt, int key)
 
 /*******************************************************************************************/
 
-const char *str_log_type[ATCMD_LOG_TYPE_MAX] = ATCMD_LOG_TYPE_STR;
-const char c_log_type[ATCMD_LOG_TYPE_MAX] = ATCMD_LOG_TYPE_CHAR;
-
-const int g_atcmd_log_valid[ATCMD_MODE_NUM] =
-{
-	[ATCMD_MODE_NORMAL] = ATCMD_LOG_TYPE_NORMAL,
-	[ATCMD_MODE_TERMINAL] = ATCMD_LOG_TYPE_TERMINAL,
-#ifdef CONFIG_ATCMD_HOST_MODE
-	[ATCMD_MODE_HOST] = ATCMD_LOG_TYPE_HOST
-#endif
-};
-
-static int g_atcmd_log_status[ATCMD_MODE_NUM] =
-{
-	[ATCMD_MODE_NORMAL] = ATCMD_LOG_TYPE_NORMAL,
-	[ATCMD_MODE_TERMINAL] = ATCMD_LOG_TYPE_TERMINAL,
-#ifdef CONFIG_ATCMD_HOST_MODE
-	[ATCMD_MODE_HOST] = ATCMD_LOG_TYPE_HOST
-#endif
-};
-
 static SemaphoreHandle_t g_atcmd_log_mutex = NULL;
 
 static int atcmd_log_mutex_create (void)
@@ -727,8 +584,7 @@ static void atcmd_log_mutex_delete (void)
 
 static bool atcmd_log_mutex_take (void)
 {
-//	TickType_t timeout = pdMS_TO_TICKS(10000);
-	TickType_t timeout = portMAX_DELAY;
+	TickType_t timeout = pdMS_TO_TICKS(60000);
 	bool take = false;
 
 	if (g_atcmd_log_mutex)
@@ -765,169 +621,62 @@ static bool atcmd_log_mutex_give (void)
 	return give;
 }
 
-static int atcmd_log_type_to_index (int type)
+int ATCMD_LOG_VSNPRINT (int type, char *buf, int len, const char *fmt, va_list ap)
 {
-	int i;
+	const char *prefix = "+";
+	int ret = 0;
 
-	for (i = 0 ; i < ATCMD_LOG_TYPE_NUM ; i++)
-	{
-		if ((type >> (1 + i)) == 0)
-			return i;
-	}
-
-	return -1;
-}
-
-bool ATCMD_LOG_VALID (int type)
-{
 	switch (type)
 	{
 		case ATCMD_LOG_TYPE_RETURN:
 		case ATCMD_LOG_TYPE_INFO:
 		case ATCMD_LOG_TYPE_EVENT:
 		case ATCMD_LOG_TYPE_HELP:
-		case ATCMD_LOG_TYPE_TRACE:
-		case ATCMD_LOG_TYPE_DEBUG:
 			break;
 
 		default:
-			return false;
+			return 0;
 	}
 
-	return !!(g_atcmd_log_valid[atcmd_mode_get()] & type);
-}
-
-void ATCMD_LOG_RESET (void)
-{
-	enum ATCMD_MODE mode = atcmd_mode_get();
-
-	g_atcmd_log_status[mode] = g_atcmd_log_valid[mode];
-}
-
-void ATCMD_LOG_ENABLE (int type)
-{
-	if (ATCMD_LOG_VALID(type))
+	if (ATCMD_IS_PROMPT())
 	{
-		enum ATCMD_MODE mode = atcmd_mode_get();
-
-		g_atcmd_log_status[mode] |= type;
-	}
-}
-
-void ATCMD_LOG_DISABLE (int type)
-{
-	if (ATCMD_LOG_VALID(type))
-	{
-		enum ATCMD_MODE mode = atcmd_mode_get();
-
-		g_atcmd_log_status[mode] &= ~type;
-	}
-}
-
-int ATCMD_LOG_STATUS (int type)
-{
-	if (ATCMD_LOG_VALID(type))
-	{
-		enum ATCMD_MODE mode = atcmd_mode_get();
-
-		return g_atcmd_log_status[mode] & type;
-	}
-
-	return false;
-}
-
-/*
- * fmt1: ATCMD_MODE_NORMAL, ATCMD_MODE_HOST
- * fmt1: ATCMD_MODE_TERMINAL
- */
-int ATCMD_LOG_VSNPRINT (int type, char *buf, int len,
-						const char *fmt1, const char *fmt2, va_list ap)
-{
-	int ret = 0;
-
-	if (ATCMD_LOG_STATUS(type))
-	{
-		const char *prefix = NULL;
-		const char *fmt = NULL;
-
-		switch (atcmd_mode_get())
-		{
-			case ATCMD_MODE_NORMAL:
-				prefix = "+";
-				fmt = fmt1;
-				break;
-
-#ifdef CONFIG_ATCMD_HOST_MODE
-			case ATCMD_MODE_HOST:
-				prefix = "  ";
-				fmt = fmt1;
-				break;
-#endif
-			case ATCMD_MODE_TERMINAL:
-				prefix = "  ";
-				fmt = fmt2;
-
-				if (ATCMD_IS_PROMPT())
-				{
-					atcmd_prompt_exit();
-
-					ret += snprintf(buf + ret, len - ret, "\r\n");
-				}
-
-#ifdef CONFIG_ATCMD_DEBUG
-				prefix = NULL;
-				ret += snprintf(buf + len, len - ret, "[%c] ",
-						c_log_type[atcmd_log_type_to_index(type)]);
-#endif
-				break;
-
-			default:
-				return 0;
-		}
-
-		if (prefix)
-			ret += snprintf(buf + ret, len - ret, prefix);
-
-		if (fmt)
-			ret += vsnprintf(buf + ret, len - ret, fmt, ap);
+		atcmd_prompt_exit();
 
 		ret += snprintf(buf + ret, len - ret, "\r\n");
 	}
 
+	ret += snprintf(buf + ret, len - ret, prefix);
+	ret += vsnprintf(buf + ret, len - ret, fmt, ap);
+	ret += snprintf(buf + ret, len - ret, "\r\n");
+
 	return ret;
 }
 
-int ATCMD_LOG_SNPRINT (int type, char *buf, int len,
-						const char *fmt1, const char *fmt2, ...)
+int ATCMD_LOG_SNPRINT (int type, char *buf, int len, const char *fmt, ...)
 {
 	va_list ap;
 
-	va_start(ap, fmt2);
-	len = ATCMD_LOG_VSNPRINT(type, buf, len, fmt1, fmt2, ap);
+	va_start(ap, fmt);
+	len = ATCMD_LOG_VSNPRINT(type, buf, len, fmt, ap);
 	va_end(ap);
 
 	return len;
 }
 
-int ATCMD_LOG_PRINT (int type, const char *fmt1, const char *fmt2, ...)
+int ATCMD_LOG_PRINT (int type, const char *fmt, ...)
 {
 	int len = 0;
 
-	if (ATCMD_LOG_STATUS(type) && atcmd_log_mutex_take())
+	if (atcmd_log_mutex_take())
 	{
 		char buf[ATCMD_LEN_MAX + 1];
 		va_list ap;
 
-		va_start(ap, fmt2);
-		len = ATCMD_LOG_VSNPRINT(type, buf, sizeof(buf) - 1, fmt1, fmt2, ap);
+		va_start(ap, fmt);
+		len = ATCMD_LOG_VSNPRINT(type, buf, sizeof(buf) - 1, fmt, ap);
 		va_end(ap);
 
-#ifdef CONFIG_ATCMD_HOST_MODE
-		if (atcmd_mode_get() == ATCMD_MODE_HOST)
-			len = atcmd_host_transmit_response(type, buf, len);
-		else
-#endif
-			len = atcmd_transmit(buf, len);
+		len = atcmd_transmit(buf, len);
 
 		atcmd_log_mutex_give();
 	}
@@ -969,7 +718,6 @@ static atcmd_list_t g_atcmd_group_head =
 	.prev = NULL
 };
 
-#ifdef CONFIG_ATCMD_DEBUG
 void atcmd_group_print (void)
 {
 	atcmd_group_t *group;
@@ -989,9 +737,6 @@ void atcmd_group_print (void)
 						group->list.next, group->list.prev);
 	}
 }
-#else
-#define atcmd_group_print()
-#endif
 
 atcmd_group_t *atcmd_group_search (enum ATCMD_GROUP_ID id)
 {
@@ -1016,8 +761,6 @@ int atcmd_group_register (atcmd_group_t *group)
 
 	atcmd_list_add(&g_atcmd_group_head, &group->list);
 
-/*	atcmd_group_print(); */
-
 	return 0;
 }
 
@@ -1035,7 +778,6 @@ int atcmd_group_unregister (enum ATCMD_GROUP_ID id)
 
 /*******************************************************************************************/
 
-#ifdef CONFIG_ATCMD_DEBUG
 void atcmd_info_print (atcmd_group_t *group)
 {
 	if (group)
@@ -1058,9 +800,6 @@ void atcmd_info_print (atcmd_group_t *group)
 		}
 	}
 }
-#else
-#define atcmd_info_print(group)
-#endif
 
 atcmd_info_t *atcmd_info_search (atcmd_group_t *group, enum ATCMD_ID id)
 {
@@ -1090,8 +829,6 @@ int atcmd_info_register (enum ATCMD_GROUP_ID gid, atcmd_info_t *info)
 
 	atcmd_list_add(&group->cmd_list_head, &info->list);
 
-/*	atcmd_info_print(group); */
-
 	return 0;
 }
 
@@ -1110,7 +847,6 @@ void atcmd_info_unregister (enum ATCMD_GROUP_ID gid, enum ATCMD_ID id)
 
 /*******************************************************************************************/
 
-#ifdef CONFIG_ATCMD_DEBUG
 static void atcmd_parse_print (enum ATCMD_TYPE type, int argc, char **argv)
 {
 	char *str_type[ATCMD_TYPE_NUM] = { "RUN", "GET", "GET_PARAM", "SET", "SET_HELP" };
@@ -1124,9 +860,6 @@ static void atcmd_parse_print (enum ATCMD_TYPE type, int argc, char **argv)
 	for (i = 1 ; i < argc ; i++)
 		_atcmd_info(" - opt%d : %s\r\n", i - 1, argv[i]);
 }
-#else
-#define atcmd_parse_print(type, argc, argv)
-#endif
 
 static enum ATCMD_HANDLER atcmd_parse (char *cmd, int *argc, char **argv)
 {
@@ -1194,17 +927,11 @@ static enum ATCMD_HANDLER atcmd_parse (char *cmd, int *argc, char **argv)
 							*argc += i;
 					}
 
-					if (*argc == 1 && ATCMD_TYPE_SET_HELP)
-					{
-#ifdef CONFIG_ATCMD_HOST_MODE
-						if (atcmd_mode_get() == ATCMD_MODE_HOST)
-							return ATCMD_HANDLER_NONE;
-#endif
-					}
-
 					strupr(argv[0]);
 
+#ifdef CONFIG_ATCMD_DEBUG
 					atcmd_parse_print(type, *argc, argv);
+#endif
 
 					switch (type)
 					{
@@ -1856,33 +1583,17 @@ static int atcmd_receive_data (char *buf, int len)
 
 int atcmd_transmit_data (atcmd_socket_rxd_t *rxd)
 {
-	if (!rxd)
-		return -1;
+	int ret = -1;
 
-	switch (atcmd_mode_get())
+	if (rxd)
 	{
-		case ATCMD_MODE_NORMAL:
-		{
-			char *msg_data = rxd->buf.msg + sizeof(rxd->buf.msg) - rxd->len.msg;
-			int len = rxd->len.msg + rxd->len.data;
+		char *msg_data = rxd->buf.msg + sizeof(rxd->buf.msg) - rxd->len.msg;
+		int len = rxd->len.msg + rxd->len.data;
 
-			atcmd_transmit(msg_data, len);
-			break;
-		}
-
-		case ATCMD_MODE_TERMINAL:
-			break;
-
-#ifdef CONFIG_ATCMD_HOST_MODE
-		case ATCMD_MODE_HOST:
-			atcmd_host_transmit_data(&rxd->socket, rxd->buf.data, rxd->len.data);
-			break;
-#endif
-		default:
-			break;
+		ret = atcmd_transmit(msg_data, len);
 	}
 
-	return 0;
+	return ret;
 }
 
 int atcmd_transmit_return (char *cmd, int ret)
@@ -1976,41 +1687,18 @@ void atcmd_receive (char *buf, int len)
 	if (!buf || !len)
 		return;
 
-/*	atcmd_dump_hex_print(buf, len, true); */
-
 	for (i = 0 ; i < len ; i += ret)
 	{
-		switch (atcmd_mode_get())
-		{
-			case ATCMD_MODE_NORMAL:
-				if (ATCMD_IS_DATA_MODE())
-				{
-					ret = atcmd_receive_data(buf + i, len - i);
-					break;
-				}
-
-			case ATCMD_MODE_TERMINAL:
-				ret = atcmd_receive_command(buf + i, len - i);
-				break;
-
-#ifdef CONFIG_ATCMD_HOST_MODE
-			case ATCMD_MODE_HOST:
-/*				atcmd_host_receive(buf + i, len - i); */
-				ret = 0;
-				break;
-#endif
-
-			default:
-				break;
-		}
+		if (ATCMD_IS_DATA_MODE())
+			ret = atcmd_receive_data(buf + i, len - i);
+		else
+			ret = atcmd_receive_command(buf + i, len - i);
 	}
 }
 
 int atcmd_transmit (char *buf, int len)
 {
 	int i;
-
-/*	atcmd_dump_hex_print(buf, len, true); */
 
 	if (!atcmd_tx_mutex_take())
 		return 0;
@@ -2022,110 +1710,6 @@ int atcmd_transmit (char *buf, int len)
 
 	return len;
 }
-
-/*******************************************************************************************/
-
-#ifdef CONFIG_ATCMD_USER
-
-static atcmd_group_t g_atcmd_group_user =
-{
-	.list.next = NULL,
-	.list.prev = NULL,
-
-	.name = "USER",
-	.id = ATCMD_GROUP_USER,
-
-	.cmd_prefix = "U",
-	.cmd_prefix_size = 1,
-
-	.cmd_list_head.next = NULL,
-	.cmd_list_head.prev = NULL,
-};
-
-int atcmd_user_register (const char *cmd, int id, atcmd_handler_t handler[])
-{
-	atcmd_info_t *info;
-	int ret;
-
-	if (!cmd || id < 0 || !handler)
-		return -1;
-
-/* 	_atcmd_debug("%s: cmd=%s, id=%d\n", __func__, cmd, id); */
-
-	info = _atcmd_malloc(sizeof(atcmd_info_t));
-	if (!info)
-		return -1;
-
-/*	_atcmd_debug("%s: info=%p\n", __func__, info); */
-
-	info->list.next = NULL,
-	info->list.prev = NULL,
-
-	info->group = ATCMD_GROUP_USER;
-
-	info->cmd = cmd;
-	info->id = id;
-
-	info->handler[ATCMD_HANDLER_RUN] = handler[ATCMD_HANDLER_RUN];
-	info->handler[ATCMD_HANDLER_GET] = handler[ATCMD_HANDLER_GET];
-	info->handler[ATCMD_HANDLER_SET] = handler[ATCMD_HANDLER_SET];
-
-	ret = atcmd_info_register(ATCMD_GROUP_USER, info);
-
-/*	_atcmd_debug("%s: ret=%d\n", __func__, ret); */
-
-	atcmd_info_print(&g_atcmd_group_user);
-
-	return ret;
-}
-
-int atcmd_user_unregister (int id)
-{
-/*	_atcmd_debug("%s: id=%d\n", __func__, id); */
-
-	if (id >= 0)
-	{
-		atcmd_info_t *info = atcmd_info_search(&g_atcmd_group_user, id);
-
-/*		_atcmd_debug("%s: info=%p\n", __func__, info); */
-
-		atcmd_info_unregister(ATCMD_GROUP_USER, id);
-
-		if (info)
-			_atcmd_free(info);
-
-		atcmd_info_print(&g_atcmd_group_user);
-
-		return 0;
-	}
-
-	return -1;
-}
-
-static int atcmd_user_enable (void)
-{
-	if (atcmd_group_register(&g_atcmd_group_user) != 0)
-		return -1;
-
-	return 0;
-}
-
-static void atcmd_user_disable (void)
-{
-	atcmd_info_t *info;
-	int i;
-
-	for (i = 0 ; g_atcmd_group_user.cmd_list_head.prev ; i++)
-	{
-		info = (atcmd_info_t *)g_atcmd_group_user.cmd_list_head.prev;
-
-		atcmd_user_unregister(info->id);
-	}
-
-	atcmd_group_unregister(ATCMD_GROUP_USER);
-}
-
-#endif /* #ifdef CONFIG_ATCMD_USER */
 
 /*******************************************************************************************/
 
@@ -2166,17 +1750,26 @@ int atcmd_enable (_hif_info_t *info)
 	_atcmd_info("ATCMD_RXBUF_SIZE: %d\n", ATCMD_RXBUF_SIZE);
 	_atcmd_info("ATCMD_DATA_LEN_MAX: %d\n", ATCMD_DATA_LEN_MAX);
 
-	atcmd_mode_set(ATCMD_MODE_NORMAL);
+	atcmd_config_disable(ATCMD_CFG_PROMPT);
+	atcmd_config_disable(ATCMD_CFG_ECHO);
+	atcmd_config_disable(ATCMD_CFG_HISTORY);
+	atcmd_config_disable(ATCMD_CFG_LOWERCASE);
+	atcmd_config_enable(ATCMD_CFG_LINEFEED);
 
-#ifdef CONFIG_ATCMD_USER
+	if (ATCMD_HISTORY_IS_ENABLED())
+		atcmd_history_enable();
+	else
+		atcmd_history_disable();
+
 	atcmd_user_enable();
-#endif
 	atcmd_test_enable();
 	atcmd_socket_enable();
 	atcmd_wifi_enable();
 	atcmd_basic_enable();
 
+#ifdef CONFIG_ATCMD_DEBUG
 	atcmd_group_print();
+#endif
 
 	info->rx_params.buf.addr = hif_rx_buf;
 	info->rx_params.buf.size = ATCMD_RXBUF_SIZE;
@@ -2209,9 +1802,7 @@ void atcmd_disable (void)
 	atcmd_wifi_disable();
 	atcmd_socket_disable();
 	atcmd_test_disable();
-#ifdef CONFIG_ATCMD_USER
 	atcmd_user_disable();
-#endif
 
 	atcmd_data_mode_task_delete();
 

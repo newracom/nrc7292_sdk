@@ -468,8 +468,6 @@ static void _hif_hspi_txq_isr (int vector) /* to host */
 
 /**********************************************************************************************/
 
-extern void atcmd_dump_hex_print (const void *buf, size_t len, bool ascii);
-
 static int __hif_hspi_read (char *buf, int len)
 {
 	static uint16_t seq = 0;

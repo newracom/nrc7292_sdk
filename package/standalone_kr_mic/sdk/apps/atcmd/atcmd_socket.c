@@ -43,7 +43,6 @@
 /**********************************************************************************************/
 
 extern uint32_t _atcmd_timeout_value (const char *cmd);
-extern int atcmd_perf_recv_data (atcmd_socket_t *socket , char *buf, int len);
 static int _atcmd_socket_close (int id, bool event);
 
 /**********************************************************************************************/
@@ -382,6 +381,8 @@ socket_send_data_fail:
 
 static void _atcmd_socket_recv_data (atcmd_socket_rxd_t *rxd)
 {
+	char param_remote_addr[ATCMD_STR_PARAM_SIZE(ATCMD_IP4_ADDR_LEN_MAX)];
+
 	switch (rxd->socket.protocol)
 	{
 		case ATCMD_SOCKET_PROTO_UDP:
@@ -392,32 +393,26 @@ static void _atcmd_socket_recv_data (atcmd_socket_rxd_t *rxd)
 			return;
 	}
 
-	if (atcmd_perf_recv_data(&rxd->socket, rxd->buf.data, rxd->len.data) != 0)
+	if (atcmd_str_to_param(rxd->socket.remote_addr, param_remote_addr, sizeof(param_remote_addr)))
 	{
-		char param_remote_addr[ATCMD_STR_PARAM_SIZE(ATCMD_IP4_ADDR_LEN_MAX)];
+		char buf[ATCMD_LEN_MAX + 1];
 
-		if (atcmd_str_to_param(rxd->socket.remote_addr,
-					param_remote_addr, sizeof(param_remote_addr)))
+		if (g_atcmd_socket_trx_mode.rx.verbose)
 		{
-			char buf[ATCMD_LEN_MAX + 1];
-
-			if (g_atcmd_socket_trx_mode.rx.verbose)
-			{
-				rxd->len.msg = ATCMD_LOG_RXD("RXD", buf, sizeof(buf) - 1,
-						"%d,%d,%s,%u", "id=%d len=%d remote=%s,%u",
-						rxd->socket.id, rxd->len.data,
-						rxd->socket.remote_addr, rxd->socket.remote_port);
-			}
-			else
-			{
-				rxd->len.msg = ATCMD_LOG_RXD("RXD", buf, sizeof(buf) - 1,
-						"%d,%d", "id=%d len=%d", rxd->socket.id, rxd->len.data);
-			}
-
-			memcpy(rxd->buf.msg + sizeof(rxd->buf.msg) - rxd->len.msg, buf, rxd->len.msg);
-
-			atcmd_transmit_data(rxd);
+			rxd->len.msg = ATCMD_LOG_RXD("RXD", buf, sizeof(buf) - 1,
+					"%d,%d,%s,%u", "id=%d len=%d remote=%s,%u",
+					rxd->socket.id, rxd->len.data,
+					rxd->socket.remote_addr, rxd->socket.remote_port);
 		}
+		else
+		{
+			rxd->len.msg = ATCMD_LOG_RXD("RXD", buf, sizeof(buf) - 1,
+					"%d,%d", "id=%d len=%d", rxd->socket.id, rxd->len.data);
+		}
+
+		memcpy(rxd->buf.msg + sizeof(rxd->buf.msg) - rxd->len.msg, buf, rxd->len.msg);
+
+		atcmd_transmit_data(rxd);
 	}
 }
 
@@ -1381,105 +1376,6 @@ static atcmd_info_t g_atcmd_socket_timeout =
 
 /**********************************************************************************************/
 
-extern int atcmd_perf_start (atcmd_socket_t *socket, bool recv, bool event, int time);
-extern int atcmd_perf_stop (void);
-
-static int _atcmd_socket_perf_set (int argc, char *argv[])
-{
-#define ATCMD_PERF_EXIT		(-1)
-#define ATCMD_PERF_SEND		(0)
-#define ATCMD_PERF_RECV		(1 << 0)
-#define ATCMD_PERF_EVENT	(1 << 1)
-
-	char *param_mode = NULL;
-	char *param_event = NULL;
-	char *param_id = NULL;
-	char *param_time = NULL;
-
-	switch (argc)
-	{
-		case 0:
-			ATCMD_LOG_HELP("AT+SPERF=0,0,<socket_id>[,<time>]	# send");
-			ATCMD_LOG_HELP("AT+SPERF=0,1,<socket_id>[,<time>]	# send & event");
-			ATCMD_LOG_HELP("AT+SPERF=1,0,<socket_id>			 # receive");
-			ATCMD_LOG_HELP("AT+SPERF=1,1,<socket_id>			 # receive & event");
-			ATCMD_LOG_HELP("AT+SPERF=-1						  # cancel or stop");
-			break;
-
-		case 4:
-			param_time = argv[3];
-
-		case 3:
-		{
-			bool recv = false;
-
-			param_mode = argv[0];
-			param_event= argv[1];
-			param_id = argv[2];
-
-			switch (atoi(param_mode))
-			{
-				case -1:
-					if (atcmd_perf_stop() == 0)
-						return ATCMD_SUCCESS;
-
-					return ATCMD_ERROR_FAIL;
-
-				case 1:
-					recv = true;
-
-				case 0:
-				{
-					bool event = false;
-
-					switch (atoi(param_event))
-					{
-						case 1:
-							event = true;
-
-						case 0:
-						{
-							int id = atoi(param_id);
-							atcmd_socket_t *socket = _atcmd_socket_search_id(id);
-							int time = param_time ? atoi(param_time) : 0;
-
-							if (socket)
-							{
-								if (atcmd_perf_start(socket, recv, event, time) == 0)
-									return ATCMD_SUCCESS;
-
-								return ATCMD_ERROR_FAIL;
-							}
-						}
-					}
-				}
-			}
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static atcmd_info_t g_atcmd_socket_perf =
-{
-	.list.next = NULL,
-	.list.prev = NULL,
-
-	.group = ATCMD_GROUP_WIFI,
-
-	.cmd = "PERF",
-	.id = ATCMD_SOCKET_PERF,
-
-	.handler[ATCMD_HANDLER_RUN] = NULL,
-	.handler[ATCMD_HANDLER_GET] = NULL,
-	.handler[ATCMD_HANDLER_SET] = _atcmd_socket_perf_set,
-};
-
-/**********************************************************************************************/
-
 static atcmd_group_t g_atcmd_group_socket =
 {
 	.list.next = NULL,
@@ -1507,7 +1403,6 @@ static atcmd_info_t *g_atcmd_info_socket[] =
 /*	&g_atcmd_socket_recv_avail, */
 /*	&g_atcmd_socket_recv, */
 	&g_atcmd_socket_timeout,
-	&g_atcmd_socket_perf,
 
 	NULL
 };
@@ -1550,6 +1445,9 @@ int atcmd_socket_enable (void)
 			return -1;
 	}
 
+#ifdef CONFIG_ATCMD_DEBUG
+	atcmd_info_print(&g_atcmd_group_socket);
+#endif
 	return 0;
 }
 

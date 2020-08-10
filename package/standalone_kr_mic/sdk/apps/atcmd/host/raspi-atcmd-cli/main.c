@@ -86,6 +86,50 @@ static int raspi_cli_send (char *buf, int len)
 	return len;
 }
 
+static void raspi_cli_wait_return (char *cmd)
+{
+	uint8_t timeout = 0;
+	int ret = 0;
+
+	if (strcmp(cmd, "ATZ\r\n") == 0)
+		timeout = 3;
+	else if (strlen(cmd) > 11 && memcmp(cmd, "AT+UART=", 8) == 0)
+		timeout = 1;
+
+	if (timeout == 0)
+		ret = pthread_cond_wait(&g_raspi_cli_cond, &g_raspi_cli_mutex);
+	else
+	{
+		struct timeval curtime;
+		struct timespec abstime;
+
+		gettimeofday(&curtime, NULL);
+
+		abstime.tv_sec = curtime.tv_sec + timeout;
+		abstime.tv_nsec = curtime.tv_usec * 1000;
+
+		ret = pthread_cond_timedwait(&g_raspi_cli_cond, &g_raspi_cli_mutex, &abstime);
+	}
+
+	switch (ret)
+	{
+		case 0:
+			break;
+
+		case EPERM:
+		case EINVAL:
+			raspi_error("%s\n", strerror(ret));
+			break;
+
+		case ETIMEDOUT:
+			raspi_info("NO RETURN\n");
+			break;
+
+		default:
+			raspi_error("%swait\n", timeout > 0 ? "timed" : "");
+	}
+}
+
 static int raspi_cli_send_cmd (const char *fmt, ...)
 {
 	va_list ap;
@@ -135,8 +179,7 @@ static int raspi_cli_send_cmd (const char *fmt, ...)
 
 	raspi_send_info("%s", cmd);
 
-	if (strcmp(cmd, "ATZ\r\n") != 0)
-		pthread_cond_wait(&g_raspi_cli_cond, &g_raspi_cli_mutex);
+	raspi_cli_wait_return(cmd);
 
 	pthread_mutex_unlock(&g_raspi_cli_mutex);
 

@@ -23,65 +23,22 @@
  *
  */
 
-#ifndef __NRC_ATCMD_HOST_H__
-#define __NRC_ATCMD_HOST_H__
+#ifndef __NRC_ATCMD_USER_H__
+#define __NRC_ATCMD_USER_H__
 /**********************************************************************************************/
 
-#define ATCMD_DATA_LEN_MAX		CONFIG_ATCMD_DATA_LEN_MAX
+#ifdef CONFIG_ATCMD_USER
 
-#define ATCMD_PKT_START			"STX["
-#define ATCMD_PKT_END			"]ETX"
+extern int atcmd_user_enable (void);
+extern void atcmd_user_disable (void);
 
-#define ATCMD_PKT_START_LEN		4
-#define ATCMD_PKT_END_LEN		4
+#else
 
-#define ATCMD_PKT_LEN_MIN		(ATCMD_PKT_START_LEN + sizeof(atcmd_packet_header_t) + ATCMD_PKT_END_LEN)
-#define ATCMD_PKT_LEN_MAX		(ATCMD_PKT_LEN_MIN + sizeof(atcmd_socket_t) + ATCMD_DATA_LEN_MAX)
+#define atcmd_user_enable()		0
+#define atcmd_user_disable()
 
-
-enum ATCMD_PKT_TYPE
-{
-	ATCMD_PKT_CMD = 0,
-	ATCMD_PKT_RET,
-	ATCMD_PKT_INFO,
-	ATCMD_PKT_EVENT,
-	ATCMD_PKT_DATA
-};
-
-typedef struct
-{
-	uint16_t type:15; /* enum ATCMD_PKT_TYPE			*/
-	uint16_t async:1; /* 1: no return value (OK/FAIL)	*/
-	uint16_t length;
-} atcmd_packet_header_t;
-
-typedef struct
-{
-	char start[ATCMD_PKT_START_LEN];
-
-	atcmd_packet_header_t header;
-
-	union
-	{
-		char payload[0];
-
-		char cmd[0];
-		char resp[0];
-
-		struct
-		{
-			atcmd_socket_t socket;
-			char data[0];
-		};
-	}; /* (24 + ATCMD_DATA_LEN_MAX)-byte */
-
-	/* char end[ATCMD_PKT_END_LEN]; */
-} atcmd_packet_t; /* (4 + 4 + 24 + ATCMD_DATA_LEN_MAX + 4)-byte */
-
-extern int atcmd_host_receive (char *buf, int len);
-extern int atcmd_host_transmit_response (int type, char *resp, int len);
-extern int atcmd_host_transmit_data (atcmd_socket_t *socket, char *data, int len);
+#endif /* #ifdef CONFIG_ATCMD_USER */
 
 /**********************************************************************************************/
-#endif /* #ifndef __NRC_ATCMD_HOST_H__ */
+#endif /* #ifndef __NRC_ATCMD_USER_H__ */
 

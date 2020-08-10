@@ -27,8 +27,17 @@
 #define __NRC_ATCMD_TEST_H__
 /**********************************************************************************************/
 
+#ifdef CONFIG_ATCMD_TEST
+
 extern int atcmd_test_enable (void);
 extern void atcmd_test_disable (void);
+
+#else
+
+#define atcmd_test_enable()		0
+#define atcmd_test_disable()
+
+#endif /* #ifdef CONFIG_ATCMD_TEST */
 
 /**********************************************************************************************/
 #endif /* #ifndef __NRC_ATCMD_TEST_H__ */

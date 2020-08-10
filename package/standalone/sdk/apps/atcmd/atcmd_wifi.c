@@ -26,6 +26,7 @@
 #include "atcmd.h"
 #include "nrc_wifi.h" /* /lib/lwip/contrib/port */
 
+
 /**********************************************************************************************/
 
 extern struct netif *nrc_netif[];
@@ -1632,17 +1633,12 @@ static int _atcmd_wifi_ping_set (int argc, char *argv[])
 {
 	char *param_remote_ip = NULL;
 	char *param_count = NULL;
-	char *param_size = NULL;
 
 	switch (argc)
 	{
 		case 0:
-/*			ATCMD_LOG_HELP("AT+WPING=\"<remote_IP>\"[,<count>,<packet_size>]"); */
 			ATCMD_LOG_HELP("AT+WPING=\"<remote_IP>\"[,<count>]");
 			break;
-
-/*		case 3:
-			param_size = argv[2]; */
 
 		case 2:
 			param_count = argv[1];
@@ -1666,10 +1662,7 @@ static int _atcmd_wifi_ping_set (int argc, char *argv[])
 			else
 				ping->count = ATCMD_WIFI_INIT_PING_COUNT;
 
-			if (param_size)
-				ping->data_size = atoi(param_size);
-			else
-				ping->data_size = ATCMD_WIFI_INIT_PING_SIZE;
+			ping->data_size = ATCMD_WIFI_INIT_PING_SIZE;
 
 /*			_atcmd_debug("remote_ip=%s interval=%u count=%u size=%u",
 							ip4addr_ntoa(&ping->remote_ip),
@@ -2057,6 +2050,9 @@ int atcmd_wifi_enable (void)
 			return -1;
 	}
 
+#ifdef CONFIG_ATCMD_DEBUG
+	atcmd_info_print(&g_atcmd_group_wifi);
+#endif
 	return 0;
 }
 

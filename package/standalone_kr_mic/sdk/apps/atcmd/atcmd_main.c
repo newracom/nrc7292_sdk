@@ -33,27 +33,6 @@
 
 /*******************************************************************************/
 
-static void nrc_show_version (void)
-{
-#ifdef RELEASE
-	nrc_usr_print("\n=======================================================\n");
-	nrc_usr_print(" Newracom Firmware Version : %02u.%02u.%02u\n"
-#if defined(VERSION_DESCRIPTION)
-				  "Description : %s\n"
-#endif
-			 	  " Compiled on "__DATE__" at "__TIME__"\n"
-			 	  " "COPYRIGHT(2019)"\n",
-				  (VERSION_MAJOR), (VERSION_MINOR), (VERSION_REVISION),
-#if defined(VERSION_DESCRIPTION)
-				  (VERSION_DESCRIPTION)
-#endif
-				);
-	nrc_usr_print("=======================================================\n");
-#endif
-}
-
-/*******************************************************************************/
-
 static bool g_nrc_atcmd_enable = false;
 
 static int nrc_atcmd_enable (int type, ...)
@@ -126,7 +105,6 @@ static int nrc_atcmd_enable_hspi (bool *console_enable)
 
 	nrc_uart_console_enable();
 
-	nrc_show_version();
 	nrc_usr_print("AT Command for NRC Halow.[%s/HSPI]\n", ATCMD_CODE_MEM_TYPE);
 
 	return nrc_atcmd_enable(_HIF_TYPE_HSPI, sw_id, bd_id);
@@ -136,45 +114,33 @@ static int nrc_atcmd_enable_hspi (bool *console_enable)
 
 static int nrc_atcmd_enable_uart (bool *console_enable)
 {
-	const uint32_t console = NRC_UART_CH3;
-	const uint32_t tbl_baudrate[] =
-	{
-		19200, 		38400, 		57600, 		115200, 	230400,
-		380400, 	460800, 	500000, 	576000, 	921600,
-		1000000, 	1152000, 	1500000, 	2000000
-	};
-	uint32_t channel = 2;
-	uint32_t baudrate = tbl_baudrate[3];
+#ifndef CONFIG_ATCMD_UART_BAUDRATE
+#define CONFIG_ATCMD_UART_BAUDRATE 	115200
+#endif
 
-#ifdef CONFIG_ATCMD_UART_BAUDRATE
-	baudrate = CONFIG_ATCMD_UART_BAUDRATE;
+	const uint32_t console = NRC_UART_CH3;
+	uint32_t channel = 2;
+	uint32_t baudrate = CONFIG_ATCMD_UART_BAUDRATE;
+	int hfc = false;
+
+#if defined(CONFIG_ATCMD_UART_HFC)
+	hfc = true;
 #endif
 
 	if (channel == console)
 		*console_enable = false;
 	else
 	{
-#if defined(CONFIG_ATCMD_UART_HFC)
-		bool hfc = true;
-#else
-		bool hfc = false;
-#endif
-
 		*console_enable = true;
 
 		nrc_uart_console_enable();
 
-		nrc_show_version();
 		nrc_usr_print("AT Command for NRC Halow.[%s/UART_%s_%d_%d]\n",
 						ATCMD_CODE_MEM_TYPE, hfc ? "HFC" : "",
 						channel, baudrate);
 	}
 
-#if defined(CONFIG_ATCMD_UART_HFC)
-	return nrc_atcmd_enable(_HIF_TYPE_UART_HFC, channel, baudrate);
-#else
-	return nrc_atcmd_enable(_HIF_TYPE_UART, channel, baudrate);
-#endif
+	return nrc_atcmd_enable((hfc ? _HIF_TYPE_UART_HFC : _HIF_TYPE_UART), channel, baudrate);
 }
 
 #else
@@ -184,7 +150,6 @@ static int nrc_atcmd_unknown_hif (bool *console_enable)
 
 	nrc_uart_console_enable();
 
-	nrc_show_version();
 	nrc_usr_print("AT Command for NRC Halow.[%s]\n", ATCMD_CODE_MEM_TYPE);
 	nrc_usr_print(" > A HIF type is not defined.\n");
 	nrc_usr_print(" > Define one of below.\n");
@@ -223,6 +188,6 @@ void user_init(void)
 		nrc_atcmd_disable();
 	}
 
-/*	if (console_enable)
-		nrc_usr_print("Exit AT Command for NRC Halow\n"); */
+	if (console_enable)
+		nrc_usr_print("Exit AT Command for NRC Halow\n");
 }
