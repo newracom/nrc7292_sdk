@@ -22,6 +22,38 @@
   - sdk
   - tools
 
+### Apply a specific package
+If you want to apply a specific package to your exiting package directory, you can choose one of following methods.
+#### Method #1: replace the whole package
+Let's assume that you have v1.3.0 and want to apply v1.3.1 to your package location.
+1. Download a specific package you want.
+   * If it is official release version 1.3.1
+     1. Go to https://github.com/newracom/nrc7292_sdk/releases and choose the release package you want.
+     ![sdk_release](/images/sdk_release.png)
+     1. Downalod the compressed package: zip version or tar.gz version
+     1. Check the filename: nrc7292_sdk-1.3.1.zip or nrc7292_sdk-1.3.1.tar.gz
+   * If it is the latest pacakge
+     1. Click "Code" and then click "Download ZIP"
+     ![sdk_latest](/images/sdk_latest.png)
+     1. Check the filename: nrc7292_sdk-master.zip
+1. Replace your old package directory with the one you downloaded.
+#### Method #2: pull down a branch
+This needs your cloned repository and the internet connection.
+1. Move to the repository directory
+   ```
+   cd repo/nrc7292_sdk
+   ```
+1. Pull down a branch
+   * If you want to pull down the latest one from master branch
+   ```
+   git pull
+   ```
+   * If you want to change into a specific branch by using tag version
+   ```
+   git tag -l
+   git checkout v1.3.1
+   ```
+
 ## NRC7292 Standalone SDK User Guide
 ### Get NRC7292 Standalone SDK Package
 NRC7292 Standalone SDK package is provided in this repository. Please refer to the following git command to get it.
