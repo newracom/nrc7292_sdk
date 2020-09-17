@@ -1222,7 +1222,7 @@ udp_receive_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_ad
 }
 
 /** Try to send more data on an iperf udp session */
-err_t lwiperf_udp_client_send_more(lwiperf_state_tcp_t* conn, int send_more, u16_t port, u32_t duration, u32_t bandwidth)
+err_t lwiperf_udp_client_send_more(lwiperf_state_tcp_t* conn, int send_more, u16_t port, u32_t duration, u32_t bandwidth, u32_t udp_data_length)
 {
 	struct pbuf *p;
 	u32_t  packet_number;
@@ -1238,7 +1238,7 @@ err_t lwiperf_udp_client_send_more(lwiperf_state_tcp_t* conn, int send_more, u16
 	u32_t sent_time = sys_now();
 	err_t err = ERR_MEM;
 
-	p = pbuf_alloc(PBUF_TRANSPORT,LWIPERF_UDP_DATA_SIZE, PBUF_POOL);
+	p = pbuf_alloc(PBUF_TRANSPORT,udp_data_length, PBUF_POOL);
 
 	tv_sec =  lwip_htonl(sent_time/MILI_PER_SECOND);
 	tv_usec =  lwip_htonl((sent_time%MILI_PER_SECOND)*1000);
@@ -1264,7 +1264,7 @@ err_t lwiperf_udp_client_send_more(lwiperf_state_tcp_t* conn, int send_more, u16
 	{
 		/* copy data to pbuf */
 		pbuf_take_at(p, (char*)(lwiperf_txbuf_const+LWIPERF_UDP_CLIENT_DATA_OFFSET),
-		LWIPERF_UDP_DATA_SIZE-LWIPERF_UDP_CLIENT_DATA_OFFSET, LWIPERF_UDP_CLIENT_DATA_OFFSET);
+		udp_data_length-LWIPERF_UDP_CLIENT_DATA_OFFSET, LWIPERF_UDP_CLIENT_DATA_OFFSET);
 
 		/* update iperf header information */
 		MEMCPY(p->payload, &packet_number, 4);
@@ -1321,11 +1321,11 @@ iperf_udp_client_send_thread(void *arg)
 			A("lwiperf_udp_client_send_more stop\n");
 			send_more = 0;
 		}
-		err = lwiperf_udp_client_send_more(conn, send_more, listen_port, conn->duration, conn->bandwidth);
+		err = lwiperf_udp_client_send_more(conn, send_more, listen_port, conn->duration, conn->bandwidth, conn->udp_data_length);
 	        if (err != ERR_OK) {
 	            E(TT_NET, "lwiperf_udp_client_send_more!! code[%d]\n", err);
 	        }
-		conn->bytes_transferred += LWIPERF_UDP_DATA_SIZE;
+		conn->bytes_transferred += conn->udp_data_length;
 
 		sys_arch_msleep(conn->time_delay);
 
@@ -1344,13 +1344,13 @@ iperf_udp_client_send_thread(void *arg)
 	vTaskDelete(conn->iperf_thread.thread_handle);
 }
 
-uint16_t iperf_udp_client_time_delay(u32_t bandwidth)
+uint16_t iperf_udp_client_time_delay(u32_t bandwidth, u32_t data_size)
 {
 	const float  time_correction_ratio = 0.99;
-	u16_t time_delay = ((BYTES_TO_BITS*LWIPERF_UDP_DATA_SIZE* MILI_PER_SECOND) / bandwidth) * time_correction_ratio;
+	u16_t time_delay = ((BYTES_TO_BITS*data_size* MILI_PER_SECOND) / bandwidth) * time_correction_ratio;
 
 	lwiperf_mutex_lock();
-	A("iperf udp client start: packet delay = %d ms, bandwidth = %d \n" , time_delay ,bandwidth );
+	A("iperf udp client start: packet delay = %d ms, bandwidth = %d  data_size = %d\n" , time_delay ,bandwidth, data_size);
 	lwiperf_mutex_unlock();
 	return time_delay;
 }
@@ -1358,7 +1358,7 @@ uint16_t iperf_udp_client_time_delay(u32_t bandwidth)
 /** Start UDP connection to the server */
 void*
 lwiperf_start_udp_client(const ip_addr_t* remote_addr, u16_t remote_port,u32_t duration,
-	lwiperf_report_fn report_fn, void* report_arg, u8_t tos, u32_t bandwidth, enum lwiperf_client_type type)
+	lwiperf_report_fn report_fn, void* report_arg, u8_t tos, u32_t bandwidth, u32_t udp_data_length, enum lwiperf_client_type type)
 {
 	err_t err;
 	struct netif *netif = NULL;
@@ -1442,7 +1442,7 @@ lwiperf_start_udp_client(const ip_addr_t* remote_addr, u16_t remote_port,u32_t d
 		ip_addr_copy(newpcb->local_ip, *local_ip);
 	}
 
-	newpcb->tos = tos; 
+	newpcb->tos = tos;
 	client_conn->tos = tos;
 	client_conn->base.tcp = 0;
 	client_conn->base.server = 0;
@@ -1452,6 +1452,7 @@ lwiperf_start_udp_client(const ip_addr_t* remote_addr, u16_t remote_port,u32_t d
 	ip4_addr_copy(client_conn->base.remote_addr, *remote_addr);
 	client_conn->base.conn = client_conn;
 	client_conn->bandwidth = bandwidth ;
+	client_conn->udp_data_length = udp_data_length ;
 	client_conn->duration = duration ;
 	client_conn->udp_conn_pcb = newpcb;
 	client_conn->report_fn = report_fn;
@@ -1460,7 +1461,7 @@ lwiperf_start_udp_client(const ip_addr_t* remote_addr, u16_t remote_port,u32_t d
 	client_conn->udp_conn_pcb->remote_port = remote_port;
 	client_conn->packet_number = -1;
 	client_conn->udp_client_status = LWIPERF_UDP_CLIENT_START;
-	client_conn->time_delay = iperf_udp_client_time_delay(bandwidth);
+	client_conn->time_delay = iperf_udp_client_time_delay(bandwidth, udp_data_length);
 	memcpy(&client_conn->settings, &settings, sizeof(settings));
 
 	sys_arch_msleep(500);
@@ -1476,9 +1477,9 @@ lwiperf_start_udp_client(const ip_addr_t* remote_addr, u16_t remote_port,u32_t d
 /** Start UDP connection to the server on the default UDP port (5001) */
 void*
 lwiperf_start_udp_client_default(lwiperf_report_fn report_fn, void* report_arg, ip_addr_t *addr,
-	u16_t port, u32_t duration, u8_t tos, u32_t bandwidth, enum lwiperf_client_type type)
+	u16_t port, u32_t duration, u8_t tos, u32_t bandwidth, u32_t udp_data_length,  enum lwiperf_client_type type)
 {
-	return lwiperf_start_udp_client(addr, port, duration, report_fn, report_arg, tos, bandwidth, type);
+	return lwiperf_start_udp_client(addr, port, duration, report_fn, report_arg, tos, bandwidth, udp_data_length, type);
 }
 
 void lwiperf_udp_server_close(lwiperf_state_tcp_t* conn)

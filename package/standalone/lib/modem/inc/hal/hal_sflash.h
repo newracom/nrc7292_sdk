@@ -82,7 +82,7 @@ typedef struct {
 	uint32_t length; /*actual data length*/
 } sf_slot_t;
 
-#define SYS_CONFIG_STRUCTURE_VERSION 1
+#define SYS_CONFIG_STRUCTURE_VERSION 2
 struct sf_reg_override {
 	uint32_t control;
 	uint32_t value;
@@ -92,9 +92,11 @@ typedef struct {
 	uint32_t version; /* sys_config structure version*/
 	uint8_t mac_addr[6]; /*mac address for interface 0*/
 	uint8_t mac_addr_1[6]; /*mac address for interface 1*/
-	uint8_t cal_use; /*enable/disable the usage of calibration data*/
+	uint32_t cal_use :8; /*enable/disable the usage of calibration data*/
+	uint32_t bdf_use :8; /*enable/disable the usage of board data*/
+	uint32_t reserved1:8;
+	uint32_t reserved2:8;
 	struct sf_reg_override rf_pllldo12_tr;
-	uint8_t bdf_use; /*enable/disable the usage of board data*/
 } sf_sys_config_t;
 
 typedef struct {
@@ -136,10 +138,7 @@ bool nrc_sf_check_slot_sig(uint32_t* signature);
 bool nrc_sf_update_slot(uint32_t address, uint8_t *data, size_t size);
 bool nrc_sf_read_slot_info(uint32_t address, sf_slot_t *data);
 bool nrc_sf_read_slot_data(uint32_t address, size_t size, uint8_t *buffer);
-void nrc_sf_migration_sysconfig(void);
 bool nrc_sf_update_version(uint32_t version);
-bool nrc_sf_get_version(uint32_t *version);
-bool nrc_sf_check_version(void);
 bool nrc_sf_update_macaddr(uint8_t *macaddr, uint8_t interface);
 bool nrc_sf_get_macaddr(uint8_t *macaddr, uint8_t interface);
 bool nrc_sf_update_cal_use(uint8_t cal_use);

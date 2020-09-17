@@ -631,6 +631,7 @@ int ATCMD_LOG_VSNPRINT (int type, char *buf, int len, const char *fmt, va_list a
 		case ATCMD_LOG_TYPE_RETURN:
 		case ATCMD_LOG_TYPE_INFO:
 		case ATCMD_LOG_TYPE_EVENT:
+		case ATCMD_LOG_TYPE_DEBUG:
 		case ATCMD_LOG_TYPE_HELP:
 			break;
 
@@ -1612,7 +1613,7 @@ int atcmd_transmit_return (char *cmd, int ret)
 		atcmd_transmit(buf, len);
 #else
 		if (cmd)
-			ATCMD_LOG_PRINT(ATCMD_LOG_TYPE_RETURN, "%s:%d", "%s: %d", cmd, ret);
+			ATCMD_LOG_PRINT(ATCMD_LOG_TYPE_RETURN, "%s:%d", cmd, ret);
 
 		atcmd_transmit("ERROR\r\n", 5 + 2);
 #endif

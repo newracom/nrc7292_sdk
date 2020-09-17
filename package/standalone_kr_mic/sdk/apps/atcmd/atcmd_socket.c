@@ -247,6 +247,8 @@ static int __atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len
 	int ret;
 	int i;
 
+	atcmd_wifi_lock();
+
 	for (ret = 0, retry = 0, i = 0 ; i < len && ret >= 0 ; )
 	{
 		if (socket->protocol == ATCMD_SOCKET_PROTO_TCP)
@@ -281,6 +283,8 @@ static int __atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len
 	}
 
 	*err = ret < 0 ? ret : 0;
+
+	atcmd_wifi_unlock();
 
 	return i;
 }
@@ -460,6 +464,8 @@ static void _atcmd_socket_recv_handler (int id)
 		return;
 	}
 
+	atcmd_wifi_lock();
+
 	switch (socket->protocol)
 	{
 		case ATCMD_SOCKET_PROTO_UDP:
@@ -472,6 +478,7 @@ static void _atcmd_socket_recv_handler (int id)
 
 			ret = _lwip_socket_recv(id, remote_addr, &remote_port,
 									rxd->buf.data, sizeof(rxd->buf.data));
+
 			if (ret >= 0)
 			{
 				memcpy(&rxd->socket, socket, sizeof(atcmd_socket_t));
@@ -512,6 +519,9 @@ static void _atcmd_socket_recv_handler (int id)
 		default:
 			_atcmd_error("invalid socket protocol\n");
 	}
+
+	atcmd_wifi_unlock();
+
 }
 
 static void _atcmd_socket_tcp_connect_handler (int id, const char *remote_addr, uint16_t remote_port)

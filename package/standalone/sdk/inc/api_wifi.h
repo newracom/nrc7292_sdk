@@ -107,13 +107,24 @@ char* nrc_wifi_get_ip_address(void);
 
 
 /**********************************************
- * @fn int nrc_wifi_get_nd(void)
+ * @fn int nrc_wifi_add_network(void)
  *
- * @brief Get network index for Wi-Fi connection
+ * @brief Add network index for Wi-Fi connection
  *
  * @return If it's bigger than 0, then it means a network index. Otherwise, it's fail.
  ***********************************************/
-int nrc_wifi_get_nd(void);
+int nrc_wifi_add_network(void);
+
+/**********************************************
+ * @fn int nrc_wifi_remove_network(int index)
+ *
+ * @brief Remove network index for Wi-Fi connection
+ *
+ * @param index: network index
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
+ ***********************************************/
+int nrc_wifi_remove_network(int index);
 
 
 /**********************************************
@@ -140,6 +151,20 @@ int nrc_wifi_set_country(char *country_code);
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
  ***********************************************/
 int nrc_wifi_set_ssid(int index, char *ssid);
+
+
+/**********************************************
+ * @fn int nrc_wifi_set_bssid(int index, char *bssid)
+ *
+ * @brief Set BSSID of AP that STA wants to connect
+ *
+ * @param index: network index
+ *
+ * @param bssid: BSSID
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
+ ***********************************************/
+int nrc_wifi_set_bssid(int index, char *bssid);
 
 
 /**********************************************

@@ -131,6 +131,16 @@ this.
 #define LWIP_STATS_DISPLAY              1
 #define LWIP_TIMERS                     1
 
+/**
+ * LWIP_TCPIP_CORE_LOCKING_INPUT: when LWIP_TCPIP_CORE_LOCKING is enabled,
+ * this lets tcpip_input() grab the mutex for input packets as well,
+ * instead of allocating a message and passing it to tcpip_thread.
+ *
+ * ATTENTION: this does not work when tcpip_input() is called from
+ * interrupt context!
+ */
+#define LWIP_TCPIP_CORE_LOCKING_INPUT   1
+
 /* ---------- Memory options ---------- */
 /* MEM_ALIGNMENT: should be set to the alignment of the CPU for which
    lwIP is compiled. 4 byte alignment -> define MEM_ALIGNMENT to 4, 2
@@ -214,9 +224,7 @@ a lot of data that needs to be copied, this should be set high. */
  *    MEMP_OVERFLOW_CHECK >= 2 checks each element in every pool every time
  *      memp_malloc() or memp_free() is called (useful but slow!)
  */
-#ifndef MEMP_OVERFLOW_CHECK
 #define MEMP_OVERFLOW_CHECK             0
-#endif
 
 /* ---------- Pbuf options ---------- */
 /* PBUF_POOL_SIZE: the number of buffers in the pbuf pool. */
@@ -265,9 +273,7 @@ a lot of data that needs to be copied, this should be set high. */
 #define TCP_OOSEQ_MAX_BYTES             (2 * TCP_MSS)
 
 /* LWIP_TCP_SACK_OUT==1: TCP will support sending selective acknowledgements (SACKs) */
-#ifndef LWIP_TCP_SACK_OUT
 #define LWIP_TCP_SACK_OUT               1
-#endif
 
 /* ---------- ARP options ---------- */
 #define LWIP_ARP		1
@@ -325,7 +331,6 @@ a lot of data that needs to be copied, this should be set high. */
 #endif /* STATS */
 
 #define LWIP_PROVIDE_ERRNO 1
-//#define LWIP_TIMEVAL_PRIVATE 0
 
 /* Used with IP headers only */
 #define LWIP_CHKSUM_ALGORITHM 1
@@ -357,9 +362,6 @@ a lot of data that needs to be copied, this should be set high. */
 /* define for sys_arch.c */
 #define LWIP_FREERTOS_THREAD_STACKSIZE_IS_STACKWORDS  1
 #define LWIP_FREERTOS_SYS_ARCH_PROTECT_USES_MUTEX     1
-#define LWIP_FREERTOS_SYS_ARCH_PROTECT_SANITY_CHECK   1
-#define LWIP_FREERTOS_CHECK_QUEUE_EMPTY_ON_FREE       1
-#define LWIP_FREERTOS_CHECK_CORE_LOCKING              1
-#define LWIP_FREERTOS_SYS_NOW_FROM_FREERTOS           1
+#define LWIP_FREERTOS_SYS_ARCH_NOT_USE_RECURSIVE_MUTEX 1
 
 #endif /* __LWIPOPTS_H__ */

@@ -98,7 +98,7 @@ static bool add_history(struct nrc_scan_info *scan, struct ieee80211_mgmt *f)
 }
 
 static bool scan_add_entry(struct nrc_scan_info *scan, uint16_t freq,
-				uint16_t rssi, uint8_t* frame, uint16_t len)
+				int8_t rssi, uint8_t* frame, uint16_t len)
 {
 	struct ieee80211_mgmt *mgmt = (struct ieee80211_mgmt *) frame;
 	const int ie_offset = offsetof(struct ieee80211_mgmt, u.beacon.variable);
@@ -126,7 +126,7 @@ static bool scan_add_entry(struct nrc_scan_info *scan, uint16_t freq,
 	res->res->qual = 0;
 	res->res->noise = 0;
 	os_memcpy(&res->res->tsf, mgmt->u.beacon.timestamp, 8);
-	res->res->level = rssi;
+	res->res->level = (rssi>-10)?-10:rssi;
 	res->res->ie_len = ie_len;
 	os_memcpy(res->res + 1, frame + ie_offset ,ie_len);
 	dump_scan_entry(res);
@@ -142,7 +142,7 @@ static bool scan_add_entry(struct nrc_scan_info *scan, uint16_t freq,
   * 3. If SSID is not filtered,
   * consider valid and return true.
 */
-static bool scan_is_valid(struct nrc_scan_info *scan, uint8_t ch, uint16_t rssi,
+static bool scan_is_valid(struct nrc_scan_info *scan, uint8_t ch, int8_t rssi,
 				struct ieee802_11_elems* elems)
 {
 	if (dl_list_len(&scan->scan_list) >= MAX_SCAN_SSID_LIST) {
@@ -217,7 +217,7 @@ uint16_t scan_resume_from(struct nrc_scan_info *scan)
 	return scan->curr_freq;
 }
 
-int scan_add(struct nrc_scan_info *scan, uint16_t freq, uint16_t rssi,
+int scan_add(struct nrc_scan_info *scan, uint16_t freq, int8_t rssi,
 				uint8_t* frame, uint16_t len)
 {
 	int ie_offset = offsetof(struct ieee80211_mgmt, u.beacon.variable);

@@ -110,7 +110,7 @@ int wifi_connect(WIFI_CONFIG *param)
 
 	/* Try to connect with ssid and security */
 	nrc_usr_print("[%s] Trying to Wi-Fi Connection...\n",__func__);
-	if ((index = nrc_wifi_get_nd()) < 0) {
+	if ((index = nrc_wifi_add_network()) < 0) {
 		nrc_usr_print("[%s] Fail to init \n", __func__);
 		return WIFI_INIT_FAIL;
 	}
@@ -118,6 +118,13 @@ int wifi_connect(WIFI_CONFIG *param)
 	if (nrc_wifi_set_ssid(index, (char *)param->ssid) != WIFI_SUCCESS) {
 		nrc_usr_print("[%s] Fail to set SSID\n", __func__);
 		return WIFI_SET_FAIL;
+	}
+
+	if (strlen((char *)param->bssid) != 0){
+		if (nrc_wifi_set_bssid(index, (char *)param->bssid) != WIFI_SUCCESS) {
+			nrc_usr_print("[%s] Fail to set BSSID\n", __func__);
+			return WIFI_SET_FAIL;
+		}
 	}
 
 	if (nrc_wifi_set_security(index, (int)param->security_mode, (char *)param->password) != WIFI_SUCCESS) {
@@ -147,7 +154,7 @@ int wifi_start_softap(WIFI_CONFIG *param)
 	nrc_usr_print("[%s] Trying to start Soft AP (SSID:%s, S1G_CH:%d)\n",\
 			 __func__, (char *)param->ssid,  s1g_channel);
 
-	if ((index = nrc_wifi_get_nd()) < 0) {
+	if ((index = nrc_wifi_add_network()) < 0) {
 		nrc_usr_print("[%s] Fail to init \n", __func__);
 		return WIFI_INIT_FAIL;
 	}

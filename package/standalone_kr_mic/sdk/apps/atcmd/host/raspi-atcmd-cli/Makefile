@@ -5,7 +5,7 @@ CC ?= gcc
 
 APP := raspi-atcmd-cli
 
-CFLAGS = -pthread -Wall -Wno-unused-function 
+CFLAGS = -pthread -Wall -Wno-unused-function
 LFLAGS = -lpthread
 
 SRCS = main.c \

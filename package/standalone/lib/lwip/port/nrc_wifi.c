@@ -366,11 +366,11 @@ const char usage_longstr1[] = "\nUsage: iperf [-s|-c host] [options] [stop]\n\n"
                            "  -s                run in server mode\n"
                            "  -c <host>         run in client mode, connecting to <host> \n";
 const char usage_longstr2[] =  "\n  -u                use UDP protocols\n"
-			"  -p      #         server port to listen on/connect to #\n"
-			"  -B <host>         bind to the specific interface associated with address host\n";
-const char usage_longstr3[] = "  -S      #         set the IP type of service(TOS), 0-255.\n"
+			"  -p      #         server port to listen on/connect to #\n";
+const char usage_longstr3[] = 	"  -S      #         set the IP type of service(TOS), 0-255.\n"
 			"  -t      #         time in seconds to transmit (default ";
-const char usage_longstr4[] = "  -b      #         UDP bandwidth to send at in bits/sec, (default ";
+const char usage_longstr4[] =   	"  -l      #         length of UDP buffer.\n"
+			"  -b      #         UDP bandwidth to send at in bits/sec, (default ";
 const char usage_longstr5[] = "  -st               show current iperf operation status\n"
                            "\n  [stop]            for stopping iperf based on [-s|-c host] [options]\n"
 			"                    (ex) iperf -s <host> -u stop : for stopping udp server in wlan0\n\n";
@@ -564,6 +564,7 @@ iperf_parm_t * iperf_init_parameters(void)
 	parm->bandwidth =lwiperf_default_udp_bandwidth;
 	parm->port = 5001;
 	parm->duration = LWIPERF_DEFAULT_DURATION;
+	parm->udp_data_length = LWIPERF_UDP_DATA_SIZE;
 	ip4_addr_set_zero(&parm->addr);
 
 	return parm;
@@ -611,7 +612,8 @@ int iperf_start_session(iperf_parm_t* parm, void *report_cb)
 									 lwiperf_report,report_cb, parm->duration, parm->tos);
 		}else{
 			s =lwiperf_start_udp_client((const ip_addr_t* )&parm->addr, parm->port,parm->duration,
-									 lwiperf_report,report_cb, parm->tos, parm->bandwidth, parm->client_type);
+									 lwiperf_report,report_cb, parm->tos, parm->bandwidth,
+									 parm->udp_data_length, parm->client_type);
 		}
 	}
 
@@ -721,6 +723,9 @@ int  iperf_run(char *cmd, void *report_cb)
 		}else if(strcmp(str, "-S") == 0){
 			str = strtok_r(NULL, " ", &pcmdStr_log);
 			iperf_parm->tos = parse_qos(str);
+		}else if(strcmp(str, "-l") == 0){
+			str = strtok_r(NULL, " ", &pcmdStr_log);
+			iperf_parm->udp_data_length = atoi(str);
 		}else if(strcmp(str , "stop") == 0) {
 			goto iperf_stop;
 		}else if(strcmp(str, "-st") == 0){

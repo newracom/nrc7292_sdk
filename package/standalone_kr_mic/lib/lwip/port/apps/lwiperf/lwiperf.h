@@ -179,6 +179,7 @@ struct _lwiperf_state_tcp {
 	u32_t packet_number;
 	u32_t bandwidth;
 	u32_t duration ;
+	u32_t udp_data_length ;
 	u16_t time_delay ;
 	u8_t tos;
 	u8_t force_stop;
@@ -204,6 +205,7 @@ typedef struct _iperf_parm {
 	u32_t bandwidth;
 	u16_t port ;
 	u32_t duration ;
+	u32_t udp_data_length ;
 	u8_t trigger ;
 	ip4_addr_t addr;
 }iperf_parm_t;
@@ -230,7 +232,7 @@ void lwiperf_tcp_server_close(lwiperf_state_tcp_t* conn);
 void* lwiperf_start_udp_server(const ip_addr_t* local_addr, u16_t local_port,
   lwiperf_report_fn report_fn, void* report_arg);
 void* lwiperf_start_udp_client(const ip_addr_t* remote_addr, u16_t remote_port,u32_t duration,
-	lwiperf_report_fn report_fn, void* report_arg, u8_t tos, u32_t bandwidth, enum lwiperf_client_type type);
+	lwiperf_report_fn report_fn, void* report_arg, u8_t tos, u32_t bandwidth, u32_t udp_data_length, enum lwiperf_client_type type);
 void lwiperf_udp_server_close(lwiperf_state_tcp_t* conn);
 
 lwiperf_state_tcp_t* lwiperf_get_session(iperf_parm_t* parm);

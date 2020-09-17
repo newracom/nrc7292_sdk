@@ -52,6 +52,15 @@ typedef signed long long            int64_t;
 typedef unsigned long long          uint64_t;
 #endif
 
+typedef uint64_t u64;
+typedef unsigned int u32;
+typedef uint16_t u16;
+typedef uint8_t u8;
+typedef int64_t s64;
+typedef int32_t s32;
+typedef int16_t s16;
+typedef int8_t s8;
+
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
@@ -77,6 +86,14 @@ typedef unsigned long long          uint64_t;
 #include "api_fota.h"
 #include "api_ps.h"
 #include "api_sflash.h"
+
+#ifndef __must_check
+#if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)
+#define __must_check __attribute__((__warn_unused_result__))
+#else
+#define __must_check
+#endif /* __GNUC__ */
+#endif /* __must_check */
 
 #define nrc_mem_malloc	pvPortMalloc
 #define nrc_mem_free	vPortFree

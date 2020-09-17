@@ -1,0 +1,2 @@
+v1.2.0
+=> Command format change for AT+WPING and AT+SSEND (UDP).

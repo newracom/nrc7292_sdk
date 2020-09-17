@@ -35,22 +35,22 @@ static int _atcmd_basic_version_get (int argc, char *argv[])
 	{
 		case 0:
 		{
-			char str_atcmd[ATCMD_STR_SIZE(8)];
-			char str_macsw[ATCMD_STR_SIZE(8)];
-			char param_atcmd[ATCMD_STR_PARAM_SIZE(8)];
-			char param_macsw[ATCMD_STR_PARAM_SIZE(8)];
+			char str_sdk_ver[ATCMD_STR_SIZE(8)];
+			char str_atcmd_ver[ATCMD_STR_SIZE(8)];
+			char param_sdk_ver[ATCMD_STR_PARAM_SIZE(8)];
+			char param_atcmd_ver[ATCMD_STR_PARAM_SIZE(8)];
 
-			snprintf(str_atcmd, sizeof(str_atcmd), "%u.%u.%u",
+			snprintf(str_atcmd_ver, sizeof(str_atcmd_ver), "%u.%u.%u",
 						ATCMD_VER_MAJOR, ATCMD_VER_MINOR, ATCMD_VER_REVISION);
 
-			snprintf(str_macsw, sizeof(str_macsw), "%u.%u.%u",
-						MACSW_VER_MAJOR, MACSW_VER_MINOR, MACSW_VER_REVISION);
+			snprintf(str_sdk_ver, sizeof(str_sdk_ver), "%u.%u.%u",
+						SDK_VER_MAJOR, SDK_VER_MINOR, SDK_VER_REVISION);
 
-			if (!atcmd_str_to_param(str_atcmd, param_atcmd, sizeof(param_atcmd)) ||
-				!atcmd_str_to_param(str_macsw, param_macsw, sizeof(param_macsw)))
+			if (!atcmd_str_to_param(str_sdk_ver, param_sdk_ver, sizeof(param_sdk_ver)) ||
+				!atcmd_str_to_param(str_atcmd_ver, param_atcmd_ver, sizeof(param_atcmd_ver)))
 				return ATCMD_ERROR_FAIL;
 
-			ATCMD_LOG_INFO("VER", "%s,%s", "atcmd=%s macsw=%s", param_atcmd, param_macsw);
+			ATCMD_LOG_INFO("VER", "%s,%s", "sdk=%s atcmd=%s", param_sdk_ver, param_atcmd_ver);
 
 			break;
 		}

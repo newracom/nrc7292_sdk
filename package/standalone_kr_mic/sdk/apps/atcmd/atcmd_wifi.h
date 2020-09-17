@@ -50,6 +50,7 @@
 #define ATCMD_WIFI_INIT_TXPOWER			17
 
 #define ATCMD_WIFI_INIT_SSID			"halow"
+#define ATCMD_WIFI_INIT_BSSID			"00:00:00:00:00:00"
 #define ATCMD_WIFI_INIT_SECURITY		"open"
 #define ATCMD_WIFI_INIT_PASSWORD		""
 
@@ -92,6 +93,7 @@ typedef struct
 	bool disconnecting;
 
 	atcmd_wifi_ssid_t ssid;
+	atcmd_wifi_bssid_t bssid;
 	atcmd_wifi_security_t security;
 	atcmd_wifi_password_t password;
 } atcmd_wifi_connect_t;
@@ -101,6 +103,21 @@ typedef struct
 	bool requesting;
 	bool responsed;
 } atcmd_wifi_dhcp_t;
+
+typedef struct
+{
+	int scan_delay;
+	int rssi_threshold;
+	int rssi_level;
+} atcmd_wifi_roaming_params_t;
+
+typedef struct
+{
+	bool enable;
+	atcmd_wifi_roaming_params_t params;
+
+	TaskHandle_t task;
+} atcmd_wifi_roaming_t;
 
 typedef _lwip_ping_params_t atcmd_wifi_ping_t;
 
@@ -144,14 +161,20 @@ typedef struct
 	atcmd_wifi_scan_t scan;
 	atcmd_wifi_connect_t connect;
 	atcmd_wifi_dhcp_t dhcp;
+	atcmd_wifi_roaming_t roaming;
 	atcmd_wifi_ping_t ping;
 	atcmd_wifi_softap_t softap;
+
+	SemaphoreHandle_t mutex;
 } atcmd_wifi_info_t;
 
 /**********************************************************************************************/
 
 extern int atcmd_wifi_enable (void);
 extern void atcmd_wifi_disable (void);
+
+extern bool atcmd_wifi_lock (void);
+extern bool atcmd_wifi_unlock (void);
 
 /**********************************************************************************************/
 #endif /* #ifndef __NRC_ATCMD_WIFI_H__ */

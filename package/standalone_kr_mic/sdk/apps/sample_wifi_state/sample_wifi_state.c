@@ -43,6 +43,7 @@ int  run_sample_wifi_state(WIFI_CONFIG *param)
 	int network_index = 0;
 	int wifi_state = WLAN_STATE_INIT;
 	int retry_count = 0;
+	SCAN_RESULTS results;
 
 	nrc_usr_print("[%s] Sample App for Wi-Fi State \n",__func__);
 
@@ -51,6 +52,16 @@ int  run_sample_wifi_state(WIFI_CONFIG *param)
 
 	if (wifi_init(param)!= WIFI_SUCCESS) {
 		nrc_usr_print ("[%s] ASSERT! Fail for init\n", __func__);
+		return RUN_FAIL;
+	}
+
+	if (nrc_wifi_scan() != WIFI_SUCCESS){
+		nrc_usr_print( "%s nrc_wifi_scan fail\n", __func__);
+		return RUN_FAIL;
+	}
+
+	if (nrc_wifi_scan_results(&results)!= WIFI_SUCCESS) {
+		nrc_usr_print ("[%s] Fail to scan\n", __func__);
 		return RUN_FAIL;
 	}
 

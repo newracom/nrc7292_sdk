@@ -41,6 +41,8 @@ uint32_t GetS1GCenterFreq(uint8_t index);
 uint8_t CheckChannelIndex(uint8_t index);
 uint8_t GetChannelIndexByS1GFreq(uint16_t s1g_freq);
 uint16_t GetS1GFreqByChannelIndex(uint8_t index);
+uint16_t GetStartS1GFreqByChspacing(uint8_t spacing);
+uint16_t GetEndS1GFreqByChspacing(uint8_t spacing);
 uint16_t GetNonS1GDefaultFreq(void);
 #if defined(INCLUDE_BD_SUPPORT)
 uint8_t GetS1GChIDFromS1GFreq(const uint16_t s1g_freq);

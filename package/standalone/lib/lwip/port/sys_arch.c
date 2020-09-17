@@ -82,6 +82,28 @@
 #define LWIP_FREERTOS_SYS_NOW_FROM_FREERTOS           1
 #endif
 
+/** Set this to 1 not to use recursive mutex
+ * Default is 0.
+ */
+#ifndef LWIP_FREERTOS_SYS_ARCH_NOT_USE_RECURSIVE_MUTEX
+#define LWIP_FREERTOS_SYS_ARCH_NOT_USE_RECURSIVE_MUTEX 0
+#endif
+
+/** Set this to 0 to show assert log in sys_mbox functions
+ * For this to work, you'll have to increase downlink throughput
+ * Default is 0
+ */
+#ifndef LWIP_FREERTOS_SYS_ARCH_LOG
+#define LWIP_FREERTOS_SYS_ARCH_LOG           0
+#endif
+
+#if !LWIP_FREERTOS_SYS_ARCH_LOG
+#ifdef LWIP_ASSERT
+#undef LWIP_ASSERT
+#endif
+#define LWIP_ASSERT(message, assertion)
+#endif
+
 #if !configSUPPORT_DYNAMIC_ALLOCATION
 # error "lwIP FreeRTOS port requires configSUPPORT_DYNAMIC_ALLOCATION"
 #endif
@@ -98,7 +120,11 @@
 #endif
 
 #if SYS_LIGHTWEIGHT_PROT && LWIP_FREERTOS_SYS_ARCH_PROTECT_USES_MUTEX
-static SemaphoreHandle_t sys_arch_protect_mutex;
+  #if LWIP_FREERTOS_SYS_ARCH_NOT_USE_RECURSIVE_MUTEX
+  static sys_mutex_t g_lwip_mutex;
+  #else
+  static SemaphoreHandle_t sys_arch_protect_mutex;
+  #endif
 #endif
 #if SYS_LIGHTWEIGHT_PROT && LWIP_FREERTOS_SYS_ARCH_PROTECT_SANITY_CHECK
 static sys_prot_t sys_arch_protect_nesting;
@@ -109,10 +135,14 @@ void
 sys_init(void)
 {
 #if SYS_LIGHTWEIGHT_PROT && LWIP_FREERTOS_SYS_ARCH_PROTECT_USES_MUTEX
+  #if LWIP_FREERTOS_SYS_ARCH_NOT_USE_RECURSIVE_MUTEX
+  sys_mutex_new(&g_lwip_mutex);
+  #else
   /* initialize sys_arch_protect global mutex */
   sys_arch_protect_mutex = xSemaphoreCreateRecursiveMutex();
   LWIP_ASSERT("failed to create sys_arch_protect mutex",
     sys_arch_protect_mutex != NULL);
+  #endif
 #endif /* SYS_LIGHTWEIGHT_PROT && LWIP_FREERTOS_SYS_ARCH_PROTECT_USES_MUTEX */
 }
 
@@ -140,11 +170,15 @@ sys_prot_t
 sys_arch_protect(void)
 {
 #if LWIP_FREERTOS_SYS_ARCH_PROTECT_USES_MUTEX
+  #if LWIP_FREERTOS_SYS_ARCH_NOT_USE_RECURSIVE_MUTEX
+  sys_mutex_lock(&g_lwip_mutex);
+  #else
   BaseType_t ret;
   LWIP_ASSERT("sys_arch_protect_mutex != NULL", sys_arch_protect_mutex != NULL);
 
   ret = xSemaphoreTakeRecursive(sys_arch_protect_mutex, portMAX_DELAY);
   LWIP_ASSERT("sys_arch_protect failed to take the mutex", ret == pdTRUE);
+  #endif
 #else /* LWIP_FREERTOS_SYS_ARCH_PROTECT_USES_MUTEX */
   taskENTER_CRITICAL();
 #endif /* LWIP_FREERTOS_SYS_ARCH_PROTECT_USES_MUTEX */
@@ -174,10 +208,14 @@ sys_arch_unprotect(sys_prot_t pval)
 #endif
 
 #if LWIP_FREERTOS_SYS_ARCH_PROTECT_USES_MUTEX
+  #if LWIP_FREERTOS_SYS_ARCH_NOT_USE_RECURSIVE_MUTEX
+  sys_mutex_unlock(&g_lwip_mutex);
+  #else
   LWIP_ASSERT("sys_arch_protect_mutex != NULL", sys_arch_protect_mutex != NULL);
 
   ret = xSemaphoreGiveRecursive(sys_arch_protect_mutex);
   LWIP_ASSERT("sys_arch_unprotect failed to give the mutex", ret == pdTRUE);
+  #endif
 #else /* LWIP_FREERTOS_SYS_ARCH_PROTECT_USES_MUTEX */
   taskEXIT_CRITICAL();
 #endif /* LWIP_FREERTOS_SYS_ARCH_PROTECT_USES_MUTEX */
@@ -213,23 +251,31 @@ sys_mutex_new(sys_mutex_t *mutex)
 void
 sys_mutex_lock(sys_mutex_t *mutex)
 {
+  #if LWIP_FREERTOS_SYS_ARCH_NOT_USE_RECURSIVE_MUTEX
+  while( xSemaphoreTake( mutex->mut, portMAX_DELAY ) != pdTRUE );
+  #else
   BaseType_t ret;
   LWIP_ASSERT("mutex != NULL", mutex != NULL);
   LWIP_ASSERT("mutex->mut != NULL", mutex->mut != NULL);
 
   ret = xSemaphoreTakeRecursive(mutex->mut, portMAX_DELAY);
   LWIP_ASSERT("failed to take the mutex", ret == pdTRUE);
+  #endif
 }
 
 void
 sys_mutex_unlock(sys_mutex_t *mutex)
 {
+  #if LWIP_FREERTOS_SYS_ARCH_NOT_USE_RECURSIVE_MUTEX
+  xSemaphoreGive( mutex->mut );
+  #else
   BaseType_t ret;
   LWIP_ASSERT("mutex != NULL", mutex != NULL);
   LWIP_ASSERT("mutex->mut != NULL", mutex->mut != NULL);
 
   ret = xSemaphoreGiveRecursive(mutex->mut);
   LWIP_ASSERT("failed to give the mutex", ret == pdTRUE);
+  #endif
 }
 
 void

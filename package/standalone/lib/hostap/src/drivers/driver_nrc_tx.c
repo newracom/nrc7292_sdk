@@ -319,12 +319,15 @@ int nrc_add_llc(uint16_t ethertype, uint8_t *pos)
 	return (llc - pos);
 }
 
-int nrc_add_qos(uint8_t *pos)
+int nrc_add_qos(uint8_t dscp, uint8_t *pos)
 {
 	/**
 	 * Fill this value with IP TOS field
 	*/
-	*pos++ = 0x0;
+
+	uint8_t tid = (dscp & 0xe0) >> 5;
+
+	*pos++ = tid;
 	*pos++ = 0x0;
 
 	return 2;
@@ -376,8 +379,8 @@ int nrc_transmit_from_8023_mb(uint8_t vif_id, uint8_t **frames, const uint16_t l
 	//wpa_driver_debug_key(wpa_key);
 	hif_len = sizeof(FRAME_HDR);
 	hif_len += nrc_get_80211_hdr(&hdr, intf, eth_hdr, wpa_key, qos);
-	hif_len += nrc_get_llc_len(ethertype);
 	hif_len += nrc_get_sec_hdr_len(wpa_key);
+	hif_len += nrc_get_llc_len(ethertype);
 
 	for (i = 0; i < n_frames; i++)
 		hif_len += len[i];
@@ -409,8 +412,10 @@ int nrc_transmit_from_8023_mb(uint8_t vif_id, uint8_t **frames, const uint16_t l
 			frame_len -= HLEN_8023;
 			os_memcpy(pos, &hdr, sizeof(hdr));
 			pos += sizeof(hdr);
-			if (qos)
-				pos += nrc_add_qos(pos);
+			if (qos) {
+				uint8_t dscp = frames[0][15];
+				pos += nrc_add_qos(dscp, pos);
+			}
 			pos += nrc_add_sec_hdr(wpa_key, pos);
 			pos += nrc_add_llc(ethertype, pos);
 			remain -= (pos - cur_buf->payload);
@@ -442,7 +447,7 @@ int nrc_transmit_from_8023_mb(uint8_t vif_id, uint8_t **frames, const uint16_t l
 	HIF_HDR(buffer).vifindex = vif_id;
 
 	tid = get_tid(buffer);
-	ac = (tid < MAX_TID) ? get_ac(buffer) : TID_TO_AC(tid);
+	ac = (tid < MAX_TID) ? TID_TO_AC(tid) : get_ac(buffer);
 
 	FRAME_HDR(buffer).info.tx.tlv_len = 0;
 	FRAME_HDR(buffer).info.tx.cipher = wpa_key ? wpa_key->cipher : WIM_CIPHER_TYPE_NONE;

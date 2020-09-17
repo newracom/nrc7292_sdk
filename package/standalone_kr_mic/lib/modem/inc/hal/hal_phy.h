@@ -38,6 +38,7 @@ void phy_op_bw(uint32_t bw);
 void phy_field_test();
 void phy_loopback_enable();
 void phy_loopback_disable();
+uint8_t phy_get_primary_1m_loc();
 void phy_set_primary_1m_loc(uint8_t loc);
 void phy_set_tx_primary_1m_loc(uint8_t loc);
 void phy_set_rx_primary_1m_loc(uint8_t loc);

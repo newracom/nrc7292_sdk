@@ -424,13 +424,12 @@ static int raspi_cli_run_script (char *script)
 		};
 	};
 
-   	bool first_line = true;
 	FILE *fp;
 	char *script_path;
 	char *script_name;
 	char data[ATCMD_DATA_LEN_MAX];
 	char cmd[SCRIPT_CMD_LEN_MAX];
-	int cmd_len;
+	int cmd_len, prev_cmd_len;
 	int cmd_line;
 	union loop loop;;
 	int i;
@@ -493,7 +492,7 @@ static int raspi_cli_run_script (char *script)
 			data[i] = 'A' + ((i % 16) - 10);
 	}
 
-	for (cmd_line = 0 ; !feof(fp); cmd_line++)
+	for (prev_cmd_len = cmd_line = 0 ; !feof(fp); cmd_line++)
 	{
 		if (fgets(cmd, sizeof(cmd), fp) == NULL)
 		{
@@ -543,7 +542,7 @@ static int raspi_cli_run_script (char *script)
 
 		if (strlen(cmd) == 0)
 		{
-			if (!first_line)
+			if (prev_cmd_len > 0)
 				raspi_info("\n");
 		}
 		else if (cmd[0] == '#')
@@ -689,16 +688,15 @@ static int raspi_cli_run_script (char *script)
 		}
 		else if (memcmp(cmd, "HOLD", 4) == 0) // HOLD
 		{
-			raspi_info("HOLD: Press any key to continue.\n");
+			raspi_info("HOLD: Press ENTER to continue.\n");
 			raspi_info();
 
-			getchar();
+			while (getchar() != '\n');
 		}
 		else
 			goto invalid_line;
 
-		if (first_line)
-			first_line = false;
+		prev_cmd_len = cmd_len;
 	}
 
 	raspi_info("\n");

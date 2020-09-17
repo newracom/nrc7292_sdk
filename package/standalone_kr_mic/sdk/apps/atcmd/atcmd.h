@@ -31,13 +31,13 @@
 #include "nrc_sdk.h"
 #include "hif.h"
 
-#define MACSW_VER_MAJOR			(VERSION_MAJOR)
-#define MACSW_VER_MINOR			(VERSION_MINOR)
-#define MACSW_VER_REVISION		(VERSION_REVISION)
+#define SDK_VER_MAJOR			(VERSION_MAJOR)
+#define SDK_VER_MINOR			(VERSION_MINOR)
+#define SDK_VER_REVISION		(VERSION_REVISION)
 
 #define ATCMD_VER_MAJOR			(1)
-#define ATCMD_VER_MINOR			(13)
-#define ATCMD_VER_REVISION		(1)
+#define ATCMD_VER_MINOR			(16)
+#define ATCMD_VER_REVISION		(0)
 
 /**********************************************************************************************/
 
@@ -167,9 +167,7 @@ enum ATCMD_ID
 {
 /* 	ATCMD_GROUP_BASIC
  *************************/
-	ATCMD_BASIC_LOG = 0,
-	ATCMD_BASIC_MODE,
-	ATCMD_BASIC_VERSION,
+	ATCMD_BASIC_VERSION = 0,
 	ATCMD_BASIC_UART,
 	ATCMD_BASIC_GPIOCFG,
 	ATCMD_BASIC_GPIOVAL,
@@ -192,8 +190,10 @@ enum ATCMD_ID
 	ATCMD_WIFI_SCAN,
 	ATCMD_WIFI_CONNECT,
 	ATCMD_WIFI_DISCONNECT,
+	ATCMD_WIFI_ROAMING,
 	ATCMD_WIFI_PING,
 	ATCMD_WIFI_SOFTAP,
+	ATCMD_WIFI_FOTA,
 	ATCMD_WIFI_TIMEOUT,
 
 /* 	ATCMD_GROUP_SOCKET
@@ -292,6 +292,7 @@ enum ATCMD_LOG_TYPE
 	ATCMD_LOG_TYPE_RETURN = 0,
 	ATCMD_LOG_TYPE_INFO,
 	ATCMD_LOG_TYPE_EVENT,
+	ATCMD_LOG_TYPE_DEBUG,
 	ATCMD_LOG_TYPE_HELP,
 
 	ATCMD_LOG_TYPE_MAX,
@@ -305,6 +306,9 @@ extern int ATCMD_LOG_VSNPRINT (int type, char *buf, int len, const char *fmt, va
 
 #define ATCMD_LOG_HELP(fmt, ...)	\
 		ATCMD_LOG_PRINT(ATCMD_LOG_TYPE_HELP, fmt, ##__VA_ARGS__)
+
+#define ATCMD_LOG_DEBUG(fmt, ...)	\
+		ATCMD_LOG_PRINT(ATCMD_LOG_TYPE_DEBUG, fmt, ##__VA_ARGS__)
 
 #define ATCMD_LOG_INFO(name, fmt1, fmt2, ...)	\
 		ATCMD_LOG_PRINT(ATCMD_LOG_TYPE_INFO, name ":" fmt1, ##__VA_ARGS__)

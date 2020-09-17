@@ -1166,7 +1166,7 @@ static void * wpa_driver_nrc_dump_load(int len)
 
 struct wim_bd_param * wpa_driver_nrc_read_bd_tx_pwr(uint8_t *country_code)
 {
-	uint8_t cc_index = BOARD_CC_US;
+	uint8_t cc_index = BOARD_CC_MAX;
 	uint16_t ret = 0;
 	uint16_t len = 0;
 	uint8_t type = 0;
@@ -2776,7 +2776,7 @@ static void start_keep_alive(struct nrc_wpa_if* intf)
 {
 	struct os_time now, past, next;
 	uint64_t max_idle, past_ms;
-	const uint32_t off_ms = 500;
+	const uint32_t off_ms = 1000;
 
 	max_idle = max_idle_to_ms(intf->bss.max_idle);
 

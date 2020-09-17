@@ -538,7 +538,7 @@ static void nrc_wpa_mgmt_sta_rx(uint16_t subtype, struct nrc_wpa_rx_data *rx)
 			struct ieee80211_hdr *hdr = rx->u.hdr;
 			if (os_memcmp(hdr->addr2, rx->intf->bss.bssid, ETH_ALEN) == 0)
 				os_get_time(&rx->intf->bss.last_beacon_update);
-#if defined(NRC_USER_APP)
+#if defined(NRC_USER_APP)||defined(CONFIG_BG_SCAN)
 			if (subtype == WLAN_FC_STYPE_PROBE_RESP)
 			   nrc_wpa_scan_sta_rx(rx);
 #endif

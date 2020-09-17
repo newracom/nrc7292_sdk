@@ -44,6 +44,7 @@ typedef struct _lmac_twt_info {
 	uint32_t	init_start_margin;
 	uint32_t	start_margin;
 	uint32_t	end_margin;
+	uint32_t	init_start_time;
 	uint8_t		request_type;
 	int8_t		vif_id;
 } lmac_twt_info;
@@ -91,6 +92,8 @@ twt_state lmac_get_twt_beacon_tim();
 void lmac_set_twt_beacon_tim(twt_state state);
 twt_state lmac_get_twt_state_pm();
 void lmac_set_twt_state_pm(twt_state state);
+uint32_t lmac_get_twt_init_start_time();
+void lmac_set_twt_init_start_time(uint32_t time);
 
 extern lmac_twt_info g_lmac_twt_info;
 #endif // __LMAC_TWT_COMMON_H__

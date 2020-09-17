@@ -41,9 +41,11 @@ typedef enum {
 typedef enum {
 	WLAN_CMD_INIT = 0,
 	WLAN_CMD_REGI_CB,
-	WLAN_CMD_GET_ND,
+	WLAN_CMD_ADD_NETWORK,
+	WLAN_CMD_REMOVE_NETWORK,
 	WLAN_CMD_SET_COUNTRY,
 	WLAN_CMD_SET_SSID,
+	WLAN_CMD_SET_BSSID,
 	WLAN_CMD_SET_SECURITY,
 	WLAN_CMD_SET_SOFTAP_CONF,
 	WLAN_CMD_SET_S1G_CONF,
@@ -104,17 +106,11 @@ typedef struct  {
 } MSG_ID_FORMAT;
 #define WLAN_ID_FM_SIZE		sizeof (MSG_ID_FORMAT)
 
-#define MAX_SSID_LENGTH 20
-#define MAX_PW_LENGTH 30
 typedef struct  {
 	int id;
 	int nd;
-	uint8_t ssid[MAX_SSID_LENGTH];
-	int s1g_freq;
-	int sec_mode;
-	uint8_t password[MAX_PW_LENGTH];
-} MSG_SOFTAP_CONF_FORMAT;
-#define WLAN_SOFTAP_CONF_SIZE	sizeof (MSG_SOFTAP_CONF_FORMAT)
+} MSG_NETWORK_ID_FORMAT;
+#define WLAN_NETWORK_ID_SIZE	sizeof (MSG_NETWORK_ID_FORMAT)
 
 typedef struct  {
 	int id;
@@ -130,12 +126,21 @@ typedef struct  {
 } MSG_CONNECT_FORMAT;
 #define WLAN_CONNECT_FM_SIZE	sizeof (MSG_CONNECT_FORMAT)
 
+#define MAX_SSID_LENGTH 32
 typedef struct  {
 	int id;
 	int nd;
-	uint8_t ssid[MAX_SSID_LENGTH];
+	uint8_t ssid[MAX_SSID_LENGTH + 1];
 } MSG_SSID_FORMAT;
 #define WLAN_SSID_FM_SIZE	sizeof (MSG_SSID_FORMAT)
+
+#define MAX_BSSID_LENGTH 17
+typedef struct  {
+	int id;
+	int nd;
+	uint8_t bssid[MAX_BSSID_LENGTH + 1];
+} MSG_BSSID_FORMAT;
+#define WLAN_BSSID_FM_SIZE	sizeof (MSG_BSSID_FORMAT)
 
 #define MAX_CC_LENGTH 3
 typedef struct  {
@@ -152,6 +157,7 @@ typedef struct  {
 } MSG_CB_FUNCTION_FORMAT;
 #define WLAN_CB_FUNC_FM_SIZE	sizeof (MSG_CB_FUNCTION_FORMAT)
 
+#define MAX_PW_LENGTH 30
 typedef struct  {
 	int id;
 	int nd;
@@ -160,9 +166,20 @@ typedef struct  {
 } MSG_SECURITY_FORMAT;
 #define WLAN_SECURITY_FM_SIZE	sizeof (MSG_SECURITY_FORMAT)
 
+typedef struct  {
+	int id;
+	int nd;
+	uint8_t ssid[MAX_SSID_LENGTH];
+	int s1g_freq;
+	int sec_mode;
+	uint8_t password[MAX_PW_LENGTH];
+} MSG_SOFTAP_CONF_FORMAT;
+#define WLAN_SOFTAP_CONF_SIZE	sizeof (MSG_SOFTAP_CONF_FORMAT)
+
 #define MAX_STATIC_IP_LENGTH 16
 typedef struct  {
 	uint8_t ssid[MAX_SSID_LENGTH];
+	uint8_t bssid[MAX_BSSID_LENGTH];
 	uint8_t country[MAX_CC_LENGTH];
 	uint8_t security_mode;
 	uint8_t password[MAX_PW_LENGTH];
@@ -183,6 +200,8 @@ typedef struct _s1g_operation_channel_table{
 	uint8_t     country[MAX_CC_LENGTH];
 	uint16_t    s1g_freq;
 } s1g_operation_channel_mapping;
+
+#define MAX_PMK_LENGTH 65
 
 #define RUN_FAIL -1
 #define RUN_SUCCESS 0
