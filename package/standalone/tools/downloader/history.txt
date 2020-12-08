@@ -1,2 +1,12 @@
 v3.0.0
 First Java version
+
+v3.1.0
+Newrafc (Python -> Java) ported
+
+v3.2.0
+JRE version check (1.8 only)\
+
+v3.3.0
+MAC address write functionality removed.
+XIP boot binary specification.
