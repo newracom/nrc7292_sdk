@@ -10,3 +10,6 @@ JRE version check (1.8 only)\
 v3.3.0
 MAC address write functionality removed.
 XIP boot binary specification.
+
+v3.3.1
+Bug fix: Wrong F/W binary reference fix
