@@ -8,11 +8,14 @@ APP := raspi-atcmd-cli
 CFLAGS = -pthread -Wall -Wno-unused-function
 LFLAGS = -lpthread
 
-SRCS = main.c \
-	raspi-hif.c \
+SRCS = \
 	raspi-spi.c \
 	raspi-uart.c \
-	nrc-hspi.c
+	raspi-hif.c \
+	nrc-hspi.c \
+	nrc-atcmd.c \
+	nrc-iperf.c \
+	main.c
 
 #########################################################
 

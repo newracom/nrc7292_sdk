@@ -116,7 +116,7 @@ static int wpa_driver_nrc_set_key_wim(struct nrc_wpa_if *intf,
 	os_memcpy(param.key, key, key_len);
 
 	wim_builder_append(wb, WIM_TLV_KEY_PARAM, &param, sizeof(param));
-	wim_builder_run_wm(wb, true);
+	wim_builder_run_wm_wq(wb, true);
 
 	return 0;
 }
@@ -148,7 +148,7 @@ static void wpa_driver_sta_type_wim(struct nrc_wpa_if *intf, uint32_t sta_type)
 	struct wim_builder *wb = wim_builder_create(intf->vif_id, WIM_CMD_SET, WB_MIN_SIZE);
 	intf->sta_type = sta_type;
 	wim_builder_append_u32(wb, WIM_TLV_STA_TYPE, intf->sta_type);
-	wim_builder_run_wm(wb, true);
+	wim_builder_run_wm_wq(wb, true);
 }
 
 struct nrc_wpa_sta* nrc_wpa_find_sta(struct nrc_wpa_if *intf,
@@ -396,7 +396,7 @@ static void run_wim_set_bssid(int vif_id, uint8_t* bssid)
 	struct wim_builder *wb = NULL;
 	wb = wim_builder_create(vif_id, WIM_CMD_SET, WB_MIN_SIZE);
 	wim_builder_append(wb, WIM_TLV_BSSID, bssid, ETH_ALEN);
-	wim_builder_run_wm(wb, true);
+	wim_builder_run_wm_wq(wb, true);
 }
 
 static int wpa_driver_nrc_set_key(const char *ifname, void *priv, enum wpa_alg alg,
@@ -1322,7 +1322,7 @@ struct wim_bd_param * wpa_driver_nrc_read_bd_tx_pwr(uint8_t *country_code)
 	}
 #endif /* defined(INCLUDE_BD_SUPPORT) */
 
-	wim_builder_run_wm(wb, true);
+	wim_builder_run_wm_wq(wb, true);
 
 	return 0;
 }
@@ -1538,7 +1538,7 @@ static int wpa_driver_nrc_scan2_nrc(struct nrc_wpa_if* intf, struct wpa_driver_s
 
 	/* Start Scan */
 	wim_builder_append(wb, WIM_TLV_SCAN_PARAM, &wimp, sizeof(wimp));
-	wim_builder_run_wm(wb, true);
+	wim_builder_run_wm_wq(wb, true);
 
 	return 0;
 }
@@ -1602,7 +1602,7 @@ static void wpa_driver_nrc_sta_cmd_wim(struct nrc_wpa_if* intf, int cmd,
  	os_memcpy(p.addr, addr, ETH_ALEN);
  	struct wim_builder * wb = wim_builder_create(intf->vif_id, WIM_CMD_STA_CMD, WB_MIN_SIZE);
 	wim_builder_append(wb, WIM_TLV_STA_PARAM, &p, sizeof(p));
-	wim_builder_run_wm(wb, true);
+	wim_builder_run_wm_wq(wb, true);
 }
 
 static void wpa_remove_sta(struct nrc_wpa_if * intf, const uint8_t* addr)
@@ -1741,13 +1741,21 @@ static int wpa_driver_nrc_sta_add(void *priv, struct hostapd_sta_add_params *p)
 {
 	struct nrc_wpa_if* intf = (struct nrc_wpa_if *)(priv);
 
+	I(TT_WPAS, TAG "[SoftAP] " MACSTR " flags:0x%x\n", MAC2STR(p->addr), p->flags);
+
 	if (p->flags & WLAN_STA_ASSOC) {
 		I(TT_WPAS, TAG "SoftAP associated " MACSTR "\n", MAC2STR(p->addr));
 		on_sta_state_changed(intf, p->addr, p->aid, WIM_STA_CMD_STATE_ASSOC);
-	} else {
+		return 0;
+	}
+
+	 if (!p->flags || p->flags & WLAN_STA_AUTH){
 		I(TT_WPAS, TAG "SoftAP authenticated " MACSTR "\n", MAC2STR(p->addr));
 		on_sta_state_changed(intf, p->addr, 0, WIM_STA_CMD_STATE_AUTH);
+		 return 0;
 	}
+
+	 I(TT_WPAS, TAG "[SoftAP] " MACSTR " not supported flags:0x%x\n",MAC2STR(p->addr), p->flags);
 
 	return 0;
 }
@@ -2070,12 +2078,12 @@ static int wpa_driver_nrc_cancel_remain_on_channel(void *priv)
 	}
 
 	wim_builder_append(wb, WIM_TLV_BSSID, null_bssid, ETH_ALEN);
-	wim_builder_run_wm(wb, true);
+	wim_builder_run_wm_wq(wb, true);
 	reset_ip_address(intf->vif_id);
 	intf->associated = false;
 
 	wb = wim_builder_create(intf->vif_id, WIM_CMD_STOP, WB_MIN_SIZE);
-	wim_builder_run_wm(wb, true);
+	wim_builder_run_wm_wq(wb, true);
 
 	if (intf->vif_id == 0) {
 		for (i = ACI_BK; i <= ACI_VO; i++)
@@ -2431,7 +2439,7 @@ static int wpa_driver_nrc_set_ndp_request(void *priv,  int enabled)
 
 	wb = wim_builder_create(intf->vif_id, WIM_CMD_SET, WB_MIN_SIZE);
 	wim_builder_append_u32(wb, WIM_TLV_NDP_PREQ, enabled);
-	wim_builder_run_wm(wb, true);
+	wim_builder_run_wm_wq(wb, true);
 	return 0;
 }
 
@@ -2484,8 +2492,10 @@ static int wpa_driver_nrc_hapd_send_eapol(void *priv, const u8 *addr,
 
 	if (wpa_driver_nrc_send_frame(intf, 0, (void *) hdr, len) < 0) {
 		E(TT_WPAS, TAG "Failed to send EAPOL frame\n");
+		os_free(hdr);
 		return -1;
 	}
+	os_free(hdr);
 	wpa_supplicant_event(intf->wpa_supp_ctx, EVENT_EAPOL_TX_STATUS, &event);
 	return 0;
 }
@@ -2501,11 +2511,11 @@ static int wpa_driver_nrc_set_freq(void *priv, struct hostapd_freq_params *freq)
 void wpa_driver_wim_run(void *eloop_ctx, void *timeout_ctx)
 {
 	struct wim_builder *wb = (struct wim_builder *) timeout_ctx;
-	wim_builder_run_wm(wb, true);
+	wim_builder_run_wm_wq(wb, true);
 }
 
-#if defined(NRC_USER_APP)
-bool start_ap = false;
+#if defined(STANDARD_11AH)
+bool g_start_ap = false;
 #endif
 static int wpa_driver_nrc_set_ap(void *priv, struct wpa_driver_ap_params *p)
 {
@@ -2518,6 +2528,14 @@ static int wpa_driver_nrc_set_ap(void *priv, struct wpa_driver_ap_params *p)
 	uint8_t bssid[ETH_ALEN];
 	uint16_t bi = p->beacon_int;
 	int frame_len = p->head_len + p->tail_len;
+
+#if defined(STANDARD_11AH)
+	if (g_start_ap) {
+		//11ah doesn't care ERP. So no need to update param whenever STA connection
+		I(TT_WPAS, TAG "%d Already Set for SoftAP\n", intf->vif_id);
+		return 0;
+	}
+#endif
 
 	I(TT_WPAS, TAG "%d Set AP\n", intf->vif_id);
 
@@ -2541,7 +2559,7 @@ static int wpa_driver_nrc_set_ap(void *priv, struct wpa_driver_ap_params *p)
 #else
 	wim_builder_append_u16(wb, WIM_TLV_BCN_INTV, bi);
 #endif
-
+	wim_builder_append_u32(wb, WIM_TLV_DTIM_PERIOD, p->dtim_period);
 	wim_builder_append(wb, WIM_TLV_SSID, (void *) p->ssid, p->ssid_len);
 
 	if (p->ht_opmode >= 0) // HT in use
@@ -2582,15 +2600,15 @@ static int wpa_driver_nrc_set_ap(void *priv, struct wpa_driver_ap_params *p)
 	os_free(frame);
 	wim_builder_append_u8(wb, WIM_TLV_BEACON_ENABLE, 1);
 
+#if defined(STANDARD_11AH)
 #if defined(NRC_USER_APP)
-	if (!start_ap) {
-		/* apply once */
 		wpa_driver_notify_event_to_app(EVENT_INTERFACE_ENABLED);
-		start_ap = true;
-	}
+#endif
+		g_start_ap = true;
 #endif
 
-	eloop_register_timeout(0, 0, wpa_driver_wim_run, (void *) intf, (void *) wb);
+	//eloop_register_timeout(0, 0, wpa_driver_wim_run, (void *) intf, (void *) wb);
+	wim_builder_run_wm_wq(wb, true);
 
 	return 0;
 }
@@ -2706,11 +2724,11 @@ void wpa_driver_sta_sta_cmd(struct nrc_wpa_if* intf, int cmd)
 	/* Add beacon interval for quick setting of beacon monitor */
 	wim_builder_append_u16(wb, WIM_TLV_SHORT_BCN_INTV, intf->bss.beacon_int);
 
-	wim_builder_run_wm(wb, true);
+	wim_builder_run_wm_wq(wb, true);
 
 	wb = wim_builder_create(intf->vif_id, WIM_CMD_STA_CMD, WB_MIN_SIZE);
 	wim_builder_append(wb, WIM_TLV_STA_PARAM, &p, sizeof(p));
-	wim_builder_run_wm(wb, true);
+	wim_builder_run_wm_wq(wb, true);
 }
 
 void send_keep_alive(struct nrc_wpa_if* intf)
@@ -2838,7 +2856,7 @@ static void wpa_driver_set_channel(void *priv, uint16_t freq)
 	struct wim_builder *wb = wim_builder_create(intf->vif_id, WIM_CMD_SET, WB_MIN_SIZE);
 	struct wim_channel_param wp = {freq, };
 	wim_builder_append(wb, WIM_TLV_CHANNEL, &wp, sizeof(wp));
-	wim_builder_run_wm(wb, true);
+	wim_builder_run_wm_wq(wb, true);
 }
 
 static int wpa_driver_nrc_authenticate(void *priv, struct wpa_driver_auth_params *p)

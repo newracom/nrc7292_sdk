@@ -324,7 +324,6 @@ int  run_iperf_tcp_client(WIFI_CONFIG *param)
 	return RUN_SUCCESS;
 }
 
-#if !defined(ATCMD_SAMPLE_APP_TEST)
 
 /******************************************************************************
  * FunctionName : user_init
@@ -350,4 +349,3 @@ void user_init(void)
 	}
 }
 
-#endif /* !defined(ATCMD_SAMPLE_APP_TEST) */

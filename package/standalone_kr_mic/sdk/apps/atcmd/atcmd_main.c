@@ -25,10 +25,16 @@
 
 #include "atcmd.h"
 
-#if defined(NRC7292_STANDALONE_XIP)
-#define ATCMD_CODE_MEM_TYPE		"XIP"
+#if defined(CPU_CM3)
+#define ATCMD_CPU_TYPE		"CM3"
 #else
-#define ATCMD_CODE_MEM_TYPE		"RAM"
+#define ATCMD_CPU_TYPE		"CM0"
+#endif
+
+#if defined(NRC7292_STANDALONE_XIP)
+#define ATCMD_MEM_TYPE		"XIP"
+#else
+#define ATCMD_MEM_TYPE		"RAM"
 #endif
 
 /*******************************************************************************/
@@ -105,7 +111,7 @@ static int nrc_atcmd_enable_hspi (bool *console_enable)
 
 	nrc_uart_console_enable();
 
-	nrc_usr_print("AT Command for NRC Halow.[%s/HSPI]\n", ATCMD_CODE_MEM_TYPE);
+	nrc_usr_print("AT Command for NRC Halow.[%s/%s/HSPI]\n", ATCMD_CPU_TYPE, ATCMD_MEM_TYPE);
 
 	return nrc_atcmd_enable(_HIF_TYPE_HSPI, sw_id, bd_id);
 }
@@ -136,7 +142,7 @@ static int nrc_atcmd_enable_uart (bool *console_enable)
 		nrc_uart_console_enable();
 
 		nrc_usr_print("AT Command for NRC Halow.[%s/UART_%s_%d_%d]\n",
-						ATCMD_CODE_MEM_TYPE, hfc ? "HFC" : "",
+						ATCMD_MEM_TYPE, hfc ? "HFC" : "",
 						channel, baudrate);
 	}
 

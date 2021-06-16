@@ -74,15 +74,10 @@ static struct
 {
 	struct
 	{
-		bool sync;
-	} tx;
-
-	struct
-	{
 		bool passive;
 		bool verbose;
 	} rx;
-} g_atcmd_socket_trx_mode = { { false }, { false, false } };
+} g_atcmd_socket_trx_mode = { { false, false } };
 
 /**********************************************************************************************/
 
@@ -501,11 +496,15 @@ static void _atcmd_socket_recv_handler (int id)
 				break;
 			}
 
+			if (!_atcmd_socket_search_id(id))
+				break;
+
 			_atcmd_info("SEVENT: RECV_ERROR, id=%d err=%d,%s\n",
-										id, ret, atcmd_strerror(ret));
+											id, ret, atcmd_strerror(ret));
 
 			ATCMD_LOG_EVENT("SEVENT", "%s,%d,%d", "%s id=%d err=%d",
 											"\"RECV_ERROR\"", id, ret);
+
 			switch (ret)
 			{
 				case -ENOTCONN:
@@ -1011,7 +1010,7 @@ static int _atcmd_socket_send_set (int argc, char *argv[])
 				if (param_len)
 				{
 					len = atoi(param_len);
-					if (len < 0 || len > ATCMD_DATA_LEN_MAX)
+					if (abs(len) > ATCMD_DATA_LEN_MAX)
 						return ATCMD_ERROR_INVAL;
 				}
 				else if (_hif_get_type() == _HIF_TYPE_UART)
@@ -1020,8 +1019,7 @@ static int _atcmd_socket_send_set (int argc, char *argv[])
 /*				_atcmd_debug("ssend: id=%d remote=%s,%d len=%d\n",
 							socket->id, socket->remote_addr, socket->remote_port, len); */
 
-				ATCMD_DATA_MODE_ENABLE(socket, len, _atcmd_timeout_value("SSEND"),
-										g_atcmd_socket_trx_mode.tx.sync);
+				ATCMD_DATA_MODE_ENABLE(socket, len, _atcmd_timeout_value("SSEND"));
 
 				break;
 			}
@@ -1047,68 +1045,6 @@ static atcmd_info_t g_atcmd_socket_send =
 	.handler[ATCMD_HANDLER_RUN] = NULL,
 	.handler[ATCMD_HANDLER_GET] = NULL,
 	.handler[ATCMD_HANDLER_SET] = _atcmd_socket_send_set,
-};
-
-/**********************************************************************************************/
-
-static int _atcmd_socket_send_mode_get (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-			ATCMD_LOG_INFO("STXMODE", "%d", "%d", g_atcmd_socket_trx_mode.tx.sync);
-			break;
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static int _atcmd_socket_send_mode_set (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-			ATCMD_LOG_HELP("AT+STXMODE=<mode>");
-			/*
-			 * 0: async
-			 * 1: sync
-			 */
-			break;
-
-		case 1:
-		{
-			int sync = atoi(argv[0]);
-
-			if (sync == 0 || sync == 1)
-			{
-				g_atcmd_socket_trx_mode.tx.sync = !!sync;
-				break;
-			}
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static atcmd_info_t g_atcmd_socket_send_mode =
-{
-	.list.next = NULL,
-	.list.prev = NULL,
-
-	.group = ATCMD_GROUP_SOCKET,
-
-	.cmd = "TXMODE",
-	.id = ATCMD_SOCKET_SEND_MODE,
-
-	.handler[ATCMD_HANDLER_RUN] = NULL,
-	.handler[ATCMD_HANDLER_GET] = _atcmd_socket_send_mode_get,
-	.handler[ATCMD_HANDLER_SET] = _atcmd_socket_send_mode_set,
 };
 
 /**********************************************************************************************/
@@ -1407,7 +1343,6 @@ static atcmd_info_t *g_atcmd_info_socket[] =
 	&g_atcmd_socket_close,
 	&g_atcmd_socket_list,
 	&g_atcmd_socket_send,
-/*	&g_atcmd_socket_send_mode, */
 /*	&g_atcmd_socket_recv_mode, */
 	&g_atcmd_socket_recv_log,
 /*	&g_atcmd_socket_recv_avail, */

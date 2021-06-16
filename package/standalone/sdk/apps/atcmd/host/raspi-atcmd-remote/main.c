@@ -319,8 +319,12 @@ static int remote_option (int argc, char *argv[], remote_opt_t *opt)
 				switch (opt->mode)
 				{
 					case REMOTE_UDP:
+					case REMOTE_UDP|REMOTE_SERVER:
+					case REMOTE_UDP|REMOTE_CLIENT:
 						printf("[ UDP ]\n");
 						printf("  - bind_port : %u\n", opt->udp.bind_port);
+
+						opt->mode &= ~(REMOTE_SERVER | REMOTE_CLIENT);
 						break;
 
 					case REMOTE_TCP|REMOTE_SERVER:
@@ -335,6 +339,7 @@ static int remote_option (int argc, char *argv[], remote_opt_t *opt)
 						break;
 
 					default:
+						printf("invalid options\n");
 						return -1;
 				}
 
@@ -353,14 +358,11 @@ static int remote_option (int argc, char *argv[], remote_opt_t *opt)
 				break;
 
 			case 's':
-				if (opt->mode & REMOTE_TCP)
-					opt->mode |= REMOTE_SERVER;
+				opt->mode |= REMOTE_SERVER;
 				break;
 
 			case 'c':
-				if (opt->mode & REMOTE_TCP)
-					opt->mode |= REMOTE_CLIENT;
-
+				opt->mode |= REMOTE_CLIENT;
 				strcpy(opt->tcp_client.server_ip, optarg);
 				break;
 

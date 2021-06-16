@@ -27,8 +27,8 @@
 #include "atcmd.h"
 #include "atcmd_fota.h"
 
-#define _atcmd_fota_debug(fmt, ...)		_atcmd_debug("fota: " fmt "\n",##__VA_ARGS__)
-#define _atcmd_fota_log(fmt, ...)		_atcmd_info("fota: " fmt "\n", ##__VA_ARGS__)
+#define _atcmd_fota_debug(fmt, ...)		//_atcmd_debug("FOTA: " fmt "\n",##__VA_ARGS__)
+#define _atcmd_fota_log(fmt, ...)		_atcmd_info("FOTA: " fmt "\n", ##__VA_ARGS__)
 
 /**********************************************************************************************/
 
@@ -124,7 +124,7 @@ static atcmd_fota_t g_atcmd_fota =
 		.fw_bin_type = FW_BIN_HSPI,
 		.server_url = { 0, },
 		.check_time = 0,
-		.check_done_cb = NULL,
+		.event_cb = NULL,
 	},
 
 	.task = NULL
@@ -143,15 +143,108 @@ typedef struct
 	int ContentLengthDone;
 } httpc_resp_t;
 
-static void _atcmd_fota_http_print_resp_info (httpc_resp_t *resp)
+static void _atcmd_fota_event_callback (enum FOTA_EVENT type, ...)
 {
-	_atcmd_fota_log("[ HTTP Resp Info ]");
+	if (g_atcmd_fota.params.event_cb)
+	{
+		va_list ap;
+		atcmd_fota_event_t event;
+
+		event.type = type;
+
+		va_start(ap, type);
+
+		switch (type)
+		{
+			case FOTA_EVT_VERSION:
+				event.version.sdk = va_arg(ap, char *);
+				event.version.atcmd = va_arg(ap, char *);
+				break;
+
+			case FOTA_EVT_BINARY:
+				event.binary.name = va_arg(ap, char *);
+				break;
+
+			case FOTA_EVT_DOWNLOAD:
+				event.download.total = va_arg(ap, uint32_t);
+				event.download.len = va_arg(ap, uint32_t);
+				break;
+
+			case FOTA_EVT_UPDATE:
+				event.update.bin_name = va_arg(ap, char *);
+				event.update.bin_size = va_arg(ap, uint32_t);
+				event.update.bin_crc = va_arg(ap, uint32_t);
+				break;
+
+			case FOTA_EVT_FAIL:
+				break;
+
+			default:
+				_atcmd_fota_log("!!! invalid event type, %d !!!", type);
+				return;
+		}
+
+		va_end(ap);
+
+		g_atcmd_fota.params.event_cb(&event);
+	}
+}
+
+static const char *_atcmd_fota_httpc_strerror (int ret)
+{
+	const char *str[] =
+	{
+		[HTTPC_RET_OK] = "Success",
+		[-(HTTPC_RET_CON_CLOSED)] = "Connection closed by remote",
+		[-(HTTPC_RET_ERROR_UNKNOWN)] = "Unknown error",
+		[-(HTTPC_RET_ERROR_CONNECTION)] = "Connection fail",
+		[-(HTTPC_RET_ERROR_RESOLVING_DNS)] = "Cannot resolve the hostname",
+		[-(HTTPC_RET_ERROR_SOCKET_FAIL)] = "Socket creation fail",
+		[-(HTTPC_RET_ERROR_SCHEME_NOT_FOUND)] = "Scheme(http:// or https://) not foun",
+		[-(HTTPC_RET_ERROR_ALLOC_FAIL)] = "Memory allocation fail",
+		[-(HTTPC_RET_ERROR_INVALID_HANDLE)] = "Invalid handle",
+		[-(HTTPC_RET_ERROR_HEADER_SEND_FAIL)] = "Request Header send fail",
+		[-(HTTPC_RET_ERROR_BODY_SEND_FAIL)] = "Request body send fail",
+		[-(HTTPC_RET_ERROR_SEED_FAIL)] = "Seed creation fail",
+		[-(HTTPC_RET_ERROR_CERT_LOADING_FAIL)] = "Certificate loading fail",
+		[-(HTTPC_RET_ERROR_PK_LOADING_FAIL)] = "Private key loading fail",
+		[-(HTTPC_RET_ERROR_TLS_CONNECTION)] = "TLS connection fail",
+	};
+
+	switch (ret)
+	{
+		case HTTPC_RET_OK:
+		case HTTPC_RET_CON_CLOSED:
+		case HTTPC_RET_ERROR_UNKNOWN:
+		case HTTPC_RET_ERROR_CONNECTION:
+		case HTTPC_RET_ERROR_RESOLVING_DNS:
+		case HTTPC_RET_ERROR_SOCKET_FAIL:
+		case HTTPC_RET_ERROR_SCHEME_NOT_FOUND:
+		case HTTPC_RET_ERROR_ALLOC_FAIL:
+		case HTTPC_RET_ERROR_INVALID_HANDLE:
+		case HTTPC_RET_ERROR_HEADER_SEND_FAIL:
+		case HTTPC_RET_ERROR_BODY_SEND_FAIL:
+		case HTTPC_RET_ERROR_SEED_FAIL:
+		case HTTPC_RET_ERROR_CERT_LOADING_FAIL:
+		case HTTPC_RET_ERROR_PK_LOADING_FAIL:
+		case HTTPC_RET_ERROR_TLS_CONNECTION:
+			return str[-ret];
+
+		default:
+			return "Invalid Return";
+	}
+}
+
+
+static void _atcmd_fota_httpc_print_resp_info (httpc_resp_t *resp)
+{
+	_atcmd_fota_log("[ HTTP RESP INFO ]");
 	_atcmd_fota_log(" - Version: %.1f", resp->Version);
 	_atcmd_fota_log(" - StatusCode: %d", resp->StatusCode);
 	_atcmd_fota_log(" - ContentLength: %d", resp->ContentLength);
 }
 
-static void _atcmd_fota_http_parse_resp_header (char *header, httpc_resp_t *resp)
+static void _atcmd_fota_httpc_parse_resp_header (char *header, httpc_resp_t *resp)
 {
 	char *saveptr;
 	char *token;
@@ -171,55 +264,41 @@ static void _atcmd_fota_http_parse_resp_header (char *header, httpc_resp_t *resp
 	}
 }
 
-static int _atcmd_fota_http_get_file (const char *server_url, const char *file_path,
-										int chunk_size, void (*cb)(char *, int, int))
+static int _atcmd_fota_httpc_get (const char *server_url, const char *file_path,
+									char *buf, int buf_len,
+									void (*cb)(char *, int, int))
 {
-	const int default_chunk_size = 512;
-	ssl_certs_t *certs = NULL;
+	static char url[ATCMD_FOTA_URL_LEN_MAX];
+	ssl_certs_t *certs;
 	con_handle_t handle;
 	httpc_data_t data;
 	httpc_resp_t resp;
-	char *buf, *url;
-	int buf_len, url_len;
+	int url_len;
+	char *header;
+	char *header_end;
+	int header_len;
 	int ret;
-	int i;
 
 	if (!server_url || !strlen(server_url))
 	{
-		_atcmd_error("invalid server_url\n");
+		_atcmd_fota_log("httpc_get: !!! invalid server_url !!!");
 		return -1;
 	}
 
 	if (!file_path || !strlen(file_path))
 	{
-		_atcmd_error("invalid file_path\n");
+		_atcmd_fota_log("httpc_get: !!! invalid file_path !!!");
 		return -1;
 	}
 
-	if (chunk_size <= 0)
-		chunk_size = default_chunk_size;
-
-	buf_len = chunk_size;
-	buf = _atcmd_malloc(buf_len);
-
-	if (!buf && buf_len > default_chunk_size)
-	{
-		_atcmd_fota_log("http_get: chunk_size, %d->%d\n", buf_len, default_chunk_size);
-
-		buf_len = default_chunk_size;
-		buf = _atcmd_malloc(buf_len);
-	}
-
 	url_len = strlen(server_url) + strlen(file_path) + 2;
-	url = _atcmd_malloc(url_len);
-
-	if (!buf || !url)
+	if (url_len > sizeof(url))
 	{
-		_atcmd_error("malloc() failed, buf=%p url=%p\n", buf, url);
-
-		ret = -1;
-		goto http_get_file_exit;
+		_atcmd_fota_log("httpc_get: !!! URL length is greater than %d !!!", sizeof(url));
+		return -1;
 	}
+
+	_atcmd_fota_debug("httpc_get: url_len=%d buf_len=%d", url_len, buf_len);
 
 	data.data_in = buf;
 	data.data_in_length = buf_len;
@@ -231,97 +310,114 @@ static int _atcmd_fota_http_get_file (const char *server_url, const char *file_p
 
 	if (memcmp(url, "https://", 8) == 0)
 		certs = &g_https_ssl_certs;
+	else
+		certs = NULL;
 
-	_atcmd_fota_log("http_get: %s", url);
+	_atcmd_fota_log("httpc_get: %s", url);
 
 	ret = nrc_httpc_get(&handle, url, NULL, &data, certs);
 	if (ret != HTTPC_RET_OK)
 	{
-		_atcmd_error("nrc_httpc_get() failed, ret=%d\n", ret);
-
-		ret = -1;
-		goto http_get_file_exit;
+		_atcmd_fota_log("httpc_get: %s (%d)", _atcmd_fota_httpc_strerror(ret), ret);
+		return -1;
 	}
 
 	memset(&resp, 0, sizeof(resp));
 
-	for (i = data.recved_size ; i < buf_len ; )
+	for (ret = 1 ; ret > 0 ; )
 	{
-		if (resp.ContentLength == 0)
+		if (resp.Version == 0)
 		{
-			char *header = data.data_in;
-			char *header_end = strstr(data.data_in, "\r\n\r\n");
+			header_end = strstr(buf, "\r\n\r\n");
 
 			if (header_end)
 			{
-				int header_len = (header_end - header) + 4;
+				header = buf;
+				header_len = (header_end - header) + 4;
+
+				_atcmd_fota_debug("httpc_get: header=%d", header_len);
 
 				memset(header_end, 0, 4);
 
-				_atcmd_fota_http_parse_resp_header(header, &resp);
-				_atcmd_fota_http_print_resp_info(&resp);
+				_atcmd_fota_httpc_parse_resp_header(header, &resp);
+				_atcmd_fota_httpc_print_resp_info(&resp);
 
-				if (resp.ContentLength > 0 && data.recved_size > header_len)
+				if (resp.StatusCode == 200)
 				{
-					resp.ContentLengthDone = data.recved_size - header_len;
-
-					if (cb)
-						cb(data.data_in + header_len, data.recved_size - header_len, resp.ContentLength);
+					data.data_in += data.recved_size;
+					data.recved_size = data.data_in - (buf + header_len);
+					data.data_in = buf + header_len;
+					data.data_in_length = buf_len - header_len;
+				}
+				else
+				{
+					_atcmd_fota_log("httpc_get: !!! status_code != 200 (%d) !!!", resp.StatusCode);
+					ret = -1;
 				}
 
-				i = 0;
+				continue;
+			}
+			else
+			{
+				data.data_in += data.recved_size;
+				data.data_in_length -= data.recved_size;
+
+				if (data.data_in >= (buf + buf_len))
+				{
+					_atcmd_fota_log("httpc_get: !!! buffer overflow (%d/%d) !!!",
+										data.data_in - buf, buf_len);
+					ret = -1;
+					continue;
+				}
 			}
 		}
+		else if (resp.ContentLength > 0 && data.recved_size > 0)
+		{
+			if (cb)
+				cb(data.data_in, data.recved_size, resp.ContentLength);
 
-		data.data_in = buf + i;
-		data.data_in_length = buf_len - i;
+			resp.ContentLengthDone += data.recved_size;
+
+			_atcmd_fota_debug("httpc_get: body=%d (%d/%d)",
+						data.recved_size, resp.ContentLengthDone, resp.ContentLength);
+
+			if (resp.ContentLengthDone == resp.ContentLength)
+			{
+				_atcmd_fota_log("httpc_get: done");
+				ret = 0;
+				continue;
+			}
+
+			data.data_in = buf;
+			data.data_in_length = buf_len;
+		}
+
 		data.recved_size = 0;
 
 		ret = nrc_httpc_recv_response(&handle, &data);
-		if (ret != HTTPC_RET_OK)
-		{
-			if (ret != HTTPC_RET_CON_CLOSED)
-				_atcmd_error("nrc_httpc_recv_response() failed, ret=%d\n", ret);
-
-			break;
-		}
-
-		if (resp.ContentLength == 0)
-			i += data.recved_size;
+		if (ret == HTTPC_RET_OK)
+			ret = 1;
 		else
 		{
-			resp.ContentLengthDone += data.recved_size;
+			_atcmd_fota_log("httpc_get: %s (%d)", _atcmd_fota_httpc_strerror(ret), ret);
 
-			if (cb)
-				cb(data.data_in, data.recved_size, resp.ContentLength);
+			if (ret == HTTPC_RET_CON_CLOSED && resp.ContentLengthDone == resp.ContentLength)
+				ret = 0;
+			else
+			{
+				_atcmd_fota_log("httpc_get: !!! content_length=%d/%d !!!",
+									resp.ContentLengthDone, resp.ContentLength);
+				ret = -1;
+			}
 		}
 	}
 
 	nrc_httpc_close(&handle);
 
-	ret = -1;
-
-	if (i >= buf_len)
-		_atcmd_error("no http resp header\n");
-	else if (resp.StatusCode != 200)
-		_atcmd_error("http resp error, status_code=%d\n", resp.StatusCode);
-	else if (resp.ContentLengthDone != resp.ContentLength)
-		_atcmd_error("http content length, %d/%d\n", resp.ContentLengthDone, resp.ContentLength);
-	else
-		ret = 0;
-
-http_get_file_exit:
-
-	if (buf)
-		_atcmd_free(buf);
-
-	if (url)
-		_atcmd_free(url);
-
 	return ret;
 }
 
-static int _atcmd_fota_fw_parse_info (char *fw_info, atcmd_fota_info_t *info)
+static int _atcmd_fota_info_parse (char *fota_info, atcmd_fota_info_t *info)
 {
 	const char *fw_ver_type[FW_VER_NUM] =
 	{
@@ -344,15 +440,17 @@ static int _atcmd_fota_fw_parse_info (char *fw_info, atcmd_fota_info_t *info)
 	char *saveptr;
 	int i;
 
-	token = strtok_r(fw_info, "\n", &saveptr);
+	_atcmd_fota_log("[ INFO FILE ]");
+
+	token = strtok_r(fota_info, "\n", &saveptr);
 
 	for (i = 0 ; token && token_name[i] ; i++)
 	{
-//		_atcmd_fota_debug("fw_info: token=%s", token);
+/*		_atcmd_fota_debug("fota_info: token=%s", token); */
 
 		if (strncmp(token, token_name[i], strlen(token_name[i])) != 0)
 		{
-			_atcmd_fota_log("invalid info file");
+			_atcmd_fota_log("!!! invalid info file !!!");
 			return -1;
 		}
 
@@ -402,42 +500,38 @@ static int _atcmd_fota_fw_parse_info (char *fw_info, atcmd_fota_info_t *info)
 	return 0;
 }
 
-static void _atcmd_fota_fw_check_info (char *data, int len, int total)
+static void _atcmd_fota_fw_check_callback (char *data, int len, int total)
 {
-	static char *fw_info = NULL;
+	static char *fota_info = NULL;
 	static uint32_t cnt = 0;
 
-//	_atcmd_fota_debug("fw_check: len=%d total=%d", len, total);
-
-	if (!fw_info)
+	if (!fota_info)
 	{
-		fw_info = _atcmd_malloc(total);
-		if (!fw_info)
+		fota_info = _atcmd_malloc(total);
+		if (!fota_info)
 		{
 			_atcmd_error("malloc() failed\n");
 			return;
 		}
 	}
 
-	memcpy(fw_info + cnt, data, len);
+	memcpy(fota_info + cnt, data, len);
 	cnt += len;
 
 	if (cnt == total)
 	{
-		fw_info[cnt] = '\0';
+		fota_info[cnt] = '\0';
 
-//		_atcmd_fota_debug("fw_check: %s", fw_info);
+		_atcmd_fota_info_parse(fota_info, &g_atcmd_fota.info);
 
-		_atcmd_fota_fw_parse_info(fw_info, &g_atcmd_fota.info);
+		_atcmd_free(fota_info);
 
-		_atcmd_free(fw_info);
-
-		fw_info = NULL;
+		fota_info = NULL;
 		cnt = 0;
 	}
 }
 
-static int _atcmd_fota_fw_check (const char *server_url)
+static int _atcmd_fota_fw_check (const char *server_url, bool *new_fw)
 {
 	const fw_ver_t fw_ver[FW_VER_NUM] =
 	{
@@ -458,8 +552,15 @@ static int _atcmd_fota_fw_check (const char *server_url)
 	const fw_ver_t *cur_ver, *new_ver;
 	int i;
 
-	if (_atcmd_fota_http_get_file(server_url, "fota.info", 0, _atcmd_fota_fw_check_info) != 0)
+	_atcmd_fota_log("Checking firmware ...");
+
+	if (_atcmd_fota_httpc_get(server_url, ATCMD_FOTA_INFO_FILE,
+							g_atcmd_fota.recv_buf.addr, g_atcmd_fota.recv_buf.len,
+							_atcmd_fota_fw_check_callback) != 0)
+	{
+		memset(&g_atcmd_fota.info, 0, sizeof(atcmd_fota_info_t));
 		return -1;
+	}
 
 	for (i = 0 ; i < FW_VER_NUM ; i++)
 	{
@@ -485,6 +586,8 @@ static int _atcmd_fota_fw_check (const char *server_url)
 		char sdk_ver[12];
 		char atcmd_ver[12];
 
+		*new_fw = true;
+
 		snprintf(sdk_ver, sizeof(sdk_ver), "%d.%d.%d",
 						g_atcmd_fota.info.fw_ver[FW_VER_SDK].major,
 						g_atcmd_fota.info.fw_ver[FW_VER_SDK].minor,
@@ -495,33 +598,44 @@ static int _atcmd_fota_fw_check (const char *server_url)
 						g_atcmd_fota.info.fw_ver[FW_VER_ATCMD].minor,
 						g_atcmd_fota.info.fw_ver[FW_VER_ATCMD].revision);
 
-		_atcmd_fota_log("fw_check: sdk=%s atcmd=%s", sdk_ver, atcmd_ver);
+		_atcmd_fota_log("version: sdk=%s atcmd=%s", sdk_ver, atcmd_ver);
 
-		if (g_atcmd_fota.params.check_done_cb)
-			g_atcmd_fota.params.check_done_cb(sdk_ver, atcmd_ver);
-
-		return 1;
+		_atcmd_fota_event_callback(FOTA_EVT_VERSION, sdk_ver, atcmd_ver);
+	}
+	else
+	{
+		memset(&g_atcmd_fota.info, 0, sizeof(atcmd_fota_info_t));
+		*new_fw = false;
 	}
 
 	return 0;
 }
 
-static void _atcmd_fota_fw_write (char *data, int len, int total)
+static void _atcmd_fota_fw_update_callback (char *data, int len, int total)
 {
 	static uint32_t cnt = 0;
+	static uint32_t event = 0;
 
 	if (cnt == 0)
 	{
-		_atcmd_fota_log("fw_erase: %d", total);
+		_atcmd_fota_debug("erase: %d", total);
 
 		util_fota_erase(0, total);
-	}
 
-	_atcmd_fota_log("fw_write: %d/%d", cnt + len, total);
+		event = total / 10;
+	}
 
 	util_fota_write(cnt, (uint8_t *)data, len);
 
 	cnt += len;
+
+	if (cnt >= event)
+	{
+		_atcmd_fota_log("download: %d/%d", cnt + len, total);
+		_atcmd_fota_event_callback(FOTA_EVT_DOWNLOAD, total, cnt);
+
+		event += total / 10;
+	}
 
 	if (cnt == total)
 	{
@@ -538,24 +652,42 @@ static int _atcmd_fota_fw_update (void)
 	enum FW_BIN fw_bin_type = g_atcmd_fota.params.fw_bin_type;
 	fw_bin_t *fw_bin = &g_atcmd_fota.info.fw_bin[fw_bin_type];
 
+	_atcmd_fota_log("Updating firmware ...");
+
 	if (!strstr(fw_bin->name, ".bin"))
-		return -1;
-
-	if (_atcmd_fota_http_get_file(g_atcmd_fota.params.server_url, fw_bin->name, 8192, _atcmd_fota_fw_write) == 0)
 	{
-		_atcmd_fota_log("fw_update: %s crc=%x size=%d", fw_bin->name, fw_bin->crc, fw_bin->size);
+		_atcmd_fota_log("!!! invalid firmware name, %s !!!", fw_bin->name);
+		return -1;
+	}
 
-		if (fw_bin->size > 0)
+	_atcmd_fota_event_callback(FOTA_EVT_BINARY, fw_bin->name);
+
+	if (_atcmd_fota_httpc_get(g_atcmd_fota.params.server_url, fw_bin->name,
+							g_atcmd_fota.recv_buf.addr, g_atcmd_fota.recv_buf.len,
+							_atcmd_fota_fw_update_callback) == 0)
+	{
+		uint32_t max_bin_size = SF_FOTA_INFO - SF_FOTA; /* hal/nrc7292/hal_sflash.h */
+
+		if (fw_bin->size == 0)
+			_atcmd_fota_log("update: !!! no binary !!!");
+		else
 		{
-			fota_info_t fota_info;
+			_atcmd_fota_log("update: %s size=%u crc=%X", fw_bin->name, fw_bin->size, fw_bin->crc);
 
-			fota_info.crc = fw_bin->crc;
-			fota_info.fw_length = fw_bin->size;
+			if (fw_bin->size > max_bin_size)
+				_atcmd_fota_log("update: !!! binary size is greater than %u byte !!!", max_bin_size);
+			else
+			{
+				fota_info_t fota_info;
 
-			/*
-			 * If the update is successful, the system is reset to run the new firmware.
-			 */
-			util_fota_update_done(&fota_info);
+				fota_info.crc = fw_bin->crc;
+				fota_info.fw_length = fw_bin->size;
+
+				_atcmd_fota_event_callback(FOTA_EVT_UPDATE, fw_bin->name, fw_bin->size, fw_bin->crc);
+
+				util_fota_set_info(fota_info.fw_length, fota_info.crc);
+				util_fota_update_done(&fota_info); /* no return if success */
+			}
 		}
 	}
 
@@ -564,28 +696,32 @@ static int _atcmd_fota_fw_update (void)
 
 static void _atcmd_fota_task (void *pvParameters)
 {
-	_atcmd_fota_log("task_run");
+	bool new_fw = false;
+
+	_atcmd_fota_log("task: run");
+
+	memset(&g_atcmd_fota.info, 0, sizeof(atcmd_fota_info_t));
 
 	while (g_atcmd_fota.enable)
 	{
 		if (g_atcmd_fota.params.check_time > 0)
 		{
-			_atcmd_fota_log("task_delay: %d", g_atcmd_fota.params.check_time);
+			_atcmd_fota_debug("task: delay=%d", g_atcmd_fota.params.check_time);
 
 			vTaskDelay(pdMS_TO_TICKS(g_atcmd_fota.params.check_time * 1000));
 
-			_atcmd_fota_log("task_expire");
+			_atcmd_fota_debug("task: expire");
 
 			if (g_atcmd_fota.params.check_time == 0)
 				continue;
 		}
 		else
 		{
-			_atcmd_fota_log("task_suspend");
+			_atcmd_fota_debug("task: suspend");
 
 			vTaskSuspend(NULL);
 
-			_atcmd_fota_log("task_resume");
+			_atcmd_fota_debug("task: resume");
 
 			if (g_atcmd_fota.params.check_time > 0)
 				continue;
@@ -593,22 +729,33 @@ static void _atcmd_fota_task (void *pvParameters)
 
 		if (g_atcmd_fota.enable)
 		{
-			_atcmd_fota_log("Checking firmware ...");
-
-			_atcmd_fota_fw_check(g_atcmd_fota.params.server_url);
-
-			if (g_atcmd_fota.update)
+			if (_atcmd_fota_fw_check(g_atcmd_fota.params.server_url, &new_fw) == 0)
 			{
-				_atcmd_fota_log("Updating firmware ...");
+				if (!g_atcmd_fota.update || !new_fw)
+					continue;
 
-				_atcmd_fota_fw_update();
+				_atcmd_fota_fw_update(); /* no return if success */
 			}
+
+			_atcmd_fota_log("failed");
+			_atcmd_fota_event_callback(FOTA_EVT_FAIL);
+
+			g_atcmd_fota.enable = false;
+			g_atcmd_fota.update = false;
 		}
 	}
 
-	_atcmd_fota_log("task exit");
+	if (g_atcmd_fota.recv_buf.addr)
+	{
+		_atcmd_free(g_atcmd_fota.recv_buf.addr);
+
+		g_atcmd_fota.recv_buf.addr = NULL;
+		g_atcmd_fota.recv_buf.len = 0;
+	}
 
 	g_atcmd_fota.task = NULL;
+
+	_atcmd_fota_log("task: delete");
 
 	vTaskDelete(NULL);
 }
@@ -622,7 +769,7 @@ static bool _atcmd_fota_valid_params (atcmd_fota_params_t *params)
 			case FW_BIN_HSPI:
 			case FW_BIN_UART:
 			case FW_BIN_UART_HFC:
-				if (params->check_time >= 0 && params->check_done_cb)
+				if (params->check_time >= 0 && params->event_cb)
 				{
 					if (strncmp(params->server_url, "http://", 7) == 0)
 						return true;
@@ -642,11 +789,23 @@ static bool _atcmd_fota_valid_params (atcmd_fota_params_t *params)
 
 static int _atcmd_fota_enable (atcmd_fota_params_t *params)
 {
-#define ATCMD_FOTA_TASK_PRIORITY		2
-#define ATCMD_FOTA_TASK_STACK_SIZE		1024
-
 	if (!_atcmd_fota_valid_params(params))
 		return -1;
+
+	if (!g_atcmd_fota.recv_buf.addr)
+	{
+		char *buf;
+
+		buf = _atcmd_malloc(ATCMD_FOTA_RECV_BUF_SIZE);
+		if (!buf)
+		{
+			_atcmd_fota_log("enable: !!! recv_buf allocation failed !!!");
+			return -1;
+		}
+
+		g_atcmd_fota.recv_buf.addr = buf;
+		g_atcmd_fota.recv_buf.len = ATCMD_FOTA_RECV_BUF_SIZE;
+	}
 
 	if (strlen(params->server_url) > 0)
 		memcpy(&g_atcmd_fota.params, params, sizeof(atcmd_fota_params_t));
@@ -654,12 +813,12 @@ static int _atcmd_fota_enable (atcmd_fota_params_t *params)
 	{
 		g_atcmd_fota.params.fw_bin_type = params->fw_bin_type;
 		g_atcmd_fota.params.check_time = params->check_time;
-		g_atcmd_fota.params.check_done_cb = params->check_done_cb;
+		g_atcmd_fota.params.event_cb = params->event_cb;
 	}
 
 	if (g_atcmd_fota.enable)
 	{
-		_atcmd_fota_log("change_params: check_time=%d server_url=%s",
+		_atcmd_fota_log("change: check_time=%d server_url=%s",
 					g_atcmd_fota.params.check_time, g_atcmd_fota.params.server_url);
 
 		vTaskResume(g_atcmd_fota.task);
@@ -676,9 +835,17 @@ static int _atcmd_fota_enable (atcmd_fota_params_t *params)
 						ATCMD_FOTA_TASK_PRIORITY,
 						&g_atcmd_fota.task) != pdPASS)
 		{
-			_atcmd_fota_log("xTaskCreate() failed");
+			_atcmd_fota_log("enable: xTaskCreate() failed");
 
 			g_atcmd_fota.enable = false;
+
+			if (g_atcmd_fota.recv_buf.addr)
+			{
+				_atcmd_free(g_atcmd_fota.recv_buf.addr);
+
+				g_atcmd_fota.recv_buf.addr = NULL;
+				g_atcmd_fota.recv_buf.len = 0;
+			}
 
 			return -1;
 		}
@@ -692,6 +859,7 @@ static int _atcmd_fota_disable (void)
 	_atcmd_fota_log("disable");
 
 	g_atcmd_fota.enable = false;
+	g_atcmd_fota.update = false;
 
 	if (g_atcmd_fota.task)
 	{

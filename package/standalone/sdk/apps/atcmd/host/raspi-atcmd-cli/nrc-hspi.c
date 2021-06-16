@@ -27,10 +27,15 @@
 #include "nrc-hspi.h"
 
 
-//#define CONFIG_HSPI_BIG_ENDIAN
-//#define CONFIG_HSPI_REG_PRINT
+#define _hspi_log(fmt, ...)				log_printf(fmt, ##__VA_ARGS__)
+
+#define _hspi_read_debug(fmt, ...)		//_hspi_log("hspi_read: " fmt, ##__VA_ARGS__)
+#define _hspi_write_debug(fmt, ...)		//_hspi_log("hspi_write: " fmt, ##__VA_ARGS__)
 
 /**********************************************************************************************/
+
+//#define CONFIG_HSPI_BIG_ENDIAN
+//#define CONFIG_HSPI_REG_PRINT
 
 static hspi_info_t g_hspi_info =
 {
@@ -477,7 +482,7 @@ static int hspi_status_update (void)
 
 static int hspi_read_slot (int slot_num, int slot_size, char *buf, int *len)
 {
-	static int seq = -1;
+	static uint8_t seq = 0;
 	char slot_buf[HSPI_SLOT_SIZE_MAX];
 	hspi_slot_t *slot = (hspi_slot_t *)slot_buf;
 	hspi_opcode_t opcode;
@@ -490,7 +495,8 @@ static int hspi_read_slot (int slot_num, int slot_size, char *buf, int *len)
 		if (hspi_transfer(&opcode, (char *)slot, slot_size) != 0)
 			return -1;
 
-		if (memcmp(slot->start, "HS", 2) != 0 || slot->len > (slot_size - HSPI_SLOT_HDR_SIZE))
+		if (memcmp(slot->start, HSPI_SLOT_START, HSPI_SLOT_START_SIZE) != 0 ||
+				slot->len > (slot_size - HSPI_SLOT_HDR_SIZE))
 		{
 			_hspi_log("hspi_read: invalid header, start=%c(%X),%c(%X) len=%u \n",
 						slot->start[0], slot->start[0], slot->start[1], slot->start[1],
@@ -502,19 +508,17 @@ static int hspi_read_slot (int slot_num, int slot_size, char *buf, int *len)
 
 		memcpy(buf + j, slot->data, slot->len);
 
-		if (seq < 0)
-			seq = slot->seq;
-
 		_hspi_read_debug("slot: seq=%u len=%u\n", slot->seq, slot->len);
 
 		if (slot->seq != seq)
 		{
-			_hspi_log("hspi_read: slot_seq: %u -> %u\n", seq, slot->seq);
+			_hspi_read_debug("hspi_read: slot_seq: %u -> %u\n", seq, slot->seq);
 
 			seq = slot->seq;
 		}
 
-		seq = (seq + 1) & HSPI_SLOT_SEQ_MASK;
+		if (++seq > HSPI_SLOT_SEQ_MAX)
+			seq = 0;
 	}
 
 	*len = j;
@@ -583,17 +587,17 @@ static int hspi_read (char *buf, int len)
 
 static int hspi_write_slot (int slot_num, int slot_size, char *buf, int *len)
 {
-	static uint16_t seq = 0;
+	static uint8_t seq = 0;
 	char slot_buf[HSPI_SLOT_SIZE_MAX];
 	hspi_slot_t *slot = (hspi_slot_t *)slot_buf;
 	hspi_opcode_t opcode;
 	int i, j;
 
-	memcpy(slot->start, "HS", 2);
+	memcpy(slot->start, HSPI_SLOT_START, HSPI_SLOT_START_SIZE);
 
 	slot->len = slot_size - HSPI_SLOT_HDR_SIZE;
 
-	for (i = 0, j = 0 ; i < slot_num ; i++, j += slot->len, seq++)
+	for (i = 0, j = 0 ; i < slot_num ; i++, j += slot->len)
 	{
 		if ((*len - j) < slot->len)
 		{
@@ -602,7 +606,7 @@ static int hspi_write_slot (int slot_num, int slot_size, char *buf, int *len)
 			memset(slot_buf + HSPI_SLOT_HDR_SIZE + slot->len, 0, slot_size - HSPI_SLOT_HDR_SIZE - slot->len);
 		}
 
-		slot->seq = seq & HSPI_SLOT_SEQ_MASK;
+		slot->seq = seq;
 
 		memcpy(slot->data, buf + j, slot->len);
 
@@ -612,6 +616,9 @@ static int hspi_write_slot (int slot_num, int slot_size, char *buf, int *len)
 
 		if (hspi_transfer(&opcode, (char *)slot, slot_size) != 0)
 			break;
+
+		if (++seq > HSPI_SLOT_SEQ_MAX)
+			seq = 0;
 	}
 
 	*len = j;
@@ -707,8 +714,11 @@ static int hspi_ready (hspi_info_t *info)
 			slot_num = (regs.msg[2 + que] >> 16) & 0xffff;
 			slot_size = regs.msg[2 + que] & 0xffff;
 
-			if (slot_num == 0 || slot_size == 0)
-				return -1; // invalid
+			if (slot_num == 0)
+				return -1;
+
+			if (slot_size == 0 || slot_size > HSPI_SLOT_SIZE_MAX)
+				return -1;
 
 			info->queue.slot[que].num = slot_num;
 			info->queue.slot[que].size = slot_size;

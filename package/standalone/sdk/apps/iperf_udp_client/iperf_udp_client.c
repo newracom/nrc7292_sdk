@@ -305,7 +305,6 @@ int  run_iperf_udp_client(WIFI_CONFIG *param)
 }
 
 
-#if !defined(ATCMD_SAMPLE_TEST)
 
 /******************************************************************************
  * FunctionName : user_init
@@ -331,4 +330,3 @@ void user_init(void)
 	}
 }
 
-#endif /* !defined(ATCMD_SAMPLE_TEST) */

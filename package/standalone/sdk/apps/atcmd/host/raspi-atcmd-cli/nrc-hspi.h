@@ -27,19 +27,7 @@
 #define __NRC_HSPI_H__
 /**********************************************************************************************/
 
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-
-
-#define _hspi_log(fmt, ...)				printf("[NRC] " fmt, ##__VA_ARGS__)
-#define _hspi_error(fmt, ...)			_hspi_log("%s,%d: " fmt, __func__, __LINE__, ##__VA_ARGS__)
-
-#define _hspi_read_debug(fmt, ...)		//_hspi_log("hspi_read: " fmt, ##__VA_ARGS__)
-#define _hspi_write_debug(fmt, ...)		//_hspi_log("hspi_write: " fmt, ##__VA_ARGS__)
-
-/**********************************************************************************************/
+#include "common.h"
 
 /**
  *	H-SPI Host-Side Registers
@@ -236,14 +224,6 @@ typedef union
 
 #define HSPI_ACK_VALUE			0x47
 
-#define HSPI_SLOT_HDR_SIZE		4 // sizeof(hspi_slot_t)
-#define HSPI_SLOT_SIZE_MAX		(HSPI_SLOT_HDR_SIZE + (4 * 128)) // (4 + 512)-byte
-
-#define HSPI_XFER_NUM_MAX		10
-#define HSPI_XFER_LEN_MAX		2048
-
-#define HSPI_XFER_RETRY_MAX		5
-
 enum
 {
 	HSPI_TXQ = 0,	// from target to host
@@ -271,6 +251,10 @@ typedef struct
 
 typedef struct
 {
+#define HSPI_XFER_NUM_MAX		10
+#define HSPI_XFER_LEN_MAX		2048
+#define HSPI_XFER_RETRY_MAX		5
+
 	int len;
 	char *tx_buf;
 	char *rx_buf;
@@ -278,9 +262,13 @@ typedef struct
 
 typedef struct
 {
-#define HSPI_SLOT_SEQ_MASK	0x3F
+#define HSPI_SLOT_SIZE_MAX		512
+#define HSPI_SLOT_HDR_SIZE		4 /* 2 + 1 + 1 */
+#define HSPI_SLOT_START_SIZE	2
+#define HSPI_SLOT_START			"HS"
+#define HSPI_SLOT_SEQ_MAX		0x3F
 
-	uint8_t start[2]; // 'HS'
+	uint8_t start[2];
 	uint16_t len:10;
 	uint16_t seq:6;
 

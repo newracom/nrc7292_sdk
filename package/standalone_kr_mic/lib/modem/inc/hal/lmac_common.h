@@ -204,5 +204,6 @@ void lmac_tx_power_init_default(void);
 #else
 void lmac_tx_power_init();
 #endif /* defined(INCLUDE_BD_SUPPORT) */
+void lmac_task_handle_data(void *param);
 
 #endif /* HAL_LMAC_COMMON_H */

@@ -31,6 +31,8 @@
  * @brief UART configuration parameters
  ***********************************************/
 
+#define DHCP_CLIENT_TIMEOUT_DEFAULT		(5000) /* msec */
+
 /** @brief security mode */
 typedef enum {
 	MODE_OPEN	= 0,
@@ -41,12 +43,13 @@ typedef enum {
 /** @brief connection results	*/
 typedef enum {
 	WIFI_INIT_FAIL 			= -1,
-	WIFI_GET_ND			= -2,
+	WIFI_GET_ND				= -2,
 	WIFI_SET_FAIL 			= -3,
 	WIFI_CONNECTION_FAIL	= -4,
 	WIFI_DHCP_FAIL			= -5,
-	WIFI_SET_IP_FAIL		= -6,
-	WIFI_SOFTAP_FAIL		= -7,
+	WIFI_DHCP_TIMEOUT		= -6,
+	WIFI_SET_IP_FAIL		= -7,
+	WIFI_SOFTAP_FAIL		= -8,
 	WIFI_SUCCESS			= 0,
 }NRC_WIFI_CONN_RET;
 

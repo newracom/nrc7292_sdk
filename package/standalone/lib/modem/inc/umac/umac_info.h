@@ -169,6 +169,11 @@ typedef struct _umac_stainfo {
 	uint8_t     key_addr[MAC_ADDR_LEN];
 	struct lmac_cipher cipher_info[MAX_KEY_ID];
 #endif /* defined(STANDARD_11AH) */
+#if defined(INCLUDE_STA_SIG_INFO)
+	int8_t		rssi;
+	uint8_t		snr;
+	uint8_t 	mcs;
+#endif /* defined(INCLUDE_SIGNAL_INFO_SOFTAP) */
 } __attribute__((packed)) umac_stainfo;
 
 #if !defined(MAX_STA)
@@ -189,6 +194,7 @@ umac_stainfo * get_umac_stainfo_by_macaddr(int8_t vif_id, uint8_t *addr);
 umac_stainfo * get_umac_stainfo_by_aid(int8_t vif_id, uint16_t aid);
 umac_stainfo * get_umac_stainfo_by_vifid(int8_t vif_id);
 bool umac_check_remain_allow_sta(int8_t vif_id, uint8_t* addr);
+bool umac_check_stainfo_by_macaddr_ap(int8_t vif_id, uint8_t *addr);
 #if defined(STANDARD_11AH)
 uint8_t* get_umac_stainfo_ssid(int8_t vif_id);
 uint8_t	get_umac_stainfo_ssid_len(int8_t vif_id);
@@ -272,6 +278,12 @@ DEC_ARR_STAINFO_GET_SET(struct lmac_cipher*, cipher_info);
 DEC_VAL_STAINFO_GET_SET(uint32_t,			twt_service_period);
 DEC_VAL_STAINFO_GET_SET(uint32_t,			twt_wake_interval);
 #endif /* defined(INCLUDE_TWT_SUPPORT) */
+#if defined(INCLUDE_STA_SIG_INFO)
+DEC_VAL_STAINFO_GET_SET(int8_t,			rssi);
+DEC_VAL_STAINFO_GET_SET(uint8_t,			snr);
+DEC_VAL_STAINFO_GET_SET(uint8_t,		mcs);
+#endif /* defined(INCLUDE_SIGNAL_INFO_SOFTAP) */
+
 #endif /* defined(LMAC_CONFIG_11AH) */
 #else /* defined(INCLUDE_UMAC) */
 static inline uint8_t *get_umac_apinfo_bssid(int8_t vif_id) {return NULL;};
@@ -280,6 +292,7 @@ static inline umac_stainfo* get_umac_stainfo_by_vifid(int8_t vif_id) {return NUL
 static inline umac_stainfo* get_umac_stainfo_by_macaddr(int8_t vif_id, uint8_t *addr) {return NULL;};
 static inline uint32_t get_umac_stainfo_listen_interval(umac_stainfo* u){return 0;}
 static inline uint32_t set_umac_apinfo_assoc_s1g_channel(int8_t v, uint8_t k){return 0;}
+static inline bool umac_check_stainfo_by_macaddr_ap(int8_t vif_id, uint8_t *addr){return 0;}
 static inline void set_umac_apinfo_bssid(int8_t v, uint8_t *m, int a) {}
 #endif /* defined(INCLUDE_UMAC) */
 #endif

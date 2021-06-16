@@ -700,7 +700,7 @@ typedef struct
 
 static atcmd_timeout_t g_atcmd_timeout_wifi[] =
 {
-	{ "WSCAN", 0 }, { "WCONN", 0 }, { "WDISCONN", 0 },
+	{ "WSCAN", 0 }, { "WCONN", 0 }, { "WDISCONN", 0 }, { "WDHCP", 60 },
 
 	{ NULL, 0 }
 };

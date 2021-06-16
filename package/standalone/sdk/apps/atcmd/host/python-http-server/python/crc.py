@@ -1,4 +1,6 @@
 #!/usr/bin/python
+#
+
 import sys
 import zlib
 
@@ -11,8 +13,7 @@ def getCRC32(filename):
         crc = zlib.crc32(f.read())
         return unsigned32(crc)
     except IOError:
-        print("Error: Cannot fine such file.")
-        #return -1
+        print("Error: Cannot find such file.")
         exit(1)
 
 if len(sys.argv) == 1:
