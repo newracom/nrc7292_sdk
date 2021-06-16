@@ -626,6 +626,14 @@ typedef struct {
 	uint8_t		data[255];
 } ie_rsn;
 
+// EID 56: TIMEOUT INTERVAL
+typedef struct {
+	uint8_t		eid;
+	uint8_t		length;
+	uint8_t		timeout_interval_type;
+	uint32_t	timeout_interval;
+} ie_timeout_interval;
+
 // EID 61: HT OPERATION
 #define IE_LENGTH_HT_OPERATION		22
 typedef  struct {

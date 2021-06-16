@@ -94,6 +94,7 @@ typedef enum  _LMacEvent {
 	LME_NAN_DW_END      = 10,
 	LME_NAN_TBTT        = 11,
 	LME_POWERSAVE		= 12,
+	LME_DATA            = 13,
 	LME_MAX,
 } LMacEvent;
 

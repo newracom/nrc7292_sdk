@@ -27,6 +27,16 @@
 #define __NRC_ATCMD_FOTA_H__
 /**********************************************************************************************/
 
+#define ATCMD_FOTA_TASK_PRIORITY		2
+#define ATCMD_FOTA_TASK_STACK_SIZE		1024
+
+#define ATCMD_FOTA_URL_LEN_MAX			256
+#define ATCMD_FOTA_INFO_FILE			"fota.info"
+#define ATCMD_FOTA_RECV_BUF_SIZE		(1024 * 8)
+
+
+/**********************************************************************************************/
+
 enum FW_VER
 {
 	FW_VER_SDK = 0,
@@ -62,8 +72,51 @@ typedef struct
 
 /**********************************************************************************************/
 
+enum FOTA_EVENT
+{
+	FOTA_EVT_VERSION = 0,
+	FOTA_EVT_BINARY,
+	FOTA_EVT_DOWNLOAD,
+	FOTA_EVT_UPDATE,
+	FOTA_EVT_FAIL,
+};
+
 typedef struct
 {
+	enum FOTA_EVENT type;
+
+	union
+	{
+		struct
+		{
+			const char *sdk;
+			const char *atcmd;
+		} version;
+
+		struct
+		{
+			const char *name;
+		} binary;
+
+		struct
+		{
+			uint32_t total;
+			uint32_t len;
+		} download;
+
+		struct
+		{
+			const char *bin_name;
+			uint32_t bin_size;
+			uint32_t bin_crc;
+		} update;
+	};
+} atcmd_fota_event_t;
+
+typedef struct
+{
+	bool new_fw;
+
 	fw_ver_t fw_ver[FW_VER_NUM];
 	fw_bin_t fw_bin[FW_BIN_NUM];
 } atcmd_fota_info_t;
@@ -75,7 +128,7 @@ typedef struct
 	enum FW_BIN fw_bin_type;
 
 	int check_time; // sec
-	void (*check_done_cb) (const char *sdk_ver, const char *atcmd_ver);
+	void (*event_cb) (atcmd_fota_event_t *event);
 
 	char server_url[ATCMD_FOTA_SERVER_URL_LEN_MAX + 1];
 } atcmd_fota_params_t;
@@ -89,6 +142,12 @@ typedef struct
 	atcmd_fota_params_t params;
 
 	TaskHandle_t task;
+
+	struct
+	{
+		char *addr;
+		int len;
+	} recv_buf;
 } atcmd_fota_t;
 
 /**********************************************************************************************/

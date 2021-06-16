@@ -23,46 +23,18 @@
  *
  */
 
-#ifndef __RASPI_H__
-#define __RASPI_H__
+#ifndef __RASPI_HIF_H__
+#define __RASPI_HIF_H__
 /**********************************************************************************************/
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdarg.h>
-
-#include <errno.h>
-#include <time.h>
 #include <fcntl.h>
-#include <poll.h>
-#include <unistd.h>
-#include <endian.h>
-#include <pthread.h>
-#include <sys/ioctl.h>
-#include <sys/time.h>
-#include <arpa/inet.h>
-
-#include <getopt.h>
 #include <termios.h>
+#include <sys/ioctl.h>
 #include <linux/spi/spidev.h>
 
-/**********************************************************************************************/
-
-#define raspi_printf(fmt, ...)		printf("[RPI] " fmt, ##__VA_ARGS__)
-
-#define raspi_trace()				raspi_printf("%s::%d\n", __func__, __LINE__)
-#define raspi_debug(fmt, ...)		raspi_printf(fmt, ##__VA_ARGS__)
-#define raspi_info(fmt, ...)		raspi_printf(fmt, ##__VA_ARGS__)
-#define raspi_error(fmt, ...)		raspi_printf("%s::%d: " fmt, __func__, __LINE__, ##__VA_ARGS__)
+#include "common.h"
 
 /**********************************************************************************************/
-
-typedef enum
-{
-	false = 0,
-	true = 1
-} bool;
 
 enum RASPI_HIF_TYPE
 {
@@ -72,7 +44,6 @@ enum RASPI_HIF_TYPE
 	RASPI_HIF_UART,
 
 	RASPI_HIF_NUM
-
 };
 
 enum RASPI_HIF_FLAG
@@ -92,36 +63,21 @@ typedef struct
 
 /**********************************************************************************************/
 
-/*
- * 	raspi-hif.c
- */
-extern int raspi_hif_open (int type, char *device, uint32_t speed, uint32_t flags);
-extern void raspi_hif_close (void);
-extern int raspi_hif_read (char *buf, int len);
-extern int raspi_hif_write (char *buf, int len);
-
-
-/*
- * 	raspi-uart.c
- */
-
-extern int raspi_uart_open (char *device, uint32_t baudrate, bool hfc);
-extern void raspi_uart_close (void);
-extern int raspi_uart_read (char *buf, int len);
-extern int raspi_uart_write (char *buf, int len);
-
-
-/*
- * 	raspi-spi.c
- */
-
-#include <linux/spi/spidev.h>
-
 extern int raspi_spi_open (const char *device);
 extern int raspi_spi_close (void);
 extern int raspi_spi_setup (int mode, int bits_per_word, int max_speed_hz, bool print);
 extern int raspi_spi_transfer (struct spi_ioc_transfer *xfers, int n_xfers);
 extern int raspi_spi_single_transfer (char *tx_buf, char *rx_buf, int len);
 
+extern int raspi_uart_open (char *device, uint32_t baudrate, bool hfc);
+extern void raspi_uart_close (void);
+extern int raspi_uart_read (char *buf, int len);
+extern int raspi_uart_write (char *buf, int len);
+
+extern int raspi_hif_open (int type, char *device, uint32_t speed, uint32_t flags);
+extern void raspi_hif_close (void);
+extern int raspi_hif_read (char *buf, int len);
+extern int raspi_hif_write (char *buf, int len);
+
 /**********************************************************************************************/
-#endif /* #ifndef __RASPI_H__ */
+#endif /* #ifndef __RASPI_HIF_H__ */

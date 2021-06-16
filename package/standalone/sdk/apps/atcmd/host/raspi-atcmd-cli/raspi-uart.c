@@ -23,12 +23,14 @@
  *
  */
 
+
+#include <termios.h>
 #include <sys/mman.h>
 
-#include "raspi.h"
+#include "raspi-hif.h"
 
-#define raspi_uart_info(fmt, ...)		//raspi_info(fmt, ##__VA_ARGS__)
-#define raspi_uart_error(fmt, ...)		raspi_error(fmt, ##__VA_ARGS__)
+#define raspi_uart_info(fmt, ...)		//log_info(fmt, ##__VA_ARGS__)
+#define raspi_uart_error(fmt, ...)		log_error(fmt, ##__VA_ARGS__)
 
 /**********************************************************************************************/
 

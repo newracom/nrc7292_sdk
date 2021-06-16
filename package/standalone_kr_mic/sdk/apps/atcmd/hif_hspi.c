@@ -26,19 +26,14 @@
 
 #include "hif.h"
 
-
 /**********************************************************************************************/
 
-#if !defined(CONFIG_HIF_HSPI_RX_SLOT_NUM) || !defined(CONFIG_HIF_HSPI_TX_SLOT_NUM)
-#error "Not defined CONFIG_HIF_HSPI_RX_SLOT_NUM or CONFIG_HIF_HSPI_TX_SLOT_NUM"
+#if !defined(CONFIG_HIF_HSPI_SLOT_NUM)
+#error "Not defined CONFIG_HIF_HSPI_SLOT_NUM"
 #endif
 
-#if !defined(CONFIG_HIF_HSPI_RX_SLOT_SIZE) || !defined(CONFIG_HIF_HSPI_TX_SLOT_SIZE)
-#error "Not defined CONFIG_HIF_HSPI_RX_SLOT_SIZE or CONFIG_HIF_HSPI_TX_SLOT_SIZE"
-#endif
-
-#if CONFIG_HIF_HSPI_SLOT_HDR_SIZE != 4 /* _HSPI_SLOT_HDR_SIZE */
-#error "Invalid CONFIG_HIF_HSPI_SLOT_HDR_SIZE"
+#if !defined(CONFIG_HIF_HSPI_SLOT_SIZE)
+#error "Not defined CONFIG_HIF_HSPI_SLOT_SIZE"
 #endif
 
 #define _hspi_read_info(fmt, ...)		/* _hif_info("hspi_read: " fmt, ##__VA_ARGS__) */
@@ -152,22 +147,25 @@ typedef struct
 
 typedef struct
 {
+#define _HSPI_SLOT_SIZE_MAX		512
 #define _HSPI_SLOT_HDR_SIZE		4
-#define _HSPI_SLOT_SEQ_MASK		0x3F
+#define _HSPI_SLOT_START_SIZE	2
+#define _HSPI_SLOT_START_CHAR	"HS"
+#define _HSPI_SLOT_SEQ_MAX		0x3F
 
-	uint8_t start[2]; /* 'HS' */
+	uint8_t start[2];
 	uint16_t len:10;
 	uint16_t seq:6;
 } _hspi_hdr_t;
 
 /**********************************************************************************************/
 
-#define _HSPI_RX_SLOT_NUM				CONFIG_HIF_HSPI_RX_SLOT_NUM
-#define _HSPI_RX_SLOT_SIZE				CONFIG_HIF_HSPI_RX_SLOT_SIZE
+#define _HSPI_RX_SLOT_NUM				CONFIG_HIF_HSPI_SLOT_NUM
+#define _HSPI_RX_SLOT_SIZE				CONFIG_HIF_HSPI_SLOT_SIZE
 #define _HSPI_RX_SLOT_DATA_LEN_MAX		(_HSPI_RX_SLOT_SIZE - _HSPI_SLOT_HDR_SIZE)
 
-#define _HSPI_TX_SLOT_NUM				CONFIG_HIF_HSPI_TX_SLOT_NUM
-#define _HSPI_TX_SLOT_SIZE				CONFIG_HIF_HSPI_TX_SLOT_SIZE
+#define _HSPI_TX_SLOT_NUM				CONFIG_HIF_HSPI_SLOT_NUM
+#define _HSPI_TX_SLOT_SIZE				CONFIG_HIF_HSPI_SLOT_SIZE
 #define _HSPI_TX_SLOT_DATA_LEN_MAX		(_HSPI_TX_SLOT_SIZE - _HSPI_SLOT_HDR_SIZE)
 
 static volatile _hspi_sys_reg_t *g_hspi_sys_reg = (volatile _hspi_sys_reg_t *)HIF_BASE_ADDR;
@@ -177,55 +175,8 @@ static volatile _hspi_que_reg_t *g_hspi_que_reg[_HSPI_QUE_NUM] =
 	(volatile _hspi_rxq_reg_t *)HIF_RXQUE_BASE_ADDR
 };
 
-/*********************************************************************************************/
-
 static _hif_fifo_t *g_hif_hspi_rx_fifo = NULL;
 static _hif_fifo_t *g_hif_hspi_tx_fifo = NULL;
-
-static void _hif_hspi_fifo_delete (void)
-{
-	if (g_hif_hspi_rx_fifo)
-	{
-		_hif_fifo_delete(g_hif_hspi_rx_fifo);
-		g_hif_hspi_rx_fifo = NULL;
-	}
-
-	if (g_hif_hspi_tx_fifo)
-	{
-		_hif_fifo_delete(g_hif_hspi_tx_fifo);
-		g_hif_hspi_tx_fifo = NULL;
-	}
-}
-
-static int _hif_hspi_fifo_create (_hif_info_t *info)
-{
-	_hif_buf_t *rx_fifo = &info->rx_fifo;
-	_hif_buf_t *tx_fifo = &info->tx_fifo;
-
-	if (rx_fifo->size > 0)
-		g_hif_hspi_rx_fifo = _hif_fifo_create(rx_fifo->addr, rx_fifo->size, true);
-
-	if (tx_fifo->size > 0)
-		g_hif_hspi_tx_fifo = _hif_fifo_create(tx_fifo->addr, tx_fifo->size, true);
-
-	if (!g_hif_hspi_rx_fifo || !g_hif_hspi_tx_fifo)
-	{
-		_hif_error("_hif_fifo_create() failed, rx=%p(%d) tx=%p(%d)\n",
-			   			g_hif_hspi_rx_fifo, rx_fifo->size,
-						g_hif_hspi_tx_fifo, tx_fifo->size);
-
-		_hif_hspi_fifo_delete();
-		return -1;
-	}
-
-	_hif_info("HSPI_FIFO: rx=(%p, %u), tx=(%p, %u)\n",
-				g_hif_hspi_rx_fifo ? g_hif_hspi_rx_fifo->buffer : 0,
-				g_hif_hspi_rx_fifo ? g_hif_hspi_rx_fifo->size : 0,
-				g_hif_hspi_tx_fifo ? g_hif_hspi_tx_fifo->buffer : 0,
-				g_hif_hspi_tx_fifo ? g_hif_hspi_tx_fifo->size : 0);
-
-	return 0;
-}
 
 /**********************************************************************************************/
 
@@ -470,7 +421,7 @@ static void _hif_hspi_txq_isr (int vector) /* to host */
 
 static int __hif_hspi_read (char *buf, int len)
 {
-	static uint16_t seq = 0;
+	static uint8_t seq = 0;
 	_hspi_hdr_t hdr;
 	int ret;
 	int i;
@@ -490,7 +441,7 @@ static int __hif_hspi_read (char *buf, int len)
 			break;
 		}
 
-		if (memcmp(hdr.start, "HS", 2) != 0 || hdr.len > _HSPI_RX_SLOT_DATA_LEN_MAX)
+		if (memcmp(hdr.start, _HSPI_SLOT_START_CHAR, _HSPI_SLOT_START_SIZE) != 0 || hdr.len > _HSPI_RX_SLOT_DATA_LEN_MAX)
 		{
 			hdr.len = 0;
 
@@ -509,7 +460,8 @@ static int __hif_hspi_read (char *buf, int len)
 				seq = hdr.seq;
 			}
 
-			seq = (seq + 1) & _HSPI_SLOT_SEQ_MASK;
+			if (++seq > _HSPI_SLOT_SEQ_MAX)
+			   seq = 0;
 		}
 
 		ret = _hif_fifo_read(g_hif_hspi_rx_fifo, hdr.len > 0 ? buf + i : NULL, _HSPI_RX_SLOT_DATA_LEN_MAX);
@@ -576,19 +528,21 @@ int _hif_hspi_read (char *buf, int len)
 
 int __hif_hspi_write (char *buf, int len)
 {
-	static uint16_t seq = 0;
+	static uint8_t seq = 0;
 	_hspi_hdr_t hdr;
 	int i;
 
-	memcpy(hdr.start, "HS", 2);
+	memcpy(hdr.start, _HSPI_SLOT_START_CHAR, _HSPI_SLOT_START_SIZE);
 	hdr.len = _HSPI_TX_SLOT_DATA_LEN_MAX;
 
-	for (i = 0 ; i < len ; i += hdr.len, seq++)
+	for (i = 0 ; i < len ; i += hdr.len)
 	{
 		if ((len - i) < _HSPI_TX_SLOT_DATA_LEN_MAX)
 			hdr.len = len - i;
 
-		hdr.seq = seq & _HSPI_SLOT_SEQ_MASK;
+		hdr.seq = seq;
+		if (++seq > _HSPI_SLOT_SEQ_MAX)
+			seq = 0;
 
 		_hif_fifo_write(g_hif_hspi_tx_fifo, (char *)&hdr, _HSPI_SLOT_HDR_SIZE);
 		_hif_fifo_write(g_hif_hspi_tx_fifo, buf + i, hdr.len);
@@ -661,6 +615,51 @@ int _hif_hspi_write (char *buf, int len)
 }
 
 /**********************************************************************************************/
+
+static void _hif_hspi_fifo_delete (void)
+{
+	if (g_hif_hspi_rx_fifo)
+	{
+		_hif_fifo_delete(g_hif_hspi_rx_fifo);
+		g_hif_hspi_rx_fifo = NULL;
+	}
+
+	if (g_hif_hspi_tx_fifo)
+	{
+		_hif_fifo_delete(g_hif_hspi_tx_fifo);
+		g_hif_hspi_tx_fifo = NULL;
+	}
+}
+
+static int _hif_hspi_fifo_create (_hif_info_t *info)
+{
+	_hif_buf_t *rx_fifo = &info->rx_fifo;
+	_hif_buf_t *tx_fifo = &info->tx_fifo;
+
+	if (rx_fifo->size > 0)
+		g_hif_hspi_rx_fifo = _hif_fifo_create(rx_fifo->addr, rx_fifo->size, true);
+
+	if (tx_fifo->size > 0)
+		g_hif_hspi_tx_fifo = _hif_fifo_create(tx_fifo->addr, tx_fifo->size, true);
+
+	if (!g_hif_hspi_rx_fifo || !g_hif_hspi_tx_fifo)
+	{
+		_hif_error("_hif_fifo_create() failed, rx=%p(%d) tx=%p(%d)\n",
+			   			g_hif_hspi_rx_fifo, rx_fifo->size,
+						g_hif_hspi_tx_fifo, tx_fifo->size);
+
+		_hif_hspi_fifo_delete();
+		return -1;
+	}
+
+	_hif_info("HSPI_FIFO: rx=(%p, %u), tx=(%p, %u)\n",
+				g_hif_hspi_rx_fifo ? g_hif_hspi_rx_fifo->buffer : 0,
+				g_hif_hspi_rx_fifo ? g_hif_hspi_rx_fifo->size : 0,
+				g_hif_hspi_tx_fifo ? g_hif_hspi_tx_fifo->buffer : 0,
+				g_hif_hspi_tx_fifo ? g_hif_hspi_tx_fifo->size : 0);
+
+	return 0;
+}
 
 static int _hif_hspi_slot_setup (uint32_t rx_fifo_size, uint32_t tx_fifo_size)
 {

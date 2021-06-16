@@ -24,7 +24,7 @@
  */
 
 
-#include "raspi.h"
+#include "raspi-hif.h"
 #include "nrc-hspi.h"
 
 /**********************************************************************************************/
@@ -36,7 +36,7 @@ static void raspi_hif_mutex_init (void)
 	int ret = pthread_mutex_init(&g_raspi_hif_mutex, NULL);
 
 	if (ret != 0)
-		raspi_error("pthread_mutex_init, %s\n", strerror(ret));
+		log_error("pthread_mutex_init, %s\n", strerror(ret));
 }
 
 static void raspi_hif_mutex_lock (void)
@@ -44,7 +44,7 @@ static void raspi_hif_mutex_lock (void)
 	int ret = pthread_mutex_lock(&g_raspi_hif_mutex);
 
 	if (ret != 0)
-		raspi_error("pthread_mutex_lock, %s\n", strerror(ret));
+		log_error("pthread_mutex_lock, %s\n", strerror(ret));
 }
 
 static void raspi_hif_mutex_unlock (void)
@@ -52,7 +52,7 @@ static void raspi_hif_mutex_unlock (void)
 	int ret = pthread_mutex_unlock(&g_raspi_hif_mutex);
 
 	if (ret < 0)
-		raspi_error("pthread_mutex_unlock, %s\n", strerror(ret));
+		log_error("pthread_mutex_unlock, %s\n", strerror(ret));
 }
 
 /**********************************************************************************************/
@@ -87,11 +87,11 @@ int raspi_hif_open (int type, char *device, uint32_t speed, uint32_t flags)
 	switch (type)
 	{
 		case RASPI_HIF_SPI:
-			raspi_info("\r\n");
-			raspi_info("[ SPI ]\n");
-			raspi_info(" - device: %s\n", device);
-			raspi_info(" - clock: %d Hz\n", speed);
-			raspi_info("\r\n");
+			log_info("\r\n");
+			log_info("[ SPI ]\n");
+			log_info(" - device: %s\n", device);
+			log_info(" - clock: %d Hz\n", speed);
+			log_info("\r\n");
 
 			ret = raspi_spi_open(device);
 			if (ret == 0)
@@ -122,11 +122,11 @@ int raspi_hif_open (int type, char *device, uint32_t speed, uint32_t flags)
 			break;
 
 		case RASPI_HIF_UART:
-			raspi_info("\r\n");
-			raspi_info("[ UART%s ]\n", flags & RASPI_HIF_UART_HFC ? "_HFC" : "");
-			raspi_info(" - device: %s\n", device);
-			raspi_info(" - baudrate : %d\n", speed);
-			raspi_info("\r\n");
+			log_info("\r\n");
+			log_info("[ UART%s ]\n", flags & RASPI_HIF_UART_HFC ? "_HFC" : "");
+			log_info(" - device: %s\n", device);
+			log_info(" - baudrate : %d\n", speed);
+			log_info("\r\n");
 
 			ret = raspi_uart_open(device, speed, !!(flags & RASPI_HIF_UART_HFC));
 			if (ret == 0)

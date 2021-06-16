@@ -36,7 +36,7 @@
 #define SDK_VER_REVISION		(VERSION_REVISION)
 
 #define ATCMD_VER_MAJOR			(1)
-#define ATCMD_VER_MINOR			(16)
+#define ATCMD_VER_MINOR			(19)
 #define ATCMD_VER_REVISION		(0)
 
 /**********************************************************************************************/
@@ -194,6 +194,7 @@ enum ATCMD_ID
 	ATCMD_WIFI_PING,
 	ATCMD_WIFI_SOFTAP,
 	ATCMD_WIFI_FOTA,
+	ATCMD_WIFI_STAINFO,
 	ATCMD_WIFI_TIMEOUT,
 
 /* 	ATCMD_GROUP_SOCKET
@@ -339,8 +340,7 @@ extern int atcmd_param_to_ulong (char *param, unsigned long *val);
 extern char *atcmd_param_to_str (const char *param, char *str, int len);
 extern char *atcmd_str_to_param (const char *str, char *param, int len);
 
-extern void ATCMD_DATA_MODE_ENABLE (atcmd_socket_t *socket, uint32_t len,
-									uint32_t timeout, bool sync);
+extern void ATCMD_DATA_MODE_ENABLE (atcmd_socket_t *socket, int32_t len, uint32_t timeout);
 extern void ATCMD_DATA_MODE_DISABLE (void);
 
 extern void atcmd_group_print (void);

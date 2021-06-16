@@ -51,6 +51,7 @@ bool insert_ie_s1g_shortbeaconinterval(struct byte_stream *bs, bool is_tx, int8_
 bool insert_ie_s1g_capabilities(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 bool insert_ie_s1g_operation(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 bool insert_ie_s1g_aid_response(struct byte_stream *bs, bool is_tx, int8_t vif_id, uint16_t aid);
+bool insert_ie_timeout_interval(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 bool insert_ie_bss_max_idle_period(struct byte_stream *bs, bool is_tx, int8_t vif_id, bool ap_sta);
 bool insert_ie_s1g_header_compression(struct byte_stream *bs, bool is_tx, int8_t vif_id, uint8_t* addr);
 #if defined(INCLUDE_TWT_SUPPORT)
@@ -84,6 +85,7 @@ uint8_t* umac_s1g_short_beacon_find_ie(SYS_BUF *buf, int eid, bool is_tx);
 
 bool parse_ie_ssid(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 bool parse_ie_rsn(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
+bool parse_ie_timeout_interval(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 bool parse_ie_bss_max_idle_period(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 bool parse_ie_s1g_capabilities(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 bool parse_ie_s1g_operation(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);

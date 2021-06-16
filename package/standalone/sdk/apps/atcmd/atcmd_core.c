@@ -159,17 +159,14 @@ typedef struct
 
 	bool idle;
 	bool error;
-
-	bool sync;
 	bool passthrough;
 
+	int32_t len;
 	uint32_t cnt;
-	uint32_t len;
 	atcmd_socket_t socket;
 
 	uint32_t send_timeout; // msec
 	uint32_t last_send_time; // msec
-
 } atcmd_data_mode_t;
 
 #ifdef ATCMD_DATA_MODE_STATIC
@@ -179,8 +176,6 @@ static atcmd_data_mode_t _atcmd_data_mode =
 
 	.idle = true,
 	.error= false,
-
-	.sync = false,
 	.passthrough = false,
 
 	.cnt = 0,
@@ -209,7 +204,7 @@ static bool ATCMD_IS_DATA_MODE (void)
 
 #define _atcmd_data_mode_trace(fmt, ...)	/* _atcmd_info(fmt, ##__VA_ARGS__) */
 
-void ATCMD_DATA_MODE_ENABLE (atcmd_socket_t *socket, uint32_t len, uint32_t timeout, bool sync)
+void ATCMD_DATA_MODE_ENABLE (atcmd_socket_t *socket, int32_t len, uint32_t timeout)
 {
 	_atcmd_data_mode_trace("DATA_MODE_ON: id=%d len=%d timeout=%u\n", socket->id, len, timeout);
 
@@ -230,11 +225,10 @@ void ATCMD_DATA_MODE_ENABLE (atcmd_socket_t *socket, uint32_t len, uint32_t time
 	g_atcmd_data_mode->idle = false;
 	g_atcmd_data_mode->error = false;
 
-	g_atcmd_data_mode->sync = sync;
-	g_atcmd_data_mode->passthrough = (len == 0) ? true : false;
+	g_atcmd_data_mode->passthrough = (len <= 0) ? true : false;
 
 	g_atcmd_data_mode->cnt = 0;
-	g_atcmd_data_mode->len = len;
+	g_atcmd_data_mode->len = abs(len);
 	memcpy(&g_atcmd_data_mode->socket, socket, sizeof(atcmd_socket_t));
 
 	g_atcmd_data_mode->send_timeout = timeout;
@@ -250,8 +244,6 @@ void ATCMD_DATA_MODE_DISABLE (void)
 
 	g_atcmd_data_mode->idle = true;
 	g_atcmd_data_mode->error = false;
-
-	g_atcmd_data_mode->sync = false;
 	g_atcmd_data_mode->passthrough = false;
 
 	g_atcmd_data_mode->cnt = 0;
@@ -1521,16 +1513,39 @@ static int atcmd_receive_data (char *buf, int len)
 		return len;
 	}
 
-	if (!g_atcmd_data_mode->passthrough)
+	if (g_atcmd_data_mode->len > 0)
 	{
-		if (g_atcmd_data_mode->len == 0)
-			return 0;
+		static char _buf[ATCMD_DATA_LEN_MAX];
 
 		if ((*rx_cnt + len) > g_atcmd_data_mode->len)
 			len = g_atcmd_data_mode->len - *rx_cnt;
-	}
 
-	ret = atcmd_socket_send_data(&g_atcmd_data_mode->socket, buf, len, &err);
+		if ((*rx_cnt + len) < g_atcmd_data_mode->len)
+			memcpy(_buf + *rx_cnt, buf, len);
+		else
+		{
+			if (*rx_cnt == 0)
+				ret = atcmd_socket_send_data(&g_atcmd_data_mode->socket, buf, g_atcmd_data_mode->len, &err);
+			else
+			{
+				memcpy(_buf + *rx_cnt, buf, len);
+
+				ret = atcmd_socket_send_data(&g_atcmd_data_mode->socket, _buf, g_atcmd_data_mode->len, &err);
+			}
+
+			if (ret != g_atcmd_data_mode->len)
+				_atcmd_error("SSEND: ret(%d) != len(%d)\n", ret, g_atcmd_data_mode->len);
+		}
+
+		ret = len;
+	}
+	else if (g_atcmd_data_mode->passthrough)
+	{
+		ret = atcmd_socket_send_data(&g_atcmd_data_mode->socket, buf, len, &err);
+
+		if (ret != len)
+			_atcmd_error("SSEND: ret(%d) != len(%d)\n", ret, len);
+	}
 
 	*rx_cnt += ret;
 
@@ -1547,36 +1562,12 @@ static int atcmd_receive_data (char *buf, int len)
 		return len;
 	}
 
-	if (ret != len)
-		_atcmd_info("SSEND: id=%d len=%u/%u\n", id, ret, len);
-
-/*	if (g_atcmd_data_mode->sync)
+	if (g_atcmd_data_mode->len > 0 && *rx_cnt == g_atcmd_data_mode->len)
 	{
 		if (g_atcmd_data_mode->passthrough)
-		{
-			_atcmd_info("SEVENT: SEND_DONE, id=%d len=%u\n", id, ret);
-
-			ATCMD_LOG_EVENT("SEVENT", "%s,%d,%u", "%s id=%d len=%u",
-											"\"SEND_DONE\"", id, ret);
-		}
-		else if (*rx_cnt == g_atcmd_data_mode->len)
-		{
-			_atcmd_info("SEVENT: SEND_DONE, id=%d len=%u\n", id, *rx_cnt);
-
-			ATCMD_LOG_EVENT("SEVENT", "%s,%d,%u", "%s id=%d len=%u",
-											"\"SEND_DONE\"", id, *rx_cnt);
-		}
-	} */
-
-	if (!g_atcmd_data_mode->passthrough && *rx_cnt == g_atcmd_data_mode->len)
-	{
-/*		_atcmd_info("SEVENT: SEND_DONE, id=%d len=%u\n",
-								g_atcmd_data_mode->socket.id, g_atcmd_data_mode->cnt);
-
-		ATCMD_LOG_EVENT("SEVENT", "%s,%d,%u", "%s id=%d len=%u", "\"SEND_DONE\"",
-								g_atcmd_data_mode->socket.id, g_atcmd_data_mode->cnt); */
-
-		ATCMD_DATA_MODE_DISABLE();
+			*rx_cnt = 0;
+		else
+			ATCMD_DATA_MODE_DISABLE();
 	}
 
 	return ret;
@@ -1747,6 +1738,7 @@ int atcmd_enable (_hif_info_t *info)
 	if (atcmd_data_mode_task_create() != 0)
 		return -1;
 
+	_atcmd_info("ATCMD_VERSION: %d.%d.%d\n", ATCMD_VER_MAJOR, ATCMD_VER_MINOR, ATCMD_VER_REVISION);
 	_atcmd_info("ATCMD_TXBUF_SIZE: %d\n", ATCMD_TXBUF_SIZE);
 	_atcmd_info("ATCMD_RXBUF_SIZE: %d\n", ATCMD_RXBUF_SIZE);
 	_atcmd_info("ATCMD_DATA_LEN_MAX: %d\n", ATCMD_DATA_LEN_MAX);

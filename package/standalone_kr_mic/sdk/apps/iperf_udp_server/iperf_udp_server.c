@@ -332,7 +332,6 @@ int  run_iperf_udp_server(WIFI_CONFIG *param)
 	return RUN_SUCCESS;
 }
 
-#if !defined(ATCMD_SAMPLE_TEST)
 
 /******************************************************************************
  * FunctionName : user_init
@@ -357,4 +356,3 @@ void user_init(void)
 		nrc_mem_free(param);
 	}
 }
-#endif /* !defined(ATCMD_SAMPLE_TEST) */
