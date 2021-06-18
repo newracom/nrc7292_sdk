@@ -13,3 +13,9 @@ XIP boot binary specification.
 
 v3.3.1
 Bug fix: Wrong F/W binary reference fix
+
+v4.0.0
+Bypassing Boot-XIP binary segment transplant from Firmware-XIP binary segment [Byte Offset: 8,...,263]
+
+v4.1.0
+Newrafc timeout 5000 ms -> 20000 ms
