@@ -1628,8 +1628,12 @@ static int _atcmd_wifi_connect_set (int argc, char *argv[])
 					case MODE_WPA2:
 						if (param_password)
 							if (atcmd_param_to_str(param_password, str_password, sizeof(str_password)))
-								if (strlen(str_password) <= ATCMD_WIFI_PASSWORD_LEN_MAX)
+							{
+								int len = strlen(str_password);
+
+								if (len >= ATCMD_WIFI_PASSWORD_LEN_MIN && len <= ATCMD_WIFI_PASSWORD_LEN_MAX)
 									break;
+							}
 
 					default:
 						return ATCMD_ERROR_INVAL;
@@ -2654,8 +2658,12 @@ static int _atcmd_wifi_softap_set (int argc, char *argv[])
 					case MODE_WPA2:
 						if (param_password)
 							if (atcmd_param_to_str(param_password, str_password, sizeof(str_password)))
-								if (strlen(str_password) <= ATCMD_WIFI_PASSWORD_LEN_MAX)
+							{
+								int len = strlen(str_password);
+
+								if (len >= ATCMD_WIFI_PASSWORD_LEN_MIN && len <= ATCMD_WIFI_PASSWORD_LEN_MAX)
 									break;
+							}
 
 					default:
 						return ATCMD_ERROR_INVAL;
@@ -3121,4 +3129,3 @@ void atcmd_wifi_disable (void)
 
 	_atcmd_free(g_atcmd_wifi_info);
 }
-

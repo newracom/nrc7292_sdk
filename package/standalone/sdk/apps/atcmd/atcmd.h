@@ -37,7 +37,7 @@
 
 #define ATCMD_VER_MAJOR			(1)
 #define ATCMD_VER_MINOR			(19)
-#define ATCMD_VER_REVISION		(0)
+#define ATCMD_VER_REVISION		(1)
 
 /**********************************************************************************************/
 
