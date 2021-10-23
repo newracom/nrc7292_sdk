@@ -4,14 +4,20 @@
 #include "hal_lmac_register.h"
 #include "nrc-wim-types.h"
 
-#define MAX_PPDU_NUMBER             16
-#define MAX_AGG_SCHED_NUMBER        8
-#define STAT_AGG_MAX                8
+//#define MAX_PPDU_NUMBER             16
+#define MAX_AGG_SCHED_NUMBER        16
+#define STAT_AGG_MAX                16
+//#define MAX_BUFFER_SIZE              8
 
 #define NOW     (*(volatile uint32_t*)(MAC_REG_TSF_0_LOWER_READONLY))
 #define NOW1    (*(volatile uint32_t*)(MAC_REG_TSF_0_LOWER_READONLY)) // FIXME
 #define TSF     (*(volatile uint32_t*)(MAC_REG_TSF_0_LOWER_READONLY))
 #define TSF1    (*(volatile uint32_t*)(MAC_REG_TSF_0_LOWER_READONLY))  // FIXME
+#define RTC     (*(volatile uint32_t*)(0x40000010))  // FIXME
+#define RTC1    (*(volatile uint32_t*)(0x4000000C))  // FIXME
+#define RTC_TO_SEC(x)	(x >> 15)
+#define RTC_TO_MS(x)	RTC_TO_SEC(x * 1000)
+#define RTC_TO_US(x)	RTC_TO_MS(x * 1000)
 
 #define SW_OWNED(desc)          (!((desc) & MAC_REG_RX_WRITE_EN_DL_DESC0_OWNERSHIP_MASK))
 #define HW_OWNED(desc)          ((desc) & MAC_REG_RX_WRITE_EN_DL_DESC0_OWNERSHIP_MASK)
@@ -124,26 +130,30 @@ MCS index   Modulation  Code rate   N_DBPS(1M)	N_DBPS(2M)	N_DBPS(4M)
     10          BPSK        1/4         6
 -----------------------------------------------------------
 */
-
+#if defined(NRC_ROMLIB)
+extern const uint16_t bits_per_symbol[BW_MAX][MAX_MCS];
+extern const uint16_t max_ul_bytes[BW_MAX][MAX_MCS];
+extern const uint32_t mcs_to_phy_rate[MAX_MCS];
+extern const float mcs_rate_bw_coeff[BW_MAX];
+#else
 static const uint16_t bits_per_symbol[BW_MAX][MAX_MCS] = {
 	{12,  24,  36,  48,  72,  96,  108, 120, 144, 160, 6},
 	{26,  52,  78,  104, 156, 208, 234, 260, 312, 0,   0},
 	{54,  108, 162, 216, 324, 432, 486, 540, 648, 720, 0}
 };
-
-// rate = mcs_to_phy_rate[mcs] * mcs_rate_bw_coeff[bw]
-static const uint32_t mcs_to_phy_rate[MAX_MCS] =
-{300, 600, 900, 1200, 1800, 2400, 2700, 3000, 3600, 4000, 150}; //kbps
-
-static const float mcs_rate_bw_coeff[BW_MAX] =
-{1, 2.166667, 4.5};
-
 // max_ul_bytes = (max_symbol(511) * bps - SERVICE_TAIL_BIT) / 8
 static const uint16_t max_ul_bytes[BW_MAX][MAX_MCS] = {
 	{ 764, 1531,  2297,  3064,  4597,  6130,  6896,  7663,  9196,  10218, 509},
 	{1659, 3319,  4980,  6641,  9962,  13284, 14945, 16605, 19927, 0,     0  },
 	{3447, 6896,  10346, 13795, 20693, 27592, 31041, 34490, 41389, 45988, 0  }
 };
+// rate = mcs_to_phy_rate[mcs] * mcs_rate_bw_coeff[bw]
+static const uint32_t mcs_to_phy_rate[MAX_MCS] =
+{300, 600, 900, 1200, 1800, 2400, 2700, 3000, 3600, 4000, 150}; //kbps
+
+static const float mcs_rate_bw_coeff[BW_MAX] =
+{1, 2.166667, 4.5};
+#endif /* defined(NRC_ROMLIB) */
 
 uint16_t compute_duration(uint16_t, uint8_t, uint8_t, uint8_t, uint8_t, uint8_t, uint32_t, uint8_t);
 uint16_t compute_symbol(uint16_t, uint8_t, uint8_t);
@@ -229,7 +239,15 @@ typedef struct _TXVECTOR{
 	uint32_t scrambler      : 7;
 	uint32_t scrambler_exist: 1;
 	uint32_t tx_pwr_level   : 8;
-	uint32_t reserved0      : 11;
+	uint32_t service_rsvd	: 1;
+#if defined (NRC5291)
+	uint32_t sbr_mode		: 1; // 0: 11ah Legacy PPDU , 1: SBR PPDU
+	uint32_t sbr_rate		: 1; // 0 :LDR , 1 : HDR
+	uint32_t sbr_byte_length : 7; // Number of data byte exepct SYNC bits
+	uint32_t ndp_page_en	: 1; // MAC H/W Internal use
+#else
+	uint32_t reserved0      : 10;
+#endif
 
 	// SIG0 & SIG1
 	union {
@@ -254,30 +272,54 @@ typedef struct _LMAC_TXHDR {
 	union {
 		struct {
 			// Word 4 : BD info 0 (Valid only at first Buffer)
-			uint32_t    reserved1                    : 6;
+#if defined(NRC5291)
+			uint32_t    legacy_tsf_sym_ptr           : 6; 		 //number of data symbol right before the symbol containing first bit of TSF subfield
+#else
+			uint32_t    reserved0                    : 6;
+#endif
 			uint32_t    ack_policy                   : 2;        // 00: Normal Ack, 01: No Ack
 			uint32_t    cipher_type                  : 3;        // 0:wep40, 1:wep128, 2:tkip, 3:ccmp, 4:wapi
 			uint32_t    rts_request                  : 1;
 			uint32_t    cts_self_request             : 1;
 			uint32_t    cf_end_request               : 1;
-			uint32_t    key_location                 : 4;        // security key location
+			uint32_t    reserved1	                 : 4;
 			uint32_t    timestamp_update             : 1;        // flag for updating timestamp in the frame
-			uint32_t    timestamp_position           : 6;        // in byte, timestamp position in frame
+			uint32_t    timestamp_position           : 6;        // in byte, timestamp position in frame , in bit (when used in SBR TSF Update)
 			uint32_t	bssid_idx                    : 2;
 			uint32_t	mac_idx                      : 2;
+#if defined(NRC5291)
+			uint32_t	sbr_tsf_update				 : 1;
+			uint32_t 	reserved2					 : 2;
+#else
 			uint32_t    reserved2                    : 3;
+#endif
 
 			// Word 5 : BD info 1
 			uint32_t    rts_duration                 : 16;
+#if defined(NRC7292)
 			uint32_t    reserved3                    : 16;
-
+#else
+			uint32_t	key_location				 : 10;
+			uint32_t	key_search_en				 : 1;
+#if defined(NRC5291)
+			uint32_t	sbr_tsf_bit_ptr				 : 5;
+#else
+			uint32_t	reserved3					 : 5;
+#endif
+#endif
 			// Word 6 : BD info 2
 			uint32_t    psdu_length                  : 20;       /////
 			uint32_t    bcn_compatible_pos           : 6;
 			uint32_t    bcn_compatible_update        : 1;
 			uint32_t    tetra_partial_tsf_update     : 1;
 			uint32_t    penta_partial_tsf_update     : 1;
+#if defined(NRC5291)
+			uint32_t	sbr_start					 : 1; //
+			uint32_t	sbr_embedded_bssid_en		 : 1; //
+			uint32_t	reserved4					 : 1;
+#else
 			uint32_t    reserved4                    : 3;
+#endif
 
 			// Word 7 : BD info 3
 			uint32_t    mpdu_length         : 14;
@@ -300,44 +342,68 @@ typedef struct _LMAC_TXHDR {
 typedef struct _LMAC_TXBD {
 	union {
 		struct {
-			// BD info #0
-			uint32_t    reserved1                    : 6;
+			// Word 0 : BD info 0 (Valid only at first Buffer)
+#if defined(NRC5291)
+			uint32_t    legacy_tsf_sym_ptr           : 6; 		 //number of data symbol right before the symbol containing first bit of TSF subfield
+#else
+			uint32_t    reserved0                    : 6;
+#endif
 			uint32_t    ack_policy                   : 2;        // 00: Normal Ack, 01: No Ack
 			uint32_t    cipher_type                  : 3;        // 0:wep40, 1:wep128, 2:tkip, 3:ccmp, 4:wapi
 			uint32_t    rts_request                  : 1;
 			uint32_t    cts_self_request             : 1;
 			uint32_t    cf_end_request               : 1;
-			uint32_t    key_location                 : 4;        // security key location
+			uint32_t    reserved1	                 : 4;        // security key location
 			uint32_t    timestamp_update             : 1;        // flag for updating timestamp in the frame
-			uint32_t    timestamp_position           : 6;        // in byte, timestamp position in frame
+			uint32_t    timestamp_position           : 6;        // in byte, timestamp position in frame , in bit (when used in SBR TSF Update)
 			uint32_t	bssid_idx                    : 2;
 			uint32_t	mac_idx                      : 2;
+#if defined(NRC5291)
+			uint32_t	sbr_tsf_update				 : 1;
+			uint32_t 	reserved2					 : 2;
+#else
 			uint32_t    reserved2                    : 3;
+#endif
 
-			// BD info #1
+			// Word 1 : BD info 1
 			uint32_t    rts_duration                 : 16;
+#if defined(NRC7292)
 			uint32_t    reserved3                    : 16;
-
-			// BD info #2
+#else
+			uint32_t	key_location				 : 10;
+			uint32_t	key_search_en				 : 1;
+#if defined(NRC5291)
+			uint32_t	sbr_tsf_bit_ptr				 : 5;
+#else
+			uint32_t	reserved3					 : 5;
+#endif
+#endif
+			// Word 2 : BD info 2
 			uint32_t    psdu_length                  : 20;       /////
 			uint32_t    bcn_compatible_pos           : 6;
 			uint32_t    bcn_compatible_update        : 1;
 			uint32_t    tetra_partial_tsf_update     : 1;
 			uint32_t    penta_partial_tsf_update     : 1;
+#if defined(NRC5291)
+			uint32_t	sbr_start					 : 1; //
+			uint32_t	sbr_embedded_bssid_en		 : 1; //
+			uint32_t	reserved4					 : 1;
+#else
 			uint32_t    reserved4                    : 3;
+#endif
 
-			// BD info #3
+			// Word 3 : BD info 3
 			uint32_t    mpdu_length         : 14;
 			uint32_t    ampdu_segment       : 2;        // 00:single, 10:first, 11:middle, 01:last
 			uint32_t    mac_header_length   : 11;
 			uint32_t    ampdu_spacing       : 5;
 
-			// BD info #4
+			// Word 4 : BD info 4
 			uint32_t    rate_index	        : 8;    // LMAC FW use only, Used for Rate Control
 			uint32_t    data_length         : 11;   // data length
 			uint32_t    segment             : 2;    // MPDU segmentation
 			uint32_t    reserved6           : 3;
-			uint32_t    ac                  : 4;	// LMAC FW use only, Assigned Queue Manager ID
+			uint32_t    ac                 : 4;	// LMAC FW use only, Assigned Queue Manager ID
 			uint32_t    tx_count            : 4;    // LMAC FW use only, check whether it exceeds retry limit
 		};
 		struct {
@@ -354,7 +420,15 @@ typedef struct _LMAC_TXBD {
 			uint32_t scrambler      : 7;
 			uint32_t scrambler_exist: 1;
 			uint32_t tx_pwr_level   : 8;
-			uint32_t reserved0      : 11;
+			uint32_t service_rsvd	: 1;
+#if defined (NRC5291)
+			uint32_t sbr_mode		: 1; // 0: 11ah Legacy PPDU , 1: SBR PPDU
+			uint32_t sbr_rate		: 1; // 0 :LDR , 1 : HDR
+			uint32_t sbr_byte_length : 7; // Number of data byte exepct SYNC bits
+			uint32_t ndp_page_en	: 1; // MAC H/W Internal use
+#else
+			uint32_t reserved7      : 10;
+#endif
 
 			// SIG0 & SIG1
 			union {
@@ -385,30 +459,54 @@ typedef struct _LMAC_TXBUF {
 	union {
 		struct {
 			// Word 4 : BD info 0 (Valid only at first Buffer)
-			uint32_t    reserved1                    : 6;
+#if defined(NRC5291)
+			uint32_t    legacy_tsf_sym_ptr           : 6; 		 //number of data symbol right before the symbol containing first bit of TSF subfield
+#else
+			uint32_t    reserved0                    : 6;
+#endif
 			uint32_t    ack_policy                   : 2;        // 00: Normal Ack, 01: No Ack
 			uint32_t    cipher_type                  : 3;        // 0:wep40, 1:wep128, 2:tkip, 3:ccmp, 4:wapi
 			uint32_t    rts_request                  : 1;
 			uint32_t    cts_self_request             : 1;
 			uint32_t    cf_end_request               : 1;
-			uint32_t    key_location                 : 4;        // security key location
+			uint32_t    reserved1	                 : 4;        // security key location
 			uint32_t    timestamp_update             : 1;        // flag for updating timestamp in the frame
-			uint32_t    timestamp_position           : 6;        // in byte, timestamp position in frame
+			uint32_t    timestamp_position           : 6;        // in byte, timestamp position in frame , in bit (when used in SBR TSF Update)
 			uint32_t	bssid_idx                    : 2;
 			uint32_t	mac_idx                      : 2;
+#if defined(NRC5291)
+			uint32_t	sbr_tsf_update				 : 1;
+			uint32_t 	reserved2					 : 2;
+#else
 			uint32_t    reserved2                    : 3;
+#endif
 
 			// Word 5 : BD info 1
 			uint32_t    rts_duration                 : 16;
+#if defined(NRC7292)
 			uint32_t    reserved3                    : 16;
-
+#else
+			uint32_t	key_location				 : 10;
+			uint32_t	key_search_en				 : 1;
+#if defined(NRC5291)
+			uint32_t	sbr_tsf_bit_ptr				 : 5;
+#else
+			uint32_t	reserved3					 : 5;
+#endif
+#endif
 			// Word 6 : BD info 2
 			uint32_t    psdu_length                  : 20;       /////
 			uint32_t    bcn_compatible_pos           : 6;
 			uint32_t    bcn_compatible_update        : 1;
 			uint32_t    tetra_partial_tsf_update     : 1;
 			uint32_t    penta_partial_tsf_update     : 1;
+#if defined(NRC5291)
+			uint32_t	sbr_start					 : 1; //
+			uint32_t	sbr_embedded_bssid_en		 : 1; //
+			uint32_t	reserved4					 : 1;
+#else
 			uint32_t    reserved4                    : 3;
+#endif
 
 			// Word 7 : BD info 3
 			uint32_t    mpdu_length         : 14;
@@ -436,7 +534,15 @@ typedef struct _LMAC_TXBUF {
 			uint32_t scrambler      : 7;
 			uint32_t scrambler_exist: 1;
 			uint32_t tx_pwr_level   : 8;
-			uint32_t reserved7      : 11;
+			uint32_t service_rsvd	: 1;
+#if defined (NRC5291)
+			uint32_t sbr_mode		: 1; // 0: 11ah Legacy PPDU , 1: SBR PPDU
+			uint32_t sbr_rate		: 1; // 0 :LDR , 1 : HDR
+			uint32_t sbr_byte_length : 7; // Number of data byte exepct SYNC bits
+			uint32_t ndp_page_en	: 1; // MAC H/W Internal use
+#else
+			uint32_t reserved7      : 10;
+#endif
 
 			// SIG0 & SIG1
 			union {

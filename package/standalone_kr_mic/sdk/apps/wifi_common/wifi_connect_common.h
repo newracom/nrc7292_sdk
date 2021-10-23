@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2020 Newracom, Inc.
+ * Copyright (c) 2021 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,12 +26,9 @@
 #ifndef __WIFI_CONNECT_COMMON_H__
 #define __WIFI_CONNECT_COMMON_H__
 
- #include "nrc_sdk.h"
-
-void wifi_event_handler(WLAN_EVENT_ID event);
 int wifi_init(WIFI_CONFIG *param);
 int wifi_connect(WIFI_CONFIG *param);
 int wifi_start_softap(WIFI_CONFIG *param);
-uint16_t wifi_get_s1g_channel_number(s1g_operation_channel_mapping *table,\
-		int table_len, uint8_t *country);
+
+
 #endif /* __WIFI_CONNECT_COMMON_H__ */

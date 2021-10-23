@@ -19,7 +19,8 @@
 enum key_type {
 	KEY_PTK = 0,
 	KEY_GTK = 1,
-	KEY_MAX = 2,
+	KEY_IGTK = 2,
+	KEY_MAX = 3,
 };
 
 enum key_cmd {
@@ -93,8 +94,10 @@ typedef enum  _LMacEvent {
 	LME_NAN_DW_START    = 9,
 	LME_NAN_DW_END      = 10,
 	LME_NAN_TBTT        = 11,
-	LME_POWERSAVE		= 12,
+	LME_POWERSAVE       = 12,
 	LME_DATA            = 13,
+	LME_PS_WAKEUP       = 14,
+	LME_CSA             = 15,
 	LME_MAX,
 } LMacEvent;
 
@@ -127,6 +130,7 @@ enum {
 enum {
 	MODE_STA = 0,
 	MODE_AP  = 1,
+	MODE_MESH = 2,
 	MODE_MAX,
 };
 

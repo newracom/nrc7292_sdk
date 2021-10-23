@@ -73,16 +73,6 @@
 #define ET_MODULE_A(a,a0) util_event_tracker_module(a, module_name(), __LINE__, 1, (uint32_t)a0, (uint32_t)0, (uint32_t)0)
 #define ET_MODULE_AA(a,a0,a1) util_event_tracker_module(a, module_name(), __LINE__, 2, (uint32_t)a0, (uint32_t)a1, (uint32_t)0)
 #define ET_MODULE_AAA(a,a0,a1,a2) util_event_tracker_module(a, module_name(), __LINE__, 3, (uint32_t)a0, (uint32_t)a1, (uint32_t)a2)
-#else 
-#define UTIL_EVENT_TRACKER_INIT() 
-#define ET_SYSBUF(a,b,c) 
-#define ET_IRQ(a,b) 
-#define ET_WIM(a,b) 
-#define ET_MODULE(a) 
-#define ET_MODULE_A(a,a1)
-#define ET_MODULE_AA(a,a1,a2)
-#define ET_MODULE_AAA(a,a1,a2,a3)
-#endif
 
 void util_event_tracker_init();
 void util_event_tracker_deinit();
@@ -92,5 +82,25 @@ void util_event_tracker_wim(uint8_t tag, struct wim_hdr *wimh);
 void util_event_tracker_module(uint8_t tag, const char *name, int32_t line, 
 							uint32_t n_arg, uint32_t arg1, uint32_t arg2, uint32_t arg3);
 void util_event_tracker_show();
+#else 
+#define UTIL_EVENT_TRACKER_INIT() 
+#define ET_SYSBUF(a,b,c) 
+#define ET_IRQ(a,b) 
+#define ET_WIM(a,b) 
+#define ET_MODULE(a) 
+#define ET_MODULE_A(a,a1)
+#define ET_MODULE_AA(a,a1,a2)
+#define ET_MODULE_AAA(a,a1,a2,a3)
+
+static inline void util_event_tracker_init(){};
+static inline void util_event_tracker_deinit(){};
+static inline void util_event_tracker_sysbuf(uint8_t tag, SYS_BUF *head, int16_t size){};
+static inline void util_event_tracker_irq(uint8_t tag, uint32_t status){};
+static inline void util_event_tracker_wim(uint8_t tag, struct wim_hdr *wimh){};
+static inline void util_event_tracker_module(uint8_t tag, const char *name, int32_t line, 
+				uint32_t n_arg, uint32_t arg1, uint32_t arg2, uint32_t arg3){};
+static inline void util_event_tracker_show(){};
+#endif //#if defined(INCLUDE_EVENT_TRACKER)
+
 
 #endif /* __UTIL_EVENT_TRACKER_H__ */

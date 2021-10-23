@@ -1,7 +1,7 @@
 MEMORY
 {
   FLASH (rx) 	: ORIGIN = 0x00010000, LENGTH = 1M
-  RAM (rwx)  	: ORIGIN = 0x10420000, LENGTH = 608K
+  RAM (rwx)  	: ORIGIN = 0x10400000, LENGTH = 736K
 
   /* mailbox test */
   /*RAM (rwx)  	: ORIGIN = 0x10420000, LENGTH = 384K */

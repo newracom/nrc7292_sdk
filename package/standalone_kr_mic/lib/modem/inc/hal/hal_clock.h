@@ -151,5 +151,7 @@ void nrc_clock_pclk_div(pclk_e dev, uint8_t);
 void nrc_clock_pclk_sel(pclk_e dev, uint8_t sel);
 uint32_t nrc_clock_boot_reason();
 void nrc_clock_boot_reason_clear();
+uint8_t nrc_clock_get_pclk_div(pclk_e dev);
+uint8_t nrc_clock_get_pclk_sel(pclk_e dev);
 
 #endif //__HAL_CLOCK_NRC7292_H__

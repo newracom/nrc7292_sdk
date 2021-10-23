@@ -22,6 +22,10 @@
 #define dot11AMPDUImplemented 					1
 #endif /* dot11AMPDUImplemented */
 
+#if !defined(dot11MaxAMPDULengthExponent)
+#define dot11MaxAMPDULengthExponent				1
+#endif /* dot11MaxAMPDULengthExponent */
+
 #if !defined(dot11NDPPSPollSupport)
 #define dot11NDPPSPollSupport 					0
 #endif /* dot11NDPPSPollSupport */
@@ -62,7 +66,7 @@
 #endif /* nrcAPStaTypeSupport */
 
 #if !defined(nrcSTAStaTypeSupport)
-#define nrcSTAStaTypeSupport 					1   // ( 1: sensor STA, 2: non-sensor )
+#define nrcSTAStaTypeSupport 					2   // ( 1: sensor STA, 2: non-sensor )
 #endif /* nrcSTAStaTypeSupport */
 
 #if !defined(nrcDuplicate1MHzSupport)
@@ -70,7 +74,7 @@
 #endif /* nrcDuplicate1MHzSupport */
 
 #if !defined(nrc1MHzControlResponsePreambleSupport)
-#define nrc1MHzControlResponsePreambleSupport 	0
+#define nrc1MHzControlResponsePreambleSupport 	0	//(0: not support, 1:support)
 #endif /* nrc1MHzControlResponsePreambleSupport */
 
 // not in both of s1g IE and MIB

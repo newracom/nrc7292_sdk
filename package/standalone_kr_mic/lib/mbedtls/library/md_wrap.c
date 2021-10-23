@@ -54,11 +54,11 @@
 #endif
 
 #if defined(MBEDTLS_SHA256_C)
-#include "mbedtls/sha256.h"
+#include "mbedtls/mbed_sha256.h"
 #endif
 
 #if defined(MBEDTLS_SHA512_C)
-#include "mbedtls/sha512.h"
+#include "mbedtls/mbed_sha512.h"
 #endif
 
 #if defined(MBEDTLS_PLATFORM_C)

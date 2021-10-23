@@ -1,0 +1,9 @@
+Running the Tools on Windows/Mac/Linux
+======================================
+**On Windows:**
+    Double click the executable.
+
+**Mac/Linux:**
+    Open a terminal and type "java -jar <executable path>".
+    
+    e.g.) java -jar ./XIPFirmwareFlashTool.exe

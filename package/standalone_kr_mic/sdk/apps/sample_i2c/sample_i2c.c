@@ -25,6 +25,9 @@
 
 #include "nrc_sdk.h"
 
+#define I2C_SCL 16
+#define I2C_SDA 17
+
 #define TEST_COUNT 10
 #define TEST_INTERVAL 3000 /* msec */
 
@@ -94,17 +97,17 @@ void i2c_write_reg(uint8_t sad, uint8_t reg, uint8_t value)
  * Parameters   : count(test count), interval(test interval)
  * Returns      : 0 or -1 (0: success, -1: fail)
  *******************************************************************************/
-int run_sample_i2c(int count, int interval)
+nrc_err_t run_sample_i2c(int count, int interval)
 {
 	int i = 0;
 	nrc_usr_print("[%s] Sample App for I2C \n", __func__);
 
 #if defined( LIS331HH )
 	/* SCL = 200kHz */
-	nrc_i2c_init(200000);
+	nrc_i2c_init(I2C_SCL, I2C_SDA, 200000);
 #else
 	/* SCL = 400kHz */
-	nrc_i2c_init(400000);
+	nrc_i2c_init(I2C_SCL, I2C_SDA, 400000);
 #endif
 
 	nrc_i2c_enable(true);
@@ -127,7 +130,7 @@ int run_sample_i2c(int count, int interval)
 			break;
 		} else {
 			nrc_usr_print("[%s] ERROR..........(0x%02x)\n", __func__, value1);
-			return RUN_FAIL
+			return NRC_FAIL
 		}
 		_delay_ms(interval);
 	}
@@ -170,7 +173,7 @@ int run_sample_i2c(int count, int interval)
 			break;
 		} else {
 			nrc_usr_print("[%s] ERROR..........(0x%02x)\n", __func__, value1);
-			return RUN_FAIL;
+			return NRC_FAIL;
 		}
 		_delay_ms(interval);
 	}
@@ -208,7 +211,7 @@ int run_sample_i2c(int count, int interval)
 			nrc_usr_print("[%s] Slave Device: LIS331HH\n  - CTRL_REG1=0x%02x\n", __func__, value1);
 		} else {
 			nrc_usr_print("[%s] ERROR..........(0x%02x)\n", __func__, value1);
-			return RUN_FAIL;
+			return NRC_FAIL;
 		}
 		_delay_ms(interval);
 	}
@@ -223,7 +226,7 @@ int run_sample_i2c(int count, int interval)
 			nrc_usr_print("[%s] WORKS FINE!!!!!\n", __func__);
 		} else {
 			nrc_usr_print("[%s] ERROR..........(0x%02x)\n", __func__, value1);
-			return RUN_FAIL;
+			return NRC_FAIL;
 		}
 		_delay_ms(interval);
 	}
@@ -231,7 +234,7 @@ int run_sample_i2c(int count, int interval)
 	nrc_usr_print("[%s] There's no slave device definition.\n", __func__);
 #endif
 	nrc_i2c_enable(false);
-	return RUN_SUCCESS;
+	return NRC_SUCCESS;
 }
 
 
@@ -243,7 +246,7 @@ int run_sample_i2c(int count, int interval)
  *******************************************************************************/
 void user_init(void)
 {
-	int ret = 0;
+	nrc_err_t ret;
 
 	//Enable Console for Debugging
 	nrc_uart_console_enable();

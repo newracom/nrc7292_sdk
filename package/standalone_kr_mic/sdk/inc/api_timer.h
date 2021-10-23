@@ -26,54 +26,81 @@
 #ifndef __NRC_API_TIMER_H__
 #define __NRC_API_TIMER_H__
 
+#define TIMER0	0	/* 32bits timer channel */
+#define TIMER1	3	/* 64bits timer channel */
+#define TIMER_MAX	2	/* Support max 2 h/w timer */
 
-/** @brief invalid timer id */
-#define INVALID_TIMER_ID        0xFF
+typedef void (*timer_callback)(int ch);
 
-/** @brief typedef timer_id */
-typedef char timer_id;
+typedef struct {
+	bool initialized;
+	int ch;
+	timer_callback cb;
+} TIMER_INFO;
+
+typedef struct {
+	TIMER_INFO       Timer[TIMER_MAX];
+} TIMER_STRUCT;
+
 
 /**********************************************
- * @brief Function prototype for timer interrupt handler callback function. It is called by SDK
- * when the timer has been expired
+ * @fn nrc_err_t nrc_hw_timer_init(int ch, timer_callback isr_cb)
  *
- * @param id: timer_id returned from nrc_timer_create()
+ * @brief hardware timer initialize
+ *
+ * @param ch: channel id
+ *        isr_cb: callback function
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-typedef void (*timer_callback)(const timer_id id);
+nrc_err_t nrc_hw_timer_init(int ch, timer_callback isr_cb);
+
 
 /**********************************************
- * @fn void nrc_timers_init(void)
+ * @fn nrc_err_t nrc_hw_timer_deinit(int ch)
  *
- * @brief Initialize timers
+ * @brief hardware timer deinitialize
  *
- * @return N/A
+ * @param ch: channel id
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-void nrc_timers_init(void);
+nrc_err_t nrc_hw_timer_deinit(int ch);
+
 
 /**********************************************
- * @fn timer_id nrc_timer_create(uint64_t time, bool repeat, timer_callback handler)
+ * @fn nrc_err_t nrc_hw_timer_start(int ch, uint64_t time)
  *
- * @brief Create timer with the time duration in microsecond and starts
+ * @brief Start timer
  *
- * @param time: time duration value in microsecond
+ * @param ch: channel id
+ *        time: time duration
  *
- * @param repeat: true(repeat) or false(one shot)
- *
- * @param timer_callback: callback handler function when the timer expired
- *
- * @return timer_id: this id can be used to stop the timer.
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-timer_id nrc_timer_create(uint64_t time, bool repeat, timer_callback handler);
+nrc_err_t nrc_hw_timer_start(int ch, uint64_t time);
+
 
 /**********************************************
- * @fn void nrc_timer_stop(timer_id id)
+ * @fn nrc_err_t nrc_hw_timer_stop(int ch)
  *
  * @brief Stop timer
  *
- * @param id: timer id
+ * @param ch: channel id
  *
- * @return N/A
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-void nrc_timer_stop(timer_id id);
+nrc_err_t nrc_hw_timer_stop(int ch);
+
+/**********************************************
+ * @fn nrc_err_t nrc_hw_timer_clear_irq(int ch)
+ *
+ * @brief hardware timer interrupt clear
+ *
+ * @param ch: channel id
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_hw_timer_clear_irq(int ch);
 
 #endif /* __NRC_API_TIMER_H__ */

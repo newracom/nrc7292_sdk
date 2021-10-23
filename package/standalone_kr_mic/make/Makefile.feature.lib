@@ -13,7 +13,7 @@ LWIP_APPS_SRC	= $(LWIP_SRC_BASE)/apps
 LWIP_IPV4		= $(LWIP_CORE)/ipv4
 LWIP_APPS_PORT	= $(LWIP_PORT)/apps
 LWIP_PING		= $(LWIP_APPS_PORT)/ping
-LWIP_IPERF		= $(LWIP_APPS_PORT)/lwiperf
+LWIP_IPERF		= $(LWIP_APPS_PORT)/iperf
 LWIP_DHCPS		= $(LWIP_APPS_PORT)/dhcpserver
 
 INCLUDE += -I$(LWIP_INC)
@@ -35,6 +35,13 @@ ifeq ($(CONFIG_LWIP), y)
 	include $(LWIP_SRC_BASE)/lwip.make
 	DEFINE	+= -DNRC_LWIP
 endif #CONFIG_LWIP
+
+ifeq ($(CONFIG_STANDALONE_USER_LIBRARY), y)
+	DEFINE	+= -DSUPPORT_LWIP
+else ifeq ($(CONFIG_LWIP), y)
+	DEFINE	+= -DSUPPORT_LWIP
+endif
+
 
 #// --------------------------------------------------
 #// LIB
@@ -157,34 +164,36 @@ endif #CONFIG_MXML
 #// AWS (Amazon Web Service)
 #// --------------------------------------------------
 AWS_IOT_BASE	= $(LIB_PATH)/aws_iot
-IOT_CLIENT_DIR	= $(AWS_IOT_BASE)
-PLATFORM_DIR	= $(IOT_CLIENT_DIR)/platform/freertos
-PLATFORM_COMMON_DIR	= $(PLATFORM_DIR)/common
-PLATFORM_NETWORK_DIR	= $(PLATFORM_DIR)/mbedtls
-IOT_CLIENT_SRC_DIR	= $(IOT_CLIENT_DIR)/src
-IOT_CLIENT_INC_DIR	= $(IOT_CLIENT_DIR)/include
-IOT_CLIENT_EXTERNAL_LIB_DIR	= $(IOT_CLIENT_DIR)/external_libs
-IOT_CLIENT_JSMN_DIR	= $(IOT_CLIENT_EXTERNAL_LIB_DIR)/jsmn
+coreMQTT_DIR	= $(AWS_IOT_BASE)/libraries/standard/coreMQTT/source
+coreHTTP_DIR	= $(AWS_IOT_BASE)/libraries/standard/coreHTTP/source
+coreJSON_DIR	= $(AWS_IOT_BASE)/libraries/standard/coreJSON/source
+corePKCS11_DIR	= $(AWS_IOT_BASE)/libraries/standard/corePKCS11/source
+backoffAlgorithm_DIR	= $(AWS_IOT_BASE)/libraries/standard/backoffAlgorithm/source
+PLATFORM_DIR	= $(AWS_IOT_BASE)/platform
 
-INCLUDE	+= -I$(IOT_CLIENT_DIR)
-INCLUDE	+= -I$(PLATFORM_DIR)
-INCLUDE	+= -I$(PLATFORM_COMMON_DIR)
-INCLUDE	+= -I$(PLATFORM_NETWORK_DIR)
-INCLUDE	+= -I$(IOT_CLIENT_SRC_DIR)
-INCLUDE	+= -I$(IOT_CLIENT_INC_DIR)
-INCLUDE	+= -I$(IOT_CLIENT_EXTERNAL_LIB_DIR)
-INCLUDE	+= -I$(IOT_CLIENT_JSMN_DIR)
+INCLUDE	+= -I$(coreMQTT_DIR)/include
+INCLUDE	+= -I$(coreMQTT_DIR)/interface
+INCLUDE	+= -I$(coreHTTP_DIR)/include
+INCLUDE	+= -I$(coreJSON_DIR)/include
+INCLUDE	+= -I$(backoffAlgorithm_DIR)/include
+INCLUDE	+= -I$(PLATFORM_DIR)/include
+INCLUDE	+= -I$(PLATFORM_DIR)/freertos
+INCLUDE	+= -I$(PLATFORM_DIR)/freertos/transport/include
+INCLUDE	+= -I$(PLATFORM_DIR)/freertos/include
 
 ifeq ($(CONFIG_AWS), y)
-	VPATH	+= $(IOT_CLIENT_DIR)
-	VPATH	+= $(PLATFORM_DIR)
-	VPATH	+= $(PLATFORM_COMMON_DIR)
-	VPATH	+= $(PLATFORM_NETWORK_DIR)
-	VPATH	+= $(IOT_CLIENT_SRC_DIR)
-	VPATH	+= $(IOT_CLIENT_INC_DIR)
-	VPATH	+=$(IOT_CLIENT_EXTERNAL_LIB_DIR)
-	VPATH	+= $(IOT_CLIENT_JSMN_DIR)
+	VPATH	+= $(coreMQTT_DIR)
+	VPATH	+= $(coreHTTP_DIR)
+	VPATH	+= $(coreJSON_DIR)
+	VPATH	+= $(corePKCS11_DIR)
+	VPATH	+= $(corePKCS11_DIR)/portable/mbedtls
+	VPATH	+= $(backoffAlgorithm_DIR)
+	VPATH	+= $(PLATFORM_DIR)/freertos
+	VPATH	+= $(PLATFORM_DIR)/freertos/transport/src
+
 	include $(AWS_IOT_BASE)/aws_iot.make
+	DEFINE += -DMQTT_DO_NOT_USE_CUSTOM_CONFIG
+	DEFINE += -DHTTP_DO_NOT_USE_CUSTOM_CONFIG
 	DEFINE += -DNRC_AWS
 
 	# Logging level control
@@ -209,3 +218,98 @@ ifeq ($(CONFIG_TINYCBOR), y)
 	VPATH	+= $(TINYCBOR_BASE):$(TINYCBOR_SRC)
 	include $(TINYCBOR_BASE)/tinycbor.make
 endif #CONFIG_TINYCBOR
+
+#// --------------------------------------------------
+#// LIB
+#// http_parser (http parser)
+#// --------------------------------------------------
+HTTP_PARSER_BASE    = $(LIB_PATH)/http_parser
+
+INCLUDE += -I$(HTTP_PARSER_BASE)
+
+ifeq ($(CONFIG_HTTP_PARSER), y)
+    VPATH   += $(HTTP_PARSER_BASE)
+
+    include $(HTTP_PARSER_BASE)/httpparser.make
+endif
+
+
+#// --------------------------------------------------
+#// LIB
+#// http_server (http server)
+#// --------------------------------------------------
+HTTP_SERVER_BASE    = $(LIB_PATH)/http_server
+HTTP_SERVER_SRC     = $(HTTP_SERVER_BASE)/src
+HTTP_SERVER_PORT    = $(HTTP_SERVER_SRC)/port
+HTTP_SERVER_UTIL    = $(HTTP_SERVER_SRC)/util
+
+INCLUDE += -I$(HTTP_SERVER_BASE)/include
+INCLUDE += -I$(HTTP_SERVER_SRC)/port/nrc7292
+INCLUDE += -I$(HTTP_SERVER_UTIL)
+
+ifeq ($(CONFIG_HTTP_SERVER), y)
+    VPATH   += $(HTTP_SERVER_SRC)
+    VPATH   += $(HTTP_SERVER_PORT)
+    VPATH   += $(HTTP_SERVER_UTIL)
+
+    include $(HTTP_SERVER_BASE)/httpserver.make
+endif
+
+#// --------------------------------------------------
+#// LIB
+#// ethernet (ethernet driver)
+#// --------------------------------------------------
+ETH_BASE    = $(LIB_PATH)/ethernet
+
+INCLUDE += -I$(ETH_BASE)
+
+ifeq ($(CONFIG_ETHERNET), y)
+    VPATH   += $(ETH_BASE)
+
+    include $(ETH_BASE)/ethernet.make
+endif
+
+#// --------------------------------------------------
+#// LIB
+#// enc28j60 ethernet (enc28j60 ethernet driver through SPI)
+#// --------------------------------------------------
+ETH_ENC28J60_BASE    = $(LIB_PATH)/eth_enc28j60
+
+INCLUDE += -I$(ETH_ENC28J60_BASE)
+
+ifeq ($(CONFIG_ETH_ENC28J60), y)
+    VPATH   += $(ETH_ENC28J60_BASE)
+
+    include $(ETH_ENC28J60_BASE)/eth_enc28j60.make
+	DEFINE	+= -DETH_DRIVER_ENC28J60
+endif
+
+#// --------------------------------------------------
+#// LIB
+#// w5500 ethernet (Wiznet w5500 ethernet driver through SPI)
+#// --------------------------------------------------
+ETH_W5500_BASE    = $(LIB_PATH)/eth_w5500
+
+INCLUDE += -I$(ETH_W5500_BASE)
+
+ifeq ($(CONFIG_ETH_W5500), y)
+    VPATH   += $(ETH_W5500_BASE)
+
+    include $(ETH_W5500_BASE)/eth_w5500.make
+	DEFINE	+= -DETH_DRIVER_W5500
+endif
+
+#// --------------------------------------------------
+#// LIB
+#// nvs_flash (NVRAM Key/Value store lib)
+#// --------------------------------------------------
+NVS_FLASH    = $(LIB_PATH)/nvs_flash
+
+INCLUDE += -I$(NVS_FLASH)/src -I$(NVS_FLASH)/include
+
+ifeq ($(CONFIG_NVS_FLASH), y)
+    VPATH   += $(NVS_FLASH)/src
+
+    include $(NVS_FLASH)/nvs_flash.make
+	DEFINE	+= -DSUPPORT_NVS_FLASH
+endif

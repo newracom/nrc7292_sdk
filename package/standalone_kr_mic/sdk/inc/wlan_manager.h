@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2020 Newracom, Inc.
+ * Copyright (c) 2021 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,17 @@
 
 #ifndef __WLAN_MANAGER_H__
 #define __WLAN_MANAGER_H__
+
+#include "nrc_types.h"
+
+#define MAX_PMK_LENGTH 65
+
+extern QueueHandle_t    x_wlan_mgr_queue_handle;
+extern WLAN_SUPPLICANT_RET x_sup_ret;
+
+#define SUP_RET				x_sup_ret.ret
+#define SUP_RET_LEN			x_sup_ret.ret_len
+#define CMD_BUFFER_LEN 512
 
 void wlan_mgr_handle_cmd(WLAN_MESSAGE *message);
 void wlan_mgr_handle_event(WLAN_MESSAGE *message);

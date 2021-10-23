@@ -37,6 +37,14 @@ typedef enum {
 	TWT_MAX
 } S1G_TWT_SETUP_COMMAND;
 
+#if defined (INCLUDE_STA_CSA_SUPPORT)
+ struct external_csa_info {
+	uint32_t		ext_csa_cnt_tsf;	//TSF Limit of ECSA_CNT
+	uint8_t			ext_csa_ch_move;	//CH to move by ECSA
+	ie_ext_csa		ie_ext_csa_format;	//ECSA IE
+};
+#endif
+
 //////////////////////
 // Public Functions //
 //////////////////////
@@ -46,6 +54,7 @@ struct byte_stream;
 // IE Managment Functions
 bool insert_ie_s1g_beacon_compatibility(struct byte_stream *bs, bool is_tx, int8_t vif_id, uint16_t capa);
 bool insert_ie_s1g_tim(struct byte_stream *bs, bool is_tx, int8_t vif_id);
+bool insert_ie_csa(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 bool insert_ie_s1g_aid_request(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 bool insert_ie_s1g_shortbeaconinterval(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 bool insert_ie_s1g_capabilities(struct byte_stream *bs, bool is_tx, int8_t vif_id);
@@ -54,6 +63,7 @@ bool insert_ie_s1g_aid_response(struct byte_stream *bs, bool is_tx, int8_t vif_i
 bool insert_ie_timeout_interval(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 bool insert_ie_bss_max_idle_period(struct byte_stream *bs, bool is_tx, int8_t vif_id, bool ap_sta);
 bool insert_ie_s1g_header_compression(struct byte_stream *bs, bool is_tx, int8_t vif_id, uint8_t* addr);
+bool insert_ie_edca_parameter_set(struct byte_stream *bs);
 #if defined(INCLUDE_TWT_SUPPORT)
 bool insert_ie_s1g_twt(struct byte_stream *bs, bool is_tx, int8_t vif_id, bool ap_sta);
 #endif /* defined(INCLUDE_TWT_SUPPORT) */
@@ -102,6 +112,7 @@ bool parse_ie_mesh_link_metric_report(struct _SYS_BUF *buf, int8_t vif_id, ie_ge
 bool parse_ie_mesh_peering_management(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 bool parse_ie_mesh_ch_switch_param(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 bool parse_ie_mesh_awake_window(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
+bool parse_ie_ext_csa(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 #if defined(INCLUDE_TWT_SUPPORT)
 bool parse_ie_s1g_twt(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 #endif /* defined(INCLUDE_TWT_SUPPORT) */
@@ -132,6 +143,11 @@ uint32_t	get_assoc_resp_status_code(uint8_t*);
 bool validate_frame_ie_structure_mul(struct byte_stream *bs, struct _SYS_BUF *buf, bool is_tx, uint16_t offset, const char *msg);
 
 void update_s1gbuffer_diff(struct _SYS_BUF *new_buf, struct _SYS_BUF *ori_buf);
+
+#if defined (INCLUDE_STA_CSA_SUPPORT)
+struct external_csa_info* get_ext_csa_info(void);
+ void init_ext_csa_info(void);
+ #endif
 
 #else
 static inline uint8_t* umac_s1g_beacon_find_ie(SYS_BUF *b, int e, bool i)

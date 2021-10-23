@@ -2,6 +2,17 @@
 #define __HAL_TIMER_NRC7292_H__
 
 #include "system_common.h"
+#include "hal_timer.h"
+
+#define NRC7292_TIMER_CH_NUM 6
+#define NRC7292_TIMER_32_BITS 32
+#define NRC7292_TIMER_64_BITS 64
+#define NRC7292_TIMER_IS_VALID(ch, bit, ret)								\
+do {																		\
+	if ((!nrc_timer_is_valid(ch)) || (nrc_timer_get_resolution(ch) != bit)) {	\
+		return ret; 														\
+	}																		\
+} while(0);
 
 typedef union {
 	struct {
@@ -129,22 +140,27 @@ typedef struct {
 	volatile timer_tcmcnt1_t tcmcnt1;
 } timer_controller64_t;
 
+struct tmr_ops *nrc_timer_7292_ops(void);
+uint32_t nrc_timer_get_resolution(int channel_index);
+bool nrc_timer_is_valid(int channel_index);
 bool nrc_timer_init(int channel_index, int prescale);
 void nrc_timer_enable(int channel_index, bool enable);
-void nrc_timer_count(int channel_index, uint32_t count);
+bool nrc_timer_get_enable(int channel_index);
+void nrc_timer_set_target(int channel_index, uint32_t target);
+uint32_t nrc_timer_get_target(int channel_index);
 void nrc_timer_stopmode(int channel_index, bool enable);
-void nrc_timer64_stopmode(int channel_index, bool enable);
+void nrc_timer_get_tick(int channel_index, uint32_t *tick);
+uint32_t nrc_timer_get_irq(int channel_index);
+void nrc_timer_clr_irq(int channel_index);
 
 bool nrc_timer64_init(int channel_index, int prescale);
 void nrc_timer64_enable(int channel_index, bool enable);
-void nrc_timer64_count(int channel_index, UINT64 count);
-void nrc_timer_get_tick(int channel_index, uint32_t *tick);
-void nrc_timer64_set_target(int channel_index, uint32_t high, uint32_t low);
-void nrc_timer64_get_tick(int channel_index, uint32_t *high, uint32_t *low);
-
-void nrc_timer_get_irq(int channel_index, uint32_t *status);
-void nrc_timer64_get_irq(int channel_index, uint32_t *status);
+bool nrc_timer64_get_enable(int channel_index);
+void nrc_timer64_set_target(int channel_index, uint64_t target);
+uint64_t nrc_timer64_get_target(int channel_index);
+void nrc_timer64_stopmode(int channel_index, bool enable);
+void nrc_timer64_get_tick(int channel_index, uint64_t *tick);
+uint32_t nrc_timer64_get_irq(int channel_index);
 void nrc_timer64_clr_irq(int channel_index);
-void nrc_timer_clr_irq(int channel_index);
 
 #endif //__HAL_TIMER_NRC7292_H__

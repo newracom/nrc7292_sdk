@@ -2590,18 +2590,27 @@ static char * wpa_supplicant_ie_txt(char *pos, char *end, const char *proto,
 	char *start;
 	int ret;
 
-	ret = os_snprintf(pos, end - pos, "[%s-", proto);
-	if (os_snprintf_error(end - pos, ret))
-		return pos;
-	pos += ret;
-
 	if (wpa_parse_wpa_ie(ie, ie_len, &data) < 0) {
-		ret = os_snprintf(pos, end - pos, "?]");
+		ret = os_snprintf(pos, end - pos, "[%s-?]", proto);
 		if (os_snprintf_error(end - pos, ret))
 			return pos;
 		pos += ret;
 		return pos;
 	}
+
+	if ( (strcmp(proto, "WPA2") == 0) &&
+		 ( (data.key_mgmt & WPA_KEY_MGMT_SAE)
+#ifdef CONFIG_OWE
+		|| (data.key_mgmt & WPA_KEY_MGMT_OWE)
+#endif
+		) ) {
+		proto = "WPA3";
+	}
+
+	ret = os_snprintf(pos, end - pos, "[%s-", proto);
+	if (os_snprintf_error(end - pos, ret))
+		return pos;
+	pos += ret;
 
 	start = pos;
 	if (data.key_mgmt & WPA_KEY_MGMT_IEEE8021X) {
@@ -3449,6 +3458,16 @@ static int wpa_supplicant_ctrl_iface_update_network(
 			eapol_sm_invalidate_cached_session(wpa_s->eapol);
 		}
 	}
+
+#ifdef CONFIG_SAE
+	if (os_strcmp(name, "sae_password") == 0 ) {
+		if (ssid->sae_password) {
+			ssid->passphrase = os_strdup(ssid->sae_password);
+			wpa_printf(MSG_DEBUG, "sae password:%s, passphrase:%s ",
+					ssid->sae_password, ssid->passphrase);
+		}
+	}
+#endif
 
 	if ((os_strcmp(name, "psk") == 0 &&
 	     value[0] == '"' && ssid->ssid_len) ||

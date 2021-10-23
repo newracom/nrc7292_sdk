@@ -29,6 +29,7 @@
 #include "raspi-hif.h"
 #include "nrc-atcmd.h"
 #include "nrc-iperf.h"
+#include "nrc-echo.h"
 
 /**********************************************************************************************/
 
@@ -204,6 +205,27 @@ static int raspi_cli_run_script (char *script)
 		{
 			if (nrc_atcmd_send_cmd(cmd) < 0)
 				goto error_exit;
+		}
+		else if (memcmp(cmd, "HOST ", 5) == 0) // HOST {0|1}
+		{
+			if ((cmd_len - 5) > 1)
+				goto invalid_line;
+
+			switch (cmd[cmd_len - 1])
+			{
+				case '0':
+					log_info("HOST: 0\n");
+					nrc_atcmd_network_stack_target();
+					break;
+
+				case '1':
+					log_info("HOST: 1\n");
+					nrc_atcmd_network_stack_host();
+					break;
+
+				default:
+					goto invalid_line;
+			}
 		}
 		else if (memcmp(cmd, "DATA ", 5) == 0) // DATA <length>
 		{
@@ -458,6 +480,54 @@ static void raspi_cli_run_loop (void)
 			iperf_main(buf);
 			continue;
 		}
+		else if (memcmp(buf, "log", 3) == 0)
+		{
+			char *param = buf + 3;
+
+			if (strlen(param) == 0)
+			{
+				log_info("ATCMD_LOG_%s\n", nrc_atcmd_log_is_on() ? "ON" : "OFF");
+				log_info("ECHO_LOG_%s\n", nrc_echo_log_is_on() ? "ON" : "OFF");
+				continue;
+			}
+			else if (memcmp(param, " atcmd ", 7) == 0)
+			{
+				param += 7;
+
+				if (strcmp(param, "on") == 0)
+				{
+					log_info("ATCMD_LOG_ON\n");
+					nrc_atcmd_log_on();
+					continue;
+				}
+				else if (strcmp(param, "off") == 0)
+				{
+					log_info("ATCMD_LOG_OFF\n");
+					nrc_atcmd_log_off();
+					continue;
+				}
+			}
+			else if (memcmp(param, " echo ", 6) == 0)
+			{
+				param += 6;
+
+				if (strcmp(param, "on") == 0)
+				{
+					log_info("ECHO_LOG_ON\n");
+					nrc_echo_log_on();
+					continue;
+				}
+				else if (strcmp(param, "off") == 0)
+				{
+					log_info("ECHO_LOG_OFF\n");
+					nrc_echo_log_off();
+					continue;
+				}
+			}
+
+			log_info("Usage: log [{atcmd|echo} {on|off}]\n");
+			continue;
+		}
 
 		switch(tx_mode)
 		{
@@ -519,12 +589,14 @@ typedef struct
 		uint32_t flags;
 	} hif;
 
+	bool host;
+	bool echo;
 	char *script;
 } raspi_cli_opt_t;
 
 static void raspi_cli_version (void)
 {
-#define RASPI_CLI_VERSION	"1.2.0"
+#define RASPI_CLI_VERSION	"1.2.1"
 
 	printf("raspi-atcmd-cli version %s\n", RASPI_CLI_VERSION);
  	printf("Copyright (c) 2019-2020  <NEWRACOM LTD>\n");
@@ -542,6 +614,8 @@ static void raspi_cli_help (char *cmd)
 
 	printf("UART/SPI:\n");
 	printf("  -D, --device #        specify the device. (default: /dev/ttyAMA0, /dev/spidev0.0)\n");
+	printf("  -H, --host            run as the host mode\n");
+	printf("  -e, --echo            enable echo for received packets (default: disable)\n");
 	printf("  -s, --script #        specify the script file.\n");
 	printf("\n");
 
@@ -573,6 +647,8 @@ static int raspi_cli_option (int argc, char *argv[], raspi_cli_opt_t *opt)
 	{
 		/* UART/SPI */
 		{ "device",				required_argument,		0,		'D' },
+		{ "host",				no_argument,			0,		'H' },
+		{ "echo",				no_argument,			0,		'e' },
 		{ "script",				required_argument,		0,		's' },
 
 		/* UART */
@@ -602,6 +678,8 @@ static int raspi_cli_option (int argc, char *argv[], raspi_cli_opt_t *opt)
 	opt->hif.device = NULL;
 	opt->hif.speed = 0;
 	opt->hif.flags = 0;
+	opt->host = false;
+	opt->echo = false;
 	opt->script = NULL;
 
 	while (1)
@@ -641,6 +719,14 @@ static int raspi_cli_option (int argc, char *argv[], raspi_cli_opt_t *opt)
 			/* UART/SPI */
 			case 'D':
 				opt->hif.device = optarg;
+				break;
+
+			case 'H':
+				opt->host = true;
+				break;
+
+			case 'e':
+				opt->echo = true;
 				break;
 
 			case 's':
@@ -716,8 +802,24 @@ int main (int argc, char *argv[])
 	if (raspi_cli_open(opt.hif.type, opt.hif.device, opt.hif.speed, opt.hif.flags) != 0)
 		return -1;
 
+	log_info("[ MODE ]\n");
+   	log_info("  - host: %s\n",opt.host ? "on" : "off");
+   	log_info("  - echo: %s\n",opt.echo ? "on" : "off");
+	log_info("\n");
+
+	if (opt.host)
+		nrc_atcmd_network_stack_host();
+	else
+		nrc_atcmd_network_stack_target();
+
+	if (opt.echo)
+		nrc_echo_enable();
+
 	if (raspi_cli_run_script(opt.script) == 0)
 		raspi_cli_run_loop();
+
+	if (opt.echo)
+		nrc_echo_disable();
 
 	raspi_cli_close();
 

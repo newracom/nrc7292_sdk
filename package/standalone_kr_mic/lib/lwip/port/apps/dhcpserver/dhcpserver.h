@@ -58,6 +58,9 @@ typedef struct _list_node {
 
 extern u32_t dhcps_lease_time;
 #define DHCPS_COARSE_TIMER_SECS  1
+/** period (in milliseconds) of the application calling dhcps_coarse_tmr() */
+#define DHCPS_COARSE_TIMER_MSECS (DHCPS_COARSE_TIMER_SECS * 1000UL)
+
 #define DHCPS_LEASE_TIMER  dhcps_lease_time  //0x05A0
 #define DHCPS_MAX_LEASE 0x64
 #define BOOTP_BROADCAST 0x8000
@@ -91,7 +94,7 @@ extern u32_t dhcps_lease_time;
 #define DHCP_OPTION_REQ_LIST     55
 #define DHCP_OPTION_END         255
 
-#define MAX_STATION_NUM      8
+#define MAX_STATION_NUM      20
 
 #define DHCPS_STATE_OFFER 1
 #define DHCPS_STATE_DECLINE 2
@@ -107,5 +110,10 @@ void dhcps_stop(void);
 
 void dhcps_coarse_tmr(void);
 
+int dhcps_status(void);
+int dhcps_get_interface(void);
+bool wifi_softap_set_dhcps_lease_time(u32_t minute);
+bool wifi_softap_reset_dhcps_lease_time(void);
+u32_t wifi_softap_get_dhcps_lease_time(void); // minute
 #endif
 

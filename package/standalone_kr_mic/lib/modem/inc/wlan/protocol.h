@@ -353,6 +353,7 @@ bool ieee80211_is_ctrl(GenericMacHeader *gmh);
 bool ieee80211_is_data(GenericMacHeader *gmh);
 bool ieee80211_is_extn(GenericMacHeader *gmh);
 bool ieee80211_is_non_qos_data(GenericMacHeader *gmh);
+bool ieee80211_is_null_data(GenericMacHeader *gmh);
 bool ieee80211_is_qos_data(GenericMacHeader *gmh);
 bool ieee80211_is_qos_null(GenericMacHeader *gmh);
 bool ieee80211_is_preq(GenericMacHeader *gmh);
@@ -363,6 +364,9 @@ bool ieee80211_is_retry(GenericMacHeader *gmh);
 bool ieee80211_is_more_data(GenericMacHeader *gmh);
 bool ieee80211_is_beacon(GenericMacHeader* gmh);
 bool ieee80211_is_auth(GenericMacHeader* gmh);
+bool ieee80211_is_deauth(GenericMacHeader* gmh);
+bool ieee80211_is_disasoc(GenericMacHeader* gmh);
+bool ieee80211_is_assoc_resp(GenericMacHeader* gmh);
 bool lmac_check_action_frame(GenericMacHeader* gmh);
 bool ieee80211_is_protected(GenericMacHeader* gmh);
 bool ieee80211_is_s1g_beacon(GenericMacHeader *gmh);
@@ -383,4 +387,7 @@ bool ieee80211_is_any_mgmt(void *mh);
 
 const uint8_t* broadcast_addr();
 bool is_broadcast_addr(const uint8_t* addr);
+
+uint8_t get_mesh_control_length(GenericMacHeader* gmh);
+uint8_t ieee80211_mhd_length(GenericMacHeader* gmh);
 #endif /* __PROTOCOL_H__ */

@@ -1,5 +1,21 @@
-#ifndef DRIVER_NRC_H
-#define DRIVER_NRC_H
+/*
+ * Copyright (c) 2016-2021 Newracom, Inc.
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+#ifndef _DRIVER_NRC_H_
+#define _DRIVER_NRC_H_
 
 #include <stdbool.h>
 #include "system_common.h"
@@ -16,11 +32,15 @@ struct nrc_wpa;
 #define NRC_WPA_INTERFACE_NAME_0		("wlan0")
 #define NRC_WPA_INTERFACE_NAME_1		("wlan1")
 
+#if defined(MAX_STA)
+#define NRC_WPA_SOFTAP_MAX_STA			MAX_STA
+#else
 #define NRC_WPA_SOFTAP_MAX_STA			(1024)
+#endif /* !defined(MAX_STA) */
 #define NRC_WPA_NUM_BEACON_MISS_ALLOWED	(20)
 #define NRC_WPA_MIN_DURATION_BEACON_MISS_ALLOWED 	(3)	// In second
 #define NRC_WPA_MAX_KEY_LEN 			(32)
-#define NRC_WPA_MAX_KEY_INDEX 			(4)
+#define NRC_WPA_MAX_KEY_INDEX 			(6)
 
 #define _FC(T,ST)	IEEE80211_FC( WLAN_FC_TYPE_##T , WLAN_FC_STYPE_##ST )
 
@@ -43,17 +63,29 @@ struct nrc_wpa;
 #define WLAN_ACTION_S1G_TWT_TEARDOWN		7
 #define WLAN_ACTION_S1G_TWT_INFO			11
 
-#if defined(INCLUDE_BD_SUPPORT)
 #define NRC_WPA_BD_HEADER_LENGTH	16
 #define NRC_WPA_BD_MAX_DATA_LENGTH	546
-#endif /* defined(INCLUDE_BD_SUPPORT) */
 
 extern uint8_t g_standalone_addr[6];
 
+#define WLAN_CCMP_MIC_LEN	8
+#define WLAN_BIP_MIC_LEN	8
+#define WLAN_CCMP_KEY_LEN_BIT	128
+#define WLAN_BIP_KEY_LEN_BIT	128
+
+enum ccmp_key_index {
+	WLAN_KEY_PTK =0,
+	WLAN_KEY_GTK_1 =1,
+	WLAN_KEY_GTK_2 =2,
+	WLAN_KEY_GTK_3 =3,
+	WLAN_KEY_IGTK_4 =4,
+	WLAN_KEY_IGTK_5 =5,
+};
+
 enum block_ack_state {
-	BLOCK_ACK_INVALID,
-	BLOCK_ACK_TX,
-	BLOCK_ACK_RX,
+	BLOCK_ACK_INVALID	= 0, //0
+	BLOCK_ACK_TX		= BIT(0), //1
+	BLOCK_ACK_RX		= BIT(1), //2
 };
 
 struct nrc_wpa_key {
@@ -81,7 +113,7 @@ struct nrc_wpa_bss {
 	uint8_t					bssid[6];
 	uint8_t					ssid[32];
 	uint8_t					ssid_len;
-	struct nrc_wpa_key		broadcast_key;
+	struct nrc_wpa_key		broadcast_key[2];
 	uint16_t 				beacon_int;
 	struct os_time 			last_beacon_update;
 	bool 					authorized_1x;
@@ -106,6 +138,7 @@ struct nrc_wpa_if {
 	struct nrc_wpa	*global;
 	struct nrc_wpa_sta *ap_sta[NRC_WPA_SOFTAP_MAX_STA];
 	int num_ap_sta;
+	int key_mgmt ;
 };
 
 struct nrc_wpa {
@@ -145,7 +178,6 @@ struct nrc_wpa_log_event {
 	int level;
 };
 
-#if defined(INCLUDE_BD_SUPPORT)
 struct nrc_wpa_bdf {
 	uint8_t	ver_major;
 	uint8_t	ver_minor;
@@ -157,25 +189,30 @@ struct nrc_wpa_bdf {
 
 	uint8_t data[NRC_WPA_BD_MAX_DATA_LENGTH];
 };
-#endif /* defined(INCLUDE_BD_SUPPORT) */
 
 struct nrc_wpa_if *wpa_driver_get_interface(int vif);
 struct nrc_wpa_sta* nrc_wpa_find_sta(struct nrc_wpa_if *intf,
 						const uint8_t addr[ETH_ALEN]);
-struct nrc_wpa_key *nrc_wpa_get_key(struct nrc_wpa_if *intf,
+struct nrc_wpa_key *nrc_wpa_get_key_by_key_idx(struct nrc_wpa_if *intf,
+						int key_idx);
+struct nrc_wpa_key *nrc_wpa_get_key_by_addr(struct nrc_wpa_if *intf,
 						const uint8_t *addr);
 void wpa_driver_sta_sta_add(struct nrc_wpa_if* intf);
-#if defined(NRC_USER_APP)
-void wpa_driver_notify_event_to_app(int event_id);
-#endif
-void wpa_driver_notify_vevent_to_app(int cmd, uint8_t* data, uint16_t len);
+void wpa_driver_set_associate_status(int status);
+int wpa_driver_get_associate_status(void);
+void wpa_driver_notify_event_to_app(enum wpa_event_type event_id, uint32_t data_len, uint8_t* data);
+void wpa_driver_notify_vevent_to_app(int event_id, uint32_t data_len, uint8_t* data);
 
 void wpa_driver_sta_sta_remove(struct nrc_wpa_if* intf);
 int wpas_l2_packet_filter(uint8_t *buffer, int len);
+void wpa_driver_clear_key_all(struct nrc_wpa_if *intf);
 int nrc_transmit(struct nrc_wpa_if* intf, uint8_t *frm, const uint16_t len);
+int nrc_transmit_pmf(struct nrc_wpa_if* intf, uint8_t *frm, const uint16_t len,
+		const uint16_t data_len, struct nrc_wpa_key *wpa_key);
 int nrc_raw_transmit(struct nrc_wpa_if* intf, uint8_t *frm, const uint16_t len,
 				const int ac);
 int nrc_get_sec_hdr_len(struct nrc_wpa_key *key);
+void nrc_start_keep_alive(struct nrc_wpa_if* intf);
 
 // Helper functions
 static inline bool is_wep(uint8_t cipher)
@@ -197,4 +234,4 @@ static inline bool is_key_ccmp(struct nrc_wpa_key *key)
 {
 	return (key && is_ccmp(key->cipher));
 }
-#endif // DRIVER_NRC_H
+#endif // _DRIVER_NRC_H_

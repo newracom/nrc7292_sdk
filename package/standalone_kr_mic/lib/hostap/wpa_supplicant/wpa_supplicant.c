@@ -3096,7 +3096,7 @@ static void wpas_start_assoc_cb(struct wpa_radio_work *work, int deinit)
 		wpas_connect_work_done(wpa_s);
 		wpa_s->scan_req = MANUAL_SCAN_REQ;
 		wpa_s->reassociate = 1;
-		wpa_supplicant_req_scan(wpa_s, 0, 0);
+		wpa_supplicant_req_scan(wpa_s, 5, 0);
 		return;
 #endif /* CONFIG_WPS */
 	} else {
@@ -5854,6 +5854,16 @@ static int wpa_supplicant_init_iface(struct wpa_supplicant *wpa_s,
 		wpa_dbg(wpa_s, MSG_DEBUG, "Failed to set country");
 		return -1;
 	}
+
+#ifdef CONFIG_NDP_PREQ
+	//TBD: use fst_llt for ndp preq
+	if (wpa_s->conf->fst_llt) {
+		if (wpa_drv_set_ndp_preq(wpa_s, 1) < 0) {
+			wpa_printf(MSG_ERROR, "Failed to set NDP (%d)'", wpa_s->conf->fst_llt);
+			return -1;
+		}
+	}
+#endif
 
 #ifdef CONFIG_FST
 	if (wpa_s->conf->fst_group_id) {

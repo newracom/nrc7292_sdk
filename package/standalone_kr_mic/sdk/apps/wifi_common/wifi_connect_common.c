@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2020 Newracom, Inc.
+ * Copyright (c) 2021 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,51 +26,44 @@
 #include "nrc_sdk.h"
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
+#include "wlan_manager.h"
 
-#define SOFTAP_COUNTRY_NUM 5
-s1g_operation_channel_mapping channel_table[SOFTAP_COUNTRY_NUM]=
+
+static void wifi_event_handler(tWIFI_EVENT_ID event, int data_len, char* data)
 {
-	{"KR", 5},	/* 5  : 1MBW_920.0MHz(KR) or 1MBW_927.5MHz(KR MIC)*/
-	{"JP", 3},	/* 3  : 1MBW_918MHz(JP) */
-	{"US", 46},	/* 46 : 2MBW_925MHz(US) */
-	{"TW", 2},	/* 2  : 2MBW_839.5MHz(TW) */
-	{"EU", 2},	/* 2  : 2MBW_864MHz(EU) */
-};
-
-
-void wifi_event_handler(WLAN_EVENT_ID event)
-{
+	char* ip_addr = NULL;
 	switch(event) {
-		case WLAN_EVT_CONNECT_SUCCESS:
+		case WIFI_EVT_CONNECT_SUCCESS:
 			nrc_usr_print("[%s] Receive Connection Success Event\n", __func__);
 			break;;
-		case WLAN_EVT_CONNECT_FAIL:
+		case WIFI_EVT_CONNECT_FAIL:
 			nrc_usr_print("[%s] Receive Connection Fail Event\n", __func__);
 			break;
-		case WLAN_EVT_GET_IP:
+		case WIFI_EVT_GET_IP:
 			nrc_usr_print("[%s] Receive IP_GET Success Event\n", __func__);
-			nrc_usr_print("[%s] IP Address : %s\n", __func__, nrc_wifi_get_ip_address());
+			if( nrc_wifi_get_ip_address(&ip_addr) == WIFI_SUCCESS)
+				nrc_usr_print("[%s] IP Address : %s\n", __func__, ip_addr ? ip_addr : "null");
 			break;
-		case WLAN_EVT_GET_IP_FAIL:
+		case WIFI_EVT_GET_IP_FAIL:
 			nrc_usr_print("[%s] Receive IP_GET Fail Event\n", __func__);
 			break;
-		case WLAN_EVT_DISCONNECT:
+		case WIFI_EVT_DISCONNECT:
 			nrc_usr_print("[%s] Receive Disconnection Event\n", __func__);
 			break;
-		case WLAN_EVT_SCAN_DONE:
+		case WIFI_EVT_SCAN_DONE:
 			nrc_usr_print("[%s] Receive Scan Done Event\n", __func__);
 			break;
-		case WLAN_EVT_START_SOFT_AP: //SoftAP
+		case WIFI_EVT_START_SOFT_AP:
 			nrc_usr_print("[%s] Receive Start Soft AP Event\n", __func__);
 			break;
-		case WLAN_EVT_SET_SOFT_AP_IP: //SoftAP
+		case WIFI_EVT_SET_SOFT_AP_IP:
 			nrc_usr_print("[%s] Receive SET IP Event\n", __func__);
-			nrc_usr_print("[%s] IP Address : %s\n", __func__, nrc_wifi_get_ip_address());
+			if( nrc_wifi_get_ip_address(&ip_addr) == WIFI_SUCCESS)
+				nrc_usr_print("[%s] IP Address : %s\n", __func__, ip_addr);
 			break;
-		case WLAN_EVT_START_DHCP_SERVER: //SoftAP
+		case WIFI_EVT_START_DHCP_SERVER:
 			nrc_usr_print("[%s] Receive Start DHCPS Event\n", __func__);
 			break;
-
 		default:
 			nrc_usr_print("[%s] Receive Unknown Event %d\n", __func__, event);
 			break;
@@ -79,26 +72,32 @@ void wifi_event_handler(WLAN_EVENT_ID event)
 
 int wifi_init(WIFI_CONFIG *param)
 {
+	int txpower;
+
 	/* Optional: Register Wi-Fi Event Handler */
 	nrc_wifi_register_event_handler(wifi_event_handler);
 
-	/* Set DHCP config (DHCP or STATIC IP) */
-	if (!nrc_wifi_set_dhcp((bool)param->dhcp_enable, (char *)param->static_ip)) {
+	/* Set IP mode config (Dynamic IP(DHCP client) or STATIC IP) */
+	if (nrc_wifi_set_ip_mode((bool)param->ip_mode, (char *)param->static_ip)<0) {
 		nrc_usr_print("[%s] Fail to set static IP \n", __func__);
 		return WIFI_SET_IP_FAIL;
 	}
 
 	/* Set TX Power */
-	if(nrc_wifi_set_tx_power((int)param->tx_power) != WIFI_SUCCESS) {
+	txpower = param->tx_power;
+
+	if(nrc_wifi_set_tx_power(txpower) != WIFI_SUCCESS) {
 		nrc_usr_print("[%s] Fail set TX Power\n", __func__);
-		return WIFI_SET_FAIL;
+		return WIFI_FAIL;
 	}
-	nrc_usr_print("[%s] TX Power (%d dBm)\n", __func__, nrc_wifi_get_tx_power());
+	txpower = 0;
+	nrc_wifi_get_tx_power(&txpower);
+	nrc_usr_print("[%s] TX Power (%d dBm)\n", __func__, txpower);
 
 	/* Set Country Code */
-	if(nrc_wifi_set_country((char *)param->country) != WIFI_SUCCESS) {
+	if(nrc_wifi_set_country(nrc_wifi_country_from_string((char *)param->country)) != WIFI_SUCCESS) {
 		nrc_usr_print("[%s] Fail to set Country\n", __func__);
-		return WIFI_SET_FAIL;
+		return WIFI_FAIL;
 	}
 
 	return WIFI_SUCCESS;
@@ -110,26 +109,31 @@ int wifi_connect(WIFI_CONFIG *param)
 
 	/* Try to connect with ssid and security */
 	nrc_usr_print("[%s] Trying to Wi-Fi Connection...\n",__func__);
-	if ((index = nrc_wifi_add_network()) < 0) {
+	if (nrc_wifi_add_network(&index) < 0) {
 		nrc_usr_print("[%s] Fail to init \n", __func__);
 		return WIFI_INIT_FAIL;
 	}
 
 	if (nrc_wifi_set_ssid(index, (char *)param->ssid) != WIFI_SUCCESS) {
 		nrc_usr_print("[%s] Fail to set SSID\n", __func__);
-		return WIFI_SET_FAIL;
+		return WIFI_FAIL;
 	}
 
 	if (strlen((char *)param->bssid) != 0){
 		if (nrc_wifi_set_bssid(index, (char *)param->bssid) != WIFI_SUCCESS) {
 			nrc_usr_print("[%s] Fail to set BSSID\n", __func__);
-			return WIFI_SET_FAIL;
+			return WIFI_FAIL;
 		}
 	}
 
 	if (nrc_wifi_set_security(index, (int)param->security_mode, (char *)param->password) != WIFI_SUCCESS) {
 		nrc_usr_print("[%s] Fail to set Security\n", __func__);
-		return WIFI_SET_FAIL;
+		return WIFI_FAIL;
+	}
+
+	if (nrc_wifi_set_scan_freq(index, param->scan_freq_list, param->scan_freq_num) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail to set Scan Freq\n", __func__);
+		return WIFI_FAIL;
 	}
 
 	if (nrc_wifi_connect(index) != WIFI_SUCCESS) {
@@ -137,8 +141,8 @@ int wifi_connect(WIFI_CONFIG *param)
 		return WIFI_CONNECTION_FAIL;
 	}
 
-	if (nrc_wifi_get_ip() != WIFI_SUCCESS) {
-		nrc_usr_print("[%s] Fail to Get IP Address\n", __func__);
+	if (nrc_wifi_set_ip_address() != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail to set IP Address\n", __func__);
 		return WIFI_SET_IP_FAIL;
 	}
 
@@ -148,21 +152,19 @@ int wifi_connect(WIFI_CONFIG *param)
 int wifi_start_softap(WIFI_CONFIG *param)
 {
 	int index = -1;
-	uint8_t s1g_channel = wifi_get_s1g_channel_number(channel_table,\
-					SOFTAP_COUNTRY_NUM, (uint8_t *)param->country);
 
 	nrc_usr_print("[%s] Trying to start Soft AP (SSID:%s, S1G_CH:%d)\n",\
-			 __func__, (char *)param->ssid,  s1g_channel);
+			 __func__, (char *)param->ssid,  (int)param->channel);
 
-	if ((index = nrc_wifi_add_network()) < 0) {
+	if ((nrc_wifi_add_network(&index)) < 0) {
 		nrc_usr_print("[%s] Fail to init \n", __func__);
 		return WIFI_INIT_FAIL;
 	}
 
-	if(nrc_wifi_softap_set_conf(index, (char *)param->ssid, (int)s1g_channel,\
+	if(nrc_wifi_softap_set_conf(index, (char *)param->ssid, (int)param->channel,\
 			(int)param->security_mode, (char *)param->password) != WIFI_SUCCESS) {
 		nrc_usr_print("[%s] Fail to set sotftap config\n", __func__);
-		return WIFI_SET_FAIL;
+		return WIFI_FAIL;
 	}
 
 	if(nrc_wifi_softap_start(index) != WIFI_SUCCESS) {
@@ -173,23 +175,3 @@ int wifi_start_softap(WIFI_CONFIG *param)
 	return WIFI_SUCCESS;
 }
 
-/******************************************************************************
- * FunctionName : wifi_get_s1g_channel_number
- * Description  : get s1g channel number based on country
- * Parameters   : s1g_operation_channel_mapping *table
-                  uint8_t *country
- * Returns	  : s1g channel number
- *******************************************************************************/
-uint16_t wifi_get_s1g_channel_number(s1g_operation_channel_mapping *table,
-				int table_len, uint8_t *country){
-	int i = 0;
-	int s1g_freq = 0;
-
-	for(i=0; i<table_len; i++){
-		if(strncmp((const char*)country, (const char*)&table[i].country, 2) == 0){
-			s1g_freq =table[i].s1g_freq;
-			break;
-		}
-	}
-	return s1g_freq;
-}

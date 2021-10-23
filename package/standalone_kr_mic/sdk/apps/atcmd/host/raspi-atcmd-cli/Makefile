@@ -15,6 +15,7 @@ SRCS = \
 	nrc-hspi.c \
 	nrc-atcmd.c \
 	nrc-iperf.c \
+	nrc-echo.c \
 	main.c
 
 #########################################################

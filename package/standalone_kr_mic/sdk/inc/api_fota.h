@@ -26,8 +26,25 @@
 #ifndef __NRC_FOTA_API_H__
 #define __NRC_FOTA_API_H__
 
+
+typedef struct {
+	uint32_t fw_length;
+	uint32_t crc;
+	uint32_t ready;
+} FOTA_INFO;
+
+
 /**********************************************
- * @fn void nrc_fota_write(uint32_t dst, uint8_t *src, uint32_t len)
+ * @fn bool nrc_fota_is_support(void)
+ *
+ * @brief check flash is able to support fota
+ *
+ * @return True or False
+ ***********************************************/
+bool nrc_fota_is_support(void);
+
+/**********************************************
+ * @fn nrc_err_t nrc_fota_write(uint32_t dst, uint8_t *src, uint32_t len)
  *
  * @brief write len size from src to dst in fota memory area
  *
@@ -37,12 +54,12 @@
  *
  * @param len: source data length
  *
- * @return N/A
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-void nrc_fota_write(uint32_t dst, uint8_t *src, uint32_t len);
+nrc_err_t nrc_fota_write(uint32_t dst, uint8_t *src, uint32_t len);
 
 /**********************************************
- * @fn void nrc_fota_erase(uint32_t dst, uint32_t len)
+ * @fn nrc_err_t nrc_fota_erase(uint32_t dst, uint32_t len)
  *
  * @brief erase len size from (fota start address + dst)
  *
@@ -50,12 +67,12 @@ void nrc_fota_write(uint32_t dst, uint8_t *src, uint32_t len);
  *
  * @param len: length for erase
  *
- * @return N/A
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-void nrc_fota_erase(uint32_t dst, uint32_t len);
+nrc_err_t nrc_fota_erase(uint32_t dst, uint32_t len);
 
 /**********************************************
- * @fn void nrc_fota_set_info(uint32_t len, uint32_t crc)
+ * @fn nrc_err_t nrc_fota_set_info(uint32_t len, uint32_t crc)
  *
  * @brief set fota binary information (binary length and crc)
  *
@@ -63,23 +80,34 @@ void nrc_fota_erase(uint32_t dst, uint32_t len);
  *
  * @param crc: crc value for binary
  *
- * @return N/A
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-void nrc_fota_set_info(uint32_t len, uint32_t crc);
+nrc_err_t nrc_fota_set_info(uint32_t len, uint32_t crc);
 
 /**********************************************
- * @fn void nrc_fota_update_done(fota_info_t* fw_info)
+ * @fn nrc_err_t nrc_fota_update_done(FOTA_INFO* fw_info)
  *
- * @brief finish fota and reboot
+ * @brief Updated firmware and reboot
  *
  * @param fw_info: fota binary information (binary length and crc)
  *
- * @return N/A
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-void nrc_fota_update_done(fota_info_t* fw_info);
+nrc_err_t nrc_fota_update_done(FOTA_INFO* fw_info);
 
 /**********************************************
- * @fn uint32_t nrc_fota_cal_crc(uint8_t* data, uint32_t len)
+ * @fn nrc_err_t nrc_fota_update_done_bootloader(FOTA_INFO* fw_info)
+ *
+ * @brief Updated bootloader and reboot
+ *
+ * @param fw_info: fota binary information (binary length and crc)
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_fota_update_done_bootloader(FOTA_INFO* fw_info);
+
+/**********************************************
+ * @fn nrc_err_t nrc_fota_cal_crc(uint8_t* data, uint32_t len, uint32_t *crc)
  *
  * @brief calculate crc32 value
  *
@@ -87,8 +115,10 @@ void nrc_fota_update_done(fota_info_t* fw_info);
  *
  * @param len: length for crc
  *
- * @return crc value
+ * @param crc: calculated crc value
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-uint32_t nrc_fota_cal_crc(uint8_t* data, uint32_t len);
+nrc_err_t nrc_fota_cal_crc(uint8_t* data, uint32_t len, uint32_t *crc);
 
 #endif // __NRC_FOTA_API_H__

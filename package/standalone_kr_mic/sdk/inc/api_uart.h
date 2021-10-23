@@ -26,6 +26,8 @@
 #ifndef __NRC_API_UART_H__
 #define __NRC_API_UART_H__
 
+#include "nrc_types.h"
+
 typedef enum  {
 	NRC_UART_INT_NONE,
 	NRC_UART_INT_ERROR,
@@ -90,151 +92,140 @@ typedef struct {
 	NRC_UART_FIFO fifo;					/**< FIFO */
 } NRC_UART_CONFIG;
 
-typedef void (*intr_handler_fn)(int vector);
 
 /**********************************************
- * @fn void nrc_uart_set_config(NRC_UART_CONFIG *conf)
+ * @fn nrc_err_t nrc_uart_set_config(NRC_UART_CONFIG *conf)
  *
  * @brief set UART configuration
  *
  * @param conf: configuration
  *
- * @return N/A
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-void nrc_uart_set_config(NRC_UART_CONFIG *conf);
+nrc_err_t nrc_uart_set_config(NRC_UART_CONFIG *conf);
 
 
 /**********************************************
- * @fn void nrc_uart_set_channel(int ch)
+ * @fn nrc_err_t nrc_uart_set_channel(int ch)
  *
  * @brief Set UART channel
  *
  * @param ch channel number
  *
- * @return true(1) or false(0)
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-bool nrc_uart_set_channel(int ch);
+nrc_err_t nrc_uart_set_channel(int ch);
 
 
 /**********************************************
- * @fn int nrc_uart_get_intr_type(int ch)
+ * @fn nrc_err_t nrc_uart_get_interrupt_type(int ch, NRC_UART_INT_TYPE *type)
  *
  * @brief get interrupt status
  *
  * @param ch: channel number
  *
- * @return Interrupt type \n
- *		UART_INT_NONE, \n
- *		UART_INT_ERROR, \n
- *		UART_INT_TIMEOUT, \n
- *		UART_INT_RX_DONE, \n
- *		UART_INT_TX_EMPTY
+ * @param type: interrupt type
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-int nrc_uart_get_intr_type(int ch);
+nrc_err_t nrc_uart_get_interrupt_type(int ch, NRC_UART_INT_TYPE *type);
 
 
 /**********************************************
- * @fn void nrc_uart_set_interrupt(int ch, bool tx_en, bool rx_en)
+ * @fn nrc_err_t nrc_uart_set_interrupt(int ch, bool tx_en, bool rx_en)
  *
  * @brief set UART interrupt
  *
  * @param ch: channel number
+ *
  * @param tx_en: TX enable flag
+ *
  * @param rx_en: RX enable flag
  *
- * @return N/A
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-void nrc_uart_set_interrupt(int ch, bool tx_en, bool rx_en);
+nrc_err_t nrc_uart_set_interrupt(int ch, bool tx_en, bool rx_en);
 
 
 /**********************************************
- * @fn void nrc_uart_intr_clr(int ch, bool tx_int, bool rx_int , bool to_int )
+ * @fn nrc_err_t nrc_uart_clear_interrupt(int ch, bool tx_int, bool rx_int , bool timeout_int )
  *
  * @brief clear UART interrupt
  *
  * @param ch: channel number
+ *
  * @param tx_int: TX interrupt
+ *
  * @param rx_int: RX interrupt
  *
- * @param to_int TIMEOUT interrupt
+ * @param timeout_int TIMEOUT interrupt
  *
- * @return N/A
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-void nrc_uart_intr_clr(int ch, bool tx_int, bool rx_int , bool to_int );
-
+nrc_err_t nrc_uart_clear_interrupt(int ch, bool tx_int, bool rx_int , bool timeout_int );
 
 
 /**********************************************
- * @fn bool nrc_uart_put(int ch, char c)
+ * @fn nrc_err_t nrc_uart_put(int ch, char data)
  *
- * @brief put data
+ * @brief put a character data
  *
  * @param ch: channel number
- * @param c: data put
  *
- * @return true(1) or false(0)
+ * @param data: data put
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-bool nrc_uart_put(int ch, char c);
+nrc_err_t nrc_uart_put(int ch, char data);
 
 
 /**********************************************
- * @fn bool nrc_uart_get(int ch, char *c)
+ * @fn nrc_err_t nrc_uart_get(int ch, char *data)
  *
- * @brief get data
+ * @brief get a character data
  *
  * @param ch: channel number
- * @param c: data get
  *
- * @return true(1) or false(0)
+ * @param data: A pointer to get data
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-bool nrc_uart_get(int ch, char *c);
+nrc_err_t nrc_uart_get(int ch, char *data);
 
 
 /**********************************************
- * @fn void nrc_uart_register_intr_handler(int ch, intr_handler_fn cb)
+ * @fn nrc_err_t nrc_uart_register_intr_handler(int ch, intr_handler_fn cb)
  *
  * @brief register user callback for UART input
  *
  * @param ch: channel number
+ *
  * @param cb: user handler for UART input
  *
- * @return N/A
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-void nrc_uart_register_intr_handler(int ch, intr_handler_fn cb);
+nrc_err_t nrc_uart_register_interrupt_handler(int ch, intr_handler_fn cb);
 
 
 /**********************************************
- * @fn void nrc_uart_console_enable(void)
+ * @fn nrc_err_t nrc_uart_console_enable(void)
  *
- * @brief enable uart console (if enabled, you can use console for debugging)
+ * @brief enable uart console
  *
- * @return N/A
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-void nrc_uart_console_enable(void);
+nrc_err_t nrc_uart_console_enable(void);
 
 
 /**********************************************
- * @fn void nrc_uart_printf(const char *f, ...)
+ * @fn nrc_err_t nrc_uart_printf(const char *f, ...)
  *
  * @brief print log on the console
  *
  * @param f: parameter point
  *
- * @return N/A
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-void nrc_uart_printf(const char *f, ...);
-
-
-/**********************************************
- * @fn void nrc_uart_vprintf(const char *f, va_list ap)
- *
- * @brief print log on the console
- *
- * @param f: parameter point
- * @param ap: parameter list
- *
- * @return N/A
- ***********************************************/
-void nrc_uart_vprintf(const char *f, va_list ap);
+nrc_err_t nrc_uart_printf(const char *f, ...);
 
 #endif /* __NRC_API_UART_H__ */

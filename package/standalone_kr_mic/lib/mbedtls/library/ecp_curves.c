@@ -29,6 +29,7 @@
 
 #include "mbedtls/ecp.h"
 #include "mbedtls/platform_util.h"
+#include "mbedtls/platform.h"
 
 #include <string.h>
 

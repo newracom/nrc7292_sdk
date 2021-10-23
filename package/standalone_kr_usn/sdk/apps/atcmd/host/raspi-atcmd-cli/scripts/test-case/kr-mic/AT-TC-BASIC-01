@@ -1,0 +1,26 @@
+#
+# Test ID : AT-TC-BASIC-01
+#
+# Test Case : Echo / Reset / Version
+#
+# Test Configuration
+#
+#  - Testbed AP
+#
+#  - STAUT
+#
+
+ECHO "Step 1"
+AT
+
+ECHO "Step 2"
+ATE
+ATE
+
+ECHO "Step 3"
+ATZ
+WAIT 5s
+AT
+
+ECHO "Step 4"
+AT+VER?

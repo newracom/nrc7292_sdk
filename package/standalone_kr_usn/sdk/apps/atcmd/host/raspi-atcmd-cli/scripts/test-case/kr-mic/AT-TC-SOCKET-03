@@ -1,0 +1,37 @@
+#
+# Test ID : AT-TC-SOCKET-03
+#
+# Test Case : TCP Client Socket
+#
+# Test Configuration
+#
+#  - Testbed AP
+#    - TCP Server
+#      - IP : 192.168.200.1
+#      - Port : 50000
+#
+#  - STAUT
+#    - TCP Client
+#
+
+ECHO "Step 1"
+ECHO "Run TCP server."
+ECHO " - IP : 192.168.200.1"
+ECHO " - Port : 50000"
+HOLD
+
+ECHO "Step 2"
+AT+SOPEN="tcp","192.168.200.1",50000
+AT+SLIST?
+
+WAIT 1s
+
+ECHO "Step 3"
+LOOP 3 5
+AT+SSEND=0,16
+DATA 16
+WAIT 1s
+
+ECHO "Step 4"
+AT+SCLOSE=0
+AT+SLIST?

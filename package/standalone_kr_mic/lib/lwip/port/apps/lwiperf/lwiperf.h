@@ -97,7 +97,15 @@ enum lwiperf_report_type
 	/** The server side test is stopped */
 	LWIPERF_TCP_STOP_SERVER,
 	/** The udp server side test is stopped */
-	LWIPERF_UDP_STOP_SERVER
+	LWIPERF_UDP_STOP_SERVER,
+	/** Local error lead to test abort */
+	LWIPERF_UDP_ABORTED_LOCAL,
+	/** Data check error lead to test abort */
+	LWIPERF_UDP_ABORTED_LOCAL_DATAERROR,
+	/** Transmit error lead to test abort */
+	LWIPERF_UDP_ABORTED_LOCAL_TXERROR,
+	/** Remote side aborted the test */
+	LWIPERF_UDP_ABORTED_REMOTE
 #endif /* NRC_LWIP */
 };
 
@@ -115,9 +123,16 @@ enum lwiperf_client_type
 /** Prototype of a report function that is called when a session is finished.
     This report function can show the test results.
     @param report_type contains the test result */
+#ifdef NRC_LWIP
+typedef void (*lwiperf_report_fn)(void *arg, enum lwiperf_report_type report_type,
+	const ip_addr_t* local_addr, u16_t local_port, const ip_addr_t* remote_addr, u16_t remote_port,
+	u32_t bytes_transferred, u32_t ms_duration, u32_t bandwidth_kbitpsec,
+	u32_t total_packets, u32_t outoforder_packets, u32_t cnt_error);
+#else
 typedef void (*lwiperf_report_fn)(void *arg, enum lwiperf_report_type report_type,
 	const ip_addr_t* local_addr, u16_t local_port, const ip_addr_t* remote_addr, u16_t remote_port,
 	u32_t bytes_transferred, u32_t ms_duration, u32_t bandwidth_kbitpsec);
+#endif
 
 #ifdef NRC_LWIP
 typedef struct _lwiperf_state_tcp lwiperf_state_tcp_t;
@@ -176,7 +191,10 @@ struct _lwiperf_state_tcp {
 #ifdef NRC_LWIP
 	struct udp_pcb* udp_conn_pcb;
 	int udp_client_status;
-	u32_t packet_number;
+	u32_t total_packets;
+	u32_t outoforder_packets;
+	u32_t cnt_error;
+	u32_t time_ended;
 	u32_t bandwidth;
 	u32_t duration ;
 	u32_t udp_data_length ;
@@ -192,6 +210,10 @@ struct _lwiperf_udp_server_conn {
 	u16_t local_port, remote_port;
 	u32_t bytes_received;
 	u32_t time_started;
+	u32_t time_ended;
+	u32_t outoforder_packets;
+	u32_t cnt_error;
+	s32_t packet_count;
 	u8_t session_on;
 	lwiperf_udp_server_conn_t* next;
 };

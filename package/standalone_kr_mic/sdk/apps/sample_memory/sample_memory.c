@@ -34,7 +34,7 @@
  * Parameters   : count(test count), interval(test interval)
  * Returns      : 0 or -1 (0: success, -1: fail)
  *******************************************************************************/
-int run_sample_memory(int count, int interval)
+nrc_err_t run_sample_memory(int count, int interval)
 {
 	int i = 0, j=0;
 
@@ -50,7 +50,7 @@ int run_sample_memory(int count, int interval)
 			int32_t heap_size_now = xPortGetFreeHeapSize();
 			if (heap_size_ori > heap_size_now) {
 				nrc_usr_print("MEMORY LEAK!! ori(%d) vs now(%d) \n", heap_size_ori, heap_size_now);
-				return RUN_FAIL;
+				return NRC_FAIL;
 			}
 			nrc_usr_print("Start Again!\n");
 			j = 1;
@@ -62,7 +62,7 @@ int run_sample_memory(int count, int interval)
 		ptr = nrc_mem_malloc(j * 100);
 		if (ptr == NULL) {
 			nrc_usr_print("Malloc Fail!! Remaining heap size is %d \n", xPortGetFreeHeapSize());
-			return RUN_FAIL;
+			return NRC_FAIL;
 		} else
 			nrc_usr_print("Malloc %d Bytes. Remaining heap size is %d \n", j*100, xPortGetFreeHeapSize());
 
@@ -72,7 +72,7 @@ int run_sample_memory(int count, int interval)
 		_delay_ms(interval);
 	}
 	nrc_usr_print("[%s] exit \n",__func__);
-	return RUN_SUCCESS;
+	return NRC_SUCCESS;
 }
 
 
@@ -84,7 +84,7 @@ int run_sample_memory(int count, int interval)
  *******************************************************************************/
 void user_init(void)
 {
-	int ret = 0;
+	nrc_err_t ret;
 
 	//Enable Console for Debugging
 	nrc_uart_console_enable();

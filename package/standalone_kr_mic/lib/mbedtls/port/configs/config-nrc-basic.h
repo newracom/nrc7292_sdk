@@ -67,6 +67,7 @@
 #define MBEDTLS_RSA_C
 #define MBEDTLS_SHA1_C
 #define MBEDTLS_SHA256_C
+#define MBEDTLS_SHA512_C
 #define MBEDTLS_SSL_COOKIE_C
 #define MBEDTLS_SSL_CLI_C
 #define MBEDTLS_SSL_SRV_C
@@ -78,6 +79,14 @@
 #define MBEDTLS_KEY_EXCHANGE_PSK_ENABLED
 #define MBEDTLS_NO_PLATFORM_ENTROPY
 #define MBEDTLS_ENTROPY_HARDWARE_ALT
+#define MBEDTLS_ECDH_C
+#define MBEDTLS_BIGNUM_C
+#define MBEDTLS_ECP_DP_SECP256R1_ENABLED
+#define MBEDTLS_ECP_C
+#if defined (INCLUDE_PMF_SWENC)
+#define MBEDTLS_CCM_C
+#endif
+#define MBEDTLS_CMAC_C
 
 /* For test certificates */
 #define MBEDTLS_BASE64_C
@@ -103,6 +112,10 @@
 #define MBEDTLS_SSL_DTLS_ANTI_REPLAY
 #define MBEDTLS_SSL_DTLS_BADMAC_LIMIT
 #define MBEDTLS_SSL_DTLS_HELLO_VERIFY
+
+#if (defined (CONFIG_SAE) || defined (CONFIG_OWE))
+#define MBEDTLS_HMAC_DRBG_C
+#endif
 
 #include "mbedtls/check_config.h"
 

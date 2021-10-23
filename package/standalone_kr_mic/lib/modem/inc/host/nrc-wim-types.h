@@ -121,6 +121,9 @@ enum WIM_CMD_ID {
 	WIM_CMD_MIC_SCAN,
 	WIM_CMD_KEEP_ALIVE,
 	WIM_CMD_SET_IE,
+	WIM_CMD_SET_SAE,
+	WIM_CMD_PM,
+	WIM_CMD_SHELL_RAW,
 	WIM_CMD_MAX,
 };
 
@@ -131,6 +134,9 @@ enum WIM_EVENT_ID {
 	WIM_EVENT_PS_READY,
 	WIM_EVENT_PS_WAKEUP,
 	WIM_EVENT_KEEP_ALIVE,
+	WIM_EVENT_REQ_DEAUTH,
+	WIM_EVENT_CSA,
+	WIM_EVENT_CH_SWITCH,
 	WIM_EVENT_MAX,
 };
 
@@ -165,7 +171,7 @@ enum WIM_TLV_ID {
 	WIM_TLV_MCS_NSS = 27,
 	WIM_TLV_BD = 28,
 	WIM_TLV_TID,
-	WIM_TLV_AMPDU_MODE,
+	WIM_TLV_AMPDU_MODE, //30
 	WIM_TLV_EXTRA_TX_INFO,
 	WIM_TLV_SHORT_BCN_INTV,
 	/* CB4861 */
@@ -176,7 +182,7 @@ enum WIM_TLV_ID {
 	WIM_TLV_ERP_PARAM,
 	WIM_TLV_TIM_PARAM,
 	WIM_TLV_SHELL_CMD,
-	WIM_TLV_SHELL_RESP,
+	WIM_TLV_SHELL_RESP, //40
 	WIM_TLV_MACADDR_PARAM,
 	WIM_TLV_DTIM_PERIOD,
 	WIM_TLV_P2P_OPPPS,
@@ -186,7 +192,7 @@ enum WIM_TLV_ID {
 	WIM_TLV_AMPDU_SUPPORT,
 	WIM_TLV_AMSDU_SUPPORT,
 	WIM_TLV_S1G_PV1,
-	WIM_TLV_COUNTRY_CODE,
+	WIM_TLV_COUNTRY_CODE, //50
 	WIM_TLV_CH_TABLE,
 	WIM_TLV_1MHZ_CTRL_RSP,
 	WIM_TLV_COLOR_IND,
@@ -196,9 +202,12 @@ enum WIM_TLV_ID {
 	WIM_TLV_CCA_1M,
 	WIM_TLV_S1G_CHANNEL,
 	WIM_TLV_RTS_THREASHOLD,
-	WIM_TLV_FRAME_INJECTION,
+	WIM_TLV_FRAME_INJECTION, //60
 	WIM_TLV_IE_PARAM,
 	WIM_TLV_NDP_PREQ,
+	WIM_TLV_SAE_PARAM,
+	WIM_TLV_DRV_INFO,
+	WIM_TLV_NDP_ACK_1M, //65
 	WIM_TLV_MAX,
 };
 
@@ -223,7 +232,8 @@ enum WIM_AMPDU_ACTION {
 	WIM_AMPDU_TX_START = 0,
 	WIM_AMPDU_TX_STOP,
 	WIM_AMPDU_RX_START,
-	WIM_AMPDU_RX_STOP
+	WIM_AMPDU_RX_STOP,
+	WIM_AMPDU_TX_OPERATIONAL,
 };
 
 enum WIM_S1G_TIM_MODE {
@@ -249,6 +259,14 @@ struct hif_hdr {
 	int8_t vifindex;
 	uint16_t len;
 	uint16_t tlv_len;
+} __packed;
+
+struct hif_lb_hdr {
+	uint8_t type;
+	uint8_t subtype;
+	uint16_t count;
+	uint16_t len;
+	uint16_t index;
 } __packed;
 
 #define NRC_FRAME_CIPHER_NONE (0)
@@ -450,6 +468,7 @@ struct nrc_tlv {
 		struct frame_tx_info_param *tx_info_param;
 		struct wim_tim_param *tim_param;
 		struct wim_sleep_duration_param *sleep_duration_param;
+		struct wim_pm_param *pm_param;
 		struct wim_s1g_channel_param *s1g_chan_param;
 		struct wim_bd_param *bd_param;
 		uint8_t *bytes_param;
@@ -640,6 +659,44 @@ struct wim_sleep_duration_param {
 } __packed;
 WIM_DECLARE(wim_sleep_duration);
 
+/**
+ * struct wowlan_pattern - packet pattern
+ * @offset: packet offset (in bytes)
+ * @mask_len: length of mask (in bytes)
+ * @pattern_len: length of pattern (in bytes)
+ * @mask: bitmask where to match pattern and where to ignore bytes,
+ *  one bit per byte, in same format as nl80211
+ * @pattern: bytes to match where bitmask is 1
+ */
+struct wowlan_pattern {
+	uint16_t offset:6;
+	uint16_t mask_len:4;
+	uint16_t pattern_len:6;
+	uint8_t mask[7];
+	uint8_t pattern[56];
+} __packed;
+
+struct wim_pm_param {
+	uint8_t ps_mode;
+	uint8_t ps_enable;
+	uint16_t ps_wakeup_pin;
+	uint64_t ps_duration;
+	uint8_t wowlan_wakeup_host_pin;
+	uint8_t wowlan_enable_any;
+	uint8_t wowlan_enable_magicpacket;
+	uint8_t wowlan_enable_disconnect;
+	uint8_t wowlan_n_patterns;
+	struct wowlan_pattern wp[2];
+} __packed;
+WIM_DECLARE(wim_pm);
+
+struct wim_drv_info_param {
+	uint32_t boot_mode		:1;
+	uint32_t cqm_off		:1;
+	uint32_t reserved		:30;
+} __packed;
+WIM_DECLARE(wim_drv_info);
+
 #define WIM_SCAN_PARAM_FLAG_NO_CCK      (BIT(0))
 #define WIM_SCAN_PARAM_FLAG_HT			(BIT(1))
 #define WIM_SCAN_PARAM_FLAG_WMM			(BIT(2))
@@ -680,6 +737,7 @@ enum wim_cipher_type {
 	WIM_CIPHER_TYPE_CCMP_256 = 3,
 	WIM_CIPHER_TYPE_WAPI = 4,
 	WIM_CIPHER_TYPE_NONE = 5,
+	WIM_CIPHER_TYPE_BIP = 6,
 };
 
 #define WIM_KEY_MAX_LEN         (32)
@@ -687,6 +745,7 @@ enum wim_cipher_type {
 
 #define WIM_KEY_FLAG_PAIRWISE   BIT(0)
 #define WIM_KEY_FLAG_GROUP      BIT(1)
+#define WIM_KEY_FLAG_IGROUP     BIT(2)
 
 struct wim_key_param {
 	uint8_t cipher_type;
@@ -723,6 +782,14 @@ struct wim_set_ie_param {
 	uint8_t length;
 	uint8_t data[INFO_ELEMENT_MAX_LENGTH];
 };
+
+#define SET_SAE_MAX_LENGTH 515
+struct wim_set_sae_param {
+	uint16_t eid;
+	uint16_t length;
+	uint8_t data[SET_SAE_MAX_LENGTH];
+};
+
 struct wim_tx_queue_param {
 	uint8_t ac;
 	uint16_t txop;

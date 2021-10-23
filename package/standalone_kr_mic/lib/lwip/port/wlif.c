@@ -32,7 +32,7 @@ struct wlif
 };
 
 extern struct netif* nrc_netif[MAX_IF];
-
+extern struct netif eth_netif;
 /**
  * In this function, the hardware should be initialized.
  * Called from wlif_init().
@@ -162,19 +162,26 @@ void lwif_input(uint8_t vif_id, void *buffer, int data_len)
 
 	switch (htons(ethhdr->type)) {
 		/* IP or ARP packet? */
-		case ETHTYPE_IP:
 		case ETHTYPE_ARP:
 #if PPPOE_SUPPORT
 		/* PPPoE packet? */
 		case ETHTYPE_PPPOEDISC:
 		case ETHTYPE_PPPOE:
 #endif /* PPPOE_SUPPORT */
+		case ETHTYPE_IP:
 		/* full packet send to tcpip_thread to process */
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+			LWIP_DEBUGF(NETIF_DEBUG, ("[%s] calling eth_netif.linkoutput...\n", __func__));
+			eth_netif.linkoutput(&eth_netif, p);
+			pbuf_free(p);
+			p = NULL;
+#else
 			if (netif->input(p, netif)!=ERR_OK) {
 				LWIP_DEBUGF(NETIF_DEBUG, ("ethernetif_input: IP input error\n"));
 				pbuf_free(p);
 				p = NULL;
 			}
+#endif
 			break;
 
 		default:

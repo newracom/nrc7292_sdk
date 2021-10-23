@@ -28,7 +28,6 @@
 #include "lwip/sockets.h"
 #include "lwip/errno.h"
 #include "lwip/netdb.h"
-#include "apps/lwiperf/lwiperf.h"
 
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
@@ -44,7 +43,19 @@
 
 static int error_val = 0;
 
-static void iperf_client_setting_display(char* buffer, lwiperf_settings_t *settings )
+/** This is the Iperf settings struct sent from the client */
+typedef struct _iperf_settings {
+	#define LWIPERF_FLAGS_ANSWER_TEST 0x80000000
+	#define LWIPERF_FLAGS_ANSWER_NOW  0x00000001
+	u32_t flags;
+	u32_t num_threads; /* unused for now */
+	u32_t remote_port;
+	u32_t buffer_len; /* unused for now */
+	u32_t win_band; /* TCP window / UDP rate: unused for now */
+	u32_t amount; /* pos. value: bytes?; neg. values: time (unit is 10ms: 1/100 second) */
+} iperf_settings_t;
+
+static void iperf_client_setting_display(char* buffer, iperf_settings_t *settings )
 {
 	int i;
 	uint32_t setting_temp[6];
@@ -137,7 +148,7 @@ static void iperf_tcp_server_task(void *pvParameters)
 		int total_received = 0, maxlen = BUFFER_SIZE;
 		char buffer[maxlen];
 		int iperf_started = false;
-		lwiperf_settings_t settings;
+		iperf_settings_t settings;
 
 		nrc_usr_print("--------------------------------------------------------------------------\n");
 		nrc_usr_print("Iperf TCP Server connected with ip address: %s\n", inet_ntoa(address.sin_addr));
@@ -201,10 +212,10 @@ exit:
  * Parameters   : count(test count), interval(test interval)
  * Returns      : 0 or -1 (0: success, -1: fail)
  *******************************************************************************/
-int run_iperf_tcp_server(WIFI_CONFIG* param)
+nrc_err_t run_iperf_tcp_server(WIFI_CONFIG* param)
 {
 	int network_index = 0;
-	int wifi_state = WLAN_STATE_INIT;
+	tWIFI_STATE_ID wifi_state = WIFI_STATE_INIT;
 	SCAN_RESULTS results;
 	int i = 0;
 	int ssid_found =false;
@@ -256,12 +267,12 @@ int run_iperf_tcp_server(WIFI_CONFIG* param)
 		}
 	}
 
-	network_index = nrc_wifi_get_network_index();
+	nrc_wifi_get_network_index(&network_index );
 
 	/* check the IP is ready */
 	while(1){
-		wifi_state = nrc_wifi_get_state();
-		if (wifi_state == WLAN_STATE_GET_IP) {
+		nrc_wifi_get_state(&wifi_state);
+		if (wifi_state == WIFI_STATE_GET_IP) {
 			nrc_usr_print("[%s] IP ...\n",__func__);
 			break;
 		} else{
@@ -275,21 +286,21 @@ int run_iperf_tcp_server(WIFI_CONFIG* param)
 		_delay_ms(1);
 	}
 
-	wifi_state = nrc_wifi_get_state();
-	if (wifi_state == WLAN_STATE_GET_IP || wifi_state == WLAN_STATE_CONNECTED) {
+	nrc_wifi_get_state(&wifi_state);
+	if (wifi_state == WIFI_STATE_GET_IP || wifi_state == WIFI_STATE_CONNECTED) {
 		nrc_usr_print("[%s] Trying to DISCONNECT... for exit\n",__func__);
 		if (nrc_wifi_disconnect(network_index) != WIFI_SUCCESS) {
 			nrc_usr_print ("[%s] Fail for Wi-Fi disconnection (results:%d)\n", __func__);
-			return RUN_FAIL;
+			return NRC_FAIL;
 		}
 	}
 
 	if (error_val < 0)
-		return RUN_FAIL;
+		return NRC_FAIL;
 
 	nrc_usr_print("[%s] End of user_init!! \n",__func__);
 
-	return RUN_SUCCESS;
+	return NRC_SUCCESS;
 }
 
 /******************************************************************************
@@ -300,7 +311,7 @@ int run_iperf_tcp_server(WIFI_CONFIG* param)
  *******************************************************************************/
 void user_init(void)
 {
-	int ret = 0;
+	nrc_err_t ret;
 	WIFI_CONFIG* param;
 
 	nrc_uart_console_enable();

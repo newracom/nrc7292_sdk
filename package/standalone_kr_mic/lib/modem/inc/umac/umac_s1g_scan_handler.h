@@ -21,19 +21,19 @@
 
 // STA
 bool handle_sta_rx_s1gbeacon(SYS_BUF **buf, int8_t vif_id, bool is_tx);
-
 bool handle_sta_tx_s1gndpprobereq(SYS_BUF **buf, int8_t vif_id, bool is_tx);
 bool handle_sta_rx_s1gpv1proberes(SYS_BUF **buf, int8_t vif_id, bool is_tx);
 bool handle_sta_tx_probereq(SYS_BUF **buf, int8_t vif_id, bool is_tx);
 bool handle_sta_rx_s1gproberes(SYS_BUF **buf, int8_t vif_id, bool is_tx);
 
 // AP
+#if defined(INCLUDE_ACCESS_POINT)
 bool handle_ap_tx_beacon(SYS_BUF **buf, int8_t vif_id, bool is_tx);
-
 bool handle_ap_rx_s1gprobereq(SYS_BUF **buf, int8_t vif_id, bool is_tx);
 bool handle_ap_rx_s1gndpprobereq(SYS_BUF **buf, int8_t vif_id, bool is_tx);
 bool handle_ap_tx_proberes(SYS_BUF **buf, int8_t vif_id, bool is_tx);
 bool handle_ap_tx_pv1proberes(SYS_BUF **buf, int8_t vif_id, bool is_tx);
+#endif
 
 //////////////////////
 // Public Functions //

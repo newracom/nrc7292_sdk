@@ -29,6 +29,7 @@ int32_t     umac_scan_done(void*);
 void        umac_scan_set_return_channel(uint16_t channel);
 void        umac_scan_set_channel(uint16_t channel);
 bool        umac_scan_check_support_ch(void);
+bool        umac_scan_check_bg_supported(void);
 #define UMAC_SCAN_MAC_HDR_LEN   24
 #define UMAC_SCAN_EID_SSID      0
 

@@ -119,10 +119,10 @@ typedef struct {
 	volatile pwm_out_reg_t 	reg[4][4];
 } pwm_controller_t;
 
-void nrc_pwm_hw_init(uint32_t id);
-void nrc_pwm_set_config(uint32_t id, uint32_t div, uint32_t mode, bool inverse);
+void nrc_pwm_init(uint32_t id);
+void nrc_pwm_config(uint32_t id, uint32_t div, uint32_t mode, bool inverse);
 void nrc_pwm_set(uint32_t id, uint32_t t0, uint32_t t1, uint32_t t2, uint32_t t3);
-void nrc_pwm_set_enable(uint32_t id, bool enable);
+void nrc_pwm_enable(uint32_t id, bool enable);
 bool nrc_pwm_busy(uint32_t id);
 void nrc_pwm_show(uint32_t index);
 void nrc_pwm_show_blockinfo(uint32_t id);

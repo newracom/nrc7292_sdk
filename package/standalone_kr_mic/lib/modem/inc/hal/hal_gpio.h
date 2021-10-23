@@ -10,9 +10,17 @@
 #define GPIO_31 31
 
 // GPIO[27:29]
-#define NRC7292_A 7 /* 0b111 */
-#define NRC7292_B 0 /* 0b000 */
-#define NRC7292_C 4 /* 0b100 */
+#define NRC7292_A_VALUE 7 /* 0b111 */
+#define NRC7292_B_VALUE 0 /* 0b000 */
+#define NRC7292_C_VALUE 4 /* 0b100 */
+
+typedef enum {
+    NRC7292_BOARD_REV_INVALID = -1,
+    NRC7292_A = 0,
+    NRC7292_B,
+    NRC7292_C,
+    NRC7292_BOARD_REV_MAX
+} board_revision;
 
 typedef union {
 	struct {
@@ -56,7 +64,7 @@ typedef struct {
 	volatile gpio_io_t data;			//00
 	volatile gpio_io_t dir;				//04
 	volatile gpio_io_t alt;				//08
-	volatile uint32_t reserved;			//0c
+	volatile gpio_io_t alt1;			//0c
 	volatile uint32_t reserved1;		//10
 	volatile uint32_t reserved2;		//14
 	volatile uint32_t reserved3;		//18
@@ -64,7 +72,7 @@ typedef struct {
 	volatile uint32_t reserved5;		//20
 	volatile uint32_t reserved6;		//24
 	volatile uint32_t reserved7;		//28
-	volatile gpio_io_t input_enable;	//2c
+	volatile gpio_io_t input_enable;	//2c /* This register is not used. */
 	volatile gpio_io_t pullup;			//30
 	volatile gpio_io_t pulldown;		//34
 	volatile gpio_io_t drv_cur_ctrl0;	//38
@@ -127,8 +135,8 @@ void nrc_gpio_init(void);
 void nrc_gpio_deinit(void);
 void nrc_gpio_config_dir(gpio_io_t *gpio);
 void nrc_gpio_get_dir(gpio_io_t *gpio);
-void nrc_gpio_get_int_enable(gpio_io_t *gpio);
-void nrc_gpio_set_int_enable(gpio_io_t *gpio);
+void nrc_gpio_get_int_enable(gpio_io_t *gpio); /* This function will be deprecated since the register is not used. */
+void nrc_gpio_set_int_enable(gpio_io_t *gpio); /* This function will be deprecated since the register is not used. */
 void nrc_gpio_out(gpio_io_t *gpio);
 void nrc_gpio_outb(int pin, int level);
 void nrc_gpio_in(gpio_io_t *gpio);
@@ -140,6 +148,8 @@ void nrc_gpio_get_pulldown(gpio_io_t *gpio);
 void nrc_gpio_set_drv_current(gpio_io_t *ctl0, gpio_io_t *ctl1);
 void nrc_gpio_set_alt(gpio_io_t *gpio);
 void nrc_gpio_get_alt(gpio_io_t *gpio);
+void nrc_gpio_set_alt1(gpio_io_t *gpio);
+void nrc_gpio_get_alt1(gpio_io_t *gpio);
 //void nrc_gpio_get_uio_sel(UIO_SEL_e uio, uio_sel_t *sel);
 void nrc_gpio_get_uio_sel(int uio, uio_sel_t *sel);
 //void nrc_gpio_set_uio_sel(UIO_SEL_e uio, uio_sel_t *sel);

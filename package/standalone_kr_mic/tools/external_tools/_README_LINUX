@@ -1,0 +1,7 @@
+The webpage (./docs/index.html) is the main user manual page for NRC tools.
+
+The programs can be launched by running the command "java -jar <executable file (.exe)>" in a terminal. 
+
+e.g) java -jar DUT2DUT.exe
+
+They all require a graphical environment.

@@ -9,6 +9,8 @@
 #ifndef OS_H
 #define OS_H
 
+#include <stdio.h>
+
 typedef long os_time_t;
 
 /**

@@ -42,7 +42,7 @@ APIFILES= \
 	netifapi.c \
 	sockets.c \
 	tcpip.c
-	
+
 # NETIFFILES: Files implementing various generic network interface functions
 NETIFFILES= \
 	ethernet.c \
@@ -54,12 +54,20 @@ NETIFFILES= \
 LWIP_PORTING = \
 	sys_arch.c \
 	wlif.c \
+	nrc_ping.c \
+	nrc_iperf.c \
 	nrc_wifi.c
+
+ifeq ($(CONFIG_ETHERNET), y)
+LWIP_PORTING_ETH = \
+	nrc_eth_if.c
+endif
 
 LWIP_APPS= \
 	dhcpserver.c \
 	captdns.c \
-	lwiperf.c\
+	nrc_iperf_tcp.c\
+	nrc_iperf_udp.c\
 	ping.c
 
 # add files to CSRCS list
@@ -69,4 +77,5 @@ CSRCS += \
 	$(APIFILES) \
 	$(NETIFFILES) \
 	$(LWIP_PORTING)\
-	$(LWIP_APPS)
+	$(LWIP_APPS) \
+	$(LWIP_PORTING_ETH)

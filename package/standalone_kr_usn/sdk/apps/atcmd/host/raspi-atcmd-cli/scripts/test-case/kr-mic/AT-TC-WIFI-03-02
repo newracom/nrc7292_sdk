@@ -1,0 +1,62 @@
+#
+# Test ID : AT-TC-WIFI-03-02
+#
+# Test Case : STA - WPA2 & DHCP on
+#
+# Test Configuration
+#
+#  - Testbed AP
+#    - Country : KR
+#    - Channel : 927MHz (2M BW)
+#    - Security : WPA2
+#    - Password : 12345678
+#    - SSID : halow_atcmd_wpa2
+#    - IP : 192.168.200.1
+#    - DHCP Server : On
+#
+#  - STAUT
+#    - DHCP Client : On
+#
+
+ECHO "Step 1"
+ATZ
+WAIT 5s
+AT
+
+ECHO "Step 2"
+AT+WCOUNTRY?
+AT+WCOUNTRY="KR"
+AT+WCOUNTRY?
+
+ECHO "Step 3"
+AT+WDISCONN
+AT+WCONN?
+
+ECHO "Step 4"
+ECHO "Run AP in wpa2 mode."
+ECHO " - Country : KR"
+ECHO " - Channel : 927MHz (2M BW)"
+ECHO " - Security : WPA2"
+ECHO " - Password : 12345678"
+ECHO " - SSID : halow_atcmd_wpa2"
+ECHO " - IP : 192.168.200.1"
+ECHO " - DHCP Server : on"
+HOLD
+
+ECHO "Step 5"
+AT+WSCAN?
+AT+WSCAN
+
+ECHO "Step 6"
+AT+WCONN?
+AT+WCONN="halow_atcmd_wpa2","wpa2","12345678"
+AT+WCONN?
+
+ECHO "Step 7"
+AT+WIPADDR?
+AT+WDHCP
+AT+WIPADDR?
+
+ECHO "Step 8"
+AT+WPING="192.168.200.1",10
+

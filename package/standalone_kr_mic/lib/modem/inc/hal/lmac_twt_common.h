@@ -10,6 +10,9 @@ typedef enum _twt_mode {
 
 typedef enum _twt_state {
 	TWT_STATE_NULL = 0,
+	TWT_STATE_REQUEST,
+	TWT_STATE_ACCEPT,
+	TWT_STATE_REJECT,
 	TWT_STATE_SERVICE,
 	TWT_STATE_QUIET,
 	TWT_STATE_SERVICE_TO_QUIET,
@@ -24,6 +27,7 @@ typedef void (*twt_service_cb)(void);
 
 typedef struct _lmac_twt_info {
 	bool		enable;
+	bool		ps_poll;
 	twt_mode     mode;
 	twt_state    state;
 	twt_state	null_state;
@@ -61,6 +65,7 @@ bool lmac_twt_add_service_cb( twt_service_cb );
 void lmac_twt_service(void);
 void lmac_twt_service_to_quiet(uint32_t now);
 void lmac_twt_service_to_quiet_ap(void);
+void lmac_twt_quiet_to_service_ap(void);
 void lmac_twt_quiet(void);
 void lmac_twt_quiet_to_service(void);
 bool lmac_get_twt_enable();

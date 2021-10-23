@@ -205,7 +205,7 @@ basic_s1g_mcs_and_nss_set*	umac_s1g_config_get_s1g_oper_basic_mcs_nss_set();
 
 void		umac_s1g_config_set_s1gtim_block_control(uint8_t bc);
 
-void		umac_s1g_config_set_block_control(uint8_t encoding, uint8_t inverse);
+void		umac_s1g_config_set_block_control(uint8_t vif_id, uint8_t encoding, uint8_t inverse);
 uint8_t		umac_s1g_config_get_block_control();
 
 void		umac_s1g_config_set_ess_type_network(bool enable);

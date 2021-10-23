@@ -36,8 +36,10 @@
 
 #include "mbedtls/ecdh.h"
 #include "mbedtls/platform_util.h"
+#include "mbedtls/platform.h"
 
 #include <string.h>
+
 
 /* Parameter validation macros based on platform_util.h */
 #define ECDH_VALIDATE_RET( cond )    \
@@ -183,7 +185,7 @@ void mbedtls_ecdh_init( mbedtls_ecdh_context *ctx )
 
     ctx->var = MBEDTLS_ECDH_VARIANT_NONE;
 #endif
-    ctx->point_format = MBEDTLS_ECP_PF_UNCOMPRESSED;
+    ctx->point_format = MBEDTLS_ECP_PF_COMPRESSED; //MBEDTLS_ECP_PF_UNCOMPRESSED
 #if defined(MBEDTLS_ECP_RESTARTABLE)
     ctx->restart_enabled = 0;
 #endif
@@ -193,7 +195,7 @@ static int ecdh_setup_internal( mbedtls_ecdh_context_mbed *ctx,
                                 mbedtls_ecp_group_id grp_id )
 {
     int ret;
-
+    
     ret = mbedtls_ecp_group_load( &ctx->grp, grp_id );
     if( ret != 0 )
     {
@@ -607,7 +609,7 @@ static int ecdh_calc_secret_internal( mbedtls_ecdh_context_mbed *ctx,
 #if defined(MBEDTLS_ECP_RESTARTABLE)
     mbedtls_ecp_restart_ctx *rs_ctx = NULL;
 #endif
-
+    
     if( ctx == NULL || ctx->grp.pbits == 0 )
         return( MBEDTLS_ERR_ECP_BAD_INPUT_DATA );
 

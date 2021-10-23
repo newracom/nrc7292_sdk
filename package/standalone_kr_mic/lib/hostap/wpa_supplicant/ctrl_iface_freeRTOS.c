@@ -6,21 +6,24 @@
 #include "system_common.h"
 #include "driver_nrc.h"
 
+#define PRINT_BUFFER_SIZE 512
+
 #ifdef CONFIG_NO_STDOUT_DEBUG
 #ifdef wpa_printf
 #undef wpa_printf
+extern int wpa_debug_level;
 static void wpa_printf(int level, const char *fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
 	system_vprintf(fmt, ap);
 	system_printf("\n");
+	va_end(ap);
 }
 #endif
 #endif
 
-static void processCommand(char* cmd);
-int ctrl_iface_receive(struct wpa_supplicant *wpa_s, char *cmd);
+int ctrl_iface_receive(int vif_id, char *cmd);
 
 struct ctrl_iface_priv {
 	struct wpa_supplicant *wpa_s;
@@ -35,6 +38,16 @@ static struct ctrl_iface_global_priv* global_ctrl_if = NULL;
 
 //struct wpa_supplicant *ctrl_if_wpa_s = NULL;
 
+static struct wpa_supplicant *wpa_get_wpa_from_vif(int vif_id)
+{
+
+	if (vif_id < 0 || vif_id >= NRC_WPA_NUM_INTERFACES ||
+	    !global_ctrl_if || !global_ctrl_if->ctrl_if[vif_id]) {
+		return NULL;
+	}
+	return global_ctrl_if->ctrl_if[vif_id]->wpa_s;
+}
+
 int wpa_cmd_receive(int vif_id, int argc, char *argv[]) {
 	int i = 0;
 	char buf[512] = {0,};
@@ -47,19 +60,20 @@ int wpa_cmd_receive(int vif_id, int argc, char *argv[]) {
 		sprintf(buf, "%s %s", buf, argv[i]);
 	}
 
-	if (!global_ctrl_if || !global_ctrl_if->ctrl_if[vif_id])
-		return -1;
-
-	return ctrl_iface_receive(global_ctrl_if->ctrl_if[vif_id]->wpa_s, buf);
+	return ctrl_iface_receive(vif_id, buf);
 }
 
-size_t ctrl_iface_receive_response(char *cmd, char *ret)
+size_t ctrl_iface_receive_response(int vif_id, char *cmd, char *ret)
 {
-	int i = 0;
 	char *reply = NULL, *p = cmd;
 	size_t reply_len = 0;
+	struct wpa_supplicant *wpa_s;
 
-	wpa_printf(MSG_DEBUG, "[%s] cmd: %s", __func__, cmd);
+	wpa_printf(MSG_INFO, "[%s] cmd: %s", __func__, cmd);
+
+	wpa_s = wpa_get_wpa_from_vif(vif_id);
+	if (!wpa_s)
+		return 0;
 
 	while(*p != ' ' && *p != 0) {
 		*p = (char) toupper((int) *p);
@@ -67,70 +81,77 @@ size_t ctrl_iface_receive_response(char *cmd, char *ret)
 	}
 
 	reply = wpa_supplicant_ctrl_iface_process(
-		global_ctrl_if->ctrl_if[0]->wpa_s, cmd, &reply_len);
-
-	reply[reply_len] = 0;
-	wpa_printf(MSG_ERROR, "reply:%s reply_len: %d \n", reply, reply_len);
-
-	memcpy(ret, reply, reply_len - 1);
-	os_free(reply);
-
-	return reply_len;
-}
-
-int ctrl_iface_receive(struct wpa_supplicant *wpa_s, char *cmd)
-{
-	int i = 0;
-	char *reply = NULL, *p = cmd;
-	size_t reply_len = 0;
-
-	wpa_printf(MSG_DEBUG, "%s() cmd: %s", __func__, cmd);
-
-	if (!wpa_s)
-		return 0;
-
-	while(*p != ' ' && *p != 0 ) {
-		*p = (char) toupper((int) *p);
-		p++;
-	}
-
-	reply = wpa_supplicant_ctrl_iface_process(wpa_s, cmd, &reply_len);
-
-	reply[reply_len] = 0;
-	wpa_printf(MSG_ERROR, "reply_len: %d ", (int)reply_len);
-
-	if(reply_len == 1) {
-		wpa_printf(MSG_DEBUG, "FAIL");
-	} else if(reply_len == 2) {
-		wpa_printf(MSG_DEBUG, "OK");
+		wpa_s, cmd, &reply_len);
+	if (reply_len <= 0) {
 		os_free(reply);
 		return 0;
-	} else if(reply) {
-	    if (reply_len > PRINT_BUFFER_SIZE ) {
-    		int pos = 0;
-	        char atom[PRINT_BUFFER_SIZE+1];
-    	    while (pos < reply_len) {
-        		int len = reply_len - pos;
-	            if (len > PRINT_BUFFER_SIZE)
-    	        	len = PRINT_BUFFER_SIZE;
-        	    memcpy(atom, reply + pos, len);
-	    	    atom[len] = '\0';
-    	        wpa_printf(MSG_DEBUG, atom);
-        	    pos += len;
-	        }
-    	} else {
-        	reply[reply_len] = 0;
-            wpa_printf(MSG_DEBUG, reply);
-        }
-	} else {
-		wpa_printf(MSG_DEBUG, "UNKNOWN");
 	}
 
-    if(reply != NULL ) {
-    	os_free(reply);
-    }
+	reply[reply_len] = 0;
+	wpa_printf(MSG_INFO, "reply_len: %d\nreply: %s\n", reply_len, reply);
 
-	return 0;
+	memcpy(ret, reply, reply_len - 1);
+	ret[reply_len - 1] = '\0';
+
+	os_free(reply);
+
+	return reply_len - 1;
+}
+
+int ctrl_iface_receive(int vif_id, char *cmd)
+{
+	struct wpa_supplicant *wpa_s = wpa_get_wpa_from_vif(vif_id);
+	int ret = -1;
+
+	if (wpa_s) {
+		char *reply;
+		size_t reply_len;
+		int i;
+
+		for (i = 0 ; cmd[i] != ' ' && cmd[i] != '\0' ; i++)
+			cmd[i] = toupper(cmd[i]);
+
+		reply = wpa_supplicant_ctrl_iface_process(wpa_s, cmd, &reply_len);
+
+		if (!reply || reply_len <= 0)
+			wpa_printf(MSG_DEBUG, "WPA: Control interface response 'INVALID'");
+		else {
+			if (reply[reply_len - 1] == '\n')
+				reply[--reply_len] = '\0'; /* remove new line */
+			else
+				reply[reply_len] = '\0';
+
+			if (strcmp(reply, "OK") == 0 || (strcmp(reply, "FAIL") != 0 && strcmp(reply, "UNKNOWN COMMAND") != 0))
+				ret = 0;
+
+			if (reply_len <= 30)
+				wpa_printf(MSG_DEBUG, "WPA: Control interface response '%s' (%d)", reply, reply_len);
+			else {
+				wpa_printf(MSG_DEBUG, "WPA: Control interface response (%d)", reply_len);
+
+				if (wpa_debug_level <= MSG_DEBUG)
+				{
+					char temp;
+
+					for (i = 0 ; i < reply_len ; i += PRINT_BUFFER_SIZE) {
+						if ((reply_len - i) < PRINT_BUFFER_SIZE)
+							wpa_printf(MSG_DEBUG, "%s\n", reply + i);
+						else {
+							temp = reply[i + PRINT_BUFFER_SIZE];
+							reply[i + PRINT_BUFFER_SIZE] = '\0';
+							wpa_printf(MSG_DEBUG, "%s", reply + i);
+							reply[i + PRINT_BUFFER_SIZE] = temp;
+						}
+					}
+				}
+			}
+		}
+
+		if (reply)
+			os_free(reply);
+	}
+
+	return ret;
 }
 
 struct ctrl_iface_priv* wpa_supplicant_ctrl_iface_init(struct wpa_supplicant *wpa_s)

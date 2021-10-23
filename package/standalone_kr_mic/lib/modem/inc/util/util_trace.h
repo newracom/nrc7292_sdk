@@ -8,14 +8,14 @@
 /*=============================================================================
 	Trace level and type enumerations
 =============================================================================*/
-enum TRACE_LEVEL {
+typedef enum {
 	TL_VB		= 0,
 	TL_INFO		= 1,
 	TL_ERR		= 2,
 	TL_MAX,
-};
+}TRACE_LEVEL;
 
-enum TRACE_TYPES {
+typedef enum {
 	TT_QM = 0,
 	TT_HIF,
 	TT_WIM,
@@ -26,20 +26,25 @@ enum TRACE_TYPES {
 	TT_DL,
 	TT_UL,
 	TT_PHY,
-	TT_RF,
+	TT_RF = 10,
 	TT_UMAC,
 	TT_PS,
 	TT_TWT,
 	TT_HALOW,
 	TT_WPAS,
 	TT_RC,
-	TT_WPA,
 	TT_NET,
 	TT_CMD,
 	TT_MM,
-	TT_BA,
-	TT_SDK_GPIO,
+	TT_BA = 20,
+	TT_FRAG,
+	TT_RCV,
+	TT_BMT,
+	TT_TEMP_SENSOR = 24,
+	/* insert type for MAC here */
+	TT_SDK_GPIO = 30,
 	TT_SDK_HTTPC,
+	TT_SDK_HTTPD,
 	TT_SDK_FOTA,
 	TT_SDK_PS,
 	TT_SDK_I2C,
@@ -47,14 +52,12 @@ enum TRACE_TYPES {
 	TT_SDK_ADC,
 	TT_SDK_PWM,
 	TT_SDK_SPI,
-	TT_SDK_TIMER,
+	TT_SDK_TIMER = 40,
 	TT_SDK_WIFI,
 	TT_SDK_WLAN_MANAGER,
-	TT_RCV,
-	TT_BMT,
-	TT_TEMP_SENSOR,
+	/* insert type for SDK here */
 	TT_MAX,             /* must be last */
-};
+}TRACE_TYPES;
 
 /*=============================================================================
 	Trace level and Map structure
@@ -75,10 +78,12 @@ struct TraceMap {
 extern struct TraceMap g_trace_map[TT_MAX];
 void show_log_level();
 uint8_t util_trace_set_log_level(int type_id, uint32_t level);
+uint8_t util_trace_get_log_level(int type_id);
 
 #define xPRINT(x, format, ...)		system_printf(format, ##__VA_ARGS__)
 
-#if !defined(RELEASE) && !defined(UCODE)
+//#if !defined(RELEASE) && !defined(UCODE)
+#if !defined(UCODE)
 #if defined(INCLUDE_TRACE_ALWAYS)
 #define A(format, ...)	\
 do {						\
@@ -148,6 +153,7 @@ do {						\
 #define VCOND(x)			do{}while(0)
 #define ICOND(x)			do{}while(0)
 #define ECOND(x)			do{}while(0)
-#endif /* #if !defined(RELEASE) && !defined(UCODE) */
+//#endif /* #if !defined(RELEASE) && !defined(UCODE) */
+#endif //#if !defined(UCODE)
 
 #endif    /* __UTIL_TRACE_H__ */

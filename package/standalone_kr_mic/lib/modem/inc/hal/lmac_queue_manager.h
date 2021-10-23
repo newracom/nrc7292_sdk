@@ -109,7 +109,7 @@ struct q_edcaparam {
 typedef struct ndpba_info_t {
 	uint32_t ssn			: 12;
 	uint32_t bitmap 		: 16;
-	uint32_t bitmap_encoded : 1; // valid only if A-MPDU is sent, 
+	uint32_t bitmap_encoded : 1; // valid only if A-MPDU is sent,
 	uint32_t reserved0      : 3;
 } NDPBA_INFO_T;
 typedef struct queuemanager {
@@ -144,12 +144,14 @@ typedef struct queuemanager {
 
 	uint16_t m_sn;                          /// Next sequence number
 	uint8_t m_max_aggregated_num;
+	uint8_t m_max_buffer;
 
 	struct q_edcaparam m_edcaparam;
 
 	uint8_t  m_response_ind;
 	bool	 m_aggregation;
 	uint16_t m_agg_size;
+	bool	 m_ba_session_tx;
 
 	uint8_t  m_priority;                    /// priority
 	uint8_t  m_vif_id;
@@ -174,11 +176,9 @@ typedef struct queuemanager {
 #if defined(INCLUDE_MODEM_RECOVERY)
 	uint16_t m_last_sn;
 #endif
-#if defined(NRC7292)
 #if defined(CONFIG_BITMAP_ENCODING)
 	NDPBA_INFO_T m_ndpba_info;
 #endif /* defined(CONFIG_BITMAP_ENCODING) */
-#endif /* defined(NRC7292) */
 
 } QUEUEMANAGER;
 
@@ -203,6 +203,7 @@ void lmac_qm_staggered_free(uint8_t ac);
 bool lmac_qm_append_pend_queue(uint8_t ac);
 void lmac_qm_restore_queue(uint8_t ac);
 void lmac_qm_buffer_to_free(uint8_t ac, LMAC_TXBUF *buffer);
+void lmac_qm_buffer_to_free_all(uint8_t ac, uint8_t qtype);
 void qm_init();
 void lmac_qm_show_all();
 void lmac_qm_check();
@@ -212,13 +213,50 @@ void lmac_qm_set_segment_duration(uint8_t ac, uint16_t duration);
 
 bool lmac_qm_transit(uint8_t ac, uint16_t state);
 
+void lmac_set_max_agg_num(int ac, int num);
+uint8_t lmac_get_max_agg_num(int ac);
+void lmac_set_aggregation(int ac, bool aggregation);
+bool lmac_get_aggregation(int ac);
 void hal_qm_init();
+bool lmac_get_ba_session_tx(int ac);
+void lmac_set_ba_session_tx(int ac, bool session);
+void lmac_reset_ba_session_tx();
+
+#if defined(INCLUDE_UMAC)
+void lmac_set_max_agg_num_ap_by_macaddr(int ac, int num, int8_t vif_id, uint8_t* macaddr);
+void lmac_set_max_agg_num_ap_by_aid(int ac, int num, int8_t vif_id, int aid);
+void lmac_set_max_agg_num_ap_by_all(int ac, int num, int8_t vif_id);
+uint8_t lmac_get_max_agg_num_ap_by_macaddr(int ac, int8_t vif_id, uint8_t* macaddr);
+uint8_t lmac_get_max_agg_num_ap_by_aid(int ac, int8_t vif_id, int aid);
+void lmac_set_aggregation_ap_by_macaddr(int ac, bool aggregation, int8_t vif_id, uint8_t* macaddr);
+void lmac_set_aggregation_ap_by_aid(int ac, bool aggregation, int8_t vif_id, int aid);
+void lmac_set_aggregation_ap_by_all(int ac, bool aggregation, int8_t vif_id);
+bool lmac_get_aggregation_ap_by_macaddr(int ac, int8_t vif_id, uint8_t* macaddr);
+bool lmac_get_aggregation_ap_by_aid(int ac, int8_t vif_id, int aid);
+bool lmac_get_ba_session_tx_ap_by_macaddr(int ac, int8_t vif_id, uint8_t* macaddr);
+bool lmac_get_ba_session_tx_ap_by_aid(int ac, int8_t vif_id, int aid);
+void lmac_set_ba_session_tx_ap_by_macaddr(int ac, bool session, int8_t vif_id, uint8_t* macaddr);
+void lmac_set_ba_session_tx_ap_by_aid(int ac, bool session, int8_t vif_id, int aid);
+#else
+inline void lmac_set_max_agg_num_ap_by_macaddr(int ac, int num, int8_t vif_id, uint8_t* macaddr) {lmac_set_max_agg_num(ac, num);};
+inline void lmac_set_max_agg_num_ap_by_aid(int ac, int num, int8_t vif_id, int aid) {lmac_set_max_agg_num(ac, num);};
+inline void lmac_set_max_agg_num_ap_by_all(int ac, int num, int8_t vif_id) {};
+inline uint8_t lmac_get_max_agg_num_ap_by_macaddr(int ac, int8_t vif_id, uint8_t* macaddr) {return lmac_get_max_agg_num(ac);};
+inline uint8_t lmac_get_max_agg_num_ap_by_aid(int ac, int8_t vif_id, int aid) {return lmac_get_max_agg_num(ac);};
+inline void lmac_set_aggregation_ap_by_macaddr(int ac, bool aggregation, int8_t vif_id, uint8_t* macaddr) {lmac_set_aggregation(ac, aggregation);};
+inline void lmac_set_aggregation_ap_by_aid(int ac, bool aggregation, int8_t vif_id, int aid) {lmac_set_aggregation(ac, aggregation);};
+inline void lmac_set_aggregation_ap_by_all(int ac, bool aggregation, int8_t vif_id) {};
+inline bool lmac_get_aggregation_ap_by_macaddr(int ac, int8_t vif_id, uint8_t* macaddr) {return lmac_get_aggregation(ac);};
+inline bool lmac_get_aggregation_ap_by_aid(int ac, int8_t vif_id, int aid) {return lmac_get_aggregation(ac);};
+inline bool lmac_get_ba_session_tx_ap_by_macaddr(int ac, int8_t vif_id, uint8_t* macaddr) {return lmac_get_ba_session_tx(ac);};
+inline bool lmac_get_ba_session_tx_ap_by_aid(int ac, int8_t vif_id, int aid) {return lmac_get_ba_session_tx(ac);};
+inline void lmac_set_ba_session_tx_ap_by_macaddr(int ac, bool session, int8_t vif_id, uint8_t* macaddr) {lmac_set_ba_session_tx(ac, session);};
+inline void lmac_set_ba_session_tx_ap_by_aid(int ac, bool session, int8_t vif_id, int aid) {lmac_set_ba_session_tx(ac, session);};
+#endif
 
 static inline void set_mac_hdr_duration(LMAC_TXBUF *txbuf, uint16_t val)
 {
 	if (ieee80211_is_pv0(txbuf->machdr) && !ieee80211_is_pspoll(txbuf->machdr) && !txbuf->txi.inject)
 		txbuf->machdr->duration_id = val;
 }
-
-
 #endif /* HAL_LMAC_QUEUE_MANAGER_H_ */

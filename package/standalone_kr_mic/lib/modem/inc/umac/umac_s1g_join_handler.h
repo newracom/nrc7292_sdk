@@ -15,10 +15,12 @@ bool handle_sta_tx_assocreq(struct _SYS_BUF **buf, int8_t vif_id, bool is_tx);
 bool handle_sta_tx_reassocreq(struct _SYS_BUF **buf, int8_t vif_id, bool is_tx);
 bool handle_sta_rx_s1gassocres(struct _SYS_BUF **buf, int8_t vif_id, bool is_tx);
 
+#if defined(INCLUDE_ACCESS_POINT)
 // AP
 bool handle_ap_rx_s1gassocreq(struct _SYS_BUF **buf, int8_t vif_id, bool is_tx);
 bool handle_ap_rx_s1greassocreq(struct _SYS_BUF **buf, int8_t vif_id, bool is_tx);
 bool handle_ap_tx_assocres(struct _SYS_BUF **buf, int8_t vif_id, bool is_tx);
+#endif
 
 //////////////////////
 // Public Functions //

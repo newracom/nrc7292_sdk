@@ -512,7 +512,7 @@ static int hspi_read_slot (int slot_num, int slot_size, char *buf, int *len)
 
 		if (slot->seq != seq)
 		{
-			_hspi_read_debug("hspi_read: slot_seq: %u -> %u\n", seq, slot->seq);
+//			_hspi_log("hspi_read: slot_seq: %u -> %u\n", seq, slot->seq);
 
 			seq = slot->seq;
 		}
@@ -693,7 +693,9 @@ static int hspi_write (char *buf, int len)
 
 static int hspi_ready (hspi_info_t *info)
 {
+	const int timeout = 10; /* sec */
 	hspi_regs_t regs;
+	int i;
 
 	if (!HSPI_ACTIVE())
 		return -1;
@@ -703,38 +705,46 @@ static int hspi_ready (hspi_info_t *info)
 
 	hspi_regs_print_all(&regs);
 
-	if (memcmp(regs.msg, "NRC-HSPI", 8) == 0)
+	for (i = 0 ; i < timeout ; i++)
 	{
-		uint16_t slot_num;
-		uint16_t slot_size;
-		int que;
-
-		for (que = HSPI_TXQ ; que <= HSPI_RXQ ; que++)
+		if (memcmp(regs.msg, "NRC-HSPI", 8) == 0)
 		{
-			slot_num = (regs.msg[2 + que] >> 16) & 0xffff;
-			slot_size = regs.msg[2 + que] & 0xffff;
+			uint16_t slot_num;
+			uint16_t slot_size;
+			int que;
 
-			if (slot_num == 0)
-				return -1;
+			for (que = HSPI_TXQ ; que <= HSPI_RXQ ; que++)
+			{
+				slot_num = (regs.msg[2 + que] >> 16) & 0xffff;
+				slot_size = regs.msg[2 + que] & 0xffff;
 
-			if (slot_size == 0 || slot_size > HSPI_SLOT_SIZE_MAX)
-				return -1;
+				if (slot_num == 0)
+					return -1;
 
-			info->queue.slot[que].num = slot_num;
-			info->queue.slot[que].size = slot_size;
-		}
+				if (slot_size == 0 || slot_size > HSPI_SLOT_SIZE_MAX)
+					return -1;
+
+				info->queue.slot[que].num = slot_num;
+				info->queue.slot[que].size = slot_size;
+			}
 #if 0
-		_hspi_log("[ HSPI_SLOT ]\n");
-		_hspi_log(" - hdr: %d-byte\n", HSPI_SLOT_HDR_SIZE);
-		_hspi_log(" - txq: (%u x %u)-byte\n",
-							info->queue.slot[HSPI_TXQ].num,
-							info->queue.slot[HSPI_TXQ].size);
-		_hspi_log(" - rxq: (%u x %u)-byte\n",
-							info->queue.slot[HSPI_RXQ].num,
-							info->queue.slot[HSPI_RXQ].size);
-		_hspi_log("\r\n");
+			_hspi_log("[ HSPI_SLOT ]\n");
+			_hspi_log(" - hdr: %d-byte\n", HSPI_SLOT_HDR_SIZE);
+			_hspi_log(" - txq: (%u x %u)-byte\n",
+					info->queue.slot[HSPI_TXQ].num,
+					info->queue.slot[HSPI_TXQ].size);
+			_hspi_log(" - rxq: (%u x %u)-byte\n",
+					info->queue.slot[HSPI_RXQ].num,
+					info->queue.slot[HSPI_RXQ].size);
+			_hspi_log("\r\n");
 #endif
-		return 0;
+			return 0;
+		}
+
+		sleep(1);
+
+		if (hspi_regs_read_message(regs.msg) != 0)
+			return -1;
 	}
 
 	_hspi_log("No ATCMD HSPI firmware\n");

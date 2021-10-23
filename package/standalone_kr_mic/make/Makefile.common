@@ -50,11 +50,11 @@ $(OBJ_PATH)/%.o:%.cpp
 	@$(CC) -MMD $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
 $(OBJ_PATH)/%.c.o:%.c
+	@ $(if $(print_CFLAGS),echo "CFLAGS: $(print_CFLAGS)" $(eval print_CFLAGS:=))
 	@echo "compile $<"
 	@$(CC) -MMD $(CFLAGS) -c $< -o $@
 
 $(OBJ_PATH)/%.S.o:%.S
-	@ $(if $(print_CFLAGS),echo "CFLAGS: $(print_CFLAGS)" $(eval print_CFLAGS:=))
 	@echo "compile $<"
 	@$(AS) -MMD $(CFLAGS) $(ASFLAGS) -c $< -o $@
 

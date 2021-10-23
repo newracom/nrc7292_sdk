@@ -39,9 +39,11 @@
  * Parameters   : count(test count), interval(test interval)
  * Returns      : 0 or -1 (0: success, -1: fail)
  *******************************************************************************/
-int run_sample_spi(int count, int interval)
+nrc_err_t run_sample_spi(int count, int interval)
 {
 	int i=0;
+	uint8_t data;
+
 	nrc_usr_print("[%s] Sample App for SPI API \n",__func__);
 
 	nrc_spi_init(SPI_MODE3, SPI_BIT8, 1000000);
@@ -49,25 +51,29 @@ int run_sample_spi(int count, int interval)
 	_delay_ms(100);
 
 #if defined (L3G4200D)
+	uint8_t read_addr = 0x0F|0x80;
 	nrc_usr_print("[%s] L3G4200D : WHO_AM_I is 0xD3.\n", __func__);		/* WHO_AM_I: 0xD3 */
 	for(i=0; i<count; i++) {
 		_delay_ms(interval);
 
-		if (nrc_spi_readbyte(0x0F|0x80) == 0xD3){
-			nrc_usr_print("[%s] WORKS FINE!!!!!\n", __func__);
+		if (nrc_spi_readbyte_value(read_addr, &data) == NRC_SUCCESS){
+			nrc_usr_print("[%s] WORKS FINE!!!!! data:0x%02x\n", __func__, data);
 		} else {
 			nrc_usr_print("[%s] ERROR..........\n", __func__);
-			return RUN_FAIL;
+			return NRC_FAIL;
 		}
 	}
 #elif defined (BME680)
-	nrc_usr_print("[%s] BME680 : spi_mem_page default value=0x%02x\n", __func__, nrc_spi_readbyte(0x73|0x80));
+	uint8_t read_addr = 0x73|0x80;
+	uint8_t write_addr = 0x73;
+
+	nrc_spi_readbyte_value(read_addr, &data);
+	nrc_usr_print("[%s] BME680 : spi_mem_page default value=0x%02x\n", __func__, data);
 	while (1)
 	{
-		nrc_spi_writebyte(0x73, 0x00);
-		uint8_t ret = nrc_spi_readbyte(0x73|0x80);
-		if (ret == 0) {
-			nrc_usr_print("[%s] spi_mem_page changed successfully!!\n", __func__);
+		nrc_spi_writebyte_value(write_addr, 0x00);
+		if (nrc_spi_readbyte_value(read_addr, &data) == NRC_SUCCESS ) {
+			nrc_usr_print("[%s] spi_mem_page changed successfully!! data:0x%02x\n", __func__, data);
 			break;
 		} else  {
 			nrc_usr_print("[%s] spi_mem_page change failed.retry...........\n", __func__);;
@@ -76,59 +82,58 @@ int run_sample_spi(int count, int interval)
 	}
 
 	/* chip_id: 0x61 */
+	read_addr = 0x50|0x80;
 	nrc_usr_print("[%s] BME680 Chid_ID is 0x61.\n", __func__);
 	for(i=0; i<count; i++) {
 		_delay_ms(interval);
-		if (nrc_spi_readbyte(0x50|0x80) == 0x61){
-			nrc_usr_print("[%s] WORKS FINE!!!!!\n", __func__);
+		if (nrc_spi_readbyte_value(read_addr, &data) == NRC_SUCCESS){
+			nrc_usr_print("[%s] WORKS FINE!!!!! data:0x%02x\n", __func__, data);
 		}else {
 			nrc_usr_print("[%s] ERROR..........\n", __func__);
-			return RUN_FAIL;
+			return NRC_FAIL;
 		}
 	}
 #elif defined (AT45DBXX)
-	uint8_t tx[] = {0x9F, 0x00, 0x00, 0x00, 0x00};
+	uint8_t read_addr = 0x9F;
 	uint8_t rx[8] = {0,};
 
 	nrc_usr_print("[AT45DBXX]\n");
 	for(i=0; i<count; i++) {
 		_delay_ms(interval);
-		uint8_t ret = nrc_spi_xfer(tx, rx, 5);
-		if (ret == 5) {
-			nrc_usr_print("[%s] 0x%08x, 0x%08x, 0x%08x, 0x%08x, 0x%08x \n", __func__,
-			rx[0], rx[1], rx[2], rx[3], rx[4]);
+		if (nrc_spi_read_values(read_addr, rx, 4) == NRC_SUCCESS) {
+			nrc_usr_print("[%s] 0x%08x, 0x%08x, 0x%08x, 0x%08x \n", __func__,
+			rx[0], rx[1], rx[2], rx[3]);
 
 			for (int i = 0; i < 8; i++){
 				rx[i] = 0;
 			}
 		}else {
 			nrc_usr_print("Does not match the actual number of bytes transmitted.\n\n");
-			return RUN_FAIL;
+			return NRC_FAIL;
 		}
 	}
 #elif defined (LIS331HH)
-	uint8_t tx[] = {0xA0, 0x00};
+	uint8_t read_addr = 0xA0;
 	uint8_t rx[8] = {0,};
 
-	nrc_usr_print("[LIS331HH] '0xff, 0x7, 0X7, 0X7, 0X7' should be printed.\n");
+	nrc_usr_print("[LIS331HH] '0x7, 0X7, 0X7, 0X7' should be printed.\n");
 
 	for(i=0; i<count; i++) {
 		_delay_ms(interval);
-		uint8_t ret = nrc_spi_xfer(tx, rx, 5);
-		if (ret == 5) {
-			nrc_usr_print("[%s] 0x%08x, 0x%08x, 0x%08x, 0x%08x, 0x%08x \n", __func__,
-			rx[0], rx[1], rx[2], rx[3], rx[4]);
+		if (nrc_spi_read_values(read_addr, rx, 4) == NRC_SUCCESS) {
+			nrc_usr_print("[%s] 0x%08x, 0x%08x, 0x%08x, 0x%08x \n", __func__,
+			rx[0], rx[1], rx[2], rx[3]);
 
 			for (int i = 0; i < 8; i++){
 				rx[i] = 0;
 			}
 		}else {
 			nrc_usr_print("Does not match the actual number of bytes transmitted.\n\n");
-			return RUN_FAIL;
+			return NRC_FAIL;
 		}
 	}
 #endif
-	return RUN_SUCCESS;
+	return NRC_SUCCESS;
 }
 
 
@@ -140,7 +145,7 @@ int run_sample_spi(int count, int interval)
  *******************************************************************************/
 void user_init(void)
 {
-	int ret = 0;
+	nrc_err_t ret;
 
 	//Enable Console for Debugging
 	nrc_uart_console_enable();

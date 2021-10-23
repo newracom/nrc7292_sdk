@@ -3,6 +3,7 @@
 
 #include "util_byte_stream.h"
 
+#if defined (INCLUDE_LMAC_DEBUG)
 #if defined(STANDARD_11N)
 #define N_CATEGORY     5
 enum {
@@ -17,7 +18,7 @@ enum {
 #if defined(STANDARD_11AH)
 #define N_CATEGORY     5
 enum {
-    MAX_TX = 96,
+    MAX_TX = 97,
     MAX_RX = 53,
     MAX_SEC = 20,
     MAX_DMA = 26,
@@ -46,7 +47,9 @@ typedef struct {
 } IndirectReg_t;
 
 void dump_indirect_reg(struct byte_stream *bs);
-#ifndef RELEASE
-extern void show_indirect_reg(const char *cat);
-#endif /* #ifndef RELEASE */
+void show_indirect_reg(const char *cat);
+#else
+static inline void dump_indirect_reg(struct byte_stream *bs){};
+static inline void show_indirect_reg(const char *cat){};
+#endif //#if defined (INCLUDE_LMAC_DEBUG)
 #endif /* #ifndef _INDIRECT_REG_H_ */

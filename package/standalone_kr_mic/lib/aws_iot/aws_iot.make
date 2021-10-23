@@ -1,31 +1,40 @@
 # iot client sources
-IOT_CLIENT_SRCS += \
-    aws_iot_jobs_interface.c \
-    aws_iot_jobs_json.c \
-    aws_iot_jobs_topics.c \
-    aws_iot_jobs_types.c \
-    aws_iot_json_utils.c \
-    aws_iot_mqtt_client.c \
-    aws_iot_mqtt_client_common_internal.c \
-    aws_iot_mqtt_client_connect.c \
-    aws_iot_mqtt_client_publish.c \
-    aws_iot_mqtt_client_subscribe.c \
-    aws_iot_mqtt_client_unsubscribe.c \
-    aws_iot_mqtt_client_yield.c \
-    aws_iot_shadow.c \
-    aws_iot_shadow_actions.c \
-    aws_iot_shadow_json.c \
-    aws_iot_shadow_records.c
+coreMQTT_SRCS += \
+	core_mqtt.c \
+	core_mqtt_serializer.c \
+	core_mqtt_state.c
 
-# iot jsmn sources
-IOT_CLIENT_JSMN_SRCS += jsmn.c
+coreHTTP_SRCS += \
+	core_http_client.c
+
+coreJSON_SRCS += \
+	core_json.c
+
+#corePKCS11_SRCS += \
+#	core_pkcs11.c \
+#	core_pki_utils.c \
+#	core_pkcs11_mbedtls.c
+
+backoffAlgorithm_SRCS += \
+	backoff_algorithm.c
+
+#iot_logging_SRCS += \
+#	iot_logging.c \
+#	iot_logging_task_dynamic_buffers.c
 
 # platform sources
-PLATFORM_SRCS +=\
-	aws_iot_timer.c \
-	network_mbedtls_wrapper.c
+PLATFORM_SRCS += \
+	clock_freertos.c \
+	sockets_freertos.c \
+	plaintext_freertos.c \
+	mbedtls_freertos.c
 
 CSRCS += \
-	$(PLATFORM_SRCS) \
-	$(IOT_CLIENT_SRCS) \
-	$(IOT_CLIENT_JSMN_SRCS)
+	$(coreMQTT_SRCS) \
+	$(coreHTTP_SRCS) \
+	$(HTTP_PARSER_SRCS) \
+	$(coreJSON_SRCS) \
+	$(corePKCS11_SRCS) \
+	$(backoffAlgorithm_SRCS) \
+	$(iot_logging_SRCS) \
+	$(PLATFORM_SRCS)

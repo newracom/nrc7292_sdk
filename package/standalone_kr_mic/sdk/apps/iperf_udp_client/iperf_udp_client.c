@@ -105,10 +105,10 @@ static void udp_receive_task(void* arg)
  * parameters   : wifi_config
  * returns	  : 0 or -1 (0: success, -1: fail)
  *******************************************************************************/
-int  run_iperf_udp_client(WIFI_CONFIG *param)
+nrc_err_t run_iperf_udp_client(WIFI_CONFIG *param)
 {
 	int network_index = 0;
-	int wifi_state = WLAN_STATE_INIT;
+	tWIFI_STATE_ID wifi_state = WIFI_STATE_INIT;
 	TaskHandle_t udp_receive_task_handle;
 	SCAN_RESULTS results;
 	int i = 0;
@@ -144,7 +144,7 @@ int  run_iperf_udp_client(WIFI_CONFIG *param)
 						ssid_found = true;
 						break;
 					}
-				}
+	}
 
 				if(ssid_found){
 					nrc_usr_print ("[%s] %s is found \n", __func__, param->ssid);
@@ -168,12 +168,12 @@ int  run_iperf_udp_client(WIFI_CONFIG *param)
 		}
 	}
 
-	network_index = nrc_wifi_get_network_index();
+	nrc_wifi_get_network_index(&network_index );
 
 	/* check the IP is ready */
 	while(1){
-		wifi_state = nrc_wifi_get_state();
-		if (wifi_state == WLAN_STATE_GET_IP) {
+		nrc_wifi_get_state(&wifi_state);
+		if (wifi_state == WIFI_STATE_GET_IP) {
 			nrc_usr_print("[%s] IP ...\n",__func__);
 			break;
 		} else{
@@ -202,7 +202,7 @@ int  run_iperf_udp_client(WIFI_CONFIG *param)
 
 	if (udp_receive_task_handle == NULL) {
 		nrc_usr_print("[%s] error: udp receiving task creation failed.\n", __func__);
-		return RUN_FAIL ;
+		return NRC_FAIL ;
 	}
 
 	/* build the destination's Internet address */
@@ -291,20 +291,18 @@ int  run_iperf_udp_client(WIFI_CONFIG *param)
 	if(udp_data)
 		nrc_mem_free(udp_data);
 
-	wifi_state = nrc_wifi_get_state();
-	if (wifi_state == WLAN_STATE_GET_IP || wifi_state == WLAN_STATE_CONNECTED) {
+	nrc_wifi_get_state(&wifi_state);
+	if (wifi_state == WIFI_STATE_GET_IP || wifi_state == WIFI_STATE_CONNECTED) {
 		nrc_usr_print("[%s] Trying to DISCONNECT... for exit\n",__func__);
 		if (nrc_wifi_disconnect(network_index) != WIFI_SUCCESS) {
 			nrc_usr_print ("[%s] Fail for Wi-Fi disconnection (results:%d)\n", __func__);
-			return RUN_FAIL;
+			return NRC_FAIL;
 		}
 	}
 	nrc_usr_print("[%s] End of Iperf UDP client Test !! \n",__func__);
 
-	return RUN_SUCCESS;
+	return NRC_SUCCESS;
 }
-
-
 
 /******************************************************************************
  * FunctionName : user_init
@@ -314,7 +312,7 @@ int  run_iperf_udp_client(WIFI_CONFIG *param)
  *******************************************************************************/
 void user_init(void)
 {
-	int ret = 0;
+	nrc_err_t ret;
 	WIFI_CONFIG* param;
 
 	nrc_uart_console_enable();
@@ -329,4 +327,3 @@ void user_init(void)
 		nrc_mem_free(param);
 	}
 }
-

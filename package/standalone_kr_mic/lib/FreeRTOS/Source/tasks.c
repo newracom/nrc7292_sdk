@@ -41,6 +41,9 @@ task.h is included from an application file. */
 #include "timers.h"
 #include "stack_macros.h"
 
+/* Newracom includes. */
+#include "util_trace_stack.h"
+
 /* Lint e961 and e750 are suppressed as a MISRA exception justified because the
 MPU ports require MPU_WRAPPERS_INCLUDED_FROM_API_FILE to be defined for the
 header files above, but not in this file, in order to generate the correct
@@ -625,8 +628,7 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB ) PRIVILEGED_FUNCTION;
 		{
 			xReturn = NULL;
 		}
-#ifdef UTIL_TRACE_STACK
-        extern void util_trace_stack_add_task( TaskHandle_t );
+#if defined(UTIL_TRACE_STACK)
         util_trace_stack_add_task(xReturn);
 #endif
 		return xReturn;

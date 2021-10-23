@@ -195,6 +195,7 @@ int mbedtls_platform_set_printf( int (*printf_func)( const char *, ... ) );
 #if defined(MBEDTLS_PLATFORM_PRINTF_MACRO)
 #define mbedtls_printf     MBEDTLS_PLATFORM_PRINTF_MACRO
 #elif  defined(NRC_MBEDTLS)
+#include "hal_uart.h"
 #define mbedtls_printf          system_printf
 #else
 #define mbedtls_printf     printf

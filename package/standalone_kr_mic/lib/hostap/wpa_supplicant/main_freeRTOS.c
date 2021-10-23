@@ -13,6 +13,7 @@
 #include "system_common.h"
 #include "lmac_common.h"
 #include "driver_nrc.h"
+#include "wpa_debug.h"
 
 void wpas_task_main(void *pvParams)
 {
@@ -21,7 +22,7 @@ void wpas_task_main(void *pvParams)
 	struct wpa_global *global;
 	int i = 0;
 	memset(&params, 0, sizeof(params));
-	params.wpa_debug_level = MSG_DEBUG;
+	params.wpa_debug_level = wpa_debug_level;
 
 	global = wpa_supplicant_init(&params);
 

@@ -147,36 +147,26 @@ this.
    byte alignment -> define MEM_ALIGNMENT to 2. */
 #define MEM_ALIGNMENT           4
 
-#ifdef NRC7292
 /* MEM_SIZE: the size of the heap memory. If the application will send
 a lot of data that needs to be copied, this should be set high. */
-#define MEM_SIZE                20000
-#else
-/* MEM_SIZE: the size of the heap memory. If the application will send
-a lot of data that needs to be copied, this should be set high. */
+#if defined(TS8266) || defined(TR6260) || defined(NRC7392)
 #define MEM_SIZE                4000
+#else
+#define MEM_SIZE                20000
 #endif
+
 /* MEMP_NUM_PBUF: the number of memp struct pbufs. If the application
    sends a lot of data out of ROM (or other static memory), this
    should be set high. */
-#define MEMP_NUM_PBUF           16
+//#define MEMP_NUM_PBUF           16
+#define MEMP_NUM_PBUF           100
 
 /* MEMP_NUM_RAW_PCB: the number of UDP protocol control blocks. One
    per active RAW "connection". */
 #define LWIP_RAW			1
 #define MEMP_NUM_RAW_PCB		8
 
-#ifdef NRC7292
-/* MEMP_NUM_UDP_PCB: the number of UDP protocol control blocks. One
-   per active UDP "connection". */
-#define MEMP_NUM_UDP_PCB        4
-/* MEMP_NUM_TCP_PCB: the number of simulatenously active TCP
-   connections. */
-#define MEMP_NUM_TCP_PCB        10
-/* MEMP_NUM_TCP_PCB_LISTEN: the number of listening TCP
-   connections. */
-#define MEMP_NUM_TCP_PCB_LISTEN 2
-#else
+#if defined(TS8266) || defined(TR6260) || defined(NRC7392)
 /* MEMP_NUM_UDP_PCB: the number of UDP protocol control blocks. One
    per active UDP "connection". */
 #define MEMP_NUM_UDP_PCB        6
@@ -186,6 +176,16 @@ a lot of data that needs to be copied, this should be set high. */
 /* MEMP_NUM_TCP_PCB_LISTEN: the number of listening TCP
    connections. */
 #define MEMP_NUM_TCP_PCB_LISTEN 8
+#else
+/* MEMP_NUM_UDP_PCB: the number of UDP protocol control blocks. One
+   per active UDP "connection". */
+#define MEMP_NUM_UDP_PCB        4
+/* MEMP_NUM_TCP_PCB: the number of simulatenously active TCP
+   connections. */
+#define MEMP_NUM_TCP_PCB        12
+/* MEMP_NUM_TCP_PCB_LISTEN: the number of listening TCP
+   connections. */
+#define MEMP_NUM_TCP_PCB_LISTEN 2
 #endif
 /* MEMP_NUM_TCP_SEG: the number of simultaneously queued TCP
    segments. */
@@ -228,10 +228,10 @@ a lot of data that needs to be copied, this should be set high. */
 
 /* ---------- Pbuf options ---------- */
 /* PBUF_POOL_SIZE: the number of buffers in the pbuf pool. */
-#if defined(TS8266) || defined(TR6260)
+#if defined(TS8266) || defined(TR6260) || defined(NRC7392)
 #define PBUF_POOL_SIZE          5
 #else
-#define PBUF_POOL_SIZE          9
+#define PBUF_POOL_SIZE          12
 #endif
 
 /* PBUF_POOL_BUFSIZE: the size of each pbuf in the pbuf pool. */
@@ -251,17 +251,21 @@ a lot of data that needs to be copied, this should be set high. */
 
 /* TCP Maximum segment size. */
 /* we change the TCP MSS for performance and legacy value is 1460 */
-#define TCP_MSS			1440
+#if defined(TS8266) || defined(TR6260) || defined(NRC7392)
+#define TCP_MSS			1460
+#else
+#define TCP_MSS			2896
+#endif
 
 /* TCP sender buffer space (bytes). */
-#define TCP_SND_BUF             (9 * TCP_MSS)
+#define TCP_SND_BUF             (4 * TCP_MSS)
 
 /* TCP sender buffer space (pbufs). This must be at least = 2 *
    TCP_SND_BUF/TCP_MSS for things to work. */
 #define TCP_SND_QUEUELEN        6 * TCP_SND_BUF/TCP_MSS
 
 /* TCP receive window. */
-#define TCP_WND                 (9 * TCP_MSS)
+#define TCP_WND                 (4 * TCP_MSS)
 
 /* Maximum number of retransmissions of data segments. */
 #define TCP_MAXRTX              12
@@ -275,10 +279,15 @@ a lot of data that needs to be copied, this should be set high. */
 /* LWIP_TCP_SACK_OUT==1: TCP will support sending selective acknowledgements (SACKs) */
 #define LWIP_TCP_SACK_OUT               1
 
+/* TCP_WND_UPDATE_THRESHOLD: difference in window to trigger anexplicit window update and defined as LWIP_MIN((TCP_WND / 4), (TCP_MSS * 4)) in opt.h */
+#define TCP_WND_UPDATE_THRESHOLD        (TCP_WND/2)
+
+
 /* ---------- ARP options ---------- */
 #define LWIP_ARP		1
 #define ARP_TABLE_SIZE 10
 #define ETHARP_TABLE_MATCH_NETIF        1
+#define ARP_QUEUEING                    1
 
 /* ---------- IP options ---------- */
 /* Define IP_FORWARD to 1 if you wish to have the ability to forward
@@ -363,5 +372,7 @@ a lot of data that needs to be copied, this should be set high. */
 #define LWIP_FREERTOS_THREAD_STACKSIZE_IS_STACKWORDS  1
 #define LWIP_FREERTOS_SYS_ARCH_PROTECT_USES_MUTEX     1
 #define LWIP_FREERTOS_SYS_ARCH_NOT_USE_RECURSIVE_MUTEX 1
+
+#define	ETHARP_SUPPORT_STATIC_ENTRIES	1
 
 #endif /* __LWIPOPTS_H__ */

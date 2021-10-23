@@ -26,6 +26,7 @@ struct byte_stream {
 
 bool util_byte_stream_init(struct byte_stream *bs, uint8_t pool_id, uint8_t bs_frame_type,
 									SYS_BUF *buf, uint16_t length, struct prealloc_buffer *pb);
+bool util_byte_stream_is_empty(struct byte_stream *bs);
 void util_byte_stream_load(struct byte_stream *bs, uint8_t pool_id, uint8_t bs_frame_type,
 									SYS_BUF *buf, uint16_t offset);
 void util_byte_stream_put_uint8(struct byte_stream *bs, uint8_t v);

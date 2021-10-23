@@ -92,6 +92,25 @@ typedef struct _SYS_TASK {
 	sys_task_func_cb    cb;
 } SYS_TASK;
 
+#if defined (INCLUDE_NEW_TASK_ARCH)
+typedef enum _TQUEUE_EVENT_ID {
+	TASK_QUEUE_EVENT_TBTT		= 0,
+	TASK_QUEUE_EVENT_WAKE_MODEM,
+	TASK_QUEUE_EVENT_RECOVERY_MODEM,
+	TASK_QUEUE_EVENT_WDT,
+	TASK_QUEUE_EVENT_MAC_DATA_RX,
+	TASK_QUEUE_EVENT_MAC_MGMT_RX,
+	TASK_QUEUE_EVENT_MAX,
+} TQUEUE_EVENT_ID;
+
+typedef struct _TQUEUE_MESSAGE {
+	uint8_t vif_id;
+	uint8_t q_event_id;
+	void* param;
+} TQUEUE_MESSAGE;
+#define TQUEUE_MESSAGE_SIZE sizeof (TQUEUE_MESSAGE)
+#endif //#if defined (INCLUDE_NEW_TASK_ARCH)
+
 struct _SYS_BUF;
 
 // Any Wordsize of SYS_HDR

@@ -117,17 +117,18 @@ ping_statistics_report(void *arg)
 
 	ping_mutex_lock();
 	LWIP_DEBUGF( PING_DEBUG, ("\n---------------------------- Ping Statistics --------------------------------\n"));
-	LWIP_DEBUGF( PING_DEBUG, (" Interface : wlan%d                   Target Address : ", ping_info->vif_id));
+	LWIP_DEBUGF( PING_DEBUG, (" Target Address : "));
 	ip_addr_debug_print(PING_DEBUG, &(ping_info->addr));
 	LWIP_DEBUGF( PING_DEBUG, ("\n"));
 	LWIP_DEBUGF( PING_DEBUG, (" %d packets transmitted, %d received, %d%% packet loss, %s ms average delay",\
-		 ping_info->count, ping_info->success, ((ping_info->count-ping_info->success)*100/ping_info->count), \
+		 (int)ping_info->count, (int)ping_info->success, (int)((ping_info->count-ping_info->success)*100/ping_info->count), \
 		((ping_info->success == 0) ?  "0":avg_delay_str)));
 	LWIP_DEBUGF( PING_DEBUG, ("\n-----------------------------------------------------------------------------\n"));
 	ping_mutex_unlock();
 }
 
 /** Initialize ping test parameters */
+
 static void
 ping_parameters_init(void *arg)
 {
@@ -196,8 +197,9 @@ ping_recv(void *arg, int s)
 {
 	ping_parm_t* ping_info = (ping_parm_t*)arg;
 	char buf[64];
-	int fromlen, len;
+	int len;
 	struct sockaddr_in from;
+	socklen_t fromlen = sizeof(from);
 	struct ip_hdr *iphdr;
 	struct icmp_echo_hdr *iecho;
 
@@ -296,7 +298,6 @@ void ping_list_display(void) {
 	ping_mutex_lock();
 	system_printf("\n-------------------------- Ping running Status ------------------------------\n");
 	while(ptr != NULL) {
-		system_printf(" wlan%d\t\t ", ptr->vif_id);
 		system_printf("%"U16_F".%"U16_F".%"U16_F".%"U16_F"\n",
 			ip4_addr1_16(&ptr->addr), ip4_addr2_16(&ptr->addr), ip4_addr3_16(&ptr->addr), ip4_addr4_16(&ptr->addr));
 
@@ -362,7 +363,7 @@ ping_init(void *arg)
 {
 	char taskName[16] = {0,};
 	ping_parm_t* ping_info = (ping_parm_t*)arg;
-	sprintf(taskName, "ping_thread_%d", ping_info->vif_id);
+	sprintf(taskName, "ping_thread");
 	return sys_thread_new(taskName, ping_thread, ping_info, \
 	LWIP_PING_TASK_STACK_SIZE, LWIP_PING_TASK_PRIORITY);
 }

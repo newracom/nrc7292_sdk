@@ -19,7 +19,8 @@ enum {
 typedef union {
 	struct {
 		uint32_t start 		: 1;
-		uint32_t reserved1	: 2;
+		uint32_t stop		: 1;
+		uint32_t reserved1	: 1;
 		uint32_t mode		: 1;
 		uint32_t int_en		: 1;
 		uint32_t load_freerun : 1;
@@ -136,8 +137,10 @@ void drv_rtc_deinit(void);
 void drv_rtc_set_int_clr();
 void drv_rtc_set_start(bool start);
 bool drv_rtc_get_start();
+void drv_rtc_set_stop();
 void drv_rtc_set_mode(int mode);
 int drv_rtc_get_mode();
+void drv_rtc_clear_count(uint8_t mode);
 
 void drv_rtc_set_int_en(bool enable);
 void drv_rtc_set_cnt(uint64_t value);
@@ -150,6 +153,10 @@ void drv_rtc_set_freq_ofst_est_dur(uint32_t dur);
 void drv_rtc_set_freq_ofst_est_mode(uint32_t mode);
 void drv_rtc_set_freq_ofst_est_start();
 
+void drv_rtc_freq_ofst_est_int_clr();
+bool drv_rtc_get_freq_ofst_est_busy();
+uint32_t drv_rtc_get_residual();
+uint8_t drv_rtc_get_lpo_cal_wait_duration();
 uint32_t drv_rtc_get_freq_ofst_in_ppm();
 uint32_t drv_rtc_get_freq_ofst_in_onbd();
 uint32_t drv_rtc_get_ofst_comp();

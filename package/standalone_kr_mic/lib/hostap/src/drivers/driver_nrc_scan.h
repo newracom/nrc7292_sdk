@@ -1,17 +1,17 @@
 /*
- * Driver interface definition
- * Copyright (c) 2003-2015, Jouni Malinen <j@w1.fi>
+ * Copyright (c) 2016-2021 Newracom, Inc.
  *
- * This software may be distributed under the terms of the BSD license.
- * See README for more details.
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
  *
- * This file defines a driver interface used by both %wpa_supplicant and
- * hostapd. The first part of the file defines data structures used in various
- * driver operations. This is followed by the struct wpa_driver_ops that each
- * driver wrapper will beed to define with callback functions for requesting
- * driver operations. After this, there are definitions for driver event
- * reporting with wpa_supplicant_event() and some convenience helper functions
- * that can be used to report events.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
 #ifndef DRIVER_FREERTOS_SCAN_H
@@ -19,6 +19,7 @@
 
 #include "common/defs.h"
 #include "utils/list.h"
+#include "drivers/driver.h"
 
 #include <stdbool.h>
 

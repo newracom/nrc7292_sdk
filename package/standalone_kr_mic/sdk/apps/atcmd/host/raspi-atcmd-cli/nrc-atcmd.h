@@ -143,6 +143,9 @@ extern void nrc_atcmd_log_on (void);
 extern void nrc_atcmd_log_off (void);
 extern bool nrc_atcmd_log_is_on (void);
 
+extern void nrc_atcmd_network_stack_host (void);
+extern void nrc_atcmd_network_stack_target (void);
+
 /**********************************************************************************************/
 #endif /* #ifndef __NRC_H__ */
 

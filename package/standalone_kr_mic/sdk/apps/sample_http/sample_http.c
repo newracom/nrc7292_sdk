@@ -118,28 +118,74 @@ const char ssl_client_key[] =
  * Parameters   : WIFI_CONFIG
  * Returns      : 0 or -1 (0: success, -1: fail)
  *******************************************************************************/
-int  run_sample_http(WIFI_CONFIG *param)
+nrc_err_t run_sample_http(WIFI_CONFIG *param)
 {
-	int i = 0;
 	int network_index = 0;
-	int wifi_state = WLAN_STATE_INIT;
+	tWIFI_STATE_ID wifi_state = WIFI_STATE_INIT;
+	SCAN_RESULTS results;
 
 	nrc_usr_print("[%s] Sample App for http \n",__func__);
 
-	if (wifi_init(param)!= WIFI_SUCCESS) {
-		nrc_usr_print ("[%s] ASSERT! Fail for init\n", __func__);
-		return RUN_FAIL;
+	int i = 0;
+	int ssid_found =false;
+
+	/* set initial wifi configuration */
+	while(1){
+		if (wifi_init(param)== WIFI_SUCCESS) {
+			nrc_usr_print ("[%s] wifi_init Success !! \n", __func__);
+			break;
+		} else {
+			nrc_usr_print ("[%s] wifi_init Failed !! \n", __func__);
+			_delay_ms(1000);
+		}
 	}
 
-	/* 1st trial to connect */
-	if (wifi_connect(param)!= WIFI_SUCCESS) {
-		nrc_usr_print ("[%s] Fail for Wi-Fi connection (results:%d)\n", __func__);
-		return RUN_FAIL;
+	/* find AP */
+	while(1){
+		if (nrc_wifi_scan() == WIFI_SUCCESS){
+			if (nrc_wifi_scan_results(&results)== WIFI_SUCCESS) {
+				/* Find the ssid in scan results */
+				for(i=0; i<results.n_result ; i++){
+					if(strcmp((char*)param->ssid, (char*)results.result[i].ssid)== 0 ){
+						ssid_found = true;
+						break;
+					}
+				}
+
+				if(ssid_found){
+					nrc_usr_print ("[%s] %s is found \n", __func__, param->ssid);
+					break;
+				}
+			}
+		} else {
+			nrc_usr_print ("[%s] Scan fail !! \n", __func__);
+			_delay_ms(1000);
+		}
 	}
 
-	if (nrc_wifi_get_state() != WLAN_STATE_GET_IP) {
-		nrc_usr_print("[%s] Fail to connect or get IP !\n",__func__);
-		return RUN_FAIL;
+	/* connect to AP */
+	while(1) {
+		if (wifi_connect(param)== WIFI_SUCCESS) {
+			nrc_usr_print ("[%s] connect to %s successfully !! \n", __func__, param->ssid);
+			break;
+		} else{
+			nrc_usr_print ("[%s] Fail for connection %s\n", __func__, param->ssid);
+			_delay_ms(1000);
+		}
+	}
+
+	nrc_wifi_get_network_index(&network_index );
+
+	/* check the IP is ready */
+	while(1){
+		nrc_wifi_get_state(&wifi_state);
+		if (wifi_state == WIFI_STATE_GET_IP) {
+			nrc_usr_print("[%s] IP ...\n",__func__);
+			break;
+		} else{
+			nrc_usr_print("[%s] Current State : %d...\n",__func__, wifi_state);
+		}
+		_delay_ms(1000);
 	}
 
 #if defined( SUPPORT_MBEDTLS ) && defined( RUN_HTTPS )
@@ -172,7 +218,7 @@ int  run_sample_http(WIFI_CONFIG *param)
 		nrc_usr_print("%s\n", data.data_in);
 		if (strstr(data.data_in, "\r\n0\r\n") != NULL) {
 			nrc_httpc_close(&handle);
-			return RUN_FAIL;
+			return NRC_FAIL;
 		}
 		memset(buf, 0, 512);
 	}
@@ -195,16 +241,16 @@ int  run_sample_http(WIFI_CONFIG *param)
 	nrc_httpc_close(&handle2);
 
 #endif
-	wifi_state = nrc_wifi_get_state();
-	if (wifi_state == WLAN_STATE_GET_IP || wifi_state == WLAN_STATE_CONNECTED) {
+	nrc_wifi_get_state(&wifi_state);
+	if (wifi_state == WIFI_STATE_GET_IP || wifi_state == WIFI_STATE_CONNECTED) {
 		nrc_usr_print("[%s] Trying to DISCONNECT... for exit\n",__func__);
 		if (nrc_wifi_disconnect(network_index) != WIFI_SUCCESS) {
 			nrc_usr_print ("[%s] Fail for Wi-Fi disconnection (results:%d)\n", __func__);
-			return RUN_FAIL;
+			return NRC_FAIL;
 		}
 	}
 	nrc_usr_print("[%s] End of run_sample_http!! \n",__func__);
-	return RUN_SUCCESS;
+	return NRC_SUCCESS;
 }
 
 
@@ -216,7 +262,7 @@ int  run_sample_http(WIFI_CONFIG *param)
  *******************************************************************************/
 void user_init(void)
 {
-	int ret = 0;
+	nrc_err_t ret;
 	WIFI_CONFIG* param;
 
 	nrc_uart_console_enable();

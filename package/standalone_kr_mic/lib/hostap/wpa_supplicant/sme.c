@@ -30,9 +30,17 @@
 #include "scan.h"
 #include "sme.h"
 #include "hs20_supplicant.h"
+#if defined (CONFIG_SAE) || defined (CONFIG_OWE)
+#include "driver_nrc_ps.h"
+#endif
 
+#if 0//def CONFIG_SAE //TBD:softAP-SAE
+#define SME_AUTH_TIMEOUT 15
+#define SME_ASSOC_TIMEOUT 15
+#else
 #define SME_AUTH_TIMEOUT 5
 #define SME_ASSOC_TIMEOUT 5
+#endif /* CONFIG_SAE */
 
 static void sme_auth_timer(void *eloop_ctx, void *timeout_ctx);
 static void sme_assoc_timer(void *eloop_ctx, void *timeout_ctx);
@@ -236,7 +244,6 @@ static void sme_auth_handle_rrm(struct wpa_supplicant *wpa_s,
 	wpa_s->rrm.rrm_used = 1;
 }
 
-
 static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 				    struct wpa_bss *bss, struct wpa_ssid *ssid,
 				    int start)
@@ -270,6 +277,15 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 	skip_auth = wpa_s->conf->reassoc_same_bss_optim &&
 		wpa_s->reassoc_same_bss;
 	wpa_s->current_bss = bss;
+
+#ifdef CONFIG_SAE
+	/* In case of sending auth for connection after deep sleep,
+		skip sending auth */
+	if (wpa_key_mgmt_sae(ssid->key_mgmt) && !wpa_driver_ps_get_recovered()) {
+		skip_auth = 1;
+		wpa_msg(wpa_s, MSG_INFO, "SME: skip auth");
+	}
+#endif
 
 	os_memset(&params, 0, sizeof(params));
 	wpa_s->reassociate = 0;
@@ -644,7 +660,7 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 				    wpa_s->key_mgmt == WPA_KEY_MGMT_FT_SAE ?
 				    WPA_KEY_MGMT_FT_SAE :
 				    WPA_KEY_MGMT_SAE) == 0) {
-		wpa_dbg(wpa_s, MSG_DEBUG,
+		wpa_msg(wpa_s, MSG_INFO,
 			"PMKSA cache entry found - try to use PMKSA caching instead of new SAE authentication");
 		wpa_sm_set_pmk_from_pmksa(wpa_s->wpa);
 		params.auth_alg = WPA_AUTH_ALG_OPEN;
@@ -652,6 +668,7 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 	}
 
 	if (!skip_auth && params.auth_alg == WPA_AUTH_ALG_SAE) {
+		wpa_msg(wpa_s, MSG_INFO, "SME: send auth-%s", start?"commit":"confirm");
 		if (start)
 			resp = sme_auth_build_sae_commit(wpa_s, ssid,
 							 bss->bssid, 0,
@@ -1286,8 +1303,9 @@ void sme_event_auth(struct wpa_supplicant *wpa_s, union wpa_event_data *data)
 		if (res != 1)
 			return;
 
-		wpa_printf(MSG_DEBUG, "SME: SAE completed - setting PMK for "
-			   "4-way handshake");
+		wpa_msg(wpa_s, MSG_INFO, "SME: setting PMK and add it in cache with BSSID:"MACSTR"",
+			MAC2STR(wpa_s->pending_bssid));
+
 		wpa_sm_set_pmk(wpa_s->wpa, wpa_s->sme.sae.pmk, PMK_LEN,
 			       wpa_s->sme.sae.pmkid, wpa_s->pending_bssid);
 	}
@@ -1553,41 +1571,52 @@ void sme_associate(struct wpa_supplicant *wpa_s, enum wpas_mode mode,
 	    wpa_s->key_mgmt == WPA_KEY_MGMT_OWE) {
 		struct wpabuf *owe_ie;
 		u16 group;
+		int skip_owe_ie_build = 0;
 
-		if (wpa_s->current_ssid && wpa_s->current_ssid->owe_group) {
-			group = wpa_s->current_ssid->owe_group;
-		} else if (wpa_s->assoc_status_code ==
-			   WLAN_STATUS_FINITE_CYCLIC_GROUP_NOT_SUPPORTED) {
-			if (wpa_s->last_owe_group == 19)
-				group = 20;
-			else if (wpa_s->last_owe_group == 20)
-				group = 21;
-			else
-				group = OWE_DH_GROUP;
+		/* In case of sending assoc for connection after deep sleep,
+			skip building owe-related elament in assoc req */
+		if (!wpa_driver_ps_get_recovered()) {
+			skip_owe_ie_build = 1;
+		}
+
+		if (skip_owe_ie_build) {
+			wpa_msg(wpa_s, MSG_INFO, "SME: skip building owe ie in assoc req");
 		} else {
-			group = OWE_DH_GROUP;
-		}
+			if (wpa_s->current_ssid && wpa_s->current_ssid->owe_group) {
+				group = wpa_s->current_ssid->owe_group;
+			} else if (wpa_s->assoc_status_code ==
+				   WLAN_STATUS_FINITE_CYCLIC_GROUP_NOT_SUPPORTED) {
+				if (wpa_s->last_owe_group == 19)
+					group = 20;
+				else if (wpa_s->last_owe_group == 20)
+					group = 21;
+				else
+					group = OWE_DH_GROUP;
+			} else {
+				group = OWE_DH_GROUP;
+			}
 
-		wpa_s->last_owe_group = group;
-		wpa_printf(MSG_DEBUG, "OWE: Try to use group %u", group);
-		owe_ie = owe_build_assoc_req(wpa_s->wpa, group);
-		if (!owe_ie) {
-			wpa_printf(MSG_ERROR,
-				   "OWE: Failed to build IE for Association Request frame");
-			return;
-		}
-		if (wpa_s->sme.assoc_req_ie_len + wpabuf_len(owe_ie) >
-		    sizeof(wpa_s->sme.assoc_req_ie)) {
-			wpa_printf(MSG_ERROR,
-				   "OWE: Not enough buffer room for own Association Request frame elements");
+			wpa_s->last_owe_group = group;
+			wpa_printf(MSG_DEBUG, "OWE: Try to use group %u", group);
+			owe_ie = owe_build_assoc_req(wpa_s->wpa, group);
+			if (!owe_ie) {
+				wpa_printf(MSG_ERROR,
+					   "OWE: Failed to build IE for Association Request frame");
+				return;
+			}
+			if (wpa_s->sme.assoc_req_ie_len + wpabuf_len(owe_ie) >
+			    sizeof(wpa_s->sme.assoc_req_ie)) {
+				wpa_printf(MSG_ERROR,
+					   "OWE: Not enough buffer room for own Association Request frame elements");
+				wpabuf_free(owe_ie);
+				return;
+			}
+			os_memcpy(wpa_s->sme.assoc_req_ie + wpa_s->sme.assoc_req_ie_len,
+				  wpabuf_head(owe_ie), wpabuf_len(owe_ie));
+			wpa_s->sme.assoc_req_ie_len += wpabuf_len(owe_ie);
 			wpabuf_free(owe_ie);
-			return;
+			}
 		}
-		os_memcpy(wpa_s->sme.assoc_req_ie + wpa_s->sme.assoc_req_ie_len,
-			  wpabuf_head(owe_ie), wpabuf_len(owe_ie));
-		wpa_s->sme.assoc_req_ie_len += wpabuf_len(owe_ie);
-		wpabuf_free(owe_ie);
-	}
 #endif /* CONFIG_OWE */
 
 #ifdef CONFIG_DPP2
@@ -1762,7 +1791,7 @@ pfs_fail:
 	if (wpa_s->sme.prev_bssid_set)
 		params.prev_bssid = wpa_s->sme.prev_bssid;
 
-	wpa_msg(wpa_s, MSG_INFO, "Trying to associate with " MACSTR
+	wpa_msg(wpa_s, MSG_INFO, "SME: Trying to associate with " MACSTR
 		" (SSID='%s' freq=%d MHz)", MAC2STR(params.bssid),
 		params.ssid ? wpa_ssid_txt(params.ssid, params.ssid_len) : "",
 		params.freq.freq);

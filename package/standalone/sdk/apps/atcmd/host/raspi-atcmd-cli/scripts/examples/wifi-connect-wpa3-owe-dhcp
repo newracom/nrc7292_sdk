@@ -1,0 +1,14 @@
+
+AT
+AT+WDISCONN
+
+ECHO "Run an AP in WPA3-OWE."
+ECHO " - SSID : halow_atcmd_owe"
+ECHO " - IP : 192.168.200.1"
+HOLD
+
+AT+WSCAN
+AT+WDISCONN
+AT+WCONN="halow_atcmd_owe","wpa3-owe"
+AT+WCONN?
+AT+WDHCP

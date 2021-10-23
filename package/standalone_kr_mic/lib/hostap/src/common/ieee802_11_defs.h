@@ -878,6 +878,11 @@ struct ieee80211_mgmt {
 			u8 variable[];
 		} STRUCT_PACKED deauth;
 		struct {
+			u8 ccmp[8];
+			le16 reason_code;
+			u8 variable[];
+		} STRUCT_PACKED deauth_protect;
+		struct {
 			le16 capab_info;
 			le16 listen_interval;
 			/* followed by SSID and Supported rates */
@@ -1042,6 +1047,9 @@ struct ieee80211_mgmt {
 							uint8_t tid						: 4;
 							uint16_t max_buf				: 10;
 							uint16_t timeout				: 16;
+							uint16_t frag					: 4;
+							uint16_t ssn					: 12;
+							u8 variable[];
 						} STRUCT_PACKED addba_req_action;
 						struct {
 							uint8_t dial_token				: 8;
@@ -1051,11 +1059,14 @@ struct ieee80211_mgmt {
 							uint8_t tid						: 4;
 							uint16_t max_buf				: 10;
 							uint16_t timeout				: 16;
+							u8 variable[];
 						} STRUCT_PACKED addba_resp_action;
 						struct {
 							uint16_t rsv					: 11;
 							uint8_t init					: 1;
 							uint8_t tid						: 4;
+							uint16_t reason					: 16;
+							u8 variable[];
 						} STRUCT_PACKED delba_req_action;
 					} u;
 				} STRUCT_PACKED ba_action;
@@ -1202,6 +1213,15 @@ struct ieee80211_s1g_operation {
 	u8 primary_chan;
 	u8 center_freq;
 	u16 basic_s1g_mcs_and_nss_set;
+} STRUCT_PACKED;
+
+/* Management MIC element  */
+struct ieee80211_mme_ie {
+	u8 eid;
+	u8 length;
+	u16 keyid;
+	u8 ipn[6];
+	u8 mic[8];
 } STRUCT_PACKED;
 
 #ifdef _MSC_VER

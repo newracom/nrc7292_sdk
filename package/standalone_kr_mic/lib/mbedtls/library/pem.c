@@ -28,7 +28,7 @@
 #if defined(MBEDTLS_PEM_PARSE_C) || defined(MBEDTLS_PEM_WRITE_C)
 
 #include "mbedtls/pem.h"
-#include "mbedtls/base64.h"
+#include "mbedtls/tls_base64.h"
 #include "mbedtls/des.h"
 #include "mbedtls/aes.h"
 #include "mbedtls/md5.h"

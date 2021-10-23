@@ -26,15 +26,15 @@
 #ifndef __NRC_API_PS_H__
 #define __NRC_API_PS_H__
 
-typedef enum _power_save_sleep_mode {
+typedef enum {
 	POWER_SAVE_MODEM_SLEEP_MODE,
 	POWER_SAVE_DEEP_SLEEP_MODE
-} power_save_sleep_mode;
+} POWER_SAVE_SLEEP_MODE;
 
-typedef enum _power_save_tim_mode {
-	POWER_SAVE_NON_TIM_MODE,
-	POWER_SAVE_TIM_MODE
-} power_save_tim_mode;
+typedef enum {
+	POWER_SAVE_NON_TIM,
+	POWER_SAVE_TIM
+} POWER_SAVE_TIM_MODE;
 
 #define WAKEUP_SOURCE_RTC (0x00000001L << 0)
 #define WAKEUP_SOURCE_GPIO (0x00000001L << 1)
@@ -52,33 +52,46 @@ typedef enum _power_save_tim_mode {
 	} while(0);
 
 /**********************************************
- * @fn void nrc_ps_set_sleep(uint8_t mode, uint16_t interval)
+ * @fn nrc_err_t nrc_ps_set_sleep(POWER_SAVE_SLEEP_MODE mode, uint64_t interval, uint32_t timeout)
  *
- * @brief The function is to choose the power save mode & power save protocol
+ * @brief The function is to set the power save mode & power save protocol
  *
- * @param mode: 0(MODEM SLEEP : TBD), 1(DEEP SLEEP)
+ * @param mode: 0(MODEM SLEEP : TBD) or 1(DEEP SLEEP)
  *
- * @param interval: 0 (Tim), non-zero (Non-Tim : TBD) (ms)
+ * @param interval(ms): 0(Tim) or non-zero(Non-Tim : interval >= 1000ms)
  *
- * @return true or false
+ * @param timeout(ms): only works in TIM mode with modem sleep
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-bool nrc_ps_set_sleep(uint8_t sleep_mode, uint16_t interval);
+nrc_err_t nrc_ps_set_sleep(POWER_SAVE_SLEEP_MODE sleep_mode, uint64_t interval, uint32_t timeout);
 
 /**********************************************
- * @fn bool nrc_ps_set_gpio_wakeup_pin(int pin_number)
+ * @fn nrc_err_t nrc_ps_set_modemsleep_stop(void)
+ *
+ * @brief The function is to stop the modem sleep
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_ps_set_modemsleep_stop(void);
+
+/**********************************************
+ * @fn nrc_err_t nrc_ps_set_gpio_wakeup_pin(bool check_debounce, int pin_number)
  *
  * @brief   Configure a wakeup-gpio-pin when system state is uCode or deepsleep.
  *			Call this function before deepsleep if user want to config
  * 			the wakeup-gpio-pin.
  *
- * @param pin_number: Select wakeup GPIO Pin number (0~31)
+ * @param check_debounce: Eliminates mechanical vibration of a switch.
  *
- * @return true or false
+ * @param pin_number: Select wakeup GPIO Pin number(0~31)
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-bool nrc_ps_set_gpio_wakeup_pin(int pin_number);
+nrc_err_t nrc_ps_set_gpio_wakeup_pin(bool check_debounce, int pin_number);
 
 /**********************************************
- * @fn bool nrc_ps_set_wakeup_source(uint8_t wakeup_source)
+ * @fn nrc_err_t nrc_ps_set_wakeup_source(uint8_t wakeup_source)
  *
  * @brief   Configure wakeup sources when system state is deepsleep.
  *			Call this function before deepsleep if user want to config
@@ -86,8 +99,8 @@ bool nrc_ps_set_gpio_wakeup_pin(int pin_number);
  *
  * @param wakeup_source: WAKEUP_SOURCE_RTC or WAKEUP_SOURCE_GPIO
  *
- * @return true or false
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-bool nrc_ps_set_wakeup_source(uint8_t wakeup_source);
+nrc_err_t nrc_ps_set_wakeup_source(uint8_t wakeup_source);
 
 #endif // __NRC_API_PS_H__

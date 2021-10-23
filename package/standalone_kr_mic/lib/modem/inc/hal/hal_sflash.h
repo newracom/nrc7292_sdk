@@ -2,6 +2,11 @@
 #define __HAL_SFLASH_NRC7292_H__
 
 #include "system.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* ----------------------------------
  * W25XX JEDEC ID
  * ---------------------------------- */
@@ -11,11 +16,13 @@
 #define IS25LP080D_JEDEC_ID (0x9D6014)
 #define IS25LP128D_JEDEC_ID (0x9D6018)
 #define EN25S16B_JEDEC_ID (0x1C3815)
+#define EN25QH16B_JEDEC_ID (0x1C7015)
 #define W25Q16FW_JEDEC_ID (0xEF6015)
 #define W25Q80EW_JEDEC_ID (0xEF6014)
 #define GD25LQ16C_JEDEC_ID (0xC86015)
 #define GD25LQ40C_JEDEC_ID (0xC86013)
 #define MX25V8035F_JEDEC_ID (0xC22314)
+#define MX25U1633F_JEDEC_ID (0xC22535)
 
 /* ----------------------------------
  * W26XX JEDEC ID
@@ -52,6 +59,7 @@ enum sf_burst_len_e {
 };
 
 enum sf_store_area_e {
+	SF_BOOTLOADER = 0x0,
 	SF_FW = 0x10000,
 	SF_FW_INFO = 0xF5000,
 	SF_CORE_DUMP = 0xF6000,
@@ -93,9 +101,8 @@ typedef struct {
 	uint8_t mac_addr[6]; /*mac address for interface 0*/
 	uint8_t mac_addr_1[6]; /*mac address for interface 1*/
 	uint32_t cal_use :8; /*enable/disable the usage of calibration data*/
-	uint32_t bdf_use :8; /*enable/disable the usage of board data*/
-	uint32_t reserved1:8;
-	uint32_t reserved2:8;
+	uint32_t bdf_use :8; /*enable/disable the usage of bdf data*/
+	uint32_t hw_version:16; /* HW Version */
 	struct sf_reg_override rf_pllldo12_tr;
 } sf_sys_config_t;
 
@@ -152,6 +159,10 @@ bool nrc_sf_userconfig_write(uint32_t address, uint8_t *data, size_t size);
 bool nrc_sf_update_bdf(uint32_t length);
 bool nrc_sf_is_bdf_use(void);
 bool nrc_sf_update_bdf_use(uint8_t bdf_use);
+uint16_t nrc_sf_get_hw_version(void);
 
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 #endif //__HAL_SFLASH_NRC7292_H__

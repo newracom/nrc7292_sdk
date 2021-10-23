@@ -102,6 +102,7 @@ static char *bps_to_string (uint32_t bps)
 
 static bool g_iperf_socket_send_idle = true;
 static bool g_iperf_socket_send_passthrough = false;
+static int s_socket_id = -1;
 
 static void iperf_udp_server_recv_callback (atcmd_rxd_t *rxd, char *data);
 static void iperf_udp_client_recv_callback (atcmd_rxd_t *rxd, char *data);
@@ -111,6 +112,7 @@ static void iperf_tcp_server_recv_callback (atcmd_rxd_t *rxd, char *data);
 static void iperf_tcp_client_recv_callback (atcmd_rxd_t *rxd, char *data);
 static void iperf_tcp_server_event_callback (enum ATCMD_EVENT event, int argc, char *argv[]);
 static void iperf_tcp_client_event_callback (enum ATCMD_EVENT event, int argc, char *argv[]);
+static void iperf_socket_info_callback (enum ATCMD_INFO info, int argc, char *argv[]);
 
 static void iperf_socket_print (iperf_socket_t *socket)
 {
@@ -136,10 +138,25 @@ static void iperf_socket_init (iperf_socket_t *socket)
 
 static int iperf_socket_open_udp (iperf_socket_t *socket)
 {
+	int i;
+	s_socket_id = -1;
+	nrc_atcmd_register_callback(ATCMD_CB_INFO, iperf_socket_info_callback);
+
 	if (nrc_atcmd_send_cmd("AT+SOPEN=\"udp\",%u", socket->local_port) != ATCMD_RET_OK)
 		return -1;
 
-	socket->id = 0;
+	for (i = 0; i < 100; i++)
+	{
+		if (s_socket_id >= 0)
+		{
+			socket->id = s_socket_id;
+			s_socket_id = -1;
+			break;
+		}
+		usleep(10000);
+	}
+	if (i == 100)
+		socket->id = 0;
 
 	if (socket->remote_port == 0 && strcmp(socket->remote_addr, IPERF_IPADDR_ANY) == 0)
 		nrc_atcmd_register_callback(ATCMD_CB_RXD, iperf_udp_server_recv_callback);
@@ -154,6 +171,10 @@ static int iperf_socket_open_udp (iperf_socket_t *socket)
 
 static int iperf_socket_open_tcp (iperf_socket_t *socket)
 {
+	int i;
+	s_socket_id = -1;
+	nrc_atcmd_register_callback(ATCMD_CB_INFO, iperf_socket_info_callback);
+
 	if (socket->local_port > 0) /* TCP Server */
 	{
 		if (nrc_atcmd_send_cmd("AT+SOPEN=\"tcp\",%u", socket->local_port) != ATCMD_RET_OK)
@@ -173,15 +194,26 @@ static int iperf_socket_open_tcp (iperf_socket_t *socket)
 	else
 		return -1;
 
-	socket->id = 0;
+	for (i = 0; i < 100; i++)
+	{
+		if (s_socket_id >= 0)
+		{
+			socket->id = s_socket_id;
+			s_socket_id = -1;
+			break;
+		}
+		usleep(10000);
+	}
+	if (i == 100)
+		socket->id = 0;
 
 	return 0;
 }
 
 static int iperf_socket_open (iperf_socket_t *socket)
 {
-/*	if (nrc_atcmd_send_cmd("AT+SRXLOGLEVEL=1") != ATCMD_RET_OK)
-		return -1; */
+	if (nrc_atcmd_send_cmd("AT+SRXLOGLEVEL=1") != ATCMD_RET_OK)
+		return -1;
 
 	switch (socket->protocol)
 	{
@@ -229,8 +261,8 @@ static int iperf_socket_close (iperf_socket_t *socket)
 	if (nrc_atcmd_send_cmd("AT+SCLOSE") != ATCMD_RET_OK)
 		return -1;
 
-/*	if (nrc_atcmd_send_cmd("AT+SRXLOGLEVEL=0") != ATCMD_RET_OK)
-		return -1; */
+	if (nrc_atcmd_send_cmd("AT+SRXLOGLEVEL=0") != ATCMD_RET_OK)
+		return -1;
 
 	return 0;
 }
@@ -607,7 +639,9 @@ static int iperf_udp_server_run (iperf_opt_t *option) // interval: sec
 
 	iperf_udp_server_report_to_client(info);
 
-	iperf_log(" Done\n");
+	iperf_log(" Done: %d/%d\n", info->datagram_cnt, info->datagram_seq);
+
+	sleep(1);
 
 	return 0;
 }
@@ -650,18 +684,25 @@ static void iperf_udp_server_recv (iperf_socket_t *socket, char *buf, int len)
 		}
 		else
 		{
+			info->datagram_cnt++;
+			info->datagram_seq++;
+
 			if (id < 0)
 			{
 				id = -id;
 				info->stop_time = rx_time;
 				memcpy(&info->last_datagram, datagram, 12);
 				info->done = true;
+
+				if (info->datagram_seq != id)
+				{
+//					iperf_log("last seq: %d -> %d\n", info->datagram_seq, id);
+
+					info->datagram_seq = id;
+				}
 			}
 			else
 			{
-				info->datagram_cnt++;
-				info->datagram_seq++;
-
 				if (id < info->datagram_seq)
 				{
 //					iperf_debug("out of order: %d -> %d\n", info->datagram_seq, id);
@@ -1151,12 +1192,8 @@ static void iperf_tcp_server_event_callback (enum ATCMD_EVENT event, int argc, c
 			{
 				switch (err)
 				{
-					case -ENOTCONN:
+					case ENOTCONN:
 						info->done = true;
-						break;
-
-					default:
-						iperf_debug("sevent_recv_error: id=%d err=%d\n", id, err);
 				}
 			}
 			break;
@@ -1362,6 +1399,19 @@ static void iperf_tcp_client_event_callback (enum ATCMD_EVENT event, int argc, c
 
 		default:
 			break;
+	}
+}
+
+static void iperf_socket_info_callback (enum ATCMD_INFO info, int argc, char *argv[])
+{
+	int id;
+
+	if (argc == 1 && memcmp(argv[0], "+SOPEN:", 7) == 0)
+	{
+		sscanf(argv[0], "+SOPEN:%u", &id);
+		iperf_debug("opened socket id:%u\n", id);
+		s_socket_id = id;
+		nrc_atcmd_unregister_callback(ATCMD_CB_INFO);
 	}
 }
 

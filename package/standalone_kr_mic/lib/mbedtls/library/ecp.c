@@ -2018,6 +2018,8 @@ static int ecp_mul_comb( mbedtls_ecp_group *grp, mbedtls_ecp_point *R,
                          void *p_rng,
                          mbedtls_ecp_restart_ctx *rs_ctx )
 {
+    //mbedtls_printf("Set critical section\n");
+    portENTER_CRITICAL();
     int ret;
     unsigned char w, p_eq_g, i;
     size_t d;
@@ -2130,6 +2132,8 @@ cleanup:
 
     ECP_RS_LEAVE( rsm );
 
+    portEXIT_CRITICAL();
+    //mbedtls_printf("Release critical section\n");
     return( ret );
 }
 

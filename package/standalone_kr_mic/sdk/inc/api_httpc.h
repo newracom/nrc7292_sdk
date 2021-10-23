@@ -126,7 +126,7 @@ httpc_ret_e nrc_httpc_post(con_handle_t *handle, const char *url, const char *cu
  *
  * @return Please refer to #httpc_ret_e
  ***********************************************/
-httpc_ret_e nrc_httpc_put(con_handle_t *handle, const char *url, const char *custom_header, httpc_data_t *data, ssl_certs_t *certs);
+httpc_ret_e nrc_httpc_put(con_handle_t *handle, const char *url, const char *custom_header,httpc_data_t *data, ssl_certs_t *certs);
 
 /**********************************************
  * @brief Executes a DELETE request on a given URL

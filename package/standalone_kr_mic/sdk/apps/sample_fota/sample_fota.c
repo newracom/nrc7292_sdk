@@ -31,11 +31,13 @@
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
 
+#include "cJSON.h"
+
 #define RUN_HTTPS
 #if defined( SUPPORT_MBEDTLS ) && defined( RUN_HTTPS )
 #define SERVER_URL "https://192.168.10.199:4443/"
 #else
-#define SERVER_URL "http://192.168.10.199:8080/"
+#define SERVER_URL "http://10.198.1.214:8080/"
 #endif
 
 #define CURRENT_FW_VER 105
@@ -127,34 +129,87 @@ typedef struct {
 
 update_info_t update_info = {0, 0, {'\0'}};
 
-void parse_response_version (char * data )
+int get_json_str_value(cJSON *cjson, char *key, char **value)
 {
-	char* token = strtok(data, "\r\n");
+	cJSON *cjson_obj = NULL;
 
-	while (token != NULL) {
-
-		if (strncmp(token, "Ver: ", 5) == 0) {
-			char* version;
-			char* temp = strtok_r(token, " ", &version);
-			update_info.version  = atoi(version);
-		}else if (strncmp(token, "Crc: ", 5) ==0) {
-			char* crc;
-			char* temp = strtok_r(token, " ", &crc);
-			update_info.crc = strtoul(crc, NULL, 16);
-		}else if (strncmp(token, "Fw_name: ", 9) ==0) {
-			char* fw_url;
-			char* temp = strtok_r(token, " ", &fw_url);
-			sprintf(update_info.fw_url, "%s%s", SERVER_URL, fw_url);
-			break;
-		}else {
-			token = strtok(NULL, "\r\n");
-			nrc_usr_print("token: %s\n", token);
-		}
-
+	cjson_obj = cJSON_GetObjectItem(cjson, key);
+	if (cjson_obj && cjson_obj->valuestring) {
+		*value = strdup(cjson_obj->valuestring);
+		return 1;
+	} else {
+		nrc_usr_print("[%s] %s not found in json\n", __func__, key);
+		return 0;
 	}
-	nrc_usr_print("[%s] version: %d,  crc: %x  fw_url: %s\n", __func__,  update_info.version, update_info.crc, update_info.fw_url);
 }
 
+void parse_response_version (char * data, uint32_t length)
+{
+	cJSON *cjson = NULL;
+
+	char *version = NULL;
+	char *crc = NULL;
+	char *fw_url = NULL;
+
+	char* token = strtok(data, "\r\n");
+	uint32_t body_length = 0;
+
+	while (token != NULL) {
+		if (strncmp(token, "Content-Length: ", 16) == 0) {
+			char* length_str;
+			char* temp = strtok_r(token, " ", &length_str);
+			body_length = atoi(length_str);
+			break;
+		} else {
+			token = strtok(NULL, "\r\n");
+		}
+	}
+
+	nrc_usr_print("[%s] version data :\n %s\n", __func__, (char *) (data + (length - body_length)));
+	cjson = cJSON_Parse((char *) (data + (length - body_length)));
+
+	if (cjson) {
+		if (get_json_str_value(cjson, "version", &version)) {
+			nrc_usr_print("[%s] version : %s\n", __func__, version);
+			update_info.version  = atoi(version);
+		} else {
+			goto exit;
+		}
+
+		if (get_json_str_value(cjson, "crc", &crc)) {
+			nrc_usr_print("[%s] crc : %s\n", __func__, crc);
+			update_info.crc = strtoul(crc, NULL, 16);
+		} else {
+			goto exit;
+		}
+
+		if (get_json_str_value(cjson, "fw_name", &fw_url)) {
+			nrc_usr_print("[%s] URL : %s\n", __func__, fw_url);
+			sprintf(update_info.fw_url, "%s%s", SERVER_URL, fw_url);
+		} else {
+			goto exit;
+		}
+	} else{
+		nrc_usr_print("[%s] JSON parse error\n", __func__);
+	}
+
+exit:
+	if (cjson) {
+		cJSON_Delete(cjson);
+
+		if (version)
+			free(version);
+
+		if (crc)
+			free(crc);
+
+		if (fw_url)
+			free(fw_url);
+
+		nrc_usr_print("[%s] version: %d,  crc: %x  fw_url: %s\n",
+			__func__,  update_info.version, update_info.crc, update_info.fw_url);
+	}
+}
 
 uint32_t fw_len = 0;
 void parse_response_content (char * data )
@@ -179,24 +234,73 @@ void parse_response_content (char * data )
  * Parameters   : WIFI_CONFIG
  * Returns      : 0 or -1 (0: success, -1: fail)
  *******************************************************************************/
-int  run_sample_fota(WIFI_CONFIG *param)
+nrc_err_t run_sample_fota(WIFI_CONFIG *param)
 {
 	nrc_usr_print("[%s] Sample App for fota (firmware over the air) \n",__func__);
+	tWIFI_STATE_ID wifi_state = WIFI_STATE_INIT;
+  	int network_index = 0;
+	SCAN_RESULTS results;
 
-	if (wifi_init(param)!= WIFI_SUCCESS) {
-		nrc_usr_print ("[%s] ASSERT! Fail for init\n", __func__);
-		return RUN_FAIL;
+	int i = 0;
+	int ssid_found =false;
+
+	/* set initial wifi configuration */
+	while(1){
+		if (wifi_init(param)== WIFI_SUCCESS) {
+			nrc_usr_print ("[%s] wifi_init Success !! \n", __func__);
+			break;
+		} else {
+			nrc_usr_print ("[%s] wifi_init Failed !! \n", __func__);
+			_delay_ms(1000);
+		}
 	}
 
-	/* 1st trial to connect */
-	if (wifi_connect(param)!= WIFI_SUCCESS) {
-		nrc_usr_print ("[%s] Fail for Wi-Fi connection (results:%d)\n", __func__);
-		return RUN_FAIL;
+	/* find AP */
+	while(1){
+		if (nrc_wifi_scan() == WIFI_SUCCESS){
+			if (nrc_wifi_scan_results(&results)== WIFI_SUCCESS) {
+				/* Find the ssid in scan results */
+				for(i=0; i<results.n_result ; i++){
+					if(strcmp((char*)param->ssid, (char*)results.result[i].ssid)== 0 ){
+						ssid_found = true;
+						break;
+					}
+				}
+
+				if(ssid_found){
+					nrc_usr_print ("[%s] %s is found \n", __func__, param->ssid);
+					break;
+				}
+			}
+		} else {
+			nrc_usr_print ("[%s] Scan fail !! \n", __func__);
+			_delay_ms(1000);
+		}
 	}
 
-	if (nrc_wifi_get_state() != WLAN_STATE_GET_IP) {
-		nrc_usr_print("[%s] Fail to connect or get IP !\n",__func__);
-		return RUN_FAIL;
+	/* connect to AP */
+	while(1) {
+		if (wifi_connect(param)== WIFI_SUCCESS) {
+			nrc_usr_print ("[%s] connect to %s successfully !! \n", __func__, param->ssid);
+			break;
+		} else{
+			nrc_usr_print ("[%s] Fail for connection %s\n", __func__, param->ssid);
+			_delay_ms(1000);
+		}
+	}
+
+	nrc_wifi_get_network_index(&network_index );
+
+	/* check the IP is ready */
+	while(1){
+		nrc_wifi_get_state(&wifi_state);
+		if (wifi_state == WIFI_STATE_GET_IP) {
+			nrc_usr_print("[%s] IP ...\n",__func__);
+			break;
+		} else{
+			nrc_usr_print("[%s] Current State : %d...\n",__func__, wifi_state);
+		}
+		_delay_ms(1000);
 	}
 
 #if defined( SUPPORT_MBEDTLS ) && defined( RUN_HTTPS )
@@ -209,6 +313,12 @@ int  run_sample_fota(WIFI_CONFIG *param)
 	certs.server_cert_length = sizeof(ssl_server_ca_crt);
 #endif
 
+	if (!nrc_fota_is_support()) {
+		nrc_usr_print("=========================================\n");
+		nrc_usr_print("   Serial Flash does not support FOTA.\n");
+		nrc_usr_print("=========================================\n");
+		return NRC_FAIL;
+	}
 
 	con_handle_t handle0, handle1, handle2;
 	httpc_data_t data;
@@ -223,6 +333,7 @@ int  run_sample_fota(WIFI_CONFIG *param)
 	nrc_usr_print("STEP 1. Check firmware version in server.\n");
 	nrc_usr_print("=========================================\n");
 	while (1) {
+		uint32_t data_size = 0;
 		data.data_in = buf;
 		memset(buf, 0, CHUNK_SIZE);
 
@@ -234,6 +345,7 @@ int  run_sample_fota(WIFI_CONFIG *param)
 
 		while (ret == HTTPC_RET_OK) {
 			data.data_in += data.recved_size;
+			data_size += data.recved_size;
 			ret = nrc_httpc_recv_response(&handle0, &data);
 
 			if (data.recved_size == 0) {
@@ -242,10 +354,10 @@ int  run_sample_fota(WIFI_CONFIG *param)
 		}
 		nrc_httpc_close(&handle0);
 
-		nrc_usr_print("[HTTP Response Length] %d\n", data.data_in);
+		nrc_usr_print("[HTTP Response Length] %d\n", data_size);
 		nrc_usr_print("-----Recvd Data-----\n");
 		nrc_usr_print("%s\n", buf);
-		parse_response_version(buf);
+		parse_response_version(buf, data_size);
 
 		if (update_info.version > CURRENT_FW_VER)
 			break;
@@ -254,16 +366,16 @@ int  run_sample_fota(WIFI_CONFIG *param)
 	}
 
 	nrc_usr_print("======================================================\n");
-	nrc_usr_print("STEP 2. Erase flash area for downloading OTA firmware.\n");
+	nrc_usr_print("STEP 2. Erase flash area for OTA firmware to be downloaded.\n");
 	nrc_usr_print("======================================================\n");
 	nrc_usr_print("Erasing......");
 	nrc_fota_erase(0, 1024*1024);
 	nrc_usr_print("Done.\n\n");
 
 	nrc_usr_print("===========================================\n");
-	nrc_usr_print("STEP 3. Download a new firmware and update.\n");
+	nrc_usr_print("STEP 3. Download new firmware and update.\n");
 	nrc_usr_print("===========================================\n\n");
-        data.data_in = buf;
+	data.data_in = buf;
 	memset(buf, 0, CHUNK_SIZE);
 
 	uint32_t total_length = 0;
@@ -308,7 +420,7 @@ int  run_sample_fota(WIFI_CONFIG *param)
 	data.data_in = buf;
 	memset(buf, 0, CHUNK_SIZE);
 
-	fota_info_t fota_info;
+	FOTA_INFO fota_info;
 	fota_info.fw_length = fw_len;
 	fota_info.crc = update_info.crc;
 	nrc_fota_set_info(fota_info.fw_length, fota_info.crc);
@@ -338,7 +450,7 @@ int  run_sample_fota(WIFI_CONFIG *param)
 
 	while(1);
 
-	return RUN_SUCCESS;
+	return NRC_SUCCESS;
 }
 
 
@@ -350,7 +462,7 @@ int  run_sample_fota(WIFI_CONFIG *param)
  *******************************************************************************/
 void user_init(void)
 {
-	int ret = 0;
+	nrc_err_t ret;
 	WIFI_CONFIG* param;
 
 	nrc_uart_console_enable();

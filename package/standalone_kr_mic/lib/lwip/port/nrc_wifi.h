@@ -77,35 +77,29 @@ needs to be 0; and it needs to be 1 only when users need to check the MAC addres
 
 typedef void (*lwiperf_report_cb_t) (const char *report_type,
 									const ip_addr_t* remote_addr, uint16_t remote_port,
-									uint32_t bytes_transferred, 
-									uint32_t ms_duration, 
+									uint32_t bytes_transferred,
+									uint32_t ms_duration,
 									uint32_t bandwidth_kbitpsec);
 
 bool wifi_get_ip_info(WIFI_INTERFACE if_index, struct ip_info *info);
 bool wifi_set_ip_info(WIFI_INTERFACE if_index, struct ip_info *info);
+bool wifi_set_dns_server(void);
 void wifi_lwip_init( void );
-void dhcp_run(int vif);
 int wifi_station_dhcpc_start(int vif);
 int wifi_station_dhcpc_stop(int vif);
 int wifi_station_dhcpc_status(int vif);
 bool wifi_ifconfig(int num_param, char *params[]);
-void ping_run(char *cmd);
-int iperf_run(char *cmd, void *report_cb);
-
 enum dhcp_status wifi_softap_dhcps_status(void);
-#if 0
-bool wifi_softap_dhcps_start(void);
-bool wifi_softap_dhcps_stop(void);
-#endif
+
 u8_t wifi_get_vif_id(ip4_addr_t* addr);
 void set_dhcp_status(bool status);
 bool get_dhcp_status(void);
 
 #ifdef LWIP_DHCP
-void dhcp_run(int vif);
+int dhcp_run(int vif);
 #endif /* LWIP_DHCP */
 
-void setup_wifi_ap_mode(int vif);
+int setup_wifi_ap_mode(int vif, int updated_lease_time);
 
 #if defined(SUPPORT_MBEDTLS) && defined(SUPPORT_AES_SAMPLE_TEST)
 int aes_sample_test(void);

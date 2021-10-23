@@ -1,0 +1,61 @@
+#
+# Test ID : AT-TC-WIFI-02-02
+#
+# Test Case : SoftAP - WPA2 & DHCP on
+#
+# Test Configuration
+#
+#  - APUT
+#    - Country : KR
+#	 - Channel : 927MHz (2M BW)
+#    - Security : WPA2
+#    - Password : 12345678
+#    - SSID : halow_atcmd_wpa2
+#    - IP : 192.168.200.1
+#    - DHCP Server : On
+#
+#  - Testbed STA
+#    - DHCP Client : On
+#
+
+ECHO "Step 1"
+ATZ
+WAIT 5s
+AT
+
+ECHO "Step 2"
+AT+WCOUNTRY?
+AT+WCOUNTRY="KR"
+AT+WCOUNTRY?
+
+ECHO "Step 3"
+AT+WSOFTAP?
+AT+WSOFTAP=927,"halow_atcmd_wpa2","wpa2","12345678"
+AT+WSOFTAP?
+
+ECHO "Step 4"
+AT+WIPADDR?
+AT+WIPADDR="192.168.200.1","255.255.255.0","192.168.200.1"
+AT+WIPADDR?
+
+ECHO "Step 5"
+AT+WDHCPS
+
+ECHO "Step 6"
+AT+WSOFTAP?
+
+ECHO "Step 7"
+ECHO "Connect STA in wpa2 mode."
+ECHO " - Country : KR"
+ECHO " - Channel : 927MHz (2M BW)"
+ECHO " - Security : WPA2"
+ECHO " - Password : 12345678"
+ECHO " - SSID : halow_atcmd_wpa2"
+ECHO " - AP IP : 192.168.200.1"
+ECHO " - DHCP Client : On"
+HOLD
+
+ECHO "Step 8"
+ECHO "Ping from STA to AP"
+HOLD
+

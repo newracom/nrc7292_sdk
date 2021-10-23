@@ -1,0 +1,16 @@
+#
+# Test ID : AT-TC-BASIC-03
+#
+# Test Case : ADC Value
+#
+# Test Configuration
+#
+#  - Testbed AP
+#
+#  - STAUT
+#
+
+ECHO "Step 1"
+AT+ADC=1
+AT+ADC=2
+AT+ADC=3

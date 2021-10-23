@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2020 Newracom, Inc.
+ * Copyright (c) 2021 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -31,9 +31,11 @@
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
 
+
 #define TRUE   1
 #define FALSE  0
 #define LOCAL_PORT 8099
+#define MAX_RETRY 5
 #define MAX_CLIENTS 128
 #define BUFFER_SIZE (1024*12)
 
@@ -45,13 +47,13 @@ static int error_val = 0;
 
 static void tcp_server_task(void *pvParameters)
 {
-	int opt = TRUE;
+	WIFI_CONFIG *param = pvParameters;
+	tWIFI_STATE_ID wifi_state;
 	int listen_socket , addrlen , new_socket , conn_socket[MAX_CLIENTS];
 	int activity, i , sd;
 	int max_sd;
 	int PORT = LOCAL_PORT;
 	struct sockaddr_in address;
-	WIFI_CONFIG *param = pvParameters;
 	char *MSGEND = "#*stop_server";
 	char buffer[BUFFER_SIZE];
 	int len,ret = 0;
@@ -61,16 +63,11 @@ static void tcp_server_task(void *pvParameters)
 	fd_set rfds, wfds;
 
 	for (i = 0; i < MAX_CLIENTS; i++) {
-		conn_socket[i] = 0;
+		conn_socket[i] = -1;
 	}
 
 	if( (listen_socket = socket(AF_INET , SOCK_STREAM , 0)) < 0)  {
 		nrc_usr_print("socket failed\n");
-		goto exit;
-	}
-
-	if( setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt)) < 0 ){
-		nrc_usr_print("setsockopt failed\n");
 		goto exit;
 	}
 
@@ -82,6 +79,9 @@ static void tcp_server_task(void *pvParameters)
 		nrc_usr_print("bind failed\n");
 		goto exit;
 	}
+	nrc_usr_print("[TCP Server]\n");
+	nrc_usr_print("Echo : %s\n", ECHO_SERVER_ENABLE ? "Enable" : "Disable");
+	nrc_usr_print("Receive buffer size :%d \n", BUFFER_SIZE);
 	nrc_usr_print("Listener on port %d \n", PORT);
 
 	if (listen(listen_socket, 3) < 0) {
@@ -94,6 +94,20 @@ static void tcp_server_task(void *pvParameters)
 
 	while(TRUE)
 	{
+		if(nrc_wifi_get_state(&wifi_state) != WIFI_SUCCESS) {
+			nrc_usr_print("[%s] Fail to get state\n", __func__);
+			goto exit;
+		}
+
+		switch (wifi_state){
+			case WIFI_STATE_CONNECTED:
+			case WIFI_STATE_GET_IP:
+				break;
+			default:
+				nrc_usr_print("[%s] Disconnected from AP!!\n", __func__);
+				goto exit;
+		}
+
 		FD_ZERO(&rfds);
 		FD_SET(listen_socket, &rfds);
 		max_sd = listen_socket;
@@ -101,7 +115,7 @@ static void tcp_server_task(void *pvParameters)
 		for ( i = 0 ; i < MAX_CLIENTS ; i++)
 		{
 			sd = conn_socket[i];
-			if(sd > 0)
+			if(sd >= 0)
 				FD_SET( sd , &rfds);
 
 			if(sd > max_sd)
@@ -127,7 +141,7 @@ static void tcp_server_task(void *pvParameters)
 
 			for (i = 0; i < MAX_CLIENTS; i++)
 			{
-				if( conn_socket[i] == 0 ){
+				if( conn_socket[i] < 0 ){
 					conn_socket[i] = new_socket;
 					nrc_usr_print("Adding to list of sockets as %d\n" , i);
 					break;
@@ -138,6 +152,8 @@ static void tcp_server_task(void *pvParameters)
 		for (i = 0; i < MAX_CLIENTS; i++)
 		{
 			sd = conn_socket[i];
+			if (sd < 0)
+				continue;
 
 			if (FD_ISSET( sd , &rfds)) 	{
 				len = recv( sd , buffer, sizeof(buffer), 0);
@@ -145,14 +161,14 @@ static void tcp_server_task(void *pvParameters)
 					nrc_usr_print("recv failed: errno %d\n", errno);
 					shutdown(sd, 0);
 					close(sd);
-					conn_socket[i] = 0;
+					conn_socket[i] = -1;
 				} else if(len == 0) {
 					getpeername(sd , (struct sockaddr*)&address , (socklen_t*)&addrlen);
 					nrc_usr_print("Host disconnected , ip %s , port %d \n" ,\
 						 inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
 
 					close( sd );
-					conn_socket[i] = 0;
+					conn_socket[i] = -1;
 				} else {
 					#if SERVER_DATA_DEBUG
 					nrc_usr_print("[%d] Recv(%d)\n", sd, len);
@@ -195,6 +211,18 @@ static void tcp_server_task(void *pvParameters)
 	}
 
 exit:
+	for (i = 0; i < MAX_CLIENTS; i++)
+	{
+		sd = conn_socket[i];
+		if (sd >= 0)
+		{
+			nrc_usr_print("close socket: i=%d sd=%d\n", i, sd);
+			shutdown(sd, 0);
+			close(sd);
+			conn_socket[i] = -1;
+		}
+	}
+
 	if (listen_socket >= 0) {
 		nrc_usr_print("Shutting down and close socket\n");
 		shutdown(listen_socket, 0);
@@ -207,61 +235,95 @@ exit:
 /******************************************************************************
  * FunctionName : run_sample_tcp_server
  * Description  : sample test for tcp server
- * Parameters   : count(test count), interval(test interval)
+ * Parameters   : WIFI_CONFIG
  * Returns      : 0 or -1 (0: success, -1: fail)
  *******************************************************************************/
-int run_sample_tcp_server(WIFI_CONFIG* param)
+nrc_err_t run_sample_tcp_server(WIFI_CONFIG* param)
 {
-	int i = 0;
-	int count =0;
-	int network_index = 0;
-	int dhcp_server =0;
-	int wifi_state = WLAN_STATE_INIT;
+	tWIFI_STATE_ID wifi_state = WIFI_STATE_INIT;
+	int count;
 
-	count = param->count;
-	dhcp_server = param->dhcp_server;
-
-	if (wifi_init(param)!= WIFI_SUCCESS) {
+	/* set initial wifi configuration */
+	if (wifi_init(param) != WIFI_SUCCESS) {
 		nrc_usr_print ("[%s] ASSERT! Fail for init\n", __func__);
-		return RUN_FAIL;
+		return -1;
 	}
 
-	/* 1st trial to connect */
-	if (wifi_connect(param)!= WIFI_SUCCESS) {
-		nrc_usr_print ("[%s] Fail for Wi-Fi connection (results:%d)\n", __func__);
-		return RUN_FAIL;
+	/* connect to AP */
+	for(count = 0 ; count < MAX_RETRY ; ){
+		if (wifi_connect(param)== WIFI_SUCCESS){
+			nrc_usr_print ("[%s] connect to %s successfully !! \n", __func__, param->ssid);
+			break;
+		}
+
+		if (++count == MAX_RETRY){
+			nrc_usr_print ("[%s] Fail for connection %s\n", __func__, param->ssid);
+			return -1;
+		}
+
+		_delay_ms(1000);
 	}
 
-	network_index = nrc_wifi_get_network_index();
+	/* check the IP is ready */
+	while(1){
+		if(nrc_wifi_get_state(&wifi_state) != WIFI_SUCCESS) {
+			nrc_usr_print("[%s] Fail to get state\n", __func__);
+			return -1;
+		}
 
-	if (nrc_wifi_get_state() != WLAN_STATE_GET_IP) {
-		nrc_usr_print("[%s] Fail to connect or get IP !\n",__func__);
-		return RUN_FAIL;
+		if (wifi_state == WIFI_STATE_CONNECTED)
+			nrc_usr_print("[%s] IP Address ...\n", __func__);
+		else if (wifi_state == WIFI_STATE_GET_IP){
+			char* ip_addr = NULL;
+
+			if (nrc_wifi_get_ip_address(&ip_addr) != WIFI_SUCCESS){
+				nrc_usr_print("[%s] Fail to get IP address\n", __func__);
+				return -1;
+			}
+
+			nrc_usr_print("[%s] IP Address : %s\n", __func__, ip_addr);
+			break;
+		}
+		else {
+			nrc_usr_print("[%s] Disconnected from AP!!\n", __func__);
+			return 0;
+		}
+
+		_delay_ms(1000);
 	}
 
+	if (xTaskCreate(tcp_server_task, "tcp_server_task", 1024,
+				(void*)param, uxTaskPriorityGet(NULL), NULL) == pdPASS)
+		param->test_running = 1;
 
-
-	xTaskCreate(tcp_server_task, "tcp_server_task", 4096, (void*)param, 5, NULL);
 	while(param->test_running){
 		_delay_ms(1);
 	}
 
-	wifi_state = nrc_wifi_get_state();
-	if (wifi_state == WLAN_STATE_GET_IP || wifi_state == WLAN_STATE_CONNECTED) {
+	if(nrc_wifi_get_state(&wifi_state) != WIFI_SUCCESS){
+		nrc_usr_print("[%s] Fail to get state\n", __func__);
+		return -1;
+	}
+
+	if (wifi_state == WIFI_STATE_GET_IP || wifi_state == WIFI_STATE_CONNECTED) {
+		int network_index;
 		nrc_usr_print("[%s] Trying to DISCONNECT... for exit\n",__func__);
+		if (nrc_wifi_get_network_index(&network_index) != WIFI_SUCCESS){
+			nrc_usr_print("[%s] Fail to get network index\n", __func__);
+			return -1;
+		}
 		if (nrc_wifi_disconnect(network_index) != WIFI_SUCCESS) {
-			nrc_usr_print ("[%s] Fail for Wi-Fi disconnection (results:%d)\n", __func__);
-			return RUN_FAIL;
+			nrc_usr_print ("[%s] Fail for Wi-Fi disconnection\n", __func__);
+			return -1;
 		}
 	}
 
 	if (error_val < 0)
-		return RUN_FAIL;
+		return -1;
 
-	nrc_usr_print("[%s] End of user_init!! \n",__func__);
-
-	return RUN_SUCCESS;
+	return 0;
 }
+
 
 /******************************************************************************
  * FunctionName : user_init
@@ -271,18 +333,17 @@ int run_sample_tcp_server(WIFI_CONFIG* param)
  *******************************************************************************/
 void user_init(void)
 {
-	int ret = 0;
+	nrc_err_t ret;
 	WIFI_CONFIG* param;
 
-	nrc_uart_console_enable();
-
-	param = nrc_mem_malloc(WIFI_CONFIG_SIZE);
+	param = malloc(WIFI_CONFIG_SIZE);
 	memset(param, 0x0, WIFI_CONFIG_SIZE);
 
 	set_wifi_config(param);
 	ret = run_sample_tcp_server(param);
 	nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
 	if(param){
-		nrc_mem_free(param);
+		free(param);
 	}
 }
+

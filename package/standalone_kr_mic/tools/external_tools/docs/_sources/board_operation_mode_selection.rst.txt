@@ -1,0 +1,45 @@
+.. _board_operation_mode_selection:
+
+NRC Board Operation Mode Selection and Power Supply
+===================================================
+The DIP switch on the NRC board can be configured to select one of the following three modes of operation:
+
+.. warning::
+   The DIP switch configurations described below assume that the board is oriented in a way that the **printed numeric indices** are positioned below, not above the DIP switch box. Different board versions may have different up-down DIP switch box orientation, even if the relative DIP switch box locations on the board remain the same.
+
+1. Firmware Upload / RAM Operation
+----------------------------------
+    
+    .. image:: images/dip_switch_download.png
+
+DIP Switch Configuration: **HHHLLH**
+
+This mode is used to both upload a RAM-mode firmware binary to the RAM for immediate execution or flash an XIP standalone firmware binary or other information to the non-volatile flash memory.
+
+A 5V adapter is used to directly supply power to the NRC board.
+
+2. Standalone Operation
+-----------------------
+    
+    .. image:: images/dip_switch_standalone.png
+
+DIP Switch Configuration: **HLLHLH**
+
+This mode is used to run the standalone application contained in the stored XIP standalone firmware binary. 
+
+A 5V adapter is used to directly supply power to the NRC board.
+
+
+3. Raspberry Pi Host Operation
+------------------------------
+
+    .. image:: images/dip_switch_host.png
+
+DIP Switch Configuration: **HHLLLH**
+
+This mode is used to run the NRC board with a Raspberry Pi Host physically mounted below the module.
+
+The Raspberry Pi host supplies power to the NRC board.
+
+.. note::
+   Most NRC tools only use **Firmware Upload / RAM Operation** mode. The exact modes of operation used by a given tool will be specified in the usage documentation.

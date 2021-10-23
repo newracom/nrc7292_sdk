@@ -1,0 +1,20 @@
+#
+# Test ID : AT-TC-SOCKET-01
+#
+# Test Case : Configuration 
+#
+# Test Configuration
+#
+#  - Testbed AP
+#
+#  - STAUT
+#
+
+ECHO "Step 1"
+AT+SRXLOGLEVEL=1
+AT+SRXLOGLEVEL?
+
+ECHO "Step 2"
+AT+STIMEOUT="SOPEN",30
+AT+STIMEOUT="SSEND",1
+AT+STIMEOUT?

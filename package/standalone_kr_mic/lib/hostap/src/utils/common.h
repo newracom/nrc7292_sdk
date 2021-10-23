@@ -89,6 +89,12 @@ struct sockaddr_storage {
 	short ss_family;
 };
 
+struct sockaddr {
+  uint8_t     sa_len;
+  uint8_t     sa_family;
+  char        sa_data[14];
+};
+
 static inline unsigned short bswap_16(unsigned short v)
 {
 	return ((v & 0xff) << 8) | (v >> 8);
@@ -112,6 +118,20 @@ static inline unsigned int bswap_32(unsigned int v)
 #define ntohl		bswap_32
 #endif
 
+#define __SOCKADDR_COMMON_SIZE	(sizeof (unsigned short int))
+struct sockaddr_in
+  {
+    in_port_t sin_port;			/* Port number.  */
+    struct in_addr sin_addr;		/* Internet address.  */
+
+    /* Pad to size of `struct sockaddr'.  */
+    unsigned char sin_zero[sizeof (struct sockaddr) -
+			   __SOCKADDR_COMMON_SIZE -
+			   sizeof (in_port_t) -
+			   sizeof (struct in_addr)];
+  };
+
+
 extern int errno;
 
 static inline char* inet_ntoa(struct in_addr in)
@@ -124,6 +144,32 @@ static int inet_aton(const char *cp, struct in_addr *ap)
 {
 	// TODO:
 	return 0;
+}
+
+static inline char *
+inet_ntop(int af, const void *src, char *dst, socklen_t size)
+{
+  char *ret = NULL;
+  int size_int = (int)size;
+  if (size_int < 0) {
+    return NULL;
+  }
+  switch (af) {
+#if LWIP_IPV4
+    case AF_INET:
+      ret = ip4addr_ntoa_r((const ip4_addr_t *)src, dst, size_int);
+      break;
+#endif
+#if LWIP_IPV6
+    case AF_INET6:
+      ret = ip6addr_ntoa_r((const ip6_addr_t *)src, dst, size_int);
+      break;
+#endif
+    default:
+	  return NULL;
+      break;
+  }
+  return ret;
 }
 
 #define os_snprintf		snprintf
@@ -172,6 +218,22 @@ static int inet_aton(const char *cp, struct in_addr *ap)
 #ifdef IEEE80211_FC
 #undef IEEE80211_FC
 #endif
+#ifdef CONFIG_WPS_NFC
+#undef CONFIG_WPS_NFC
+#endif
+
+#define IP4ADDR_STRLEN_MAX    16
+#define IP6ADDR_STRLEN_MAX    46
+
+#ifndef INET_ADDRSTRLEN
+#define INET_ADDRSTRLEN     IP4ADDR_STRLEN_MAX
+#endif
+#if LWIP_IPV6
+#ifndef INET6_ADDRSTRLEN
+#define INET6_ADDRSTRLEN    IP6ADDR_STRLEN_MAX
+#endif
+#endif
+
 #endif /* __FREERTOS__ */
 
 #ifdef __rtems__
@@ -713,5 +775,7 @@ void * __hide_aliasing_typecast(void *foo);
 #else /* CONFIG_VALGRIND */
 #define WPA_MEM_DEFINED(ptr, len) do { } while (0)
 #endif /* CONFIG_VALGRIND */
+
+#define IANA_SECP256R1 19
 
 #endif /* COMMON_H */

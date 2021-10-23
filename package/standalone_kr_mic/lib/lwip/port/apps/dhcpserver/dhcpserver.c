@@ -43,7 +43,7 @@ static bool renew = false;
 #define DHCPS_LEASE_TIME_DEF	(120)
 u32_t dhcps_lease_time = DHCPS_LEASE_TIME_DEF;  //minute
 
-static u8_t softap_if_id = 0; // index of SOFTAP_IF
+static int softap_if_id = -1; // index of SOFTAP_IF
 
 /******************************************************************************
  * FunctionName : node_insert_to_list
@@ -899,54 +899,55 @@ void dhcps_stop(void)
 		mem_free(pback_node);
 		pback_node = NULL;
 	}
+	softap_if_id = -1;
 }
 
 bool wifi_softap_set_dhcps_lease(struct dhcps_lease* please)
 {
-	    struct ip_info info;
-	    u32_t softap_ip = 0;
-	    u32_t start_ip = 0;
-	    u32_t end_ip = 0;
+	struct ip_info info;
+	u32_t softap_ip = 0;
+	u32_t start_ip = 0;
+	u32_t end_ip = 0;
 
-	    u8_t opmode = wifi_get_opmode();
+	u8_t opmode = wifi_get_opmode();
 
-	    if (opmode == WIFI_STATION_MODE || opmode == WIFI_NULL_MODE) {
+	if (opmode == WIFI_STATION_MODE || opmode == WIFI_NULL_MODE) {
 		return false;
-	    }
+	}
 
-	    if (please == NULL || wifi_softap_dhcps_status() == DHCP_STARTED) {
+	if (please == NULL || wifi_softap_dhcps_status() == DHCP_STARTED) {
 		return false;
-	    }
-	    if (please->enable) {
-		        bzero(&info, sizeof(struct ip_info));
-		        wifi_get_ip_info(softap_if_id, &info);
-		        softap_ip = htonl(info.ip.addr);
-		        start_ip = htonl(please->start_ip.addr);
-		        end_ip = htonl(please->end_ip.addr);
+	}
 
-		        /*config ip information can't contain local ip*/
-		        if ((start_ip <= softap_ip) && (softap_ip <= end_ip)) {
-				return false;
-		        }
+	if (please->enable) {
+		bzero(&info, sizeof(struct ip_info));
+		wifi_get_ip_info(softap_if_id, &info);
+		softap_ip = htonl(info.ip.addr);
+		start_ip = htonl(please->start_ip.addr);
+		end_ip = htonl(please->end_ip.addr);
 
-		        /*config ip information must be in the same segment as the local ip*/
-		        softap_ip >>= 8;
+		/*config ip information can't contain local ip*/
+		if ((start_ip <= softap_ip) && (softap_ip <= end_ip)) {
+			return false;
+		}
 
-		        if ((start_ip >> 8 != softap_ip)
-		                || (end_ip >> 8 != softap_ip)) {
-				return false;
-		        }
+		/*config ip information must be in the same segment as the local ip*/
+		softap_ip >>= 8;
 
-		        if (end_ip - start_ip > DHCPS_MAX_LEASE) {
-				return false;
-		        }
-		        bzero(&dhcps_lease, sizeof(dhcps_lease));
-		        dhcps_lease.start_ip.addr = please->start_ip.addr;
-		        dhcps_lease.end_ip.addr = please->end_ip.addr;
-	    }
+		if ((start_ip >> 8 != softap_ip)|| (end_ip >> 8 != softap_ip)) {
+			return false;
+		}
 
-	    dhcps_lease.enable = please->enable;
-	    return true;
+		if (end_ip - start_ip > DHCPS_MAX_LEASE) {
+			return false;
+		}
+		bzero(&dhcps_lease, sizeof(dhcps_lease));
+		dhcps_lease.start_ip.addr = please->start_ip.addr;
+		dhcps_lease.end_ip.addr = please->end_ip.addr;
+	}
+
+	dhcps_lease.enable = please->enable;
+	return true;
 }
 
 /******************************************************************************
@@ -1048,7 +1049,7 @@ void dhcps_coarse_tmr(void)
 	}
 
 	if (num_dhcps_pool >= MAX_STATION_NUM) {
-	kill_oldest_dhcps_pool();
+		kill_oldest_dhcps_pool();
 	}
 }
 
@@ -1117,6 +1118,37 @@ bool wifi_softap_reset_dhcps_lease_time(void)
 u32_t wifi_softap_get_dhcps_lease_time(void) // minute
 {
 	return dhcps_lease_time;
+}
+
+int dhcps_status(void)
+{
+	u8_t num_dhcps_pool = 0;
+	list_node* pback_node = NULL;
+	list_node* pnode = NULL;
+	struct dhcps_pool* pdhcps_pool = NULL;
+	pnode = plist;
+	A("\n-------------------------- DHCP Server Status ------------------------------\n");
+	A(" DHCP Server:%s   \tInterface:%d\n",
+		wifi_softap_dhcps_status()== DHCP_STARTED ? "On":"Off", dhcps_get_interface());
+	A(" Lease Time:%d(min)\tMax Lease Number:%d\n", dhcps_lease_time, DHCPS_MAX_LEASE);
+	while (pnode != NULL) {
+		pdhcps_pool = pnode->pnode;
+		A("[%2d] MAC address : " MACSTR "\t", num_dhcps_pool, MAC2STR(pdhcps_pool->mac));
+		A("ip address : %"U16_F".%"U16_F".%"U16_F".%"U16_F"\n",
+			ip4_addr1_16(&pdhcps_pool->ip), ip4_addr2_16(&pdhcps_pool->ip),
+			ip4_addr3_16(&pdhcps_pool->ip), ip4_addr4_16(&pdhcps_pool->ip));
+
+		pnode = pnode ->pnext;
+		num_dhcps_pool ++;
+	}
+	A("----------------------------------------------------------------------------\n");
+
+	return 0;
+}
+
+int dhcps_get_interface(void)
+{
+	return softap_if_id;
 }
 
 #endif

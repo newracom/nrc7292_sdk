@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2020 Newracom, Inc.
+ * Copyright (c) 2021 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -30,10 +30,13 @@
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
 
-#define REMOTE_PORT 8088
+
+#define MAX_RETRY 5
 #define RECV_BUF_SIZE (1024 * 2)
 #define UDP_DGRAM_SIZE 1470
 #define RECVFROM_WAITING_TIME 0 /* seconds */
+#define UDP_CLIENT_TESTING_TIME 10000 /* msec */
+
 
 //#define TICK_TOK_TEST_ENABLE 1
 #if defined(TICK_TOK_TEST_ENABLE)
@@ -102,13 +105,13 @@ static int recv_from_timeout(int sockfd, long sec, long usec)
 
 static void udp_client_task(void *pvParameters)
 {
+	WIFI_CONFIG *param = pvParameters;
+	tWIFI_STATE_ID wifi_state;
 	char rx_buffer[RECV_BUF_SIZE];
 	int ret = 0;
 	int destlen;
 	int sockfd;
 	struct sockaddr_in dest_addr;
-	WIFI_CONFIG *param = pvParameters;
-	int count = 0;
 
 	uint32_t total_sent =0;
 	uint32_t start_time =0;
@@ -131,12 +134,29 @@ static void udp_client_task(void *pvParameters)
 
 	// Filling server information
 	dest_addr.sin_family = AF_INET;
-	dest_addr.sin_port = htons(REMOTE_PORT);
+	dest_addr.sin_port = htons(param->remote_port);
 	dest_addr.sin_addr.s_addr = inet_addr((const char*)param->remote_addr);
 
 	destlen = sizeof(dest_addr);
+	nrc_usr_print("[UDP Client]\n");
+	nrc_usr_print("Connection to %s:%d, Duration:%d[sec]\n",  inet_ntoa(dest_addr.sin_addr),
+		ntohs(dest_addr.sin_port), UDP_CLIENT_TESTING_TIME/1000);
+
 	while (1) {
-		_delay_ms(1000);
+		if(nrc_wifi_get_state(&wifi_state) != WIFI_SUCCESS) {
+			nrc_usr_print("[%s] Fail to get state\n", __func__);
+			goto exit;
+		}
+
+		switch (wifi_state){
+			case WIFI_STATE_CONNECTED:
+			case WIFI_STATE_GET_IP:
+				break;
+			default:
+				nrc_usr_print("[%s] Disconnected from AP!!\n", __func__);
+				goto exit;
+		}
+
 #if defined(TICK_TOK_TEST_ENABLE)
 		int flag = count%2;
 		ret = sendto(sockfd, (const char *)message[flag], sizeof(message[flag])+1, 0,
@@ -163,18 +183,18 @@ static void udp_client_task(void *pvParameters)
 					(struct sockaddr *) &dest_addr, (socklen_t *)&destlen);
 		}
 
-		if(++count == param->count && param->count != -1){
-			end_time = sys_now();
+		end_time = sys_now();
+		if((end_time - start_time) >=  param->duration){
 			nrc_usr_print("-------------------------------------------------------------------------------------\n");
 			nrc_usr_print("[UDP Client]\n");
-			nrc_usr_print("%lu [Bytes], Duration:%d [msec], %d [kbits/s]\n", \
-				 total_sent, end_time, (total_sent * 8 / end_time));
+			nrc_usr_print("%lu [Bytes], Duration:%lu [msec], %ld [kbits/s] Interval:%d [msec]\n", \
+				 total_sent, (end_time - start_time), (total_sent * 8 / (end_time - start_time)), param->interval);
 			nrc_usr_print("-------------------------------------------------------------------------------------\n");
 			break;
 		}
-	}
 
-	_delay_ms(5000);
+		_delay_ms(param->interval);
+	}
 
 	error_val = 0;
 
@@ -194,55 +214,92 @@ exit:
  * Parameters   : WIFI_CONFIG
  * Returns      : 0 or -1 (0: success, -1: fail)
  *******************************************************************************/
-int  run_sample_udp_client(WIFI_CONFIG *param)
+nrc_err_t run_sample_udp_client(WIFI_CONFIG *param)
 {
-	int i = 0;
-	int count = 0;
-	int interval = 0;
-	int network_index = 0;
-	int wifi_state = WLAN_STATE_INIT;
+	tWIFI_STATE_ID wifi_state = WIFI_STATE_INIT;
+	int count;
 
 	nrc_usr_print("[%s] Sample App for run_sample_udp_client \n",__func__);
 
-	count = param->count;
-	interval = param->interval;
-
+	/* set initial wifi configuration */
 	if (wifi_init(param)!= WIFI_SUCCESS) {
 		nrc_usr_print ("[%s] ASSERT! Fail for init\n", __func__);
-		return RUN_FAIL;
+		return -1;
 	}
 
-	/* 1st trial to connect */
-	if (wifi_connect(param)!= WIFI_SUCCESS) {
-		nrc_usr_print ("[%s] Fail for Wi-Fi connection (results:%d)\n", __func__);
-		return RUN_FAIL;
+	/* connect to AP */
+	for(count = 0 ; count < MAX_RETRY ; ){
+		if (wifi_connect(param)== WIFI_SUCCESS){
+			nrc_usr_print ("[%s] connect to %s successfully !! \n", __func__, param->ssid);
+			break;
+		}
+
+		if (++count == MAX_RETRY){
+			nrc_usr_print ("[%s] Fail for connection %s\n", __func__, param->ssid);
+			return -1;
+		}
+
+		_delay_ms(1000);
 	}
 
-	if (nrc_wifi_get_state() != WLAN_STATE_GET_IP) {
-		nrc_usr_print("[%s] Fail to connect or get IP !\n",__func__);
-		return RUN_FAIL;
+	/* check the IP is ready */
+	while(1){
+		if(nrc_wifi_get_state(&wifi_state) != WIFI_SUCCESS) {
+			nrc_usr_print("[%s] Fail to get state\n", __func__);
+			return -1;
+		}
+
+		if (wifi_state == WIFI_STATE_CONNECTED)
+			nrc_usr_print("[%s] IP Address ...\n", __func__);
+		else if (wifi_state == WIFI_STATE_GET_IP){
+			char* ip_addr = NULL;
+
+			if (nrc_wifi_get_ip_address(&ip_addr) != WIFI_SUCCESS){
+				nrc_usr_print("[%s] Fail to get IP address\n", __func__);
+				return -1;
+			}
+
+			nrc_usr_print("[%s] IP Address : %s\n", __func__, ip_addr);
+			break;
+		}
+		else {
+			nrc_usr_print("[%s] Disconnected from AP!!\n", __func__);
+			return 0;
+		}
+
+		_delay_ms(1000);
 	}
 
-	xTaskCreate(udp_client_task, "udp_client", 4096, (void*)param, 5, NULL);
+	if (xTaskCreate(udp_client_task, "udp_client", 1024,
+				(void*)param, uxTaskPriorityGet(NULL), NULL) == pdPASS)
+		param->test_running = 1;
+
 	while(param->test_running){
-		_delay_ms(1);
+		_delay_ms(500);
 	}
 
-	wifi_state = nrc_wifi_get_state();
-	if (wifi_state == WLAN_STATE_GET_IP || wifi_state == WLAN_STATE_CONNECTED) {
+	if(nrc_wifi_get_state(&wifi_state) != WIFI_SUCCESS)
+		return -1;
+
+	if (wifi_state == WIFI_STATE_GET_IP || wifi_state == WIFI_STATE_CONNECTED) {
+		int network_index;
 		nrc_usr_print("[%s] Trying to DISCONNECT... for exit\n",__func__);
+		if (nrc_wifi_get_network_index(&network_index) != WIFI_SUCCESS){
+			nrc_usr_print("[%s] Fail to get network index\n", __func__);
+			return -1;
+		}
 		if (nrc_wifi_disconnect(network_index) != WIFI_SUCCESS) {
-			nrc_usr_print ("[%s] Fail for Wi-Fi disconnection (results:%d)\n", __func__);
-			return RUN_FAIL;
+			nrc_usr_print ("[%s] Fail for Wi-Fi disconnection\n", __func__);
+			return -1;
 		}
 	}
 
 	if (error_val < 0)
-		return RUN_FAIL;
+		return -1;
 
 	nrc_usr_print("[%s] End of run_sample_udp_client!! \n",__func__);
 
-	return RUN_SUCCESS;
+	return 0;
 }
 
 
@@ -254,18 +311,19 @@ int  run_sample_udp_client(WIFI_CONFIG *param)
  *******************************************************************************/
 void user_init(void)
 {
-	int ret = 0;
+	nrc_err_t ret;
 	WIFI_CONFIG* param;
 
-	nrc_uart_console_enable();
-
-	param = nrc_mem_malloc(WIFI_CONFIG_SIZE);
+	param = malloc(WIFI_CONFIG_SIZE);
 	memset(param, 0x0, WIFI_CONFIG_SIZE);
 
 	set_wifi_config(param);
+	param->duration = UDP_CLIENT_TESTING_TIME;
+
 	ret = run_sample_udp_client(param);
 	nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
 	if(param){
-		nrc_mem_free(param);
+		free(param);
 	}
 }
+

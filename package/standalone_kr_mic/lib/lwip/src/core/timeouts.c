@@ -97,7 +97,7 @@ const struct lwip_cyclic_timer lwip_cyclic_timers[] = {
 #endif /* LWIP_DHCP */
 #ifdef NRC_LWIP
 #if LWIP_DHCPS
-  {DHCP_COARSE_TIMER_MSECS, HANDLER(dhcps_coarse_tmr)},
+  {DHCPS_COARSE_TIMER_MSECS, HANDLER(dhcps_coarse_tmr)},
 #endif
 #endif /* NRC_LWIP */
 #if LWIP_AUTOIP

@@ -15,6 +15,12 @@
 #define NULL ((void*)0)
 #endif
 
+#if defined (INCLUDE_RUNRAM)
+#define ATTR_RUNRAM		__attribute__((section(".run_ram")))
+#else
+#define ATTR_RUNRAM
+#endif
+
 /*****************************************************************************************************************
 * Global Definition
 ******************************************************************************************************************/
@@ -534,6 +540,9 @@ typedef struct {
 #define SETPEND  (*((volatile uint32_t *)(0xE000E200)))
 #define CLRPEND  (*((volatile uint32_t *)(0xE000E280)))
 
+#if defined(CPU_CM3)
+#define VTOR (*((volatile uint32_t *)(0xE000ED08)))
+#endif
 #define SCR  (*((volatile uint32_t *)(0xE000ED10)))
 
 
@@ -668,6 +677,17 @@ struct sys_nonvolatile {
 	uint32_t n_restore;
 };
 
+typedef struct {
+	volatile unsigned long stack[8];
+	volatile unsigned long CFSR;		// Configurable Fault Status
+	volatile unsigned long HFSR;		// Hard Fault Status
+	volatile unsigned long DFSR;		// Debug Fault Status
+	volatile unsigned long AFSR;		// Auxiliary Fault Status
+	volatile unsigned long BFAR;		// Bus Fault Address
+	volatile unsigned long MMAR;		// MemManage Fault Address
+	volatile unsigned long ICSR;		// Interrupt Control and State
+} core_reg_t;
+
 //===================================================================================================================
 // Host Interface
 //===================================================================================================================
@@ -794,9 +814,10 @@ typedef struct {
 #define RegPMC_STATUS0       	(*((volatile uint32_t *)(PMC_BASE_ADDR + 0x10)))
 #define RegPMC_STATUS1       	(*((volatile uint32_t *)(PMC_BASE_ADDR + 0x14)))
 #define RegPMC_STATUS2       	(*((volatile uint32_t *)(PMC_BASE_ADDR + 0x18)))
-#define RegPMC_PWR_SW_MASk     	(*((volatile uint32_t *)(PMC_BASE_ADDR + 0x20)))
+#define RegPMC_PWR_SW_MASK     	(*((volatile uint32_t *)(PMC_BASE_ADDR + 0x20)))
 #define RegPMC_PWR_MANUAL_EN    (*((volatile uint32_t *)(PMC_BASE_ADDR + 0x24)))
 #define RegPMC_PWR_MANUAL     	(*((volatile uint32_t *)(PMC_BASE_ADDR + 0x28)))
+#define RegPMC_ISO_MANUAL     	(*((volatile uint32_t *)(PMC_BASE_ADDR + 0x2C)))
 #define RegPMC_ETC_CTRL			(*((volatile uint32_t *)(PMC_BASE_ADDR + 0x30)))
 #define RegPMC_PWR_ALARM		(*((volatile uint32_t *)(PMC_BASE_ADDR + 0x34)))
 #define RegPMC_PWR_ALARM_STATS	(*((volatile uint32_t *)(PMC_BASE_ADDR + 0x38)))
@@ -847,8 +868,8 @@ typedef union {
 
 typedef union {
 	struct {
-		uint32_t interrupt 		: 4;
-		uint32_t reserved		: 28;
+		uint32_t interrupt 		: 8;
+		uint32_t reserved		: 24;
 	} bit;
 	uint32_t word;
 } pmc_status0_t;
@@ -968,6 +989,7 @@ typedef struct {
 #define RegRTC_OFFSET_COMPENSATION   		(*((volatile uint32_t *)(RTC_BASE_ADDR + 0x14)))
 #define RegRTC_LOAD_CNT_H   				(*((volatile uint32_t *)(RTC_BASE_ADDR + 0x18)))
 #define RegRTC_LOAD_CNT_L   				(*((volatile uint32_t *)(RTC_BASE_ADDR + 0x1C)))
+#define RegRTC_INT_STATUS 	 				(*((volatile uint32_t *)(RTC_BASE_ADDR + 0x30)))
 
 #define RegRTC_FREQ_OFFSET_ESTIMATOR_CTRL	(*((volatile uint32_t *)(RTC_CAL_BASE_ADDR + 0x00)))
 #define RegRTC_TRACKING_INCREMENT			(*((volatile uint32_t *)(RTC_CAL_BASE_ADDR + 0x04)))
@@ -1029,6 +1051,15 @@ typedef struct {
 #define RegSCFG_BR					(*((volatile uint32_t *)(SCFG_BASE_ADDR + 0x18)))
 #define RegSCFG_XIP_DEEPSLEEP		(*((volatile uint32_t *)(SCFG_BASE_ADDR + 0x1C)))
 
+#define REMAP_XIP		(0)
+#if defined(CPU_CM3)
+#define REMAP_ROM		(2)
+#else
+#define REMAP_ROM		(1)
+#endif
+#define REMAP_SRAM_0	(3)
+#define REMAP_SRAM_2	(4)
+
 //===================================================================================================================
 // RF SPI  Defines
 //===================================================================================================================
@@ -1040,5 +1071,6 @@ typedef struct {
 void system_default_setting(int vif_id);
 void system_print_logo();
 char *system_prompt_func();
+void system_get_core_reg(core_reg_t *core_reg);
 
 #endif

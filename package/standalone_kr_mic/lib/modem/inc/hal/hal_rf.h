@@ -62,17 +62,14 @@ void nrf_filter_bw(uint32_t bw);
 void nrf_self_trx_cal(void);
 void nrf_self_rxdc_cal(void);
 void nrf_self_txlo_cal(void);
-#if defined(NRF_1M_BW_CENTER_FREQ)
-void nrf_self_tx_cal(uint8_t, uint8_t);
-void nrf_self_f_tx_cal(uint8_t, uint8_t);
-#else
 void nrf_self_tx_cal(uint8_t);
-#endif
 void nrf_spi_write(uint32_t addr, uint32_t wdata);
 void nrf_pms_spi_write(uint32_t addr, uint32_t wdata);
+void nrf_pms_spi_write_7292(uint32_t addr, uint32_t wdata, uint8_t* result);
 uint32_t nrf_channel_freq_find(uint32_t ch_idx);
 uint32_t nrf_spi_read(uint32_t addr);
 uint32_t nrf_pms_spi_read(uint32_t addr);
+uint32_t nrf_pms_spi_read_7292(uint32_t addr, uint8_t* result);
 uint8_t nrf_pll_lock_flag(void);
 void nrf_loiqcal_loopback(uint32_t cal_mode);
 void nrf_cfo_cal(double cfo_ppm, uint32_t *cfo_reg);
@@ -94,7 +91,6 @@ void update_cal_info_tx_pwr_tbl(uint8_t index, int16_t value);
 void update_cal_info_freq_pwr_delta_tbl(uint8_t index, int16_t value);
 void update_cal_info_country(uint8_t* code);
 void show_cal_info(void);
-int hal_rf_get_board(void);
 
 #if defined( NRC7292_LMACTEST_FREERTOS )
 void nrf_set_test_mode(int mode);

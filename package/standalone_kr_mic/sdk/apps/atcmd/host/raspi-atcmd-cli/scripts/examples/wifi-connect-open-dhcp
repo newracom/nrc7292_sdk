@@ -1,7 +1,8 @@
 
+AT
 AT+WDISCONN
 
-ECHO "Run an AP in open mode."
+ECHO "Run an AP in OPEN."
 ECHO " - SSID : halow_atcmd_open"
 ECHO " - IP : 192.168.200.1"
 HOLD
@@ -9,4 +10,5 @@ HOLD
 AT+WSCAN
 AT+WDISCONN
 AT+WCONN="halow_atcmd_open"
+AT+WCONN?
 AT+WDHCP

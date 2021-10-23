@@ -34,7 +34,7 @@
  * Parameters   : count(test count), interval(test interval)
  * Returns      : 0 or -1 (0: success, -1: fail)
  *******************************************************************************/
-int run_sample_adc(int count, int interval)
+nrc_err_t run_sample_adc(int count, int interval)
 {
 	bool flag = false;
 	uint16_t data = 0;
@@ -42,22 +42,22 @@ int run_sample_adc(int count, int interval)
 	int i = 0;
 
 	nrc_usr_print("[%s] Sample App for ADC API \n", __func__);
-	nrc_nadc_init();
+	nrc_adc_init();
 	_delay_ms(100);
 
 	for(i=0; i<count; i++) {
 		nrc_usr_print("[%s] ", __func__);
 
 		for (id = ADC1; id <= ADC3 ; id++) {
-			data = nrc_nadc_get_data(id);
+			nrc_adc_get_data(id, &data);
 			nrc_usr_print("CH%d=%03d  ", id, data);
 		}
 		nrc_usr_print("\n");
 		_delay_ms(interval);
 	}
-	nrc_nadc_fini();
+	nrc_adc_deinit();
 	nrc_usr_print("[%s] exit \n",__func__);
-	return RUN_SUCCESS;
+	return NRC_SUCCESS;
 }
 
 
@@ -69,7 +69,7 @@ int run_sample_adc(int count, int interval)
  *******************************************************************************/
 void user_init(void)
 {
-	int ret = 0;
+	nrc_err_t ret;
 
 	//Enable Console for Debugging
 	nrc_uart_console_enable();

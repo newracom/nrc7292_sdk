@@ -158,8 +158,10 @@ void * __attribute__ ((noinline)) os_malloc(size_t size)
 
 void * os_realloc(void *ptr, size_t size)
 {
+	void *ret = os_malloc(size);
+	os_memcpy(ret, ptr, size);
 	os_free(ptr);
-	return os_malloc(size);
+	return ret;
 }
 
 void os_free(void *ptr)

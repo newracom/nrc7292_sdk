@@ -3,6 +3,9 @@
 
 #include "system.h"
 
+#define SSP_READ_BIT  1
+#define SSP_WRITE_BIT 0
+
 enum spi_mode_e {
     SPI_SLAVE = 0,
     SPI_MASTER = 1
@@ -27,6 +30,7 @@ bool nrc_ssp_init(uint8_t ch, enum spi_cpol_e cpol, enum spi_cpha_e cpha, enum s
 void nrc_ssp(uint8_t ch, bool enable);
 void nrc_ssp_deinit(uint8_t ch);
 uint32_t nrc_ssp_xfer(uint8_t ch, uint8_t *wbuffer, uint8_t *rbuffer, size_t size);
+uint32_t nrc_ssp_xfer_custom(uint8_t ch, uint32_t wr, uint32_t addr, uint8_t addr_size, uint32_t *data, size_t data_size_in_bytes);
 void nrc_ssp_dma(uint8_t ch, uint32_t id, bool enable);
 uint32_t nrc_ssp_int_status(uint8_t ch);
 void nrc_ssp_int(uint8_t ch, uint32_t id, bool enable);

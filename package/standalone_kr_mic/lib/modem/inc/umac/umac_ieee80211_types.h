@@ -589,6 +589,17 @@ typedef struct {
 	edca_param_record   ac_vo;
 } ie_edca_parameter_set;
 
+// EID 37 : WLAN_EID_CHANNEL_SWITCH_ANNOUNCEMENT
+typedef struct
+{
+	uint8_t		eid;
+	uint8_t		length;
+	uint8_t		mode;
+	uint8_t		channel;
+	uint8_t		ch_switch_cnt;
+}ie_csa;
+
+
 // EID 45 : HT Capabilities
 #define IE_LENGTH_HT_CAPABILITIES	26
 typedef  struct {
@@ -633,6 +644,17 @@ typedef struct {
 	uint8_t		timeout_interval_type;
 	uint32_t	timeout_interval;
 } ie_timeout_interval;
+
+// EID 60 : WLAN_EID_EXT_CHANNEL_SWITCH_ANNOUNCEMENT
+typedef struct
+{
+	uint8_t		eid;
+	uint8_t		length;
+	uint8_t		mode;
+	uint8_t		class;
+	uint8_t		channel;
+	uint8_t		ch_switch_cnt;
+}ie_ext_csa;
 
 // EID 61: HT OPERATION
 #define IE_LENGTH_HT_OPERATION		22

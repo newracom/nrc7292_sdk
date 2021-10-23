@@ -42,7 +42,9 @@
 #define WAKEUP_GPIO_PIN 15
 #endif /* WAKEUP_GPIO_PIN */
 
-#if defined( READ_I2C_SENSOR_ENABLE )
+#if READ_I2C_SENSOR_ENABLE
+#define I2C_SCL 16
+#define I2C_SDA 17
 #define LIS331HH		(0x30) /* VDD:3.3v, VIL(<0.2*VDD), VIH(>0.8*VDD), VOL(<0.1*VDD), VOH(>0.9*VDD) */
 #endif
 
@@ -72,12 +74,12 @@ static void tcp_client_task(void *pvParameters)
 	WIFI_CONFIG *param = pvParameters;
 	int count = 0;
 	char send_data[] = "This is a power save test application using tcp client";
-#if defined(READ_I2C_SENSOR_ENABLE)
+#if READ_I2C_SENSOR_ENABLE
 	uint8_t value1;
 
 #if defined( LIS331HH )
 	/* SCL = 200kHz */
-	nrc_i2c_init(200000);
+	nrc_i2c_init(I2C_SCL, I2C_SDA, 200000);
 	nrc_i2c_enable(true);
 #endif
 #endif
@@ -109,7 +111,7 @@ static void tcp_client_task(void *pvParameters)
 		nrc_usr_print("Successfully connected\n");
 	}
 
-#if defined(READ_I2C_SENSOR_ENABLE)
+#if READ_I2C_SENSOR_ENABLE
 	i2c_read_reg(LIS331HH, 0x20, &value1);
 
 	/* CTRL_REG1 default value : 0x07 */
@@ -149,37 +151,69 @@ exit:
  * Parameters   : WIFI_CONFIG
  * Returns      : 0 or -1 (0: success, -1: fail)
  *******************************************************************************/
-int  run_sample_ps_tcp_client(WIFI_CONFIG *param)
+nrc_err_t run_sample_ps_tcp_client(WIFI_CONFIG *param)
 {
 	int network_index = 0;
-	int wifi_state = WLAN_STATE_INIT;
+	tWIFI_STATE_ID wifi_state = WIFI_STATE_INIT;
 	int retry_count = 0;
+	SCAN_RESULTS results;
 
 	nrc_usr_print("[%s] Sample App for run_sample_tcp_client \n",__func__);
 
-	if (wifi_init(param)!= WIFI_SUCCESS) {
-		nrc_usr_print ("[%s] ASSERT! Fail for init\n", __func__);
-		return RUN_FAIL;
-	}
+	int i = 0;
+	int ssid_found =false;
 
-	for(retry_count=0; retry_count<MAX_RETRY; retry_count++){
-		if (wifi_connect(param)!= WIFI_SUCCESS) {
-			nrc_usr_print ("[%s] Fail for Wi-Fi connection, retry:%d\n", __func__, retry_count);
-			if (retry_count == MAX_RETRY) {
-				return RUN_FAIL;
-			}
-			_delay_ms(1000);
-		}else{
-			nrc_usr_print ("[%s] Success for Wi-Fi connection\n", __func__);
-			retry_count = 0;
+	/* set initial wifi configuration */
+	while(1){
+		if (wifi_init(param)== WIFI_SUCCESS) {
+			nrc_usr_print ("[%s] wifi_init Success !! \n", __func__);
 			break;
+		} else {
+			nrc_usr_print ("[%s] wifi_init Failed !! \n", __func__);
+			_delay_ms(1000);
 		}
 	}
 
-	/* Check the IP is ready */
+	/* find AP */
 	while(1){
-		wifi_state = nrc_wifi_get_state();
-		if (wifi_state == WLAN_STATE_GET_IP) {
+		if (nrc_wifi_scan() == WIFI_SUCCESS){
+			if (nrc_wifi_scan_results(&results)== WIFI_SUCCESS) {
+				/* Find the ssid in scan results */
+				for(i=0; i<results.n_result ; i++){
+					if(strcmp((char*)param->ssid, (char*)results.result[i].ssid)== 0 ){
+						ssid_found = true;
+						break;
+					}
+	}
+
+				if(ssid_found){
+					nrc_usr_print ("[%s] %s is found \n", __func__, param->ssid);
+					break;
+				}
+			}
+		} else {
+			nrc_usr_print ("[%s] Scan fail !! \n", __func__);
+			_delay_ms(1000);
+		}
+	}
+
+	/* connect to AP */
+	while(1) {
+		if (wifi_connect(param)== WIFI_SUCCESS) {
+			nrc_usr_print ("[%s] connect to %s successfully !! \n", __func__, param->ssid);
+			break;
+		}else{
+			nrc_usr_print ("[%s] Fail for connection %s\n", __func__, param->ssid);
+			_delay_ms(1000);
+		}
+	}
+
+	nrc_wifi_get_network_index(&network_index );
+
+	/* check the IP is ready */
+	while(1){
+		nrc_wifi_get_state(&wifi_state);
+		if (wifi_state == WIFI_STATE_GET_IP) {
 			nrc_usr_print("[%s] IP ...\n",__func__);
 			break;
 		} else{
@@ -196,12 +230,12 @@ int  run_sample_ps_tcp_client(WIFI_CONFIG *param)
 	_delay_ms(5000);
 
 #if defined(WAKEUP_GPIO_PIN)
-	nrc_ps_set_gpio_wakeup_pin(WAKEUP_GPIO_PIN);
+	nrc_ps_set_gpio_wakeup_pin(false, WAKEUP_GPIO_PIN);
 	nrc_ps_set_wakeup_source(WAKEUP_SOURCE_RTC|WAKEUP_SOURCE_GPIO);
 #endif /* defined(WAKEUP_GPIO_PIN) */
 
 	/* 0(Tim), non-zero(Non-Tim)(ms) */
-	nrc_ps_set_sleep(SLEEP_MODE, INTERVAL);
+	nrc_ps_set_sleep(SLEEP_MODE, INTERVAL, 0);
 
 	nrc_usr_print("[%s] End of run_sample_ps_tcp_client!! \n",__func__);
 
@@ -209,7 +243,7 @@ int  run_sample_ps_tcp_client(WIFI_CONFIG *param)
 		_delay_ms(1000);
 	}
 
-	return RUN_SUCCESS;
+	return NRC_SUCCESS;
 }
 
 
@@ -221,7 +255,7 @@ int  run_sample_ps_tcp_client(WIFI_CONFIG *param)
  *******************************************************************************/
 void user_init(void)
 {
-	int ret = 0;
+	nrc_err_t ret;
 	WIFI_CONFIG* param;
 
 	nrc_uart_console_enable();

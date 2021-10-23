@@ -49,7 +49,9 @@
 #include "mesh_mpm.h"
 #include "wmm_ac.h"
 #include "dpp_supplicant.h"
-
+#if defined (CONFIG_SAE) ||defined (CONFIG_OWE)
+#include "driver_nrc_ps.h"
+#endif
 
 #define MAX_OWE_TRANSITION_BSS_SELECT_COUNT 5
 
@@ -2146,6 +2148,10 @@ static int wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 
 int wpa_supplicant_fast_associate(struct wpa_supplicant *wpa_s)
 {
+#ifdef CONFIG_NO_FAST_ASSOC
+	return -1;
+#endif
+
 #ifdef CONFIG_NO_SCAN_PROCESSING
 	return -1;
 #else /* CONFIG_NO_SCAN_PROCESSING */
@@ -2490,13 +2496,25 @@ static int wpa_supplicant_event_associnfo(struct wpa_supplicant *wpa_s,
 #endif /* CONFIG_FILS */
 
 #ifdef CONFIG_OWE
+	int skip_owe_process = 0;
+	/* In case of sending assoc for connection after deep sleep,
+		skip building owe-related elements in assoc req */
 	if (wpa_s->key_mgmt == WPA_KEY_MGMT_OWE &&
-	    (wpa_drv_get_bssid(wpa_s, bssid) < 0 ||
-	     owe_process_assoc_resp(wpa_s->wpa, bssid,
-				    data->assoc_info.resp_ies,
-				    data->assoc_info.resp_ies_len) < 0)) {
-		wpa_supplicant_deauthenticate(wpa_s, WLAN_REASON_UNSPECIFIED);
-		return -1;
+		!wpa_driver_ps_get_recovered()) {
+		skip_owe_process = 1;
+	}
+
+	if (skip_owe_process) {
+		wpa_msg(wpa_s, MSG_INFO, "SME: skip processing owe ie in assoc resp");
+	} else {
+		if ( wpa_s->key_mgmt == WPA_KEY_MGMT_OWE &&
+			(wpa_drv_get_bssid(wpa_s, bssid) < 0 ||
+			owe_process_assoc_resp(wpa_s->wpa, bssid,
+					data->assoc_info.resp_ies,
+					data->assoc_info.resp_ies_len) < 0)) {
+			wpa_supplicant_deauthenticate(wpa_s, WLAN_REASON_UNSPECIFIED);
+			return -1;
+		}
 	}
 #endif /* CONFIG_OWE */
 
@@ -3064,6 +3082,9 @@ static void wpa_supplicant_event_disassoc_finish(struct wpa_supplicant *wpa_s,
 			return; /* P2P group removed */
 		wpas_auth_failed(wpa_s, "WRONG_KEY");
 	}
+
+	wpa_msg(wpa_s, MSG_INFO, "EVENT-DISASSOC-FINISH scanning=%d sched_scanning=%d scan_work=%d",
+			wpa_s->scanning, wpa_s->sched_scanning, (wpa_s->scan_work == NULL) ? 0 : 1);
 	if (!wpa_s->disconnected &&
 	    (!wpa_s->auto_reconnect_disabled ||
 	     wpa_s->key_mgmt == WPA_KEY_MGMT_WPS ||
@@ -3087,9 +3108,12 @@ static void wpa_supplicant_event_disassoc_finish(struct wpa_supplicant *wpa_s,
 			 */
 			fast_reconnect = wpa_s->current_bss;
 			fast_reconnect_ssid = wpa_s->current_ssid;
-		} else if (wpa_s->wpa_state >= WPA_ASSOCIATING)
+		} else if (wpa_s->wpa_state >= WPA_ASSOCIATING){
+			while(wpa_s->scanning){
+				os_sleep(0, 100000);
+			}
 			wpa_supplicant_req_scan(wpa_s, 0, 100000);
-		else
+		}else
 			wpa_dbg(wpa_s, MSG_DEBUG, "Do not request new "
 				"immediate scan");
 	} else {

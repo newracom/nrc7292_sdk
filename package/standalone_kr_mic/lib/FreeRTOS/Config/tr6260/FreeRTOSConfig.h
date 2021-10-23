@@ -200,4 +200,12 @@ received packets. */
 #define configUSE_TICK_HOOK     0
 #endif
 
+/* The priority of the wlan_manager task */
+#if defined (INCLUDE_NEW_TASK_ARCH)
+#define WLAN_MANAGER_TASK_PRIORITY	NRC_TASK_PRIORITY
+#else
+#define WLAN_MANAGER_TASK_PRIORITY	NRC_TASK_PRIORITY-1
+#endif //#if defined (INCLUDE_NEW_TASK_ARCH)
+#define WLAN_MANAGER_STACK_SIZE	( 4096 )
+
 #endif /* FREERTOS_CONFIG_H */

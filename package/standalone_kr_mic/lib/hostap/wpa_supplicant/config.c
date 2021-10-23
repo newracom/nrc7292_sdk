@@ -18,7 +18,8 @@
 #include "p2p/p2p.h"
 #include "fst/fst.h"
 #include "config.h"
-
+#include "system_modem_api.h"
+#include "driver_nrc_ps.h"
 
 #if !defined(CONFIG_CTRL_IFACE) && defined(CONFIG_NO_CONFIG_WRITE)
 #define NO_CONFIG_WRITE
@@ -556,8 +557,8 @@ static int wpa_config_parse_psk(const struct parse_data *data,
 
 	str_clear_free(ssid->passphrase);
 	ssid->passphrase = NULL;
-
 	ssid->psk_set = 1;
+	system_modem_api_ps_set_pmk(ssid->psk, PMK_LEN);
 	wpa_hexdump_key(MSG_MSGDUMP, "PSK", ssid->psk, PMK_LEN);
 	return 0;
 }
@@ -1543,7 +1544,9 @@ static int wpa_config_parse_eap(const struct parse_data *data,
 			ssid->leap++;
 		else
 			ssid->non_leap++;
+
 		num_methods++;
+
 		if (last)
 			break;
 		start = end + 1;
@@ -1551,13 +1554,16 @@ static int wpa_config_parse_eap(const struct parse_data *data,
 	os_free(buf);
 
 	tmp = methods;
+
 	methods = os_realloc_array(methods, num_methods + 1, sizeof(*methods));
 	if (methods == NULL) {
 		os_free(tmp);
 		return -1;
 	}
+	
 	methods[num_methods].vendor = EAP_VENDOR_IETF;
 	methods[num_methods].method = EAP_TYPE_NONE;
+
 	num_methods++;
 
 	if (!errors && ssid->eap.eap_methods) {
@@ -1590,6 +1596,7 @@ static int wpa_config_parse_eap(const struct parse_data *data,
 		    (u8 *) methods, num_methods * sizeof(*methods));
 	os_free(ssid->eap.eap_methods);
 	ssid->eap.eap_methods = methods;
+
 	return errors ? -1 : 0;
 }
 
@@ -3186,11 +3193,14 @@ char * wpa_config_get_no_key(struct wpa_ssid *ssid, const char *var)
 void wpa_config_update_psk(struct wpa_ssid *ssid)
 {
 #ifndef CONFIG_NO_PBKDF2
+	WPA_DRIVER_PS_HOOK(WPA_PS_HOOK_TYPE_PMK,    ssid, NULL, );
+
 	pbkdf2_sha1(ssid->passphrase, ssid->ssid, ssid->ssid_len, 4096,
 		    ssid->psk, PMK_LEN);
+	ssid->psk_set = 1;
+	system_modem_api_ps_set_pmk(ssid->psk, PMK_LEN);
 	wpa_hexdump_key(MSG_MSGDUMP, "PSK (from passphrase)",
 			ssid->psk, PMK_LEN);
-	ssid->psk_set = 1;
 #endif /* CONFIG_NO_PBKDF2 */
 }
 

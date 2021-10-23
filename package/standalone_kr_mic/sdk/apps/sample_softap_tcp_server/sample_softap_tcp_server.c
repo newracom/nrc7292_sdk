@@ -38,7 +38,7 @@
 #define BUFFER_SIZE (1024*12)
 
 #define ECHO_SERVER_ENABLE 1
-#define SERVER_DATA_DEBUG 1
+#define SERVER_DATA_DEBUG 0
 #define SERVER_DATA_HEX_PRINT 0
 
 static int error_val = 0;
@@ -186,7 +186,9 @@ static void softap_tcp_server_task(void *pvParameters)
 						}
 						nrc_usr_print("send failed: errno %d\n", errno);
 					} else {
+					#if SERVER_DATA_DEBUG
 						nrc_usr_print("[%d] Send(%d)\n", sd, ret);
+					#endif /* SERVER_DATA_DEBUG */
 					}
 					#endif /* ECHO_SERVER_ENABLE */
 				}
@@ -210,39 +212,43 @@ exit:
  * Parameters   : count(test count), interval(test interval)
  * Returns      : 0 or -1 (0: success, -1: fail)
  *******************************************************************************/
-int run_sample_softap_tcp_server(WIFI_CONFIG* param)
+nrc_err_t run_sample_softap_tcp_server(WIFI_CONFIG* param)
 {
 	int i = 0;
 	int count =0;
 	int network_index = 0;
 	int dhcp_server =0;
-	int wifi_state = WLAN_STATE_INIT;
+	tWIFI_STATE_ID wifi_state = WIFI_STATE_INIT;
 
 	count = param->count;
 	dhcp_server = param->dhcp_server;
 
-
-
-	if (wifi_init(param)!= WIFI_SUCCESS) {
-		nrc_usr_print ("[%s] ASSERT! Fail for init\n", __func__);
-		return RUN_FAIL;
+	/* set initial wifi configuration */
+	while(1){
+		if (wifi_init(param)== WIFI_SUCCESS) {
+			nrc_usr_print ("[%s] wifi_init Success !! \n", __func__);
+			break;
+		} else {
+			nrc_usr_print ("[%s] wifi_init Failed !! \n", __func__);
+			_delay_ms(1000);
+		}
 	}
 
 	if (wifi_start_softap(param)!= WIFI_SUCCESS) {
 		nrc_usr_print ("[%s] ASSERT! Fail to start softap\n", __func__);
-		return RUN_FAIL;
+		return NRC_FAIL;
 	}
 
 	if (nrc_wifi_softap_set_ip((char *)&param->ap_ip) != WIFI_SUCCESS) {
 		nrc_usr_print("[%s] Fail set AP's IP\n", __func__);
-		return RUN_FAIL;
+		return NRC_FAIL;
 	}
 
 	if (dhcp_server == 1) {
 		nrc_usr_print("[%s] Trying to start DHCP Server\n",	__func__);
 		if(nrc_wifi_softap_start_dhcp_server() != WIFI_SUCCESS) {
 			nrc_usr_print("[%s] Fail to start dhcp server\n", __func__);
-			return RUN_FAIL;
+			return NRC_FAIL;
 		}
 	}
 
@@ -251,21 +257,21 @@ int run_sample_softap_tcp_server(WIFI_CONFIG* param)
 		_delay_ms(1);
 	}
 
-	wifi_state = nrc_wifi_get_state();
-	if (wifi_state == WLAN_STATE_GET_IP || wifi_state == WLAN_STATE_CONNECTED) {
+	nrc_wifi_get_state(&wifi_state);
+	if (wifi_state == WIFI_STATE_GET_IP || wifi_state == WIFI_STATE_CONNECTED) {
 		nrc_usr_print("[%s] Trying to DISCONNECT... for exit\n",__func__);
 		if (nrc_wifi_disconnect(network_index) != WIFI_SUCCESS) {
 			nrc_usr_print ("[%s] Fail for Wi-Fi disconnection (results:%d)\n", __func__);
-			return RUN_FAIL;
+			return NRC_FAIL;
 		}
 	}
 
 	if (error_val < 0)
-		return RUN_FAIL;
+		return NRC_FAIL;
 
 	nrc_usr_print("[%s] End of user_init!! \n",__func__);
 
-	return RUN_SUCCESS;
+	return NRC_SUCCESS;
 }
 
 /******************************************************************************
@@ -276,7 +282,7 @@ int run_sample_softap_tcp_server(WIFI_CONFIG* param)
  *******************************************************************************/
 void user_init(void)
 {
-	int ret = 0;
+	nrc_err_t ret;
 	WIFI_CONFIG* param;
 
 	nrc_uart_console_enable();

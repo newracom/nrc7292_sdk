@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2020 Newracom, Inc.
+ * Copyright (c) 2021 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -27,27 +27,43 @@
 #define __WIFI_CONFIG_H__
 
 #define STR_SSID "halow_demo"
-#define COUNTRY_CODE "KR" /* KR:Korea, JP: Japan, US:United States, TW: Taiwan, EU: EURO */
+#define COUNTRY_CODE "US" /* KR:Korea, JP: Japan, US:United States, TW: Taiwan, EU: EURO */
 
-#define NRC_WIFI_SECURE  MODE_WPA2 /* MODE_OPEN,  MODE_WPA2 */
-#define NRC_WIFI_DHCP_ENABLE 0
+#define NRC_WIFI_SECURE  WIFI_SEC_OPEN /* WIFI_SEC_OPEN, WIFI_SEC_WPA2, WIFI_SEC_WPA3_SAE, WIFI_SEC_WPA3_SAE */
+#define NRC_WIFI_IP_MODE	WIFI_DYNAMIC_IP	 /*   WIFI_STATIC_IP, WIFI_DYNAMIC_IP*/
 
 #define NRC_REMOTE_ADDRESS "192.168.200.1"
+#define NRC_REMOTE_PORT		8099
+
+#define NRC_WIFI_SCAN_LIST 0 /* Scan APs on specfied frequencies */
 
 #define TX_POWER 17 /* 17 dBm */
 
-#define NRC_WIFI_TEST_COUNT 100
-#define NRC_WIFI_TEST_INTERVAL 1000 /* ms */
+#define NRC_WIFI_TEST_COUNT 20
+#define NRC_WIFI_TEST_INTERVAL 1000 /* ms*/
+#define NRC_WIFI_TEST_DURATION 10000 /* ms */
 
-#if defined(NRC_WIFI_SECURE) && (NRC_WIFI_SECURE == MODE_WPA2)
+#if defined(NRC_WIFI_SECURE) && (NRC_WIFI_SECURE == WIFI_SEC_WPA2)
 #define NRC_WIFI_PASSWORD  "12345678"
 #endif
 
-#if (NRC_WIFI_DHCP_ENABLE != 1)
+#if (NRC_WIFI_IP_MODE == WIFI_STATIC_IP)
 #define NRC_STATIC_IP "192.168.200.13"
 #endif
 
+#if NRC_WIFI_SCAN_LIST
+#if defined(INCLUDE_KR_MIC_CHANNEL)
+#define NRC_WIFI_SCAN_FREQ_NUM 3
+uint16_t nrc_scan_freq_list[NRC_WIFI_SCAN_FREQ_NUM]={9255,9275,9270};
+#else
+#define NRC_WIFI_SCAN_FREQ_NUM 5
+uint16_t nrc_scan_freq_list[NRC_WIFI_SCAN_FREQ_NUM]={9180,9200,9185,9225,9215};
+#endif
+#endif
+
+//SOFT_AP SET
 #define NRC_WIFI_SOFTAP_DHCP_SERVER 1
 #define NRC_AP_IP "192.168.200.1"
+#define NRC_AP_SET_CHANNEL 9225 /* Default Set -> KR: 920.0MHz(KR MIC: 927.5)  JP: 918.0  US:925.0  TW:839.5  EU:864.0  */
 
 #endif /* __WIFI_CONFIG_H__ */

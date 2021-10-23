@@ -33,12 +33,12 @@
 #include <stddef.h>
 
 #if defined(MBEDTLS_SHA512_C) && !defined(MBEDTLS_ENTROPY_FORCE_SHA256)
-#include "sha512.h"
+#include "mbed_sha512.h"
 #define MBEDTLS_ENTROPY_SHA512_ACCUMULATOR
 #else
 #if defined(MBEDTLS_SHA256_C)
 #define MBEDTLS_ENTROPY_SHA256_ACCUMULATOR
-#include "sha256.h"
+#include "mbed_sha256.h"
 #endif
 #endif
 

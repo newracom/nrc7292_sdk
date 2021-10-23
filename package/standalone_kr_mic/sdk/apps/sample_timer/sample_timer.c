@@ -25,41 +25,49 @@
 
 #include "nrc_sdk.h"
 
-#define LED_GREEN	GPIO_02
-#define LED_RED 	GPIO_03
+#define TIMER_INTERVAL_UNIT	1000000 // us
 
-uint32_t g_counter0 = 1;
-uint32_t g_toggle1;
-uint32_t g_toggle2;
+#define TIMER0_INTERVAL	1*TIMER_INTERVAL_UNIT // 1 sec
+#define TIMER1_INTERVAL	2*TIMER_INTERVAL_UNIT // 2 sec
 
-void timer_expire_handler00(const timer_id id) {
-	nrc_usr_print("[timer_id:%d] %d\n", id, g_counter0);
+#define TIMER0_COUNT_MAX	30
+#define TIMER1_COUNT_MAX	10
+
+int count0, count1;
+
+void timer_callback_func0(int ch)
+{
+	nrc_usr_print("[%s] count:%d\n",__func__, count0);
+
+	nrc_hw_timer_clear_irq(TIMER0);
+	if(count0++ < TIMER0_COUNT_MAX){
+		nrc_hw_timer_start(TIMER0, TIMER0_INTERVAL);
+	} else {
+		nrc_usr_print("[%s] Timer0 is cleared \n",__func__);
+		nrc_hw_timer_deinit(TIMER0);
+		count0 = 0;
+	}
 }
 
-void timer_expire_handler01(const timer_id id) {
-	g_counter0++;
-}
+void timer_callback_func1(int ch)
+{
+	nrc_usr_print("[%s] count:%d\n",__func__, count1);
 
-void timer_expire_handler02(const timer_id id) {
-	nrc_gpio_outputb(LED_GREEN, g_toggle1);
-	g_toggle1 = !g_toggle1;
-}
+	nrc_hw_timer_clear_irq(TIMER1);
+	if(count1++ < TIMER1_COUNT_MAX){
+		nrc_hw_timer_start(TIMER1, TIMER1_INTERVAL);
+	} else {
+		nrc_usr_print("[%s] Timer1 is deinit \n",__func__);
+		nrc_hw_timer_deinit(TIMER1);
 
-void timer_expire_handler03(const timer_id id) {
-	nrc_gpio_outputb(LED_RED, g_toggle2);
-	g_toggle2 = !g_toggle2;
+		/* Forcely stop and clear timer0 */
+		nrc_usr_print("[%s] Timer0 is stopped and deinit\n",__func__);
+		nrc_hw_timer_stop(TIMER0);
+		nrc_hw_timer_clear_irq(TIMER0);
+		nrc_hw_timer_deinit(TIMER0);
+		count1 = 0;
+	}
 }
-
-void timer_expire_handler04(const timer_id id) {
-	nrc_usr_print("[timer_id:%d] expired.\n", id);
-	nrc_timer_stop(id);
-}
-
-void timer_expire_handler05(const timer_id id) {
-	nrc_usr_print("[timer_id:%d] expired.\n", id);
-	nrc_timer_stop(id);
-}
-
 
 /******************************************************************************
  * FunctionName : run_sample_timer
@@ -67,51 +75,28 @@ void timer_expire_handler05(const timer_id id) {
  * Parameters   : count(test count), interval(test interval)
  * Returns      : 0 or -1 (0: success, -1: fail)
  *******************************************************************************/
-int run_sample_timer(void)
+nrc_err_t run_sample_timer(void)
 {
+	nrc_hw_timer_init(TIMER0, timer_callback_func0);
+	nrc_hw_timer_init(TIMER1, timer_callback_func1);
+
 	nrc_usr_print("[%s] Sample App for timer test\n", __func__);
 	nrc_usr_print("============================================\n");
-	nrc_usr_print("1. The 1st timer starts with 1 second interval infinitely\n");
-	nrc_usr_print("and print out a counter value which will be increased by the 2nd timer.\n");
-	nrc_usr_print("2. The 2nd timer starts with 100 milliseconds interval infinitely\n");
-	nrc_usr_print("and increases 1 of the counter value whenever expired.\n");
-	nrc_usr_print("3. The 3rd timer starts with 100 milliseconds interval infinitely\n");
-	nrc_usr_print("and toggles the green LED on the board whenever expired.\n");
-	nrc_usr_print("4. The 4th timer starts with 50 milliseconds interval infinitely\n");
-	nrc_usr_print("and toggles the red LED on the board whenever expired.\n");
-	nrc_usr_print("5. The 5th timer starts with 5 seconds interval infinitely\n");
-	nrc_usr_print("but it will be stopped when expired.\n");
-	nrc_usr_print("6. The 6th timer starts with 10 seconds interval infinitely\n");
-	nrc_usr_print("but it will be stopped when expired.\n\n");
+	nrc_usr_print("1. The 1st timer starts with %d second interval, %d times\n",\
+		(TIMER0_INTERVAL/TIMER_INTERVAL_UNIT), TIMER0_COUNT_MAX);
+	nrc_usr_print("2. The 2nd timer starts with %d second interval, %d times\n",\
+		(TIMER1_INTERVAL/TIMER_INTERVAL_UNIT), TIMER1_COUNT_MAX);
+	nrc_usr_print("3. The 1nd timer forcely stoped and deinit by timer2 callback after %d second\n",\
+		(TIMER1_INTERVAL/TIMER_INTERVAL_UNIT), TIMER1_COUNT_MAX);
 
-	nrc_timers_init();
-
-	NRC_GPIO_CONFIG gpio_conf;
-
-	gpio_conf.gpio_pin = LED_GREEN;
-	gpio_conf.gpio_dir = GPIO_OUTPUT;
-	gpio_conf.gpio_mode = GPIO_PULL_UP;
-	gpio_conf.gpio_alt= GPIO_FUNC;
-	nrc_gpio_config(&gpio_conf);
-
-	gpio_conf.gpio_pin = LED_RED;
-	gpio_conf.gpio_dir = GPIO_OUTPUT;
-	gpio_conf.gpio_mode = GPIO_PULL_UP;
-	gpio_conf.gpio_alt= GPIO_FUNC;
-	nrc_gpio_config(&gpio_conf);
-
-	nrc_timer_create(1000000, 1, timer_expire_handler00);
-	nrc_timer_create(100000, 1, timer_expire_handler01);
-	nrc_timer_create(100000, 1, timer_expire_handler02);
-	nrc_timer_create(50000, 1, timer_expire_handler03);
-	nrc_timer_create(5000000, 1, timer_expire_handler04);
-	nrc_timer_create(10000000, 1, timer_expire_handler05);
+	nrc_hw_timer_start(TIMER0, TIMER0_INTERVAL);
+	nrc_hw_timer_start(TIMER1, TIMER1_INTERVAL);
 
 	while(1);
 
 
 	nrc_usr_print("[%s] exit \n",__func__);
-	return RUN_SUCCESS;
+	return NRC_SUCCESS;
 }
 
 
@@ -123,7 +108,7 @@ int run_sample_timer(void)
  *******************************************************************************/
 void user_init(void)
 {
-	int ret = 0;
+	nrc_err_t ret;
 
 	//Enable Console for Debugging
 	nrc_uart_console_enable();

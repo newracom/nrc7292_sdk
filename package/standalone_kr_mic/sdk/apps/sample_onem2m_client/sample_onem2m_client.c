@@ -66,56 +66,56 @@ static const char ca_cert[] =
 
 static const char client_cert[] =
 "-----BEGIN CERTIFICATE-----\r\n"
-"MIIDBjCCAe4CCQCmB35rT9UYsjANBgkqhkiG9w0BAQsFADBFMQswCQYDVQQGEwJB\r\n"
+"MIIDBjCCAe4CCQDOfHUh/FAWyjANBgkqhkiG9w0BAQsFADBFMQswCQYDVQQGEwJB\r\n"
 "VTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50ZXJuZXQgV2lkZ2l0\r\n"
-"cyBQdHkgTHRkMB4XDTE5MTAzMTEwNTIxNFoXDTIwMTAzMDEwNTIxNFowRTELMAkG\r\n"
+"cyBQdHkgTHRkMB4XDTIxMDQxNTAyNDUzNFoXDTIyMDQxNTAyNDUzNFowRTELMAkG\r\n"
 "A1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoMGEludGVybmV0\r\n"
 "IFdpZGdpdHMgUHR5IEx0ZDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB\r\n"
-"ALAKfY9bE3PM6EvlSZRcAsBdYrwrXRadAqLfo7SWlTXoGC9RrI0IvK2lo2sWjBw1\r\n"
-"isQEpZD0lxRpUPHIxMYcuOxsztphWYc3nxQZvcngsgREI7jJd/+VC5EyHn7k08bh\r\n"
-"OydVOxgCe7Sl8Mhh6CGpn0DMjq35mSEElUmnGkuWwUXh5GREC0PUJyt0fGYDM1qd\r\n"
-"eqy9dnvDnpnTUy3tRoWFE5LwhZt3VEH6anvSGGCFpqK0PAsTM9R12b0rqE8CAqM0\r\n"
-"hIbHxOzjHennvZAomGQL+20Q7DCFM+K1q0wH6WPvkMIkiSNQ/TrmIfsI/S+u7wAz\r\n"
-"V4abljVUqVvMHbOpWUWMUBMCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAgyfu7nsV\r\n"
-"olez07yqCLvN0cwFjKApKw13yZ65CylmUDSM0JRF2yZ/AkG1M7LLCza0rqBrO4F6\r\n"
-"S/YvKrbw3dCALPD0MZjHEJfjb5nlS303dAezlixEftugTANgadafXJJl1PLDALQC\r\n"
-"5N0Bt2xKtzdbo/cTR1aAUOIJQDqjn/qMdylzG+Xp4bfAeo3Mco7f6lEV8AZdSmxa\r\n"
-"EKXyEtfZI4H9MiMx9t76FUfyxGLGYNZRWBG+/IkHnEPbo8+ndyDalS90ymqIQsof\r\n"
-"fnzLY+kHZZMQRGm780X/RkocCK4QJRYOdb45eZ+Imh6GhNXPect+BbL54yNph1Sx\r\n"
-"eCSxYSAwvukuFw==\r\n"
+"AKL71f30DySYtPIFOXQ1Zd29itrZ6VZ5WtLXSANkJq2YxNuMJySMvpi9y540970G\r\n"
+"xP3ING/rhPr+acsmCQ+IBM9xrUSzU0VsrNUTuom8ZdydrsuZf3Zei5jtAJsWzYXD\r\n"
+"P5LKgZbGSTzUmZXmXlX3HGSx0rE0q1Epjh6PGKzpw2rQJzlY3cK7lTHIC8x6YBEV\r\n"
+"Yr9Rw/NwXZEKP6lx6HCpRC8DGck2+8MDCDty40Bl7bMjbY712rt3J/1uHz9c5OmN\r\n"
+"dof8jwFkO/noOB6vsEXCQXlLW9ZXNL3zsA23S2QHrmGukNcLxCpvYtztaHtOuv8y\r\n"
+"OQt8EFHtQyGykTsvP5/0ShkCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAc1Pd/thJ\r\n"
+"4aemeQnQD36ISchvyJs9n8MZW9tMRD2Y0Dq/WpBb4xDOWGQ37Clee2f0k2K3ospJ\r\n"
+"zZ4r9q+f6WRaMDc2ZXk0OJGbgPfvqTbaNo4vP058E87bwLsuUj1JYvI3d+d1hWMC\r\n"
+"a1o8dUOjQyVYf8IfxkL2zAO42/uij2rQw7u3fcC59EbBOAaPk/SO5VGWwBjsDTwQ\r\n"
+"VGQPPoG7iNOU4SvPcLUK6lDWZ68PllFBA+7LIiNHU2xAuHkHc79srySkdbMMJ9pd\r\n"
+"Va6JA2K1JKl+lgIeCK1Z6i11DQyL7HdIAKoK4G5V9pId17Uq8zdnvpQkklg3Udpf\r\n"
+"oQWOaxyon2nU3w==\r\n"
 "-----END CERTIFICATE-----\r\n";
 
 
 static const char client_pk[] =
 "-----BEGIN RSA PRIVATE KEY-----\r\n"
-"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\r\n"
+"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\r\n"
 "-----END RSA PRIVATE KEY-----\r\n";
 
-static const char client_pk_pwd[] = "newratek2019";
+static const char client_pk_pwd[] = "";
 #endif
 
 #define AE_NAME "base0"
@@ -349,13 +349,13 @@ void publish_update_co2(MQTTClient *mqtt_client)
  * Parameters   : WIFI_CONFIG
  * Returns      : 0 or -1 (0: success, -1: fail)
  *******************************************************************************/
-int  run_sample_onem2m(WIFI_CONFIG *param)
+nrc_err_t run_sample_onem2m(WIFI_CONFIG *param)
 {
-	int i = 0;
 	int count = 0;
 	int interval = 0;
 	int network_index = 0;
-	int wifi_state = WLAN_STATE_INIT;
+	tWIFI_STATE_ID wifi_state = WIFI_STATE_INIT;
+	SCAN_RESULTS results;
 
 	MQTTClient *mqtt_client = nrc_mem_malloc(sizeof(MQTTClient));
 	memset(mqtt_client, 0x0, sizeof(MQTTClient));
@@ -366,20 +366,66 @@ int  run_sample_onem2m(WIFI_CONFIG *param)
 	count = param->count;
 	interval = param->interval;
 
-	if (wifi_init(param)!= WIFI_SUCCESS) {
-		nrc_usr_print ("[%s] ASSERT! Fail for init\n", __func__);
-		return RUN_FAIL;
+	int i = 0;
+	int ssid_found =false;
+
+	/* set initial wifi configuration */
+	while(1){
+		if (wifi_init(param)== WIFI_SUCCESS) {
+			nrc_usr_print ("[%s] wifi_init Success !! \n", __func__);
+			break;
+		} else {
+			nrc_usr_print ("[%s] wifi_init Failed !! \n", __func__);
+			_delay_ms(1000);
+		}
 	}
 
-	/* 1st trial to connect */
-	if (wifi_connect(param)!= WIFI_SUCCESS) {
-		nrc_usr_print ("[%s] Fail for Wi-Fi connection (results:%d)\n", __func__);
-		return RUN_FAIL;
+	/* find AP */
+	while(1){
+		if (nrc_wifi_scan() == WIFI_SUCCESS){
+			if (nrc_wifi_scan_results(&results)== WIFI_SUCCESS) {
+				/* Find the ssid in scan results */
+				for(i=0; i<results.n_result ; i++){
+					if(strcmp((char*)param->ssid, (char*)results.result[i].ssid)== 0 ){
+						ssid_found = true;
+						break;
+					}
+				}
+
+				if(ssid_found){
+					nrc_usr_print ("[%s] %s is found \n", __func__, param->ssid);
+					break;
+				}
+			}
+		} else {
+			nrc_usr_print ("[%s] Scan fail !! \n", __func__);
+			_delay_ms(1000);
+		}
 	}
 
-	if (nrc_wifi_get_state() != WLAN_STATE_GET_IP) {
-		nrc_usr_print("[%s] Fail to connect or get IP !\n", __func__);
-		return RUN_FAIL;
+	/* connect to AP */
+	while(1) {
+		if (wifi_connect(param)== WIFI_SUCCESS) {
+			nrc_usr_print ("[%s] connect to %s successfully !! \n", __func__, param->ssid);
+			break;
+		} else{
+			nrc_usr_print ("[%s] Fail for connection %s\n", __func__, param->ssid);
+			_delay_ms(1000);
+		}
+	}
+
+	nrc_wifi_get_network_index(&network_index );
+
+	/* check the IP is ready */
+	while(1){
+		nrc_wifi_get_state(&wifi_state);
+		if (wifi_state == WIFI_STATE_GET_IP) {
+			nrc_usr_print("[%s] IP ...\n",__func__);
+			break;
+		} else{
+			nrc_usr_print("[%s] Current State : %d...\n",__func__, wifi_state);
+		}
+		_delay_ms(1000);
 	}
 
 	/*
@@ -468,16 +514,16 @@ int  run_sample_onem2m(WIFI_CONFIG *param)
 
 	vTaskDelete((TaskHandle_t)mqtt_client->thread.task);
 
-	wifi_state = nrc_wifi_get_state();
-	if (wifi_state == WLAN_STATE_GET_IP || wifi_state == WLAN_STATE_CONNECTED) {
+	nrc_wifi_get_state(&wifi_state);
+	if (wifi_state == WIFI_STATE_GET_IP || wifi_state == WIFI_STATE_CONNECTED) {
 		nrc_usr_print("[%s] Trying to DISCONNECT... for exit\n",__func__);
 		if (nrc_wifi_disconnect(network_index) != WIFI_SUCCESS) {
 			nrc_usr_print ("[%s] Fail for Wi-Fi disconnection (results:%d)\n", __func__);
-			return RUN_FAIL;
+			return NRC_FAIL;
 		}
 	}
 	nrc_usr_print("[%s] exit \n",__func__);
-	return RUN_SUCCESS;
+	return NRC_SUCCESS;
 }
 
 
@@ -489,7 +535,7 @@ int  run_sample_onem2m(WIFI_CONFIG *param)
  *******************************************************************************/
 void user_init(void)
 {
-	int ret = 0;
+	nrc_err_t ret;
 	WIFI_CONFIG* param;
 
 	nrc_uart_console_enable();

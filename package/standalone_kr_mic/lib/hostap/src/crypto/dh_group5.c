@@ -15,7 +15,7 @@
 
 void * dh5_init(struct wpabuf **priv, struct wpabuf **publ)
 {
-	wpabuf_free(*publ);
+	// wpabuf_free(*publ);
 	*publ = dh_init(dh_groups_get(5), priv);
 	if (*publ == NULL)
 		return NULL;

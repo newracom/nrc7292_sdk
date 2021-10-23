@@ -28,8 +28,11 @@ static FILE *wpa_debug_tracing_file = NULL;
 #define WPAS_TRACE_PFX "wpas <%d>: "
 #endif /* CONFIG_DEBUG_LINUX_TRACING */
 
-
+#ifdef INCLUDE_WPA_DEBUG
+int wpa_debug_level = MSG_DEBUG;
+#else
 int wpa_debug_level = MSG_INFO;
+#endif
 int wpa_debug_show_keys = 0;
 int wpa_debug_timestamp = 0;
 
@@ -212,6 +215,7 @@ void wpa_debug_close_linux_tracing(void)
 void wpa_printf(int level, const char *fmt, ...)
 {
 	va_list ap;
+
 	va_start(ap, fmt);
 	if (level >= wpa_debug_level) {
 #ifdef _FREERTOS
@@ -372,16 +376,18 @@ static void _wpa_hexdump(int level, const char *title, const u8 *buf,
 	} else {
 #endif /* CONFIG_DEBUG_FILE */
 #ifdef _FREERTOS
-	system_printf("%s - hexdump(len=%lu):", title, (unsigned long) len);
-	if (buf == NULL) {
-		system_printf(" [NULL]");
-	} else if (show) {
-		for (i = 0; i < len; i++)
-			system_printf(" %02x", buf[i]);
-	} else {
-		system_printf(" [REMOVED]");
+	if (level >= wpa_debug_level) {
+		system_printf("%s - hexdump(len=%lu):", title, (unsigned long) len);
+		if (buf == NULL) {
+			system_printf(" [NULL]");
+		} else if (show) {
+			for (i = 0; i < len; i++)
+				system_printf(" %02x", buf[i]);
+		} else {
+			system_printf(" [REMOVED]");
+		}
+		system_printf("\n");
 	}
-	system_printf("\n");
 #else
 	printf("%s - hexdump(len=%lu):", title, (unsigned long) len);
 	if (buf == NULL) {
@@ -691,7 +697,8 @@ void wpa_msg_register_ifname_cb(wpa_msg_get_ifname_func func)
 
 void wpa_msg(void *ctx, int level, const char *fmt, ...)
 {
-#if defined(_FREERTOS)
+#if defined(_FREERTOS) && defined(CONFIG_WPA_MSG)
+
 	va_list ap;
 	if (level >= wpa_debug_level) {
 		system_printf("WPA: ");
@@ -701,6 +708,7 @@ void wpa_msg(void *ctx, int level, const char *fmt, ...)
 		va_end(ap);
 	}
 #else
+#if 0
 	va_list ap;
 	char *buf;
 	int buflen;
@@ -734,6 +742,7 @@ void wpa_msg(void *ctx, int level, const char *fmt, ...)
 	if (wpa_msg_cb)
 		wpa_msg_cb(ctx, level, WPA_MSG_PER_INTERFACE, buf, len);
 	bin_clear_free(buf, buflen);
+#endif
 #endif
 }
 

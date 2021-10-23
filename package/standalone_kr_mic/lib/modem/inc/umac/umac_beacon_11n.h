@@ -42,10 +42,10 @@ typedef struct {
 
 void umac_beacon_init(int8_t vif_id);
 void umac_beacon_start(int8_t vif_id);
-void umac_beacon_stop();
+void umac_beacon_stop(uint8_t vif_id);
 
 void umac_beacon_update(int8_t vif_id, uint8_t* b, uint16_t len);
-void umac_beacon_update_tim(uint16_t aid, bool flag);
+void umac_beacon_update_tim(uint8_t vif_id, uint16_t aid, bool flag);
 void umac_beacon_update_dtim_period(int8_t vif_id, uint8_t period );
 void umac_beacon_set_beacon_interval(int8_t vif_id, uint16_t interval);
 void umac_beacon_set_ssid(int8_t vif_id, uint8_t *ssid , uint8_t ssid_len);

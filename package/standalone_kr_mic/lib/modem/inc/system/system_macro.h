@@ -107,9 +107,31 @@
 #define BITC(D, M)              (D = BITAND(D,BITNOT(M)))
 #define BITSC(D, M, C)          (D = BITOR(M,BITAND(D,BITNOT(C))))
 
+#define PROFILE_INIT			uint32_t time_a, time_b;
+#define PROFILE_REF(func)													\
+	do {																	\
+		A(#func " : before : %u us\n", TSF);	 							\
+		time_a = TSF;														\
+		func;																\
+		time_b = TSF;														\
+		A(#func " : after  : %u us (diff:%u us)\n", time_b, time_b-time_a);	\
+	} while(0);					
+
 #define READ_REG(offset)        (*(volatile uint32_t*)(offset))
-#define WRITE_REG(offset,value) (*(volatile uint32_t*)(offset) = (uint32_t)(value));
+
+#define WRITE_REG(offset,value) \
+(*(volatile uint32_t*)(offset) = (uint32_t)(value));
+
+
 #define WRITE_REG2(value,offset) (*(volatile uint32_t*)(offset) = (uint32_t)(value));
+
+#define WRITE_REG_DBG(offset,value) 							\
+ 	do															\
+ 	{															\
+ 		A(#offset " 0x%08X", READ_REG(offset));					\
+ 		(*(volatile uint32_t*)(offset) = (uint32_t)(value));	\
+ 		A("-> 0x%08X\n", READ_REG(offset));						\
+ 	} while (0);
 
 #define READ_FIELD(reg, field) \
 	((*(volatile uint32_t*)reg & (reg##_##field##_MASK)) >> (reg##_##field##_SHIFT))
@@ -145,6 +167,20 @@
 #define	CHECK_RTC_TIME_V(x,v) ({x(v);});
 #define	CHECK_RTC_TIME_VV(x,v,vv) ({x(v,vv);});
 
+#define CHECK_TSF_INIT 					\
+	uint32_t ck_point_start = 0;		\
+	uint32_t ck_point_end = 0;			
+	
+#define CHECK_TSF_TIME(x)											\
+	do																\
+	{																\
+		ck_point_start = TSF;										\
+		x;															\
+		ck_point_end = TSF;											\
+		A(#x " - Runnig Time : %u\n",ck_point_end - ck_point_start);	\
+	} while (0);
+	
+
 #define CASE_STRING_DECLARE(n) switch(n)
 #define CASE_STRING_ITEM(n) case n: return #n;
 #define CASE_STRING_DEFAULT(n) default: return #n;
@@ -171,6 +207,7 @@
 
 #define LMAC_BUF_TO_SYS_BUF(buf) ((SYS_BUF*)(((uint32_t)(buf)) - sizeof(SYS_HDR)))
 #define LMAC_BUF_TO_SYS_HDR(buf) SYS_HDR(LMAC_BUF_TO_SYS_BUF(buf))
+#define LMAC_BUF_TO_FRAME_HDR(buf) FRAME_HDR(LMAC_BUF_TO_SYS_BUF(buf))
 #define SYS_BUF_TO_LMAC_TXBUF(buf) ((LMAC_TXBUF*)(&(buf)->lmac_txhdr))
 #define SYS_BUF_TO_LMAC_RXBUF(buf) ((LMAC_RXBUF*)(&(buf)->lmac_rxhdr))
 

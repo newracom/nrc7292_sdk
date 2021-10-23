@@ -33,6 +33,10 @@
 #include "p2p/p2p.h"
 #include "p2p_supplicant.h"
 #include "wps_supplicant.h"
+#include "system_common.h"
+#ifdef WPS_SDK_CB
+#include "api_pbc.h"
+#endif
 
 
 #ifndef WPS_PIN_SCAN_IGNORE_SEL_REG
@@ -864,9 +868,19 @@ static void wpa_supplicant_wps_event(void *ctx, enum wps_event event,
 		break;
 	case WPS_EV_FAIL:
 		wpa_supplicant_wps_event_fail(wpa_s, &data->fail);
+#ifdef WPS_SDK_CB
+		if(wps_pbc_ops->nrc_wifi_wps_pbc_fail) {
+			wps_pbc_ops->nrc_wifi_wps_pbc_fail();
+		}
+#endif /* WPS_SDK_CB */
 		break;
 	case WPS_EV_SUCCESS:
 		wpa_supplicant_wps_event_success(wpa_s);
+#ifdef WPS_SDK_CB
+		if(wps_pbc_ops->nrc_wifi_wps_pbc_success) {
+			wps_pbc_ops->nrc_wifi_wps_pbc_success();
+		}
+#endif /* WPS_SDK_CB */
 		break;
 	case WPS_EV_PWD_AUTH_FAIL:
 #ifdef CONFIG_AP
@@ -877,6 +891,11 @@ static void wpa_supplicant_wps_event(void *ctx, enum wps_event event,
 	case WPS_EV_PBC_OVERLAP:
 		break;
 	case WPS_EV_PBC_TIMEOUT:
+#ifdef WPS_SDK_CB
+		if(wps_pbc_ops->nrc_wifi_wps_pbc_timeout) {
+			wps_pbc_ops->nrc_wifi_wps_pbc_timeout();
+		}
+#endif /* WPS_SDK_CB */
 		break;
 	case WPS_EV_PBC_ACTIVE:
 		wpa_msg(wpa_s, MSG_INFO, WPS_EVENT_ACTIVE);
@@ -997,6 +1016,9 @@ static void wpas_wps_timeout(void *eloop_ctx, void *timeout_ctx)
 	 */
 	wpas_notify_wps_event_fail(wpa_s, &data.fail);
 	wpas_clear_wps(wpa_s);
+#ifdef WPS_SDK_CB
+	wpa_supplicant_wps_event(NULL, WPS_EV_PBC_TIMEOUT, NULL);
+#endif /* WPS_SDK_CB */
 }
 
 

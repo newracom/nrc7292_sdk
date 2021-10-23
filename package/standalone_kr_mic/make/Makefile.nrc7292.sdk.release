@@ -1,16 +1,124 @@
 ALIAS = lib
 
+#//--------------------------------------------------
+#// TARGET
+#//--------------------------------------------------
+TARGET=standalone_xip
+
+ifneq ($(APP_NAME),)
+BUILD_NAME = $(APP_NAME)
+else
+BUILD_NAME = standalone
+endif
+
+#//--------------------------------------------------
+#// CONFIG
+#//--------------------------------------------------
+# S1G HOOK for 11ah
+CONFIG_S1G_HOOK=y
+
+# Background Scan
+CONFIG_BG_SCAN=y
+
+# Modem Recovery
+CONFIG_MODEM_RECOVERY=y
+
+# RF TX CALIBRATION
+CONFIG_APPLY_TX_GAIN_1_5_WITH_TXLO_TXIMG_CAL=y
+
+# Temp sensor
+CONFIG_USE_TEMP_SENSOR=y
+
+# SW-based Encryption for PMF //only for Standalone
+CONFIG_PMF_SWENC=n
+
+# SW-Based BA Bitmap Encoding
+CONFIG_BITMAP_ENCODING=y
+
+# SW-Based NDP ACK Generation (Reversing Scrambler Value)
+ifeq ($(CONFIG_BITMAP_ENCODING),y)
+CONFIG_REVERSE_SCRAMBLER=n
+endif
+
+# Board data
+CONFIG_BD=y
+
+# Power Save - Non PS-Poll
+CONFIG_PS_NONPOLL=y
+
+# SET WIM command via task(Work Queue)
+CONFIG_SET_WIM_BY_WQ=y
+
+# TX Frame via task(Work Queue)
+CONFIG_DL_TRANSMIT_BY_WQ=n
+
+# TASK RENEW
+CONFIG_NEW_TASK_ARCH=y
+
+# Avoid FragAttack
+CONFIG_AVOID_FRAG_ATTACK=n
+
+# Fragmentation on target to support low MCS
+# Disable until SAM FW support assemble of fragmented frame
+CONFIG_FRAGMENT_FRAME=n
+
+# WATCHDOG TIMER
+ifeq ($(CONFIG_NEW_TASK_ARCH),y)
+CONFIG_WDT=y
+endif
+
+# CLI
+CONFIG_CLI=y
+
+# DEBUG (DEBUG, TRACKER, Statistics, etc.)
+CONFIG_DEBUG=y
+
+# PRINT Console LOG
+CONFIG_LOG=y
+
+# (only for CM3) USE PRIMASK-based INT Lock (y:PRIMASK, n:BASEPRI)
+CONFIG_PRIMASK_INT_LOCK=n
+
+# STA-Role ONLY
+CONFIG_ONLY_STA=n
+
+ifeq ($(CONFIG_ONLY_STA),n)
+# only for AP 
+# Gather STA's SIGNAL INFO (RSSI,SNR,MCS) on AP
+CONFIG_STA_SIG_INFO=y
+# Probe Response Offloading
+CONFIG_UMAC_PRESP=y
+endif
+
+# USE SMALL MEMORY for pool and heap
+CONFIG_USE_SMALL_MEM=n
+
+# major lmac/umac codes are run on RAM
+ifneq ($(findstring norunram, $(ALIAS)), )
+CONFIG_RUNRAM=n
+else
+CONFIG_RUNRAM=y
+endif
+
+# RELEASE FW
+CONFIG_CLI=n
+CONFIG_DEBUG=n
+CONFIG_LOG=n
+
 #// --------------------------------------------------
 #// 3rd party library
 #// --------------------------------------------------
-
-# wpa_supplicant/hostapd
-CONFIG_WPA_SUPP	= n
-CONFIG_SOFT_AP		= n
+CONFIG_WPA_SUPP_CRYPTO = mbedtls
 
 CONFIG_FREERTOS	= y
-CONFIG_LWIP		= y
+CONFIG_LWIP	= y
 CONFIG_MBEDTLS	= y
+CONFIG_WPA_SUPP	= y
+ifeq ($(CONFIG_ONLY_STA),y)
+CONFIG_SOFT_AP	=	n
+else
+CONFIG_SOFT_AP	=	y
+endif
 
 #// --------------------------------------------------
 #// Alias Generated From system_info
@@ -18,10 +126,18 @@ CONFIG_MBEDTLS	= y
 TOP					=	.
 SYSTEM				=	nrc7292
 STANDARD			=	11ah
-CPU					=	ARM_CM0
+ifneq ($(findstring cm3, $(ALIAS)), )
+CPU				=	ARM_CM3
+DEFINE				+=	-DCPU_CM3
+else
+CPU				=	ARM_CM0
+DEFINE				+=	-DCPU_CM0
+endif
+
 PREFIX				=	arm-none-eabi-
-TARGET				=	standalone_xip
-DEFINE				=	-DNRC7292
+
+DEFINE				+=	-DNRC7292
+DEFINE				+=	-DINCLUDE_STANDALONE
 DEFINE				+=	-DNRC7292_STANDALONE_XIP
 DEFINE				+=	-DCACHE_XIP
 DEFINE				+=	-DSF_WRITABLE
@@ -30,46 +146,104 @@ DEFINE				+=	-DSDK_TARGET_NAME=\"$(TARGET)\"
 OUTPUT				=	$(SYSTEM)_$(TARGET)_$(APP_NAME)
 
 #// -------------------------------------------------
-#// Features
+#// 11AH Features (common)
 #// --------------------------------------------------
-DEFINE				+=	-DINCLUDE_STANDALONE
-DEFINE				+=	-DINCLUDE_UMAC_BEACON
-DEFINE				+=	-DINCLUDE_PV1
+DEFINE				+=	-DSTANDARD_11AH
+DEFINE				+=	-DLMAC_CONFIG_11AH=1
+DEFINE				+=	-DINCLUDE_UMAC
 DEFINE				+=	-DINCLUDE_TIM_HANDLER
+DEFINE				+=	-DINCLUDE_CDC
+DEFINE				+=	-DUMAC_BEACON_MONITOR
+#DEFINE				+=	-DINCLUDE_PV1
+#DEFINE				+=	-DNRC_NDP_PV1_SUPPORT
+
+#//-------------------------------------------------
+#// AP Features
+#//--------------------------------------------------
+ifeq ($(CONFIG_ONLY_STA),n)
 DEFINE				+=	-DINCLUDE_ACCESS_POINT
+DEFINE				+=	-DINCLUDE_UMAC_BEACON
+DEFINE                          +=      -DINCLUDE_BEACON_AP_BEACON
+#DEFINE                          +=      -DINCLUDE_BEACON_BCMC
+DEFINE				+=	-DMAX_STA=10
+else
+DEFINE				+=	-DMAX_STA=1
+endif
 
-DEFINE				+=	-DINCLUDE_BUF_TRACKER
-DEFINE				+=	-DINCLUDE_EVENT_TRACKER
 
-DEFINE				+=	-DINCLUDE_TRACE_ALWAYS
+#//-------------------------------------------------
+#// Rate Control
+#//--------------------------------------------------
+DEFINE				+=	-DRC_START_MIN
+DEFINE				+=	-DRC_MCS_SINGLE
+
+#//-------------------------------------------------
+#// RF
+#//--------------------------------------------------
+DEFINE				+=	-DNRF_NO_USE_SPI
+
+#//-------------------------------------------------
+#// LOG
+#//--------------------------------------------------
+ifeq ($(CONFIG_LOG),y)
 DEFINE				+=	-DINCLUDE_TRACE_VERBOSE
 DEFINE				+=	-DINCLUDE_TRACE_INFO
 DEFINE				+=	-DINCLUDE_TRACE_ERROR
+DEFINE				+=	-DINCLUDE_TRACE_ALWAYS
 DEFINE				+=	-DINCLUDE_TRACE_ASSERT
-DEFINE				+=	-DINCLUDE_UMAC
-DEFINE				+=	-DINCLUDE_S1G_CONFIG
-DEFINE				+=	-DINCLUDE_S1G_HOOK
+else
+DEFINE				+=	-DINCLUDE_TRACE_ALWAYS
+DEFINE				+=	-DINCLUDE_TRACE_ASSERT
+endif
+#//-------------------------------------------------
+#// CLI
+#//--------------------------------------------------
+ifeq ($(CONFIG_CLI),y)
+DEFINE				+=	-DINCLUDE_USE_CLI
+endif
+
+#//-------------------------------------------------
+#// Debug (CLI,TRACKER,STATISTICS)
+#//--------------------------------------------------
+ifeq ($(CONFIG_DEBUG),y)
+DEFINE				+=	-DINCLUDE_WPA_DEBUG
 DEFINE				+=	-DINCLUDE_LMAC_DEBUG
 DEFINE				+=	-DINCLUDE_RF_DEBUG
 DEFINE				+=	-DINCLUDE_PHY_DEBUG
-DEFINE				+=	-DINCLUDE_CDC
+DEFINE				+=	-DINCLUDE_BUF_TRACKER
+DEFINE				+=	-DINCLUDE_EVENT_TRACKER
+DEFINE				+=	-DUTIL_TRACE_STACK
+DEFINE				+=	-DDEBUG_MAC_STATS
+else
+DEFINE				+=	-DINCLUDE_LMAC_DEBUG
+DEFINE				+=	-DDEBUG_MAC_STATS
+endif
+
 #//-------------------------------------------------
 #// Configuration
 #//--------------------------------------------------
-DEFINE				+=	-DSTANDARD_11AH
-DEFINE				+=	-DLMAC_CONFIG_11AH=1
-
 DEFINE 				+=	-DLMAC_CONFIG_FREERTOS=1
 DEFINE				+=	-DLMAC_CONFIG_NAN=0
 DEFINE				+=	-DLMAC_CONFIG_BUFFER_SIZE=512
-DEFINE				+=	-DLMAC_CONFIG_DL_DESCRIPTOR=32
-DEFINE 				+=	-DLMAC_CONFIG_POOL_0_NUM=45
+ifeq ($(CONFIG_USE_SMALL_MEM),y)
+# 32KB Pool
+DEFINE				+=	-DLMAC_CONFIG_DL_DESCRIPTOR=16
 DEFINE 				+=	-DLMAC_CONFIG_POOL_0_RESERVED_NUM=4
+DEFINE 				+=	-DLMAC_CONFIG_POOL_0_NUM=32
+DEFINE 				+=	-DLMAC_CONFIG_POOL_1_NUM=32
+else
+# 40.5KB Pool
+DEFINE				+=	-DLMAC_CONFIG_DL_DESCRIPTOR=32
+DEFINE 				+=	-DLMAC_CONFIG_POOL_0_RESERVED_NUM=4
+DEFINE 				+=	-DLMAC_CONFIG_POOL_0_NUM=45
 DEFINE 				+=	-DLMAC_CONFIG_POOL_1_NUM=36
+endif
+
 DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM0=8
 DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM1=8
 DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM2=8
 DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM3=9
+
 #// --------------------------------------------------
 #// Common Tool
 #// --------------------------------------------------
@@ -82,12 +256,11 @@ SZ					=	$(PREFIX)size
 NM					=	$(PREFIX)nm
 ST					=	$(PREFIX)strip
 READELF				=	$(PREFIX)readelf
-#// --------------------------------------------------
 
 #// --------------------------------------------------
 #// Common Path
 #// --------------------------------------------------
-OUT_PATH			=	out/$(SYSTEM)/$(TARGET)/$(APP_NAME)
+OUT_PATH			=	out/$(SYSTEM)/$(TARGET)/$(BUILD_NAME)
 OBJ_PATH			=	$(OUT_PATH)/objs
 
 LIB_PATH			=	lib
@@ -118,17 +291,32 @@ include make/configure-in.os
 #// --------------------------------------------------
 #// Specific LD File
 #// --------------------------------------------------
-LD_CM_FILE_NAME	= cmx_common.ld
-LD_FILE_NAME		= cmx_single_huge_7291s1.ld
-LD_CM_FILE			= $(LIB_MODEM_PATH)/$(LD_CM_FILE_NAME)
-LD_FILE				= $(LIB_MODEM_PATH)/$(LD_FILE_NAME)
+LD_CM_FILE_NAME_RUNRAM = cmx_common_runram.ld
+LD_FILE_NAME_RUNRAM = cmx_single_huge_7292.ld
+LD_CM_FILE_NAME_NORMAL = cmx_common.ld
+LD_FILE_NAME_NORMAL = cmx_single_huge_7291s1.ld
+
+ifeq ($(CONFIG_RUNRAM), y)
+LD_CM_FILE_NAME		=	$(LD_CM_FILE_NAME_RUNRAM)
+LD_FILE_NAME		=	$(LD_FILE_NAME_RUNRAM)
+else
+LD_CM_FILE_NAME	= $(LD_CM_FILE_NAME_NORMAL)
+LD_FILE_NAME		= $(LD_FILE_NAME_NORMAL)
+endif
+LD_CM_FILE		=	$(LIB_MODEM_PATH)/$(LD_CM_FILE_NAME)
+LD_FILE			=	$(LIB_MODEM_PATH)/$(LD_FILE_NAME)
 
 #// --------------------------------------------------
 #// System/Target Dependent Define
 #// --------------------------------------------------
 # PRO_FPGA : 2STA platform and no RF
-DEFINE	+= -DCONFIG_OS_FREERTOS -DPRO_FPGA
-DEFINE	+= -DconfigTOTAL_HEAP_SIZE=419840
+DEFINE	+= -DCONFIG_OS_FREERTOS
+DEFINE	+= -DPRO_FPGA
+ifeq ($(CONFIG_RUNRAM), y)
+DEFINE	+= -DconfigTOTAL_HEAP_SIZE=160000
+else
+DEFINE	+= -DconfigTOTAL_HEAP_SIZE=404720
+endif
 
 #// --------------------------------------------------
 #// APP Core
@@ -146,16 +334,15 @@ endif
 
 SDK_PROJECT = $(SDK_APPS)/$(PROJECT_FOLDER)
 
+INCLUDE	+= -I$(SDK_INC)
 INCLUDE += -I$(SDK_WIFI_COMMON)
 INCLUDE += -I$(SDK_PROJECT)
-INCLUDE	+= -I$(SDK_INC)
 
+VPATH += $(SDK_INC):$(SDK_APPS)
 VPATH += $(SDK_PROJECT):$(SDK_WIFI_COMMON)
 
-DEFINE += -DNRC_USER_APP
-
-include $(SDK_PROJECT)/Makefile
 include $(SDK_PROJECT)/.config
+include $(SDK_PROJECT)/Makefile
 
 #// --------------------------------------------------
 #// Build Information
@@ -163,12 +350,17 @@ include $(SDK_PROJECT)/.config
 PWD := $(shell pwd)
 UNAME := "$(shell uname -a)"
 TIMEFMT := --format="- %e Seconds"
+
 #// --------------------------------------------------
 
 #// --------------------------------------------------
-#// Bulid Flag
+#// Build Flag
 #// --------------------------------------------------
+ifneq ($(findstring cm3, $(ALIAS)), )
+ARCH_FLAGS      = -mcpu=cortex-m3 -mthumb
+else
 ARCH_FLAGS	= -mcpu=cortex-m0 -mthumb
+endif
 SYS_FLAGS	= --specs=nosys.specs
 
 CPPFLAGS = --std=gun++1y -Wno-literal-suffix -fpermissive -fno-rtti
@@ -189,6 +381,7 @@ CPFLAGS	= -O binary
 ODFLAGS = -S -C --demangle
 ASFLAGS	=
 NMFLAGS	= -S --demangle --size-sort -s -r
+
 #// --------------------------------------------------
 
 include make/Makefile.feature.lib

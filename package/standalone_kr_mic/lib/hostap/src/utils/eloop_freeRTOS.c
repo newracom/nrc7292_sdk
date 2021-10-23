@@ -55,9 +55,10 @@ struct eloop_global {
 };
 
 static struct eloop_global	eloop;
-static StaticTimer_t		eloop_timer;
+//static StaticTimer_t		eloop_timer;
 static TickType_t eloop_rearrange_timeout(void);
 
+#if 0
 #ifdef CONFIG_NO_STDOUT_DEBUG
 #include "system_common.h"
 #include "hal_uart.h"
@@ -70,6 +71,7 @@ static void wpa_printf(int level, const char *fmt, ...)
 	system_vprintf(fmt, ap);
 	system_printf("\n");
 }
+#endif
 #endif
 #endif
 
@@ -381,7 +383,7 @@ int eloop_deplete_timeout(unsigned int req_secs, unsigned int req_usecs,
 	if (!lock_timeout_list())
 		return -1;
 
-	wpa_printf(MSG_INFO, "eloop: %s", __func__);
+	//wpa_printf(MSG_INFO, "eloop: %s", __func__);
 
 	dl_list_for_each(tmp, &eloop.timeout, struct eloop_timeout, list) {
 		if (tmp->handler == handler &&
@@ -415,7 +417,7 @@ int eloop_replenish_timeout(unsigned int req_secs, unsigned int req_usecs,
 {
 	struct os_reltime now, requested, remaining;
 	struct eloop_timeout *tmp;
-	int ret = -1;
+	//int ret = -1;
 
 	if (!lock_timeout_list())
 		return -1;

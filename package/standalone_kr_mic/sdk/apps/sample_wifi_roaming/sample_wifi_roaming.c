@@ -409,25 +409,33 @@ exit:
  * Parameters   : WIFI_CONFIG
  * Returns      : 0 or -1 (0: success, -1: fail)
  *******************************************************************************/
-int  run_sample_wifi_roaming(WIFI_CONFIG *param)
+nrc_err_t run_sample_wifi_roaming(WIFI_CONFIG *param)
 {
 	init_roaming_info(&roaming_info);
 
 	nrc_usr_print("[%s] Sample App for Wifi Roaming  \n",__func__);
+	tWIFI_STATE_ID wifi_state = WIFI_STATE_INIT;
 
-	if (wifi_init(param)!= WIFI_SUCCESS) {
-		nrc_usr_print ("[%s] ASSERT! Fail for init\n", __func__);
-		return RUN_FAIL;
+	/* set initial wifi configuration */
+	while(1){
+		if (wifi_init(param)== WIFI_SUCCESS) {
+			nrc_usr_print ("[%s] wifi_init Success !! \n", __func__);
+			break;
+		} else {
+			nrc_usr_print ("[%s] wifi_init Failed !! \n", __func__);
+			_delay_ms(1000);
+		}
 	}
 
-	if (nrc_wifi_scan() != WIFI_SUCCESS){
-		nrc_usr_print( "%s nrc_wifi_scan fail\n", __func__);
-		return RUN_FAIL;
-	}
-
-	if (nrc_wifi_scan_results(&results)!= WIFI_SUCCESS) {
-		nrc_usr_print ("[%s] Fail to scan\n", __func__);
-		return RUN_FAIL;
+	/* find AP */
+	while(1){
+		if (nrc_wifi_scan() == WIFI_SUCCESS){
+			if (nrc_wifi_scan_results(&results)== WIFI_SUCCESS)
+				break;
+		} else {
+			nrc_usr_print ("[%s] Scan fail !! \n", __func__);
+		}
+		_delay_ms(1000);
 	}
 	display_scan_results(&results);
 
@@ -453,11 +461,11 @@ int  run_sample_wifi_roaming(WIFI_CONFIG *param)
 	}
 
 	if (error_val < 0)
-		return RUN_FAIL;
+		return NRC_FAIL;
 
 	nrc_usr_print("[%s] End of user_init!! \n",__func__);
 
-	return RUN_SUCCESS;
+	return NRC_SUCCESS;
 
 }
 
@@ -470,7 +478,7 @@ int  run_sample_wifi_roaming(WIFI_CONFIG *param)
  *******************************************************************************/
 void user_init(void)
 {
-	int ret = 0;
+	nrc_err_t ret;
 	WIFI_CONFIG* param;
 
 	nrc_uart_console_enable();

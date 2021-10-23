@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2020 Newracom, Inc.
+ * Copyright (c) 2021 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,124 +26,98 @@
 #ifndef __NRC_API_WIFI_H__
 #define __NRC_API_WIFI_H__
 
+#include "nrc_types.h"
+
+#define DHCP_CLIENT_TIMEOUT_DEFAULT		(10000) /* msec */
+
+#define WIFI_TX_POWER_MIN            1		/* minimum value of tx power input range */
+#define WIFI_TX_POWER_MAX            30		/* maximum value of tx power input range */
+
 /**********************************************
- * @struct NRC_UART_CONFIG
- * @brief UART configuration parameters
+ * @fn  tWIFI_STATUS nrc_wifi_get_ip_mode(tWIFI_IP_MODE* mode)
+ *
+ * @brief Get IP address mode
+ *
+ * @param mode: WIFI_STATIC_IP or WIFI_DYNAMIC_IP
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
+tWIFI_STATUS nrc_wifi_get_ip_mode(tWIFI_IP_MODE* mode);
 
-#define DHCP_CLIENT_TIMEOUT_DEFAULT		(5000) /* msec */
-
-/** @brief security mode */
-typedef enum {
-	MODE_OPEN	= 0,
-	MODE_WPA2	= 1,
-	MODE_SEC_MAX,
-} NRC_WIFI_SECURITY;
-
-/** @brief connection results	*/
-typedef enum {
-	WIFI_INIT_FAIL 			= -1,
-	WIFI_GET_ND				= -2,
-	WIFI_SET_FAIL 			= -3,
-	WIFI_CONNECTION_FAIL	= -4,
-	WIFI_DHCP_FAIL			= -5,
-	WIFI_DHCP_TIMEOUT		= -6,
-	WIFI_SET_IP_FAIL		= -7,
-	WIFI_SOFTAP_FAIL		= -8,
-	WIFI_SUCCESS			= 0,
-}NRC_WIFI_CONN_RET;
-
-/** @brief scan item */
-typedef union
-{
-	char *items[5];
-	struct
-	{
-		char *bssid;
-		char *freq;
-		char *sig_level;
-		char *flags;
-		char *ssid;
-	};
-} SCAN_RESULT;
-
-/** @brief scan list */
-typedef struct
-{
-#define SCAN_RESULT_BUFFER_SIZE		512
-#define SCAN_RESULT_NUM				10
-
-	int n_result;
-	SCAN_RESULT result[SCAN_RESULT_NUM];
-} SCAN_RESULTS;
 
 /**********************************************
- * @fn bool nrc_wifi_get_dhcp(void)
+ * @fn tWIFI_STATUS nrc_wifi_set_ip_mode(tWIFI_IP_MODE mode, char* ip_addr)
  *
- * @brief Get DHCP state
+ * @brief Enable DHCP cient or set static IP
  *
- * @return true(enabled) or false(disabled)
+ * @param mode: WIFI_STATIC_IP or WIFI_DYNAMIC_IP
+ *
+ * @param ip_addr: IP address for static IP
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-bool nrc_wifi_get_dhcp(void);
+tWIFI_STATUS nrc_wifi_set_ip_mode(tWIFI_IP_MODE mode, char* ip_addr);
 
 
 /**********************************************
- * @fn bool nrc_wifi_set_dhcp(bool dhcp, char *ip_addr)
+ * @fn tWIFI_STATUS nrc_wifi_set_ip_address(void)
  *
- * @brief Set DHCP or static IP
+ * @brief Set IP address
  *
- * @param dhcp: true(DHCP) or false(static IP)
- *
- * @return true(success) or false(fail)
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-bool nrc_wifi_set_dhcp(bool dhcp, char *ip_addr);
+tWIFI_STATUS nrc_wifi_set_ip_address(void);
 
 
 /**********************************************
- * @fn char* nrc_wifi_get_ip_address(void)
- *
- * @brief Get IP address
- *
- * @return IP address
- ***********************************************/
-char* nrc_wifi_get_ip_address(void);
-
-
-/**********************************************
- * @fn int nrc_wifi_add_network(void)
+ * @fn tWIFI_STATUS nrc_wifi_add_network(int *index)
  *
  * @brief Add network index for Wi-Fi connection
  *
- * @return If it's bigger than 0, then it means a network index. Otherwise, it's fail.
+ * @param index: network index (>= 0)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-int nrc_wifi_add_network(void);
+tWIFI_STATUS nrc_wifi_add_network(int *index);
 
 /**********************************************
- * @fn int nrc_wifi_remove_network(int index)
+ * @fn  tWIFI_STATUS nrc_wifi_remove_network(int index)
  *
  * @brief Remove network index for Wi-Fi connection
  *
  * @param index: network index
  *
- * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-int nrc_wifi_remove_network(int index);
+tWIFI_STATUS nrc_wifi_remove_network(int index);
 
 
 /**********************************************
- * @fn int nrc_wifi_set_country(char *country_code)
+ * @fn tWIFI_STATUS nrc_wifi_get_country(tWIFI_COUNTRY_CODE *country_code)
+ *
+ * @brief Get country code
+ *
+ * @param country_code: country code value
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_country(tWIFI_COUNTRY_CODE *country_code);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_country(char *country_code)
  *
  * @brief Set country code
  *
- * @param country_code: country code (JP, KR, US, TW, EU)
+ * @param country_code: country code value
  *
- * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-int nrc_wifi_set_country(char *country_code);
+tWIFI_STATUS nrc_wifi_set_country(tWIFI_COUNTRY_CODE country_code);
 
 
 /**********************************************
- * @fn int nrc_wifi_set_ssid(int index, char *ssid)
+ * @fn tWIFI_STATUS nrc_wifi_set_ssid(int index, char *ssid)
  *
  * @brief Set SSID of AP that STA wants to connect
  *
@@ -151,13 +125,13 @@ int nrc_wifi_set_country(char *country_code);
  *
  * @param ssid: SSID
  *
- * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-int nrc_wifi_set_ssid(int index, char *ssid);
+tWIFI_STATUS nrc_wifi_set_ssid(int index, char *ssid);
 
 
 /**********************************************
- * @fn int nrc_wifi_set_bssid(int index, char *bssid)
+ * @fn tWIFI_STATUS nrc_wifi_set_bssid(int index, char *bssid)
  *
  * @brief Set BSSID of AP that STA wants to connect
  *
@@ -165,71 +139,121 @@ int nrc_wifi_set_ssid(int index, char *ssid);
  *
  * @param bssid: BSSID
  *
- * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-int nrc_wifi_set_bssid(int index, char *bssid);
+tWIFI_STATUS nrc_wifi_set_bssid(int index, char *bssid);
 
 
 /**********************************************
- * @fn int nrc_wifi_set_security(int index, int mode, char *password)
+ * @fn tWIFI_STATUS nrc_wifi_set_scan_freq(int index, uint16_t *freq, uint8_t num_freq)
+ *
+ * @brief Set scan list for scan AP
+ *
+ * @param index: network index
+ *
+ * @param freq: freq list to scan
+ *
+ * @param num_freq: num of freq
+
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_scan_freq(int index, uint16_t *freq, uint8_t num_freq);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_bssid(char *bssid)
+ *
+ * @brief Get the BSSID of the AP to establish connection
+ *
+ * @param bssid: BSSID
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_bssid(char *bssid);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_security(int index, int mode, char *password)
  *
  * @brief Set security parameters for Wi-Fi connection
  *
  * @param index: network index
  *
- * @param mode: security mode (Open, WPA1, WPA2)
+ * @param mode: security mode
  *
  * @param password: PASSWORD
  *
- * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-int nrc_wifi_set_security(int index, int mode, char *password);
+tWIFI_STATUS nrc_wifi_set_security(int index, int mode, char *password);
 
 
 /**********************************************
- * @fn int nrc_wifi_scan(void)
+ * @fn tWIFI_STATUS nrc_wifi_get_enable_key(bool *enable)
+ *
+ * @brief Get information on whether security is active.
+ *
+ * @param enable: enable
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ * ***********************************************/
+tWIFI_STATUS nrc_wifi_get_enable_key(bool *enable);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_scan(void)
  *
  * @brief Start scan procedure (sync: block until scan is done)
  *
- * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-int nrc_wifi_scan(void);
+tWIFI_STATUS nrc_wifi_scan(void);
 
 
 /**********************************************
- * @fn int nrc_wifi_scan_results(SCAN_RESULTS *results)
+ * @fn tWIFI_STATUS nrc_wifi_scan_results(SCAN_RESULTS *results)
  *
  * @brief Get scan results
  *
  * @param results: scan list
  *
- * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-int nrc_wifi_scan_results(SCAN_RESULTS *results);
+tWIFI_STATUS nrc_wifi_scan_results(SCAN_RESULTS *results);
 
 
 /**********************************************
- * @fn int nrc_wifi_connect(int index)
+ * @fn tWIFI_STATUS nrc_wifi_abort_scan(void)
+ *
+ * @brief Stop scan procedure (async: unblock regardless of getting scan done)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_abort_scan(void);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_disassociate(char* mac_addr)
+ *
+ * @brief Disassociate all stations or a specific station equal to mac address.
+ *
+ * @param results: broadcast(ff:ff:ff:ff:ff:ff) or single sta's  MAC Address
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_disassociate(char* mac_addr);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_connect(int index)
  *
  * @brief Start connection (sync: block until association is connected)
  *
  * @param index: network index
  *
- * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-int nrc_wifi_connect(int index);
-
-
-/**********************************************
- * @fn int nrc_wifi_connect_async(int index)
- *
- * @brief Start connection (async: unblock regardless of getting connected)
- *
- * @param index: network index
- *
- * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
- ***********************************************/
-int nrc_wifi_connect_async(int index);
+tWIFI_STATUS nrc_wifi_connect(int index);
 
 
 /**********************************************
@@ -239,69 +263,298 @@ int nrc_wifi_connect_async(int index);
  *
  * @param index: network index
  *
- * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-int nrc_wifi_disconnect(int index);
+tWIFI_STATUS nrc_wifi_disconnect(int index);
 
 
 /**********************************************
- * @fn int nrc_wifi_disconnect_sync(int index)
+ * @fn  tWIFI_STATUS nrc_wifi_get_ip_address(char** ip_addr)
  *
- * @brief Start disconnection (sync: block until getting disconnected)
+ * @brief Get IP address. Start DHCP or set static IP (Sync: block until getting IP)
  *
- * @param index: network index
+ * @param ip_addr: ip address
  *
- * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-int nrc_wifi_disconnect_sync(int index);
+tWIFI_STATUS nrc_wifi_get_ip_address(char **ip_addr);
 
 
 /**********************************************
- * @fn int nrc_wifi_get_ip(void)
- *
- * @brief Get IP address. Start DHCP or set Static IP (Sync: block until getting IP)
- *
- * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
- ***********************************************/
-int nrc_wifi_get_ip(void);
-
-
-/**********************************************
- * @fn WLAN_STATE_ID nrc_wifi_get_state(void)
- *
- * @brief Get state of Wi-Fi connection
- *
- * @return WLAN_STATE_ID
- ***********************************************/
-WLAN_STATE_ID nrc_wifi_get_state(void);
-
-
-/**********************************************
- * @fn WLAN_STATE_ID nrc_wifi_set_state(WLAN_STATE_ID state)
+ * @fn tWIFI_STATUS nrc_wifi_set_state(tWIFI_STATE_ID state)
  *
  * @brief Set state of Wi-Fi connection
  *
- * @param state: wifi state
+ * @param state: Wi-Fi State
  *
- * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-void nrc_wifi_set_state(WLAN_STATE_ID state);
+tWIFI_STATUS nrc_wifi_set_state(tWIFI_STATE_ID state);
 
 
 /**********************************************
- * @fn int nrc_wifi_softap_set_ip(char *ip_addr)
+ * @fn tWIFI_STATUS nrc_wifi_get_state(tWIFI_STATE_ID* state)
+ *
+ * @brief Get state of Wi-Fi connection
+ *
+ * @param state: Wi-Fi State
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_state(tWIFI_STATE_ID* state);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_tx_power(int txpower)
+ *
+ * @brief Set TX Power
+ *
+ * @param txpower: TX Power (in dBm) (8~18)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_tx_power(int txpower);
+
+
+/**********************************************
+ * @fn int nrc_wifi_get_tx_power(int *txpower)
+ *
+ * @brief Get TX Power
+ *
+ * @param txpower: TX Power (in dBm)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_tx_power(int *txpower);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_register_event_handler(event_callback_fn fn)
+ *
+ * @brief Regiest event handler for connection and DHCP
+ *
+ * @param fn: Callback function for wifi connection and DHCP
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_register_event_handler(event_callback_fn fn);
+
+
+/**********************************************
+ * @fn  tWIFI_STATUS nrc_wifi_get_rssi(int8_t* rssi)
+ *
+ * @brief Get RSSI
+ *
+ * @param rssi: RSSI value (in dB)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_rssi(int8_t *rssi);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_snr(uint8_t* snr)
+ *
+ * @brief Get SNR
+ *
+ * @param snr: SNR value (in dB)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_snr(uint8_t *snr);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_mac_address(char **addr)
+ *
+ * @brief Get MAC address
+ *
+ * @param addr: MAC address
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_mac_address(char **addr);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_device_mode(tWIFI_DEVICE_MODE *mode)
+ *
+ * @brief Get the current device mode
+ *
+ * @param mode: device mode (WIFI_MODE_STATION:0, WIFI_MODE_AP:1, WIFI_MODE_MESH_POINT:2)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_device_mode(tWIFI_DEVICE_MODE *mode);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_rate_control(bool enable)
+ *
+ * @brief Configure the MCS rate control option
+ *
+ * @param enable: 1(enable) or 0(disable)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_rate_control(bool enable);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_rate_control(bool *enable)
+ *
+ * @brief Get the MCS rate control option
+ *
+ * @param enable: 1(enable) or 0(disable)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_rate_control(bool *enable);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_aid(int *aid)
+ *
+ * @brief Get association ID, allocated by AP
+ *
+ * @param aid: association id
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_aid(int *aid);
+
+
+/**********************************************
+ * @fn int nrc_wifi_get_network_index(int *index)
+ *
+ * @brief Get the current network index
+ *
+ * @param index: network index
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_network_index(int *index);
+
+
+/**********************************************
+ * @fn tWIFI_COUNTRY_CODE nrc_wifi_country_from_string (const char *str)
+ *
+ * @brief Get country code index from string
+ *
+ * @param str: country code ("KR", "US", "JP", "TW", "EU", "CN", "NZ", "AU")
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_COUNTRY_CODE nrc_wifi_country_from_string(const char *str);
+
+
+/**********************************************
+ * @fn const char *nrc_wifi_country_to_string(tWIFI_COUNTRY_CODE cc)
+ *
+ * @brief Get string from country code index
+ *
+ * @param cc: country code index (tWIFI_COUNTRY_CODE)
+ *
+ * @return If success, then string. Otherwise null.
+ ***********************************************/
+const char *nrc_wifi_country_to_string(tWIFI_COUNTRY_CODE cc);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS register_vendor_ie_handler(int cmd, vendor_ie_event_callback_fn func)
+ *
+ * @brief Register vendor ie handler
+ *
+ * @param cmd: command value (0xF0 ~ 0xF4)
+ *
+ * @param func: event callback function
+ *
+ * @return If success, then string. Otherwise null.
+ ***********************************************/
+tWIFI_STATUS register_vendor_ie_handler(int cmd, vendor_ie_event_callback_fn func);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS unregister_vendor_ie_handler(int cmd)
+ *
+ * @brief Unregister vendor ie handler
+ *
+ * @param cmd: command value (0xF0 ~ 0xF4)
+ *
+ * @return If success, then string. Otherwise null.
+ ***********************************************/
+tWIFI_STATUS unregister_vendor_ie_handler(int cmd);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_s1g_config(uint8_t s1g_channel)
+ *
+ * @brief Set S1G channel
+ *
+ * @param s1g_channel: S1G channel
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_s1g_config(uint16_t s1g_channel);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_wps_pbc()
+ *
+ * @brief Set WPS Pushbutton
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_wps_pbc();
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_channel(uint32_t s1g_freq)
+ *
+ * @brief Set frequency (Sub-1GHz)
+ *
+ * @param s1g_freq: S1G channel frequency (MHz/10)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_channel(uint32_t s1g_freq);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_channel(uint32_t *s1g_freq)
+ *
+ * @brief Get frequency (Sub-1GHz)
+ *
+ * @param s1g_freq: S1G channel frequency (MHz/10)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_channel(uint32_t *s1g_freq);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_ch_bw(uint8_t bandwidth)
+ *
+ * @brief Get channel bandwidth
+ *
+ * @param bandwidth: 0(1M BW) or 1(2M BW) or 2(4M BW)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_ch_bw(uint8_t *bandwidth);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_softap_set_ip(char *ip_addr)
  *
  * @brief Set IP for softap
  *
  * @param ip_addr: IP address
  *
- * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-int nrc_wifi_softap_set_ip(char *ip_addr);
+tWIFI_STATUS nrc_wifi_softap_set_ip(char *ip_addr);
 
 
 /**********************************************
- * @fn int nrc_wifi_softap_set_conf(int index, char *ssid, int channel, int sec_mode, char *password)
+ * @fn tWIFI_STATUS nrc_wifi_softap_set_conf(int index, char *ssid, int channel, int sec_mode, char *password)
  *
  * @brief Set configuration for softap
  *
@@ -311,161 +564,35 @@ int nrc_wifi_softap_set_ip(char *ip_addr);
  *
  * @param channel: 11ah channel
  *
- * @param sec_mode: security mode (Open or WPA2)
+ * @param mode: security mode (tWIFI_SECURITY)
  *
  * @param password: PASSWORD
  *
- * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-int nrc_wifi_softap_set_conf(int index, char *ssid, int channel, int sec_mode, char *password);
+tWIFI_STATUS nrc_wifi_softap_set_conf(int index, char *ssid, int channel, int sec_mode, char *password);
 
 
 /**********************************************
- * @fn int nrc_wifi_softap_start(int index)
+ * @fn tWIFI_STATUS nrc_wifi_softap_start(int index)
  *
  * @brief Start softap
  *
  * @param index: network index
  *
- * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-int nrc_wifi_softap_start(int index);
+tWIFI_STATUS nrc_wifi_softap_start(int index);
 
 
 /**********************************************
- * @fn int nrc_wifi_softap_start_dhcp_server(void)
+ * @fn tWIFI_STATUS nrc_wifi_softap_start_dhcp_server(void)
  *
  * @brief Start DHCP Server
  *
- * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-int nrc_wifi_softap_start_dhcp_server(void);
+tWIFI_STATUS nrc_wifi_softap_start_dhcp_server(void);
 
 
-/**********************************************
- * @fn int nrc_wifi_set_tx_power(int tx_power)
- *
- * @brief Set TX Power
- *
- * @param tx_power: TX Power (in dBm) (8~18)
- *
- * @return If success, then WIFI_SUCCESS. Otherwise, error code(NRC_WIFI_CONN_RET) is returned.
- ***********************************************/
-int nrc_wifi_set_tx_power(int tx_power);
-
-
-/**********************************************
- * @fn int nrc_wifi_get_tx_power(void)
- *
- * @brief Get TX Power
- *
- * @return TX Power (in dBm) (8~18)
- ***********************************************/
-int nrc_wifi_get_tx_power(void);
-
-
-/**********************************************
- * @fn void nrc_wifi_register_event_handler(event_callback_fn fn)
- *
- * @brief Regiest event handler for connection and dhcp
- *
- * @param fn: event handler for wifi connection and dhcp
- *
- * @return N/A
- ***********************************************/
-void nrc_wifi_register_event_handler(event_callback_fn fn);
-
-
-/**********************************************
- * @fn int8_t nrc_wifi_get_rssi(void)
- *
- * @brief Get RSSI
- *
- * @return RSSI (in dB)
- ***********************************************/
-int8_t nrc_wifi_get_rssi(void);
-
-
-/**********************************************
- * @fn int nrc_wifi_get_snr(void)
- *
- * @brief Get SNR
- *
- * @return SNR (in dB)
- ***********************************************/
-uint32_t nrc_wifi_get_snr(void);
-
-
-/**********************************************
- * @fn char* nrc_wifi_get_mac_address(void)
- *
- * @brief Get MAC address
- *
- * @return MAC address string("%02x:%02x:%02x:%02x:%02x:%02x")
- ***********************************************/
-char* nrc_wifi_get_mac_address(void);
-
-
-/**********************************************
- * @fn void nrc_wifi_set_rate_control(bool enable)
- *
- * @brief Configure the MCS rate control option
- *
- * @param enable: true or false
- *
- * @return N/A
- ***********************************************/
-void nrc_wifi_set_rate_control(bool enable);
-
-
-/**********************************************
- * @fn bool nrc_wifi_get_rate_control(void)
- *
- * @brief Get the MCS rate control option
- *
- * @return true or false
- ***********************************************/
-bool nrc_wifi_get_rate_control(void);
-
-
-/**********************************************
- * @fn void nrc_wifi_set_mcs(uint8_t mcs)
- *
- * @brief Configure the MCS index
- *
- * @param mcs: MCS index(0~7 or 10)
- *
- * @return N/A
- ***********************************************/
-void nrc_wifi_set_mcs(uint8_t mcs);
-
-
-/**********************************************
- * @fn uint8_t nrc_wifi_get_mcs(void)
- *
- * @brief Get the current MCS index
- *
- * @return MCS index(0~7 or 10)
- ***********************************************/
-uint8_t nrc_wifi_get_mcs(void);
-
-
-/**********************************************
- * @fn void nrc_wifi_set_network_index(int)
- *
- * @brief Set the current Network index
- *
- * @return N/A
- ***********************************************/
-void nrc_wifi_set_network_index(int index);
-
-
-/**********************************************
- * @fn int nrc_wifi_get_network_index(void)
- *
- * @brief Get the current Network index
- *
- * @return Current Network index
- ***********************************************/
-int nrc_wifi_get_network_index(void);
 #endif /* __NRC_API_WIFI_H__ */

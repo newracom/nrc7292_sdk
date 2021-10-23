@@ -24,6 +24,7 @@
  */
 
 #include "nrc_sdk.h"
+#include "wifi_config_setup.h"
 #include "mxml.h"
 
 #define BUFFER_SIZE	256
@@ -100,10 +101,14 @@ static void create_xml_objects(char *buffer, int buffer_size)
  * Parameters   : void
  * Returns      : 0 or -1 (0: success, -1: fail)
  *******************************************************************************/
-int  run_sample_xml(void)
+nrc_err_t run_sample_xml(void)
 {
 	char* data;
 	data = nrc_mem_malloc(BUFFER_SIZE + 1);
+
+	if(!data)
+		return NRC_FAIL;
+
 	memset(data, 0x0, BUFFER_SIZE);
 
 	/* Create Object */
@@ -116,7 +121,7 @@ int  run_sample_xml(void)
 		nrc_mem_free(data);
 
 	nrc_usr_print("[%s] End of run_sample_xml!! \n",__func__);
-	return RUN_SUCCESS;
+	return NRC_SUCCESS;
 }
 
 
@@ -128,7 +133,7 @@ int  run_sample_xml(void)
  *******************************************************************************/
 void user_init(void)
 {
-	int ret = 0;
+	nrc_err_t ret;
 	WIFI_CONFIG* param;
 
 	nrc_uart_console_enable();

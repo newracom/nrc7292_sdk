@@ -28,80 +28,84 @@
 
 
 /**********************************************
- * @fn void nrc_i2c_init(uint32_t clk)
+ * @fn nrc_err_t nrc_i2c_init(uint32_t clk)
  *
  * @brief Initialize I2C controller
  *
+ * @param scl: Clock line for i2c
+ *
+ * @param sda: Data line for i2c
+ *
  * @param clk: Clock speed of I2C controller. It can be set up to 400,000Hz.
  *
- * @return N/A
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-void nrc_i2c_init(uint32_t clk);
+nrc_err_t nrc_i2c_init(uint8_t scl, uint8_t sda, uint32_t clk);
 
 
 /**********************************************
- * @fn void nrc_i2c_enable(bool enable)
+ * @fn nrc_err_t nrc_i2c_enable(bool enable)
  *
  * @brief Enable or disable I2C. And, DO NOT disable I2C while a transaction is in progress.
  * Please disable I2C only after a transaction is stopped.
  *
  * @param enable: true(enable) or false(disable)
  *
- * @return N/A
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-void nrc_i2c_enable(bool enable);
+nrc_err_t nrc_i2c_enable(bool enable);
 
 
 /**********************************************
- * @fn void nrc_i2c_reset(void)
+ * @fn nrc_err_t nrc_i2c_reset(void)
  *
  * @brief Reset I2C controller
  *
- * @return N/A
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-void nrc_i2c_reset(void);
+nrc_err_t nrc_i2c_reset(void);
 
 
 /**********************************************
- * @fn void nrc_i2c_start(void)
+ * @fn nrc_err_t nrc_i2c_start(void)
  *
  * @brief Start I2C operation
  *
- * @return N/A
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-void nrc_i2c_start(void);
+nrc_err_t nrc_i2c_start(void);
 
 
 /**********************************************
- * @fn void nrc_i2c_stop(void)
+ * @fn nrc_err_t nrc_i2c_stop(void)
  *
  * @brief Stop I2C operation
  *
- * @return N/A
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-void nrc_i2c_stop(void);
+nrc_err_t nrc_i2c_stop(void);
 
 
 /**********************************************
- * @fn bool nrc_i2c_waitack(void)
+ * @fn nrc_err_t nrc_i2c_waitack(void)
  *
  * @brief Wait ACK or NACK of I2C
  *
- * @return true(ACK) false(NACK)
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-bool nrc_i2c_waitack(void);
+nrc_err_t nrc_i2c_waitack(void);
 
 
 /**********************************************
- * @fn bool nrc_i2c_writebyte(uint8_t data)
+ * @fn nrc_err_t nrc_i2c_writebyte(uint8_t data)
  *
  * @brief Write data
  *
  * @param data: data to write
  *
- * @return true or false
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-bool nrc_i2c_writebyte(uint8_t data);
+nrc_err_t nrc_i2c_writebyte(uint8_t data);
 
 
 /**********************************************
@@ -113,7 +117,7 @@ bool nrc_i2c_writebyte(uint8_t data);
  *
  * @param ack: if there's no further reading registers, then false. otherwise, true.
  *
- * @return N/A
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-bool nrc_i2c_readbyte(uint8_t *data, bool ack);
+nrc_err_t nrc_i2c_readbyte(uint8_t *data, bool ack);
 #endif /* __NRC_API_I2C_H__ */

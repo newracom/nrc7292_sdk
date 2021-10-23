@@ -459,9 +459,11 @@ void ap_handle_timer(void *eloop_ctx, void *timeout_ctx)
 			goto skip_poll;
 		} else if (inactive_sec < hapd->conf->ap_max_inactivity) {
 			/* station activity detected; reset timeout state */
+#if 0
 			wpa_msg(hapd->msg_ctx, MSG_DEBUG,
 				"Station " MACSTR " has been active %is ago",
 				MAC2STR(sta->addr), inactive_sec);
+#endif
 			sta->timeout_next = STA_NULLFUNC;
 			next_time = hapd->conf->ap_max_inactivity + fuzz -
 				inactive_sec;

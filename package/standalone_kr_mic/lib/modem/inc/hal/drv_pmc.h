@@ -1,6 +1,9 @@
 #ifndef __DRV_PMC_H__
 #define __DRV_PMC_H__
 
+#define SEC_TO_HZ(s) s * 32768
+#define MS_TO_HZ(m) (m * 32768) / 1000
+
 enum {
     PMC_X32K = 0,
     PMC_X32M,
@@ -23,7 +26,8 @@ enum {
 };
 
 enum {
-    PMC_SLEEP0 = 1,
+    PMC_MODEMSLEEP = 0,
+    PMC_SLEEP0,
     PMC_SLEEP1,
     PMC_SLEEP2,
     PMC_DEEPSLEEP0,
@@ -44,6 +48,8 @@ void drv_pmc_deinit();
 void drv_pmc_reset();
 void drv_pmc_irq(bool enable);
 void drv_pmc_enable(bool enable);
+void drv_pmc_int0_level(uint32_t level);
+void drv_pmc_int1_level(uint32_t level);
 void drv_pmc_wakeup_source_mask(uint32_t source);
 void drv_pmc_opcode(uint32_t code);
 void drv_pmc_wait(uint32_t id, uint32_t value);
@@ -71,12 +77,15 @@ uint32_t drv_pmc_get_pwr_alarm_cnt(void);
 
 const char *drv_scfg_get_boot_reason_str(uint8_t reason);
 uint8_t drv_scfg_get_boot_reason();
+void drv_scfg_clr_boot_reason();
 
-void drv_pmc_enter_sleep0(uint32_t after_ms);
-void drv_pmc_execute_deepsleep(uint32_t after_ms);
-void drv_pmc_execute_modemsleep(uint32_t after_ms);
+void drv_pmc_sleep(int mode, uint64_t sleep_duration_ms);
+//void drv_pmc_enter_sleep0(uint32_t after_ms);
+void drv_pmc_execute_deepsleep(uint64_t after_ms);
+//void drv_pmc_execute_modemsleep(uint64_t after_ms);
+void remap_and_reset(int remap, int others);
 
-void drv_pmc_test(int mode, uint32_t duration_sec);
+//void drv_pmc_test(int mode, uint64_t duration_sec);
 void drv_pmc_show();
 
 #endif //__DRV_PMC_H__

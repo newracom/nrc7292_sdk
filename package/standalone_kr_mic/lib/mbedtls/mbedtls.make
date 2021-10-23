@@ -6,7 +6,7 @@ CRYPTO_SRCS	+= \
     aria.c \
     asn1parse.c \
     asn1write.c \
-    base64.c \
+    tls_base64.c \
     bignum.c \
     blowfish.c \
     camellia.c \
@@ -54,8 +54,8 @@ CRYPTO_SRCS	+= \
     rsa.c \
     rsa_internal.c \
     sha1.c \
-    sha256.c \
-    sha512.c \
+    mbed_sha256.c \
+    mbed_sha512.c \
     threading.c \
     timing.c \
     version.c \
@@ -92,11 +92,7 @@ PORTING_SRCS += \
 
 CSRCS += $(CRYPTO_SRCS)
 CSRCS += $(X509_SRCS)
-CSRCS += $(TLS_SRCS)
 CSRCS += $(PORTING_SRCS)
-
-# append prefix 'mbedtls_' and add files to CSRCS list
-#CSRCS += $(addprefix mbedtls_,$(CRYPTO_SRCS)) \
-#	$(addprefix mbedtls_,$(X509_SRCS)) \
-#	$(addprefix mbedtls_,$(TLS_SRCS)) \
-#	$(PORTING_SRCS)
+ifeq ($(CONFIG_LWIP), y)
+CSRCS += $(TLS_SRCS)
+endif #CONFIG_LWIP

@@ -2,26 +2,19 @@
 
 ## Notice
 ### Release roadmap
+- v1.3.4 (2021.10.22)
+- v1.3.3 (skip)
 - v1.3.2 (2020.09.16)
 - v1.3.1 (2020.08.05)
 - v1.3.0 (2020.07.19)
 
 ### Latest release
-- [NRC7292_Standalone_SDK_v1.3.2](https://github.com/newracom/nrc7292_sdk/releases/tag/v1.3.2)
+- [NRC7292_Standalone_SDK_v1.3.4](https://github.com/newracom/nrc7292_sdk/releases/tag/v1.3.4)
 
 ### Release package contents
-- standalone
-  - doc
-  - lib
-  - make
-  - sdk
-  - tools
-- standalone_kr_mic
-  - doc
-  - lib
-  - make
-  - sdk
-  - tools
+- standalone: NRC7292 standalone SDK package for global regulatory domains
+- standalone_kr_mic: NRC7292 standalone SDK package for South Korea MIC frequency regulation
+- standalone_kr_usn: NRC7292 standalone SDK package for South Korea USN frequency regulation
 
 ### Apply a specific package
 If you want to apply a specific package to your exiting package directory, you can choose one of following methods.

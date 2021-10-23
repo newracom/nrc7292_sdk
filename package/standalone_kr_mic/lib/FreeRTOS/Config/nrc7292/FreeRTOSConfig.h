@@ -114,7 +114,7 @@
 #define configUSE_MALLOC_FAILED_HOOK	0
 #define configUSE_APPLICATION_TASK_TAG	0
 #define configUSE_COUNTING_SEMAPHORES	1
-#define configGENERATE_RUN_TIME_STATS	0
+#define configGENERATE_RUN_TIME_STATS	1
 #define configUSE_TASK_NOTIFICATIONS	1
 
 #define configMAX_SYSCALL_INTERRUPT_PRIORITY 	0x10
@@ -128,7 +128,7 @@
 #define configUSE_TIMERS				0
 #else
 #define configUSE_TIMERS				1
-#define configTIMER_TASK_PRIORITY		( 2 )
+#define configTIMER_TASK_PRIORITY		( 3 )
 #define configTIMER_QUEUE_LENGTH		5
 #define configTIMER_TASK_STACK_DEPTH	( 1024 )
 #endif
@@ -164,14 +164,22 @@ standard names - or at least those used in the unmodified vector table. */
 
 /* The priority for the task that unblocked by the MAC interrupt to process
 received packets. */
-#define NRC_TASK_PRIORITY	( configMAX_PRIORITIES - 2 )
+#if defined (INCLUDE_NEW_TASK_ARCH)
+#define NRC_TASK_PRIORITY	( configMAX_PRIORITIES - 3 ) //29
+#else
+#define NRC_TASK_PRIORITY	( configMAX_PRIORITIES - 2 ) //30
+#endif //#if defined (NEW_TASK_ARCH)
 #define NRC_TASK_STACK_SIZE 	(2048 / sizeof(StackType_t))
 
 /* The priority of the task that runs the lwIP stack. */
-#define LWIP_TASK_PRIORITY	( configMAX_PRIORITIES - 3 )
+#define LWIP_TASK_PRIORITY	( configMAX_PRIORITIES - 3 ) //29
 #define LWIP_TASK_STACK_SIZE	( 2048 )
 
-#define LWIP_IPERF_TASK_PRIORITY	( configMAX_PRIORITIES - 5 )
+#if defined (INCLUDE_NEW_TASK_ARCH)
+#define LWIP_IPERF_TASK_PRIORITY	( configMAX_PRIORITIES - 3) //29
+#else
+#define LWIP_IPERF_TASK_PRIORITY	( configMAX_PRIORITIES - 5 ) //27
+#endif //#if defined (INCLUDE_NEW_TASK_ARCH)
 #define LWIP_IPERF_TASK_STACK_SIZE	( 512 )
 
 #define LWIP_PING_TASK_PRIORITY	( 3 )
@@ -180,5 +188,13 @@ received packets. */
 /* The priority of the task that runs the test task */
 #define TEST_TASK_PRIORITY	( 2 )
 #define TEST_TASK_STACK_SIZE 	(1024 / sizeof(StackType_t))
+
+/* The priority of the wlan_manager task */
+#if defined (INCLUDE_NEW_TASK_ARCH)
+#define WLAN_MANAGER_TASK_PRIORITY	NRC_TASK_PRIORITY
+#else
+#define WLAN_MANAGER_TASK_PRIORITY	NRC_TASK_PRIORITY-1
+#endif //#if defined (INCLUDE_NEW_TASK_ARCH)
+#define WLAN_MANAGER_STACK_SIZE	( 4096 )
 
 #endif /* FREERTOS_CONFIG_H */

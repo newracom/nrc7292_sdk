@@ -13,11 +13,7 @@ void phy_dbe_init();
 void phy_dfe_init_ap();
 void mdelay(uint32_t delay);
 
-#if defined(NRF_1M_BW_CENTER_FREQ)
-void phy_set_cfo2sfo_factor(double channel_freq, uint32_t op_mode);
-#else
 void phy_set_cfo2sfo_factor(uint32_t channel_freq, uint32_t op_mode);
-#endif
 void phy_arf_txgain_control(uint32_t arf_txgain);
 void phy_arf_rxgain_control(uint32_t arf_rxgain);
 void phy_arf_rxgain_fixed(uint32_t fixed_rxgain);
@@ -30,11 +26,7 @@ void phy_dfe_status_counter_rst();
 void phy_gain_adap_on();
 void phy_gain_adap_off();
 
-#if defined(NRF_1M_BW_CENTER_FREQ)
-void phy_op_bw(uint32_t bw, uint8_t pri1m);
-#else
 void phy_op_bw(uint32_t bw);
-#endif
 void phy_field_test();
 void phy_loopback_enable();
 void phy_loopback_disable();
@@ -79,15 +71,12 @@ void phy_prf_rxgain_lut_write(uint32_t ram_type);
 void phy_nrf_txgain_lut_write(uint32_t ram_type);
 void phy_nrf_rxgain_lut_write(uint32_t ram_type);
 void phy_nrf_txgain_control(uint32_t nrf_txgain);
+void phy_nrf_txgain_init_control(uint32_t nrf_txgain);
 void phy_nrf_rxgain_control(uint32_t nrf_rxgain);
 void phy_nrf_rxgain_fixed(uint32_t fixed_rxgain);
 void phy_nrf_rxgain_fixed_off();
 void phy_inter_power_scan(uint8_t range, uint8_t log);
 void hal_phy_set_bssid(bool enable, int index, int value);
-#if defined(NRF_1M_BW_CENTER_FREQ)
-void phy_nrf_singen_on(uint32_t freq);
-void phy_nrf_singen_off();
-#endif
 uint32_t phy_get_txgain();
 uint32_t phy_get_rxgain();
 #endif //__NRC_PHY_H__

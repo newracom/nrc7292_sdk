@@ -13,6 +13,7 @@
 static struct
 {
 	bool log;
+	bool host;
 
 	struct
 	{
@@ -31,6 +32,7 @@ static struct
 } g_atcmd_info =
 {
 	.log = true,
+	.host = false,
 
 	.ret =
 	{
@@ -226,10 +228,30 @@ int nrc_atcmd_send_cmd (const char *fmt, ...)
 
 int nrc_atcmd_send_data (char *data, int len)
 {
-	if (nrc_atcmd_send(data, len) < 0)
-		return -1;
+	if (g_atcmd_info.host)
+	{
+		static uint16_t seq = 0;
+		static char buf[ATCMD_PACKET_LEN_MAX];
+		atcmd_packet_t *packet = (atcmd_packet_t *)buf;
 
-	atcmd_log_send("DATA %d\n", len);
+		memcpy(packet->start, ATCMD_PACKET_START, ATCMD_PACKET_START_SIZE);
+		packet->seq = seq;
+		packet->len = len;
+		memcpy(packet->payload, data, len);
+		memcpy(packet->payload + len, ATCMD_PACKET_END, ATCMD_PACKET_END_SIZE);
+
+		if (nrc_atcmd_send(buf, len + ATCMD_PACKET_LEN_MIN) < 0)
+			return -1;
+
+		seq++;
+	}
+	else
+	{
+		if (nrc_atcmd_send(data, len) < 0)
+			return -1;
+	}
+
+	atcmd_log_send("DATA %d %d\n", !!g_atcmd_info.host, len);
 
 	return 0;
 }
@@ -251,7 +273,7 @@ static int nrc_atcmd_recv_info (char *msg, int len)
 
 	if (g_atcmd_info.cb.info)
 	{
-//		g_atcmd_info.cb.info(info, argc, argv);
+		g_atcmd_info.cb.info(0, 1, &msg);
 	}
 
 	return 0;
@@ -333,21 +355,17 @@ static int nrc_atcmd_recv_rxd (atcmd_rxd_t *rxd, char *msg)
 
 	nrc_atcmd_init_rxd(rxd);
 
-	if (memcmp(msg, "+RXD:", 5) != 0)
-	{
-		atcmd_error("\n");
+	if (memcmp(msg, "+RXD:", 5) == 0)
+		msg += 5;
+	else if (memcmp(msg, "+HRXD:", 6) == 0)
+		msg += 6;
+	else
 		return -1;
-	}
-
-	msg += 5;
 
 	for (argv[0] = msg, argc = 1 ; *msg != '\0' ; msg++)
 	{
 		if (argc > 4)
-		{
-			atcmd_error("\n");
 			return -1;
-		}
 
 		if (*msg == ',')
 		{
@@ -357,10 +375,7 @@ static int nrc_atcmd_recv_rxd (atcmd_rxd_t *rxd, char *msg)
 	}
 
 	if (argc != 2 && argc != 4)
-	{
-		atcmd_error("\n");
 		return -1;
-	}
 
 	rxd->verbose = argc == 4 ? true : false;
 
@@ -371,19 +386,13 @@ static int nrc_atcmd_recv_rxd (atcmd_rxd_t *rxd, char *msg)
 			case 0:
 				rxd->id = atoi(argv[i]);
 				if (rxd->id < 0)
-				{
-					atcmd_error("\n");
 					return -1;
-				}
 				break;
 
 			case 1:
 				rxd->len = atoi(argv[i]);
 				if (rxd->len < 0)
-				{
-					atcmd_error("\n");
 					return -1;
-				}
 				break;
 
 			case 2:
@@ -391,10 +400,7 @@ static int nrc_atcmd_recv_rxd (atcmd_rxd_t *rxd, char *msg)
 				int ip_len = strlen(argv[i]);
 
 				if (ip_len	< 7 || ip_len > 15)
-				{
-					atcmd_error("\n");
 					return -1;
-				}
 
 				strcpy(rxd->remote_addr, argv[i]);
 				break;
@@ -403,10 +409,7 @@ static int nrc_atcmd_recv_rxd (atcmd_rxd_t *rxd, char *msg)
 			case 3:
 				rxd->remote_port = atoi(argv[i]);
 				if (rxd->remote_port < 0)
-				{
-					atcmd_error("\n");
 					return -1;
-				}
 		}
 	}
 
@@ -556,17 +559,35 @@ void nrc_atcmd_recv (char *buf, int len)
 				break;
 
 			case ATCMD_MSG_INFO:
-				if (memcmp(msg.buf, "+RXD:", msg.cnt) == 0)
+				if (g_atcmd_info.host)
 				{
-					if (msg.cnt == 5)
-						msg.type = ATCMD_MSG_DATA;
-					continue;
+					if (memcmp(msg.buf, "+HRXD:", msg.cnt) == 0)
+					{
+						if (msg.cnt == 6)
+							msg.type = ATCMD_MSG_DATA;
+						continue;
+					}
+					else if (memcmp(msg.buf, "+HEVENT:", msg.cnt) == 0)
+					{
+						if (msg.cnt == 8)
+							msg.type = ATCMD_MSG_HEVENT;
+						continue;
+					}
 				}
-				else if (memcmp(msg.buf, "+SEVENT:", msg.cnt) == 0)
+				else
 				{
-					if (msg.cnt == 8)
-						msg.type = ATCMD_MSG_SEVENT;
-					continue;
+					if (memcmp(msg.buf, "+RXD:", msg.cnt) == 0)
+					{
+						if (msg.cnt == 5)
+							msg.type = ATCMD_MSG_DATA;
+						continue;
+					}
+					else if (memcmp(msg.buf, "+SEVENT:", msg.cnt) == 0)
+					{
+						if (msg.cnt == 8)
+							msg.type = ATCMD_MSG_SEVENT;
+						continue;
+					}
 				}
 
 				if (memcmp(msg.buf, "+WEVENT:", msg.cnt) == 0)
@@ -686,5 +707,15 @@ void nrc_atcmd_log_off (void)
 bool nrc_atcmd_log_is_on (void)
 {
 	return g_atcmd_info.log;
+}
+
+void nrc_atcmd_network_stack_host (void)
+{
+	g_atcmd_info.host = true;
+}
+
+void nrc_atcmd_network_stack_target (void)
+{
+	g_atcmd_info.host = false;
 }
 

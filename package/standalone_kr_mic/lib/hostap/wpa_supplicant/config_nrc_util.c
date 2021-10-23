@@ -17,9 +17,68 @@
 #include "config.h"
 #include "base64.h"
 
+#define USE_WLAN0_AUTO_CONFIG 0 //0: use (WPA)CLI, 1:use config
+
+#if 0 //Sample Config for  reference
+//Open
+const char* __attribute__((weak)) wlan0_conf =  "\n\
+{\n\
+ssid=\"halow_demo\"\n \
+key_mgmt=NONE\n \
+}";
+
+//WPA2-PSK
+const char* __attribute__((weak)) wlan0_conf =  "\n\
+{\n\
+ssid=\"halow_demo\"\n \
+proto=RSN\n \
+ieee80211w=0\n \
+key_mgmt=WPA-PSK\n \
+psk=\"12345678\"\n \
+}";
+
+//WPA3-SAE
+const char* __attribute__((weak)) wlan0_conf =  "\n\
+{\n\
+ssid=\"halow_demo\"\n \
+proto=RSN\n \
+ieee80211w=2\n \
+key_mgmt=SAE\n \
+sae_password=\"12345678\"\n \
+}";
+
+//WPA3-OWE
+const char* __attribute__((weak)) wlan0_conf =  "\n\
+{\n\
+ssid=\"halow_demo\"\n \
+proto=RSN\n \
+ieee80211w=2\n \
+key_mgmt=OWE\n \
+}";
+#endif
+
+#if USE_WLAN0_AUTO_CONFIG
+//WPA2
+const char* __attribute__((weak)) wlan0_conf =  "\n\
+{\n\
+ssid=\"halow_ap_sae\"\n \
+proto=RSN\n \
+ieee80211w=2\n \
+key_mgmt=SAE\n \
+sae_password=\"12345678\"\n \
+}";
+#else
 const char* __attribute__((weak)) wlan0_conf = NULL;
+#endif
 const char* __attribute__((weak)) wlan1_conf = NULL;
+
+#if USE_WLAN0_AUTO_CONFIG
+const char* __attribute__((weak)) global_conf = "\n\
+COUNTRY=US\n \
+NDP_PREQ=1";
+#else
 const char* __attribute__((weak)) global_conf = NULL;
+#endif
 
 extern const char* wlan0_conf;
 extern const char* wlan1_conf;
@@ -40,7 +99,6 @@ static char *os_strnchr(const char *s, const char ch, int *count, const int boun
 
 int find_text(char *start, char *end, char *copy_to)
 {
-	char* ret = NULL;
 	int len = end - start;
 
 	if (!start || !end || len < 0 || len > 1024) {
@@ -49,7 +107,6 @@ int find_text(char *start, char *end, char *copy_to)
 		return -1;
 	}
 
-	//ret = (char *) os_malloc(len + 1);
 	memcpy(copy_to, start, len);
 	copy_to[len] = 0;
 	return 0;
@@ -59,7 +116,6 @@ static struct wpa_ssid * wpa_config_read_network(char* str_conf, int id,
 											const int start, const int end)
 {
 	char *pos = str_conf + start, *delimiter;
-	char *delimiter_pos = NULL;
 	int err = 0, count = 0;
 	struct wpa_ssid *ssid = os_malloc(sizeof(*ssid));
 
@@ -67,7 +123,7 @@ static struct wpa_ssid * wpa_config_read_network(char* str_conf, int id,
 		wpa_printf(MSG_DEBUG, "%s: Failed to allocate ssid.", __func__);
 		return NULL;
 	}
-    memset( ssid , 0 , sizeof(*ssid) );
+	memset( ssid , 0 , sizeof(*ssid) );
 
 	dl_list_init(&ssid->psk_list);
 	ssid->id = id;
@@ -126,7 +182,7 @@ static struct wpa_ssid * wpa_config_read_network(char* str_conf, int id,
 }
 
 static char * find_next_network_block(const char* s, int offset, int len,
-												int *start, int *end)
+			int *start, int *end)
 {
 	const char ch_begin             = '{';
 	const char ch_end               = '}';
@@ -180,6 +236,14 @@ static void wpa_config_read_global(struct wpa_config *config, const char *s)
 			wpa_printf(MSG_DEBUG, "country = '%c%c'",
 				config->country[0], config->country[1]);
 		}
+
+#ifdef CONFIG_NDP_PREQ
+		if (os_strncmp("NDP_PREQ=", p, 9) == 0) {
+			int v = atoi ((p + 9));
+			if (v) config->fst_llt = v;
+			wpa_printf(MSG_DEBUG, "NDP_PREQ = '%d'", config->fst_llt);
+		}
+#endif
 
 		p += (count + 1);
 	}

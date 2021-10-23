@@ -1,0 +1,7 @@
+v1.2.0
+=> Command format change for AT+WPING and AT+SSEND (UDP).
+
+v1.3.0
+=> Refactoring.
+=> Passthrough mode support added.
+=> Asynchronous continuous transmission mode support removed.

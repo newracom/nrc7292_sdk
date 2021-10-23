@@ -37,6 +37,7 @@ struct lmac_cipher {
 	enum key_type key_type;
 	uint8_t		key_id;
 	uint32_t	key[MAX_KEY_LEN];
+	uint64_t	tx_pn;
 };
 
 typedef struct {
@@ -46,6 +47,7 @@ typedef struct {
 	uint8_t		ssid_len;	// key_length
 
 	uint8_t		security;
+	uint8_t		akm_type; //1:wpa2-ent, 2:wpa2-psk, 8:wpa3-sae, 18:wpa3-owe
 	uint16_t	beacon_interval;
 
 #if defined(STANDARD_11AH)
@@ -70,6 +72,7 @@ typedef struct {
 	uint8_t		rx_s1gmcs_map;
 	uint8_t		color;
 	uint8_t		traveling_pilot_support;
+	bool		s1g_1mctrlresppreamble_support;
 	uint32_t	base_pn_bk;
 	uint32_t	base_pn_be;
 	uint32_t	base_pn_vi;
@@ -124,10 +127,14 @@ typedef enum {
 
 typedef struct _umac_stainfo {
 	uint8_t maddr[6];
+	uint8_t vif_id;
 	uint16_t aid;			// key
 	uint32_t listen_interval;
 	bool bss_max_idle_period_idle_option;
 	uint16_t bss_max_idle_period;
+	bool aggregation[MAX_AC];
+	uint8_t maxagg_num[MAX_AC];
+	bool ba_session_tx[MAX_AC];
 #if defined(STANDARD_11AH)
    	bool s1g_long_support;
 	bool pv1_frame_support;
@@ -143,6 +150,7 @@ typedef struct _umac_stainfo {
 	uint8_t minimum_mpdu_start_spacing: 5;
 	uint8_t rx_s1gmcs_map;
 	uint8_t	traveling_pilot_support;
+	bool s1g_1mctrlresppreamble_support;
 	uint8_t	ssid[IEEE80211_MAX_SSID_LEN];
 	uint8_t	ssid_len;
 	uint32_t base_pn_bk;
@@ -156,7 +164,7 @@ typedef struct _umac_stainfo {
 			uint16_t tx_sn		: 12;
 			uint16_t win_end	: 12;
 			uint16_t win_start	: 12;
-			uint64_t win_bitmap	: MAX_AGG_SCHED_NUMBER;
+			uint64_t win_bitmap	: 16;
 		} qos_sn[MAX_TID];
 		uint16_t rx_sn		: 12;
 	} snmanager;
@@ -174,10 +182,18 @@ typedef struct _umac_stainfo {
 	uint8_t		snr;
 	uint8_t 	mcs;
 #endif /* defined(INCLUDE_SIGNAL_INFO_SOFTAP) */
+#if defined(INCLUDE_AVOID_FRAG_ATTACK)
+	uint32_t 	PN_H;
+	uint32_t 	PN_L;
+#endif /* INCLUDE_AVOID_FRAG_ATTACK */
 } __attribute__((packed)) umac_stainfo;
 
 #if !defined(MAX_STA)
+#if defined(NRC7292)
 #define MAX_STA			1024
+#else
+#define MAX_STA			4
+#endif
 #endif /* !defined(MAX_STA) */
 
 //////////////////////
@@ -193,8 +209,23 @@ void del_umac_stainfo_peer_sta(int8_t vif_id, uint8_t* addr);
 umac_stainfo * get_umac_stainfo_by_macaddr(int8_t vif_id, uint8_t *addr);
 umac_stainfo * get_umac_stainfo_by_aid(int8_t vif_id, uint16_t aid);
 umac_stainfo * get_umac_stainfo_by_vifid(int8_t vif_id);
+uint16_t get_umac_aid_by_sta_index(int8_t vif_id, uint16_t sta_idx);
 bool umac_check_remain_allow_sta(int8_t vif_id, uint8_t* addr);
 bool umac_check_stainfo_by_macaddr_ap(int8_t vif_id, uint8_t *addr);
+void set_umac_max_agg_num_ap_by_macaddr(int ac, int num, int8_t vif_id, uint8_t* macaddr);
+void set_umac_max_agg_num_ap_by_aid(int ac, int num, int8_t vif_id, int aid);
+void set_umac_max_agg_num_ap_by_all(int ac, int num, int8_t vif_id);
+uint8_t get_umac_max_agg_num_ap_by_macaddr(int ac, int8_t vif_id, uint8_t* macaddr);
+uint8_t get_umac_max_agg_num_ap_by_aid(int ac, int8_t vif_id, int aid);
+void set_umac_aggregation_ap_by_macaddr(int ac, bool aggregation, int8_t vif_id, uint8_t* macaddr);
+void set_umac_aggregation_ap_by_aid(int ac, bool aggregation, int8_t vif_id, int aid);
+void set_umac_aggregation_ap_by_all(int ac, bool aggregation, int8_t vif_id);
+bool get_umac_aggregation_ap_by_macaddr(int ac, int8_t vif_id, uint8_t* macaddr);
+bool get_umac_aggregation_ap_by_aid(int ac, int8_t vif_id, int aid);
+void set_umac_ba_session_tx_ap_by_macaddr(int ac, bool session, int8_t vif_id, uint8_t* macaddr);
+void set_umac_ba_session_tx_ap_by_aid(int ac, bool session, int8_t vif_id, int aid);
+bool get_umac_ba_session_tx_ap_by_macaddr(int ac, int8_t vif_id, uint8_t* macaddr);
+bool get_umac_ba_session_tx_ap_by_aid(int ac, int8_t vif_id, int aid);
 #if defined(STANDARD_11AH)
 uint8_t* get_umac_stainfo_ssid(int8_t vif_id);
 uint8_t	get_umac_stainfo_ssid_len(int8_t vif_id);
@@ -205,7 +236,9 @@ void clear_umac_stainfo_key_info(int8_t vif_id, uint16_t aid, enum key_type key_
 						uint8_t key_id);
 bool get_umac_apinfo_key_info(int8_t vif_id, uint8_t key_id, struct cipher_def *lmc);
 bool get_umac_stainfo_key_info(int8_t vif_id, uint16_t sta_idx, uint8_t key_id, struct cipher_def *lmc);
-
+bool get_umac_s1g_ampdu_supported(int8_t vif_id, uint8_t* addr);
+uint8_t get_umac_s1g_max_ampdu_length_exp(int8_t vif_id, uint8_t* addr);
+bool get_umac_s1g_1mctrlresppreamble_support(int8_t vif_id, uint8_t* addr);
 void test_cmd_show_info();
 #endif /* defined(STANDARD_11AH) */
 
@@ -213,6 +246,7 @@ DEC_ARR_APINFO_GET_SET(uint8_t*,			bssid);
 DEC_ARR_APINFO_GET_SET(uint8_t*,			ssid);
 
 DEC_VAL_APINFO_GET_SET(uint8_t, 			ssid_len);
+DEC_VAL_APINFO_GET_SET(uint8_t, 			akm_type);
 DEC_VAL_APINFO_GET_SET(uint8_t, 			security);
 DEC_VAL_APINFO_GET_SET(uint16_t,			beacon_interval);
 
@@ -240,6 +274,7 @@ DEC_VAL_APINFO_GET_SET(uint8_t,     		minimum_mpdu_start_spacing);
 DEC_VAL_APINFO_GET_SET(uint8_t,     		rx_s1gmcs_map);
 DEC_VAL_APINFO_GET_SET(uint8_t,     		color);
 DEC_VAL_APINFO_GET_SET(uint8_t,        		traveling_pilot_support);
+DEC_VAL_APINFO_GET_SET(bool,        		s1g_1mctrlresppreamble_support);
 DEC_VAL_APINFO_GET_SET(uint32_t, 			base_pn_bk);
 DEC_VAL_APINFO_GET_SET(uint32_t, 			base_pn_be);
 DEC_VAL_APINFO_GET_SET(uint32_t, 			base_pn_vi);
@@ -267,6 +302,7 @@ DEC_VAL_STAINFO_GET_SET(uint8_t,     		maximum_ampdu_length_exp);
 DEC_VAL_STAINFO_GET_SET(uint8_t,     		minimum_mpdu_start_spacing);
 DEC_VAL_STAINFO_GET_SET(uint8_t,     		rx_s1gmcs_map);
 DEC_VAL_STAINFO_GET_SET(uint8_t,       		traveling_pilot_support);
+DEC_VAL_STAINFO_GET_SET(bool,        		s1g_1mctrlresppreamble_support);
 DEC_VAL_STAINFO_GET_SET(uint32_t,       	base_pn_bk);
 DEC_VAL_STAINFO_GET_SET(uint32_t,       	base_pn_be);
 DEC_VAL_STAINFO_GET_SET(uint32_t,       	base_pn_vi);
@@ -289,10 +325,17 @@ DEC_VAL_STAINFO_GET_SET(uint8_t,		mcs);
 static inline uint8_t *get_umac_apinfo_bssid(int8_t vif_id) {return NULL;};
 static inline umac_stainfo*	get_umac_stainfo_by_aid(int8_t vif_id, uint16_t aid) {return NULL;};
 static inline umac_stainfo* get_umac_stainfo_by_vifid(int8_t vif_id) {return NULL;};
+static inline uint16_t get_umac_aid_by_sta_index(int8_t vif_id, uint16_t sta_idx) {return 0;};
 static inline umac_stainfo* get_umac_stainfo_by_macaddr(int8_t vif_id, uint8_t *addr) {return NULL;};
 static inline uint32_t get_umac_stainfo_listen_interval(umac_stainfo* u){return 0;}
 static inline uint32_t set_umac_apinfo_assoc_s1g_channel(int8_t v, uint8_t k){return 0;}
 static inline bool umac_check_stainfo_by_macaddr_ap(int8_t vif_id, uint8_t *addr){return 0;}
 static inline void set_umac_apinfo_bssid(int8_t v, uint8_t *m, int a) {}
+static inline bool get_umac_s1g_ampdu_supported(int8_t vif_id, uint8_t* addr) {return 1;}
+static inline uint8_t get_umac_s1g_max_ampdu_length_exp(int8_t vif_id, uint8_t* addr) {return 3;};
+inline bool get_umac_ba_session_tx_ap_by_macaddr(int ac, int8_t vif_id, uint8_t* macaddr) {return 0;};
+inline bool get_umac_ba_session_tx_ap_by_aid(int ac, int8_t vif_id, int aid) {return 0;};
+static inline bool get_umac_s1g_1mctrlresppreamble_support(int8_t vif_id, uint8_t* addr) {return 0;}
+static uint16_t g_umac_aid_arr_sta_num = 0;
 #endif /* defined(INCLUDE_UMAC) */
 #endif

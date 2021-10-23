@@ -54,6 +54,7 @@
 #include "lwip/udp.h"
 #include "lwip/tcp.h"
 #include "lwip/sys.h"
+#include "driver_nrc.h"
 #include <string.h>
 
 #if LWIP_IPERF
@@ -242,6 +243,10 @@ lwip_tcp_conn_report(lwiperf_state_tcp_t *conn, enum lwiperf_report_type report_
 	if ((conn != NULL) && (conn->report_fn != NULL)) {
 		u32_t now, duration_ms, bandwidth_kbitpsec;
 		now = sys_now();
+#if defined(NRC_LWIP)
+		if(conn->time_ended)
+			now = conn->time_ended;
+#endif
 		duration_ms = now - conn->time_started;
 		if (duration_ms == 0) {
 			bandwidth_kbitpsec = 0;
@@ -256,11 +261,13 @@ lwip_tcp_conn_report(lwiperf_state_tcp_t *conn, enum lwiperf_report_type report_
 #if defined(NRC_LWIP)
 				&conn->base.local_addr, conn->base.local_port,
 				&conn->base.remote_addr, conn->base.remote_port,
+				conn->bytes_transferred, duration_ms, bandwidth_kbitpsec,
+				conn->total_packets, conn->outoforder_packets, conn->cnt_error);
 #else
 				&conn->conn_pcb->local_ip, conn->conn_pcb->local_port,
 				&conn->conn_pcb->remote_ip, conn->conn_pcb->remote_port,
-#endif
 				conn->bytes_transferred, duration_ms, bandwidth_kbitpsec);
+#endif
 	}
 }
 
@@ -306,6 +313,12 @@ lwiperf_tcp_client_send_more(lwiperf_state_tcp_t *conn)
 
 	do {
 		send_more = 0;
+
+		if (conn->force_stop == true) {
+			lwiperf_tcp_close(conn, LWIPERF_TCP_DONE_CLIENT);
+			return ERR_OK;
+		}
+
 		if (conn->settings.amount & PP_HTONL(0x80000000)) {
 			/* this session is time-limited */
 			u32_t now = sys_now();
@@ -1075,6 +1088,11 @@ lwiperf_udp_server_conn_t* lwiperf_udp_server_conn_init(lwiperf_state_tcp_t *con
 	udp_server_conn->local_port= conn->udp_conn_pcb->local_port;
 	udp_server_conn->session_on= 0;
 	udp_server_conn->bytes_received = 0;
+	udp_server_conn->outoforder_packets= 0;
+	udp_server_conn->cnt_error = 0;
+	udp_server_conn->packet_count = -1;
+	udp_server_conn->time_started = sys_now();
+	udp_server_conn->time_ended = 0;
 
 	ip4_addr_copy(udp_server_conn->remote_ip, *(&conn->udp_conn_pcb->remote_ip));
 	ip4_addr_copy(udp_server_conn->local_ip, *(&conn->udp_conn_pcb->local_ip));
@@ -1096,14 +1114,16 @@ lwiperf_udp_recv(void *arg, struct udp_pcb *upcb,
                                struct pbuf *p, const ip_addr_t *addr, u16_t port)
 {
 	s32_t  pcount;
+	uint32_t pc;
+	int ret = 0;
 	lwiperf_state_tcp_t *conn = (lwiperf_state_tcp_t*)arg;
-	lwiperf_udp_server_conn_t* udp_server_conn;
+	lwiperf_udp_server_conn_t* udp_server_conn = NULL;
 
 	if (p != NULL) {
 		 /* copy payload inside static buffer for processing */
 		if (pbuf_copy_partial(p, payload, p->tot_len, 0) == p->tot_len) {
-			memcpy(&pcount, payload, sizeof(pcount));
-			pcount = lwip_htonl(pcount);
+			memcpy(&pc, payload, sizeof(pc));
+			pcount = ntohl(pc);
 			conn->udp_conn_pcb->remote_port= port;
 			ip4_addr_copy(conn->udp_conn_pcb->remote_ip, *addr);
 
@@ -1112,27 +1132,47 @@ lwiperf_udp_recv(void *arg, struct udp_pcb *upcb,
 				udp_server_conn = lwiperf_udp_server_conn_init(conn);
 			}
 
-			if(udp_server_conn->session_on == 0){
-				udp_server_conn->time_started = sys_now();;
-				lwiperf_display_server_connect(conn);
-				udp_server_conn->session_on = 1;
-			}
+			if(pcount >= 0){
+				if(udp_server_conn->session_on == 0){
+					lwiperf_display_server_connect(conn);
+					udp_server_conn->session_on = 1;
+				}
 
-			// update total received length
-			udp_server_conn->bytes_received += p->tot_len;
-
-
-			if(pcount<0 && udp_server_conn != NULL){
+				if (pcount >= udp_server_conn->packet_count + 1) {
+					if (pcount > udp_server_conn->packet_count + 1) {
+						udp_server_conn->cnt_error += (pcount - 1) - udp_server_conn->packet_count;
+					}
+					udp_server_conn->packet_count = pcount;
+				} else {
+					udp_server_conn->outoforder_packets++;
+					if (udp_server_conn->cnt_error > 0)
+						udp_server_conn->cnt_error--;
+					//A(" * OUT OF ORDER - incoming packet sequence %d but expected sequence %d\n",
+					//	 pcount, udp_server_conn->packet_count + 1);
+				}
+				// update total received length
+				udp_server_conn->bytes_received += p->tot_len;
+				udp_server_conn->time_ended = sys_now();
+			} else {
 				udp_sendto(upcb,p, addr, port);
-				conn->time_started = udp_server_conn->time_started;
-				conn->bytes_transferred = udp_server_conn->bytes_received;
-				lwip_tcp_conn_report(conn, LWIPERF_UDP_DONE_SERVER);
-				udp_server_conn->session_on = 0;
-				lwiperf_udp_server_conn_deinit(udp_server_conn);
+				if(udp_server_conn != NULL){
+					conn->time_started = udp_server_conn->time_started;
+					conn->time_ended = udp_server_conn->time_ended;
+					conn->outoforder_packets = udp_server_conn->outoforder_packets;
+					conn->cnt_error = udp_server_conn->cnt_error;
+					conn->total_packets = -1*(pcount);
+					conn->bytes_transferred = udp_server_conn->bytes_received;
+					if(udp_server_conn->session_on == 1) {
+						lwip_tcp_conn_report(conn, LWIPERF_UDP_DONE_SERVER);
+						udp_server_conn->session_on = 0;
+					}
+					lwiperf_udp_server_conn_deinit(udp_server_conn);
+				}
 			}
 		}
 		/* free the pbuf */
-		pbuf_free(p);
+		if (p->ref != 0)
+			pbuf_free(p);
 	}
 }
 
@@ -1215,17 +1255,28 @@ udp_receive_callback(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_ad
 	}
 
 	/* Free receive pbuf */
-	if(p){
+	if (p->ref != 0)
 		pbuf_free(p);
-	}
+}
 
+/** Close an iperf udp session */
+static void
+lwiperf_udp_close(lwiperf_state_tcp_t* conn, enum lwiperf_report_type report_type)
+{
+	lwip_tcp_conn_report(conn, report_type);
+	lwiperf_list_remove(&conn->base);
+	if(conn->udp_conn_pcb != NULL)
+		udp_remove(conn->udp_conn_pcb);
+
+	if (conn != NULL)
+		LWIPERF_FREE(lwiperf_state_tcp_t, conn);
 }
 
 /** Try to send more data on an iperf udp session */
 err_t lwiperf_udp_client_send_more(lwiperf_state_tcp_t* conn, int send_more, u16_t port, u32_t duration, u32_t bandwidth, u32_t udp_data_length)
 {
 	struct pbuf *p;
-	u32_t  packet_number;
+	u32_t  pcount;
 	u32_t tv_sec;
 	u32_t tv_usec;
 	u32_t test_mode;
@@ -1240,34 +1291,34 @@ err_t lwiperf_udp_client_send_more(lwiperf_state_tcp_t* conn, int send_more, u16
 
 	p = pbuf_alloc(PBUF_TRANSPORT,udp_data_length, PBUF_POOL);
 
-	tv_sec =  lwip_htonl(sent_time/MILI_PER_SECOND);
-	tv_usec =  lwip_htonl((sent_time%MILI_PER_SECOND)*1000);
-	flags =  lwip_htonl(0);
-	numThreads =  lwip_htonl(1);
-	listen_port =  lwip_htonl(port);
-	bufferlen =  lwip_htonl(0);
-	mUDPRate =  lwip_htonl(bandwidth);
-	mAmount = (s32_t)lwip_htonl((100*duration)*(-1));
-
-	if(send_more){
-		conn->packet_number++;
-		packet_number = lwip_htonl(conn->packet_number);
-		conn->udp_client_status = LWIPERF_UDP_CLIENT_RUNNING;
-	}else{
-		packet_number = ~lwip_htonl(conn->packet_number);
-		conn->udp_client_status = LWIPERF_UDP_CLIENT_STOPPING;
-		sys_arch_msleep(10);
-		conn->packet_number++;
-	}
-
-	if (p != NULL)
+	if (p)
 	{
+		tv_sec =  lwip_htonl(sent_time/MILI_PER_SECOND);
+		tv_usec =  lwip_htonl((sent_time%MILI_PER_SECOND)*1000);
+		flags =  lwip_htonl(0);
+		numThreads =  lwip_htonl(1);
+		listen_port =  lwip_htonl(port);
+		bufferlen =  lwip_htonl(0);
+		mUDPRate =  lwip_htonl(bandwidth);
+		mAmount = (s32_t)lwip_htonl((100*duration)*(-1));
+
+		if(send_more){
+			pcount = lwip_htonl(conn->total_packets);
+			conn->total_packets++;
+			conn->udp_client_status = LWIPERF_UDP_CLIENT_RUNNING;
+		}else{
+			pcount = ~lwip_htonl(conn->total_packets-1);
+			conn->udp_client_status = LWIPERF_UDP_CLIENT_STOPPING;
+			conn->time_ended = sys_now();
+			sys_arch_msleep(10);
+		}
+
 		/* copy data to pbuf */
 		pbuf_take_at(p, (char*)(lwiperf_txbuf_const+LWIPERF_UDP_CLIENT_DATA_OFFSET),
 		udp_data_length-LWIPERF_UDP_CLIENT_DATA_OFFSET, LWIPERF_UDP_CLIENT_DATA_OFFSET);
 
 		/* update iperf header information */
-		MEMCPY(p->payload, &packet_number, 4);
+		MEMCPY(p->payload, &pcount, 4);
 		MEMCPY(p->payload+4, &tv_sec, 4);
 		MEMCPY(p->payload+8, &tv_usec, 4);
 		MEMCPY(p->payload+12, &flags, 4);
@@ -1279,26 +1330,16 @@ err_t lwiperf_udp_client_send_more(lwiperf_state_tcp_t* conn, int send_more, u16
 
 		/* send udp data */
 		err = udp_send(conn->udp_conn_pcb , p);
-
-		/* free pbuf */
-		if (p->ref != 0) {
+		if (err != ERR_OK) {
+			A("err : %d\n", err);
+			lwiperf_udp_close(conn, LWIPERF_UDP_ABORTED_LOCAL_TXERROR);
+		}
+		/* release pbuf */
+		if(p->ref != 0){
 			pbuf_free(p);
 		}
 	}
  	return err;
-}
-
-/** Close an iperf udp session */
-static void
-lwiperf_udp_close(lwiperf_state_tcp_t* conn, enum lwiperf_report_type report_type)
-{
-	lwip_tcp_conn_report(conn, report_type);
-	lwiperf_list_remove(&conn->base);
-	if(conn->udp_conn_pcb != NULL)
-		udp_remove(conn->udp_conn_pcb);
-
-	if (conn != NULL)
-		LWIPERF_FREE(lwiperf_state_tcp_t, conn);
 }
 
 static void
@@ -1317,7 +1358,8 @@ iperf_udp_client_send_thread(void *arg)
 		u32_t diff_ms = now - conn->time_started;
 		u32_t time = (u32_t)-(s32_t)lwip_htonl(conn->settings.amount);
 		u32_t time_ms = time * 10;
-		if (diff_ms >= time_ms || conn->force_stop == true){
+		if (diff_ms >= time_ms || conn->force_stop == true  ||
+		(wifi_softap_dhcps_status()== DHCP_STOPPED && wpa_driver_get_associate_status() == false) ){
 			A("lwiperf_udp_client_send_more stop\n");
 			send_more = 0;
 		}
@@ -1459,7 +1501,9 @@ lwiperf_start_udp_client(const ip_addr_t* remote_addr, u16_t remote_port,u32_t d
 	client_conn->report_arg = report_arg;
 	client_conn->bytes_transferred = 0;
 	client_conn->udp_conn_pcb->remote_port = remote_port;
-	client_conn->packet_number = -1;
+	client_conn->total_packets = 0;
+	client_conn->outoforder_packets = 0;
+	client_conn->cnt_error = 0;
 	client_conn->udp_client_status = LWIPERF_UDP_CLIENT_START;
 	client_conn->time_delay = iperf_udp_client_time_delay(bandwidth, udp_data_length);
 	memcpy(&client_conn->settings, &settings, sizeof(settings));
@@ -1467,6 +1511,7 @@ lwiperf_start_udp_client(const ip_addr_t* remote_addr, u16_t remote_port,u32_t d
 	sys_arch_msleep(500);
 
 	client_conn->time_started = sys_now();
+	client_conn->time_ended = 0;
 	client_conn->iperf_thread = sys_thread_new("iperf_thread", iperf_udp_client_send_thread, \
 			client_conn, LWIP_IPERF_TASK_STACK_SIZE, LWIP_IPERF_TASK_PRIORITY);
 

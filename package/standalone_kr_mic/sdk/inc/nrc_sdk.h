@@ -26,66 +26,46 @@
 #ifndef __NRC_SDK_H__
 #define __NRC_SDK_H__
 
-#if !defined (NRC_SDK_RELEASE)
-#include "system_common.h"
-#include "umac_s1g_channel.h"
-#include "system_modem_api.h"
-#include "util_cli_freertos.h"
-#include "util_fota.h"
-#include "lmac_ps_common.h"
-#else //#if !defined (NRC_SDK_RELEASE)
-
-#ifndef bool
-#define bool uint32_t
-#endif
-#define true 1
-#define false 0
-
-// Type Definition
-typedef signed char                 int8_t;
-typedef unsigned char               uint8_t;
-typedef signed short                int16_t;
-typedef unsigned short              uint16_t;
-typedef signed long                 int32_t;
-typedef unsigned long               uint32_t;
-typedef signed long long            int64_t;
-typedef unsigned long long          uint64_t;
-#endif
-
-typedef uint64_t u64;
-typedef unsigned int u32;
-typedef uint16_t u16;
-typedef uint8_t u8;
-typedef int64_t s64;
-typedef int32_t s32;
-typedef int16_t s16;
-typedef int8_t s8;
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <stdarg.h>
+#include <stdbool.h>
 
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
 #include "semphr.h"
 
-#include "stdio.h"
-#include "string.h"
-
+#include "nrc_types.h"
 #include "nrc_user_app.h"
 
+#include "system_modem_api.h"
+
 #include "util_fota.h"
+#include "util_trace.h"
+#include "util_cli_freertos.h"
+
+#include "umac_scan.h"
+#include "umac_s1g_channel.h"
+
+#include "lmac_config.h"
 #include "lmac_ps_common.h"
+#include "lmac_rate_control.h"
 
 #include "api_wifi.h"
+#include "api_system.h"
 #include "api_uart.h"
 #include "api_timer.h"
 #include "api_gpio.h"
 #include "api_i2c.h"
-#include "api_nadc.h"
+#include "api_adc.h"
 #include "api_pwm.h"
 #include "api_spi.h"
 #include "api_httpc.h"
 #include "api_fota.h"
 #include "api_ps.h"
-#include "api_sflash.h"
 
 #ifndef __must_check
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)
@@ -99,7 +79,6 @@ typedef int8_t s8;
 #define nrc_mem_free	vPortFree
 
 #define nrc_usr_print	nrc_uart_printf
-#define nrc_usr_vprint	nrc_uart_vprintf
 
 /* delay in millisecond */
 #define _delay_ms(x)   vTaskDelay(pdMS_TO_TICKS(x))

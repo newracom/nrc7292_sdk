@@ -12,5 +12,9 @@ void umac_wim_manager_run(int vif_id, uint16_t cmd, struct nrc_tlv **map);
 void umac_wim_manager_run2(void *param);
 bool umac_wim_manager_run_by_work_queue(void *param);
 void umac_wim_manager_register_external_interface(struct wim_manager_external_interface *ext_if);
+void umac_wim_manager_restart();
+void umac_wim_manager_check_ps_abnormal();
+void umac_wim_manager_inform_CSA();
+void umac_wim_manager_inform_chan_switch();
 
 #endif //__UMAC_WIM_MANAGER_H__

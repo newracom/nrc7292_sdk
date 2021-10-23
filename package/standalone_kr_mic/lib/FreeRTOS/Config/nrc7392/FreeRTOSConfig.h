@@ -170,16 +170,25 @@ received packets. */
 
 /* The priority of the task that runs the lwIP stack. */
 #define LWIP_TASK_PRIORITY	( configMAX_PRIORITIES - 3 )
-#define LWIP_TASK_STACK_SIZE	( 2048 )
+#define LWIP_TASK_STACK_SIZE	( 1024 )
 
 #define LWIP_IPERF_TASK_PRIORITY	( configMAX_PRIORITIES - 5 )
 #define LWIP_IPERF_TASK_STACK_SIZE	( 512 )
 
-#define LWIP_PING_TASK_PRIORITY	( 3 )
-#define LWIP_PING_TASK_STACK_SIZE	( 1024 )
-
+#ifdef LWIP_PING
+#define LWIP_PING_TASK_PRIORITY	( configMAX_PRIORITIES - 6 )
+#define LWIP_PING_TASK_STACK_SIZE	( 512 )
+#endif
 /* The priority of the task that runs the test task */
 #define TEST_TASK_PRIORITY	( 2 )
 #define TEST_TASK_STACK_SIZE 	(1024 / sizeof(StackType_t))
+
+/* The priority of the wlan_manager task */
+#if defined (INCLUDE_NEW_TASK_ARCH)
+#define WLAN_MANAGER_TASK_PRIORITY	NRC_TASK_PRIORITY
+#else
+#define WLAN_MANAGER_TASK_PRIORITY	NRC_TASK_PRIORITY-1
+#endif //#if defined (INCLUDE_NEW_TASK_ARCH)
+#define WLAN_MANAGER_STACK_SIZE	( 512 )
 
 #endif /* FREERTOS_CONFIG_H */

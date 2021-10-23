@@ -28,47 +28,46 @@
 #define TEST_COUNT 10
 #define TEST_INTERVAL 2000 /* msec */
 
-//#define USE_GPIO_INTERRUPT
-#define PIN_INPUT	GPIO_10
-#define PIN_OUTPUT	GPIO_02
+#define GREEN_LED_PIN	GPIO_02
+#define RED_LED_PIN	GPIO_03
 
-int g_toggle = 0;
+#define USE_GPIO_INTERRUPT
 
-#if defined(USE_GPIO_INTERRUPT)
-void gpio_intr_handler(int vector)
+#ifdef USE_GPIO_INTERRUPT
+#define GPIO_INT0_PIN	GPIO_10
+#define GPIO_INT1_PIN	GPIO_11
+void gpio_intr_handler0(int vector)
 {
-	if (nrc_gpio_inputb(PIN_INPUT)) {
-		nrc_usr_print("[%s] LED ON \n", __func__);
-		nrc_gpio_outputb(PIN_OUTPUT, 1);
+	int input_high;
+
+	if (nrc_gpio_inputb(GPIO_INT0_PIN, &input_high))
+		return;
+
+   	if (input_high) {
+		nrc_usr_print("[%s] GREEN LED ON \n", __func__);
+		nrc_gpio_outputb(GREEN_LED_PIN, 1);
 	} else {
-		nrc_usr_print("[%s] LED OFF \n", __func__);
-		nrc_gpio_outputb(PIN_OUTPUT, 0);
+		nrc_usr_print("[%s] GREEN LED OFF \n", __func__);
+		nrc_gpio_outputb(GREEN_LED_PIN, 0);
 	}
 }
-#endif
 
-static int gpio_init(void)
+void gpio_intr_handler1(int vector)
 {
-	NRC_GPIO_CONFIG gpio_conf;
+	int input_high;
 
-	//GPIO_01 for Output (LED)
-	gpio_conf.gpio_pin = PIN_OUTPUT;
-	gpio_conf.gpio_dir = GPIO_OUTPUT;
-	gpio_conf.gpio_mode = GPIO_PULL_UP;
-	gpio_conf.gpio_alt= GPIO_FUNC;
-	nrc_gpio_config(&gpio_conf);
+	if (nrc_gpio_inputb(GPIO_INT1_PIN, &input_high))
+		return;
 
-#if defined(USE_GPIO_INTERRUPT)
-	//GPIO_00 for Input (Switch)
-	gpio_conf.gpio_pin = PIN_INPUT;
-	gpio_conf.gpio_dir = GPIO_INPUT;
-	gpio_conf.gpio_mode = GPIO_PULL_UP;
-	gpio_conf.gpio_alt= GPIO_FUNC;
-	nrc_gpio_config(&gpio_conf);
-	nrc_gpio_register_intr_handler(PIN_INPUT, gpio_intr_handler);
-#endif
-	return 0;
+   	if (input_high) {
+		nrc_usr_print("[%s] RED LED ON \n", __func__);
+		nrc_gpio_outputb(RED_LED_PIN, 1);
+	} else {
+		nrc_usr_print("[%s] RED LED OFF \n", __func__);
+		nrc_gpio_outputb(RED_LED_PIN, 0);
+	}
 }
+#endif /* USE_GPIO_INTERRUPT */
 
 /******************************************************************************
  * FunctionName : run_sample_gpio
@@ -76,34 +75,58 @@ static int gpio_init(void)
  * Parameters   : count(test count), interval(test interval)
  * Returns      : 0 or -1 (0: success, -1: fail)
  *******************************************************************************/
-int run_sample_gpio(int count, int interval)
+nrc_err_t run_sample_gpio(int count, int interval)
 {
 	int i=0;
+	NRC_GPIO_CONFIG gpio_conf;
+
 	nrc_usr_print("[%s] Sample App for GPIO \n",__func__);
+	gpio_conf.gpio_pin = GREEN_LED_PIN;
+	gpio_conf.gpio_dir = GPIO_OUTPUT;
+	gpio_conf.gpio_mode = GPIO_PULL_UP;
+	gpio_conf.gpio_alt= GPIO_FUNC;
+	nrc_gpio_config(&gpio_conf);
 
-	if(gpio_init() != 0)  {
-		nrc_usr_print ("[%s] Fail to init GPIO\n", __func__);
-		return RUN_FAIL;
+	gpio_conf.gpio_pin = RED_LED_PIN;
+	gpio_conf.gpio_dir = GPIO_OUTPUT;
+	gpio_conf.gpio_mode = GPIO_PULL_UP;
+	gpio_conf.gpio_alt= GPIO_FUNC;
+	nrc_gpio_config(&gpio_conf);
+
+#ifdef USE_GPIO_INTERRUPT
+	gpio_conf.gpio_pin = GPIO_INT1_PIN;
+	gpio_conf.gpio_dir = GPIO_INPUT;
+	gpio_conf.gpio_mode = GPIO_PULL_DOWN;
+	gpio_conf.gpio_alt= GPIO_FUNC;
+	nrc_gpio_config(&gpio_conf);
+	nrc_gpio_register_interrupt_handler(GPIO_INT1_PIN , gpio_intr_handler1);
+
+	gpio_conf.gpio_pin = GPIO_INT0_PIN;
+	gpio_conf.gpio_dir = GPIO_INPUT;
+	gpio_conf.gpio_mode = GPIO_PULL_DOWN;
+	gpio_conf.gpio_alt= GPIO_FUNC;
+	nrc_gpio_config(&gpio_conf);
+	nrc_gpio_register_interrupt_handler(GPIO_INT0_PIN , gpio_intr_handler0);
+#endif /* USE_GPIO_INTERRUPT */
+
+#ifdef USE_GPIO_INTERRUPT
+	while(1){
+		;
 	}
-
+#else
 	nrc_usr_print("[%s] Complete GPIO Init\n",__func__);
-
+	bool toggle = 0;
 	for(i=0; i<count; i++) {
-		//_wifi_wait_message_async();
-#if !defined(USE_GPIO_INTERRUPT)
 		_delay_ms(interval);
-		//Blink at 1-second interval
-		if (g_toggle){
-			g_toggle = 0;
-		} else {
-			g_toggle = 1;
-		}
-		nrc_usr_print("[%s] LED %s\n", __func__, g_toggle? "ON":"OFF");
-		nrc_gpio_outputb(PIN_OUTPUT, g_toggle);
-#endif
+		toggle = !toggle;
+		nrc_usr_print("[%s] LED %s\n", __func__, toggle? "ON":"OFF");
+		nrc_gpio_outputb(GREEN_LED_PIN, toggle);
+		nrc_gpio_outputb(RED_LED_PIN, toggle);
 	}
+#endif
+
 	nrc_usr_print("[%s] exit \n",__func__);
-	return RUN_SUCCESS;
+	return NRC_SUCCESS;
 }
 
 
@@ -115,7 +138,7 @@ int run_sample_gpio(int count, int interval)
  *******************************************************************************/
 void user_init(void)
 {
-	int ret = 0;
+	nrc_err_t ret;
 
 	//Enable Console for Debugging
 	nrc_uart_console_enable();
