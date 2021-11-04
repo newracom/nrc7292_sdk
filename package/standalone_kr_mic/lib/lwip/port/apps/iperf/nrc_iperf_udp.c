@@ -32,7 +32,7 @@
 
 
 extern void sys_arch_msleep(u32_t delay_ms);
-
+extern int wpa_driver_get_associate_status(void);
 
 #if defined(LWIP_IPERF) && (LWIP_IPERF == 1)
 
@@ -171,6 +171,9 @@ static int iperf_await_server_fin_packet (iperf_opt_t * option, 	iperf_udp_datag
 uint16_t iperf_udp_client_send_delay(u32_t bandwidth, u32_t data_size)
 {
 	u16_t time_delay = ((8*data_size* 1000) / bandwidth);
+
+	if(!time_delay)
+		time_delay = 1;
 	//A("packet delay = %d ms, bandwidth = %d  data_size = %d\n" , time_delay ,bandwidth, data_size);
 	return time_delay;
 }
@@ -257,6 +260,11 @@ void iperf_udp_client(void *pvParameters)
 		datagram->tv_sec = htonl((uint32_t)now);
 		datagram->tv_usec = htonl((uint32_t)((now - ntohl(datagram->tv_sec)) * 1000000));
 
+		if (wpa_driver_get_associate_status()== false){
+			option->client_info.end_time = now;
+			break;
+		}
+
 		if (option->mForceStop || (now >= stop_time)){
 			datagram->id = htonl(~(packet_count-1));
 			sendto(sock, (const char *)datagram, option->mBufLen, 0,
@@ -281,7 +289,8 @@ void iperf_udp_client(void *pvParameters)
 	}
 
 	iperf_udp_client_report(option);
-	iperf_await_server_fin_packet(option, datagram);
+	if (wpa_driver_get_associate_status()== true)
+		iperf_await_server_fin_packet(option, datagram);
 
 exit:
 	nrc_iperf_task_list_del(option);

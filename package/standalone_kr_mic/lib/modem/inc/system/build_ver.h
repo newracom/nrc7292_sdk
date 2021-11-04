@@ -3,7 +3,7 @@
 
 #define VERSION_BRANCH "gerrit/master"
 
-#define VERSION_BUILD "19f5a"
+#define VERSION_BUILD "09b2b"
 #define VERSION_MAJOR 1
 #define VERSION_MINOR 3
 #define VERSION_REVISION 4

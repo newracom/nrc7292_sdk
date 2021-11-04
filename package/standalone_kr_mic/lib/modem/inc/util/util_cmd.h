@@ -195,10 +195,14 @@ int compact_phy_rxgain(uint32_t rxgain);
 int compact_test_agg(int ac, uint32_t maxagg_num);
 int compact_sniffer(uint32_t val);
 int compact_mm();
+int compact_read_reg(uint32_t addr);
+int compact_write_reg(uint32_t addr, uint32_t val);
 int compact_agg(uint32_t val);
 int compact_rc(uint32_t val);
 int compact_mcs(uint32_t val);
 int compact_show_tx_stats();
+int compact_test_snr(uint8_t val);
+int compact_set_freq_test(uint32_t val);
 static inline int util_cmd_run_command(char *cmd)
 {	
 	uint32_t arg;
@@ -214,40 +218,58 @@ static inline int util_cmd_run_command(char *cmd)
 		case 'C':
 			compact_show_config();
 			break;
-		case 'R':
-			arg = atoi(cmd+2);	
-			compact_phy_rxgain(arg);
+		case 'D':
+			compact_show_tx_stats();
 			break;
-		case 'T':
-			arg = atoi(cmd+2);	
-			compact_phy_txgain(arg);
+		case 'E':
+			arg = atoi(cmd+2);
+			compact_rc(arg);
+			break;
+		case 'G':
+			arg = atoi(cmd+2);
+			compact_agg(arg);
+			break;
+		case 'M':
+			arg = atoi(cmd+2);
+			compact_mcs(arg);
 			break;
 		case 'N':
 			ac = atoi(cmd+2);
 			arg = atoi(cmd+4);
 			compact_test_agg(ac, arg);
 			break;
+		case 'P':
+			arg = atoi(cmd+2);
+			compact_test_snr(arg);
+			break;
+		case 'R':
+			arg = atoi(cmd+2);	
+			compact_phy_rxgain(arg);
+			break;
 		case 'S':
 			arg = atoi(cmd+2);	
 			compact_sniffer(arg);
 			break;
+		case 'T':
+			arg = atoi(cmd+2);	
+			compact_phy_txgain(arg);
+			break;
 		case 'U':
 			compact_mm();
 			break;
-		case 'G':
+		case 'V':
 			arg = atoi(cmd+2);
-			compact_agg(arg);
+			compact_read_reg(arg);
 			break;
-		case 'E':
+		case 'W':		
 			arg = atoi(cmd+2);
-			compact_rc(arg);
+			uint32_t arg2 = atoi(cmd+13);
+			compact_write_reg(arg, arg2);
 			break;
-		case 'M':
+		case 'Z':
 			arg = atoi(cmd+2);
-			compact_mcs(arg);
+			compact_set_freq_test(arg);
 			break;
-		case 'D':
-			compact_show_tx_stats();
 			
 		default:
 			return 0;

@@ -569,19 +569,21 @@ typedef struct _RXINFO {
 	uint32_t preamble_type		: 1;
 	uint32_t bandwidth        	: 2;
 	uint32_t scrambler_or_crc 	: 7;
-	uint32_t rcpi           	: 8;
-	uint32_t obss_frame     : 1;
-	uint32_t ndp_ind        : 1;
-	uint32_t long_2m_ind    : 1;
-	uint32_t aggregation    : 1;
-	uint32_t error_mic      : 1;
-	uint32_t error_key      : 1;
-	uint32_t protection     : 1;
-	uint32_t error_length   : 1;
-	uint32_t error_match    : 1;
-	uint32_t error_crc      : 1;
-	uint32_t okay           : 1;
-	uint32_t error_seq      : 1;
+	uint32_t rcpi           	: 6;
+	uint32_t error_all_delim    : 1;
+	uint32_t eof_ind            : 1;
+	uint32_t obss_frame         : 1;
+	uint32_t ndp_ind            : 1;
+	uint32_t long_2m_ind        : 1;
+	uint32_t aggregation        : 1;
+	uint32_t error_mic          : 1;
+	uint32_t error_key          : 1;
+	uint32_t protection         : 1;
+	uint32_t error_length       : 1;
+	uint32_t error_match        : 1;
+	uint32_t error_crc          : 1;
+	uint32_t okay               : 1;
+	uint32_t error_seq          : 1;
 	// RXINFO #3
 	uint32_t timestamp;
 	// RXINFO #4

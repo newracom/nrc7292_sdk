@@ -249,6 +249,10 @@ void lmac_tx_power_init_default(void);
 void lmac_tx_power_init();
 #endif /* defined(INCLUDE_BD_SUPPORT) */
 
+#if !defined(NRC7292)
+void lmac_set_rx_buffer_lookup(bool v);
+#endif /* !defined(NRC7292) */
+
 void lmac_task_handle_data(void *param);
 void lmac_task_send_queue(LMacEvent evt, uint8_t sub_evt);
 

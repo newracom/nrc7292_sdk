@@ -262,8 +262,9 @@ struct ret_ucodeinfo {
 // 1B
 struct ret_drvinfo {
 	uint8_t		fw_boot_mode:2; //FW boot mode (1B) : 0(XIP), 1 or 2(ROM, it must be distinguished in the code based on the core type)
+	uint8_t		do_reset:1;		//FW reboot mode in uCode (1B) : 0(reboot with jump), 1(reboot with reset)
 	uint8_t		cqm_off:1;
-	uint8_t		reserved:5;
+	uint8_t		reserved:4;
 } __attribute__ ((packed));
 #define RET_DRV_INFO_SIZE sizeof(struct ret_drvinfo)
 
@@ -355,6 +356,7 @@ struct nrc_ps_ops {
 /* =================== Internal INTERFACE =========================================== */
 /* ============================================================================== */
 struct retention_info* nrc_ps_get_retention_info();
+struct nrc_ps_ops *nrc_ps_get_user(void);
 struct nrc_ps_ops *nrc_ps_get_vendor(void);
 struct nrc_ps_ops *nrc_ps_get(void);
 
@@ -399,4 +401,5 @@ int nrc_ps_get_wakeup_pin(bool *check_debounce, int *pin_number);
 int nrc_ps_get_power_indication_pin(bool *enable, int *pin_number);
 int nrc_ps_get_wakeup_source(uint8_t *wakeup_source);
 #endif
+
 #endif /*__NRC_PS_API_H__*/

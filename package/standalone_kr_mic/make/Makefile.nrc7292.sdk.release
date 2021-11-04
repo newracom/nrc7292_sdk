@@ -67,15 +67,6 @@ ifeq ($(CONFIG_NEW_TASK_ARCH),y)
 CONFIG_WDT=y
 endif
 
-# CLI
-CONFIG_CLI=y
-
-# DEBUG (DEBUG, TRACKER, Statistics, etc.)
-CONFIG_DEBUG=y
-
-# PRINT Console LOG
-CONFIG_LOG=y
-
 # (only for CM3) USE PRIMASK-based INT Lock (y:PRIMASK, n:BASEPRI)
 CONFIG_PRIMASK_INT_LOCK=n
 

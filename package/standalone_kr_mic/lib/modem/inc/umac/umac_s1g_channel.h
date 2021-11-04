@@ -45,6 +45,8 @@ enum {
 	US,
 	EU,
 	CN,
+	NZ,
+	AU,
 	MAX_COUNTRY_CODE
 };
 // extern  CHANNEL_MAPPING_TABLE nons1g_cc_ch_mapping_table[MAX_COUNTRY_CODE][MAX_NON_S1G_CHANNEL_NUM];

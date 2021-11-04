@@ -143,6 +143,7 @@ void system_api_set_rf_cal(uint32_t address, uint8_t *buffer, size_t size);
 void system_api_clear_rf_cal(uint32_t address, size_t size);
 void system_api_set_user_config(uint32_t address, uint8_t *buffer, size_t size);
 bool system_modem_api_get_1m_center_lo(int vif_id);
+int  system_api_set_freq_bw_prim(uint32_t lo_freq_hz, int rx_bw_index, int tx_bw_index, int prim_1m_loc);
 #if defined(SF_WRITABLE)
 void system_api_sflash_write(uint32_t address, struct _SYS_BUF *packet, size_t size);
 uint16_t system_api_sflash_read(uint32_t sf_address, struct byte_stream *bs, int size);

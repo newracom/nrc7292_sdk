@@ -34,6 +34,8 @@
 
 #if defined(LWIP_IPERF) && (LWIP_IPERF == 1)
 
+extern int wpa_driver_get_associate_status(void);
+
 static void iperf_tcp_client_report (iperf_opt_t * option )
 {
 	iperf_time_t start_time = 0.0;
@@ -141,8 +143,15 @@ void iperf_tcp_client(void *pvParameters)
 	stop_time = start_time + (option->mAmount / 100.);
 
 	option->mBufLen = TCP_MSS;
+	option->client_info.start_time = start_time;
 
 	while (1) {
+		if(wpa_driver_get_associate_status()== false){
+			iperf_get_time(&now);
+			option->client_info.end_time = now;
+			break;
+		}
+
 		ret = send(sock, datagram, option->mBufLen, 0);
 		if (ret > 0) {
 			option->client_info.datagram_cnt++;
@@ -155,7 +164,6 @@ void iperf_tcp_client(void *pvParameters)
 		iperf_get_time(&now);
 
 		if (option->mForceStop || (now >= stop_time)){
-			option->client_info.start_time = start_time;
 			option->client_info.end_time = now;
 			break;
 		}
