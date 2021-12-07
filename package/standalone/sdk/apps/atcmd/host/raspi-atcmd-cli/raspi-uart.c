@@ -29,7 +29,7 @@
 
 #include "raspi-hif.h"
 
-#define raspi_uart_info(fmt, ...)		//log_info(fmt, ##__VA_ARGS__)
+#define raspi_uart_info(fmt, ...)		/* log_info(fmt, ##__VA_ARGS__) */
 #define raspi_uart_error(fmt, ...)		log_error(fmt, ##__VA_ARGS__)
 
 /**********************************************************************************************/
@@ -54,7 +54,7 @@ static int raspi_gpio_base (unsigned *addr)
 	else
 		*addr = 0x20000000;
 
-	*addr += 0x200000; // gpio offset
+	*addr += 0x200000; /* gpio offset */
 
 	fclose(fp);
 
@@ -152,10 +152,10 @@ static unsigned int raspi_uart_baudrate_to_flag (uint32_t baudrate)
 		case 1152000:	return B1152000;
 		case 1500000:	return B1500000;
 		case 2000000:	return B2000000;
-//		case 2500000:	return B2500000;
-//		case 3000000:	return B3000000;
-//		case 3500000:	return B3500000;
-//		case 4000000:	return B4000000;
+/*		case 2500000:	return B2500000;
+		case 3000000:	return B3000000;
+		case 3500000:	return B3500000;
+		case 4000000:	return B4000000; */
 		default:		return B0;
 	}
 }
@@ -178,8 +178,8 @@ int raspi_uart_open (char *device, uint32_t baudrate, bool rts_cts)
 	}
 
 	comfd = open(device, O_RDWR | O_NOCTTY);
-//	comfd = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
-//	comfd = open(device, O_RDWR | O_NOCTTY | O_NDELAY);
+/*	comfd = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK); */
+/*	comfd = open(device, O_RDWR | O_NOCTTY | O_NDELAY); */
 	if (comfd < 0)
 	{
 		raspi_uart_error("%s, open()\n", strerror(errno));
@@ -194,7 +194,7 @@ int raspi_uart_open (char *device, uint32_t baudrate, bool rts_cts)
 	if (err)
 		return err;
 
-	tcgetattr(comfd,&oldtio); // save current port settings
+	tcgetattr(comfd,&oldtio); /* save current port settings */
 
 	newtio.c_cflag = CS8 | CLOCAL | CREAD | (rts_cts ? CRTSCTS : 0);
 	newtio.c_cflag |= flag_baudrate;

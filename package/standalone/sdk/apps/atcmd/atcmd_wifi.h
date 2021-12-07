@@ -64,9 +64,9 @@
 /*
  * Country Code
  */
-#define ATCMD_WIFI_COUNTRY_NUMBER		6
-#define ATCMD_WIFI_COUNTRY_ARRAY		{ "US", "KR", "JP", "CN", "TW", "EU" }
-#define ATCMD_WIFI_COUNTRY_STRING		"US|KR|JP|CN|TW|EU"
+#define ATCMD_WIFI_COUNTRY_NUMBER		8
+#define ATCMD_WIFI_COUNTRY_ARRAY		{ "AU", "CN", "EU", "JP", "NZ", "TW", "US", "KR" }
+#define ATCMD_WIFI_COUNTRY_STRING		"AU|CN|EU|JP|NZ|TW|US|KR"
 
 
 /*

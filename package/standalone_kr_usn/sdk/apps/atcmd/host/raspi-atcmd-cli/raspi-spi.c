@@ -27,9 +27,9 @@
 #include "raspi-hif.h"
 
 
-//#define CONFIG_SPIDEV_MODE32
+/* #define CONFIG_SPIDEV_MODE32 */
 
-#define raspi_spi_info(fmt, ...)		//log_info(fmt, ##__VA_ARGS__)
+#define raspi_spi_info(fmt, ...)		/* log_info(fmt, ##__VA_ARGS__) */
 #define raspi_spi_error(fmt, ...)		log_error(fmt, ##__VA_ARGS__)
 
 
@@ -253,8 +253,8 @@ int raspi_spi_single_transfer (char *tx_buf, char *rx_buf, int len)
 #endif
 	xfer.len = len;
 
-//	xfer.delay_usecs = 1;
-//	xfer.cs_change = 1;
+/*	xfer.delay_usecs = 1; */
+/*	xfer.cs_change = 1; */
 
 	ret = raspi_spi_transfer(&xfer, 1);
 	if (ret < 0)

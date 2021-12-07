@@ -66,36 +66,36 @@
 
 typedef	struct
 {
-	uint8_t wake_up; // Write 0x79, write only
+	uint8_t wake_up; /* Write 0x79, write only */
 
 	union
 	{
-		uint8_t reset; // Write 0xC8 for reset, write only
+		uint8_t reset; /* Write 0xC8 for reset, write only */
 
 		struct
 		{
 			uint8_t ready:1;
 			uint8_t sleep:1;
 			uint8_t reserved:6;
-		} status; // read only
+		} status; /* read only */
 	};
 
-	uint16_t chip_id;  // hw fix, read only
-	uint32_t modem_id; // hw fix, read only
-	uint32_t sw_id;	   // fw write, read only
-	uint32_t board_id; // fw write, read only
+	uint16_t chip_id;  /* hw fix, read only */
+	uint32_t modem_id; /* hw fix, read only */
+	uint32_t sw_id;	   /* fw write, read only */
+	uint32_t board_id; /* fw write, read only */
 } hspi_sys_t;
 
-#define HSPI_EIRQ_LOW			0
-#define HSPI_EIRQ_HIGH			1
+#define HSPI_EIRQ_LOW		0
+#define HSPI_EIRQ_HIGH		1
 #define HSPI_EIRQ_LEVEL		0
-#define HSPI_EIRQ_EDGE			(1<<1)
+#define HSPI_EIRQ_EDGE		(1<<1)
 
-#define HSPI_EIRQ_TXQ			1
-#define HSPI_EIRQ_RXQ			(1<<1)
+#define HSPI_EIRQ_TXQ		1
+#define HSPI_EIRQ_RXQ		(1<<1)
 #define HSPI_EIRQ_READY		(1<<2)
 #define HSPI_EIRQ_SLEEP		(1<<3)
-#define HSPI_EIRQ_ALL			0xF
+#define HSPI_EIRQ_ALL		0xF
 
 typedef union
 {
@@ -105,9 +105,9 @@ typedef union
 	{
 		struct
 		{
-			uint8_t active:1;	 // 0:low, 1:high
-			uint8_t trigger:1; 	 // 0:level, 1:edge
-			uint8_t io_enable:1; // 0:disable, 1:enable
+			uint8_t active:1;	 /* 0:low, 1:high */
+			uint8_t trigger:1; 	 /* 0:level, 1:edge */
+			uint8_t io_enable:1; /* 0:disable, 1:enable */
 			uint8_t reserved:5;
 		} mode;
 
@@ -126,7 +126,7 @@ typedef struct
 {
 #define HSPI_SLOT_CNT_MAX		0x3F
 
-	uint8_t latch; // Read others after read this value, and then interrupt is cleared.
+	uint8_t latch; /* Read others after read this value, and then interrupt is cleared. */
 
 	struct
 	{
@@ -139,28 +139,28 @@ typedef struct
 
 	struct
 	{
-		uint8_t error; 	  // valid bits : 7-bit
-		uint8_t slot_cnt; // valid bits : 7-bit
+		uint8_t error; 	  /* valid bits : 7-bit */
+		uint8_t slot_cnt; /* valid bits : 7-bit */
 		uint16_t slot_size;
 		uint16_t total_slot_size;
-	} txq; // target -> host
+	} txq; /* target -> host */
 
 	struct
 	{
-		uint8_t error; 	  // valid bits : 7-bit
-		uint8_t slot_cnt; // valid bits : 7-bit
+		uint8_t error; 	  /* valid bits : 7-bit */
+		uint8_t slot_cnt; /* valid bits : 7-bit */
 		uint16_t slot_size;
 		uint16_t total_slot_size;
-	} rxq; // host -> target
+	} rxq; /* host -> target */
 
-} hspi_status_t; // read only
+} hspi_status_t; /* read only */
 
-typedef uint32_t hspi_msg_t[4]; // read only
+typedef uint32_t hspi_msg_t[4]; /* read only */
 
 typedef	struct
 {
 	uint8_t reserved;
-	uint8_t window; // rxq: write only, txq: read only
+	uint8_t window; /* rxq: write only, txq: read only */
 } hspi_que_t;
 
 typedef struct
@@ -169,8 +169,8 @@ typedef struct
 	hspi_eirq_t eirq;
 	hspi_status_t status;
 	hspi_msg_t msg;
-	hspi_que_t rxq; // uplink
-	hspi_que_t txq; // downlink
+	hspi_que_t rxq; /* uplink */
+	hspi_que_t txq; /* downlink */
 } hspi_regs_t;
 
 
@@ -178,11 +178,11 @@ typedef struct
  *	H-SPI Opcode
  **********************************************************************************************/
 
-#define HSPI_START					(0x50 << 24)
-#define HSPI_BURST					(1 << 23)
-#define HSPI_READ					(0 << 22)
-#define HSPI_WRITE					(1 << 22)
-#define HSPI_FIXED					(1 << 21)
+#define HSPI_START				(0x50 << 24)
+#define HSPI_BURST				(1 << 23)
+#define HSPI_READ				(0 << 22)
+#define HSPI_WRITE				(1 << 22)
+#define HSPI_FIXED				(1 << 21)
 #define HSPI_ADDR(addr)			(addr << 13)
 #define HSPI_LENGTH(length)		(length)
 #define HSPI_DATA(data)			(data)
@@ -205,17 +205,17 @@ typedef union
 
 	struct
 	{
-		uint32_t length:13;			// burst length
-		// uint32_t write_data:8;	// single data
-		// uint32_t reserved:5;
+		uint32_t length:13;			/* burst length */
+		/* uint32_t write_data:8; *//* single data */
+		/* uint32_t reserved:5; */
 
-		uint32_t address:8;			// addresss
-		uint32_t fixed:1;			// 0:incremental, 1:fixed
-		uint32_t write:1;			// 0:read, 1:write
-		uint32_t burst:1; 			// 0:single, 1:burst
-		uint32_t start:8; 			// 0x50
+		uint32_t address:8;			/* addresss */
+		uint32_t fixed:1;			/* 0:incremental, 1:fixed */
+		uint32_t write:1;			/* 0:read, 1:write */
+		uint32_t burst:1; 			/* 0:single, 1:burst */
+		uint32_t start:8; 			/* 0x50 */
 	};
-} hspi_opcode_t; // 4-byte
+} hspi_opcode_t; /* 4-byte */
 
 
 /**
@@ -226,8 +226,8 @@ typedef union
 
 enum
 {
-	HSPI_TXQ = 0,	// from target to host
-	HSPI_RXQ,	  	// from host to target
+	HSPI_TXQ = 0,	/* from target to host */
+	HSPI_RXQ,	  	/* from host to target */
 
 	HSPI_QUE_NUM,
 	HSPI_QUE_ALL = HSPI_QUE_NUM
@@ -239,15 +239,15 @@ typedef struct
 
 	uint8_t crc;
 	uint8_t reserved[3];
-} hspi_cmd_t; // 8-byte
+} hspi_cmd_t; /* 8-byte */
 
 typedef struct
 {
 	uint8_t reserved[6];
 
-	uint8_t data; // single data
+	uint8_t data; /* single data */
 	uint8_t ack;
-} hspi_resp_t; // 8-byte
+} hspi_resp_t; /* 8-byte */
 
 typedef struct
 {

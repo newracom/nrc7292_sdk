@@ -57,8 +57,8 @@ static void *raspi_cli_recv_thread (void *arg)
 
 static int raspi_cli_run_script (char *script)
 {
-#define script_debug_call(fmt, ...)		//log_debug(fmt, ##__VA_ARGS__)
-#define script_debug_loop(fmt, ...)		//log_debug(fmt, ##__VA_ARGS__)
+#define script_debug_call(fmt, ...)		/* log_debug(fmt, ##__VA_ARGS__) */
+#define script_debug_loop(fmt, ...)		/* log_debug(fmt, ##__VA_ARGS__) */
 
 #define SCRIPT_FILE_LEN_MAX		128
 #define SCRIPT_CMD_LEN_MAX		256
@@ -192,7 +192,7 @@ static int raspi_cli_run_script (char *script)
 		cmd_len = strlen(cmd) - 1;
 		cmd[cmd_len] = '\0';
 
-//		log_debug("%s\n", cmd);
+/*		log_debug("%s\n", cmd); */
 
 		if (strlen(cmd) == 0)
 		{
@@ -206,7 +206,7 @@ static int raspi_cli_run_script (char *script)
 			if (nrc_atcmd_send_cmd(cmd) < 0)
 				goto error_exit;
 		}
-		else if (memcmp(cmd, "HOST ", 5) == 0) // HOST {0|1}
+		else if (memcmp(cmd, "HOST ", 5) == 0) /* HOST {0|1} */
 		{
 			if ((cmd_len - 5) > 1)
 				goto invalid_line;
@@ -218,16 +218,17 @@ static int raspi_cli_run_script (char *script)
 					nrc_atcmd_network_stack_target();
 					break;
 
+#if !defined(SUPPORT_HOST_STACK)
 				case '1':
 					log_info("HOST: 1\n");
 					nrc_atcmd_network_stack_host();
 					break;
-
+#endif
 				default:
 					goto invalid_line;
 			}
 		}
-		else if (memcmp(cmd, "DATA ", 5) == 0) // DATA <length>
+		else if (memcmp(cmd, "DATA ", 5) == 0) /* DATA <length> */
 		{
 			int data_len;
 			int ret;
@@ -250,7 +251,7 @@ static int raspi_cli_run_script (char *script)
 					goto error_exit;
 			}
 		}
-		else if (memcmp(cmd, "CALL ", 5) == 0) // CALL <script_name>
+		else if (memcmp(cmd, "CALL ", 5) == 0) /* CALL <script_name> */
 		{
 			char *call_script;
 			int ret;
@@ -276,7 +277,7 @@ static int raspi_cli_run_script (char *script)
 			if (ret < 0)
 				goto error_exit;
 		}
-		else if (memcmp(cmd, "WAIT ", 5) == 0) // WAIT <time>{s|m|u}
+		else if (memcmp(cmd, "WAIT ", 5) == 0) /* WAIT <time>{s|m|u} */
 		{
 			char unit;
 			int time;
@@ -317,7 +318,7 @@ static int raspi_cli_run_script (char *script)
 					usleep(time);
 			}
 		}
-		else if (memcmp(cmd, "ECHO \"", 6) == 0) // ECHO "<message>"
+		else if (memcmp(cmd, "ECHO \"", 6) == 0) /* ECHO "<message>" */
 		{
 			char *msg_end = strchr(cmd + 6, '\"');
 
@@ -328,7 +329,7 @@ static int raspi_cli_run_script (char *script)
 
 			log_info("ECHO: %s\n", cmd + 6);
 		}
-		else if (memcmp(cmd, "LOOP ", 5) == 0) // LOOP <line> <count>
+		else if (memcmp(cmd, "LOOP ", 5) == 0) /* LOOP <line> <count> */
 		{
 			char *param[2];
 			int i;
@@ -361,7 +362,7 @@ static int raspi_cli_run_script (char *script)
 			script_debug_loop("LOOP: cnt=%d line=%d fpos=%ld\n",
 								loop.max_cnt, loop.max_line, loop.fpos);
 		}
-		else if (memcmp(cmd, "HOLD", 4) == 0) // HOLD
+		else if (memcmp(cmd, "HOLD", 4) == 0) /* HOLD */
 		{
 			log_info("HOLD: Press ENTER to continue.\n");
 			log_info();
@@ -453,14 +454,14 @@ static void raspi_cli_run_loop (void)
 
 				switch (argc)
 				{
-					case 2: // tcp
-					case 4: // udp
+					case 2: /* tcp */
+					case 4: /* udp */
 						tx_mode = ATCMD_TX_NORMAL;
 						tx_data_len = atoi(argv[argc - 1]);
 						break;
 
-					case 1: // tcp passthrough
-					case 3: // udp passthrough
+					case 1: /* tcp passthrough */
+					case 3: /* udp passthrough */
 						tx_mode = ATCMD_TX_PASSTHROUGH;
 						tx_data_len = 0;
 						break;
@@ -596,7 +597,7 @@ typedef struct
 
 static void raspi_cli_version (void)
 {
-#define RASPI_CLI_VERSION	"1.2.1"
+#define RASPI_CLI_VERSION	"1.2.2"
 
 	printf("raspi-atcmd-cli version %s\n", RASPI_CLI_VERSION);
  	printf("Copyright (c) 2019-2020  <NEWRACOM LTD>\n");
@@ -608,13 +609,20 @@ static void raspi_cli_help (char *cmd)
 
 	printf("\n");
 	printf("Usage:\n");
+#if defined(SUPPORT_HOST_STACK)
 	printf("  $ %s -U [-H] [-D <device>] [-b <baudrate>] [-d] [-f] [-s <script>]\n", cmd);
 	printf("  $ %s -S [-H] [-D <device>] [-c <clock>] [-s <script>]\n", cmd);
+#else
+	printf("  $ %s -U [-D <device>] [-b <baudrate>] [-d] [-f] [-s <script>]\n", cmd);
+	printf("  $ %s -S [-D <device>] [-c <clock>] [-s <script>]\n", cmd);
+#endif	
 	printf("\n");
 
 	printf("UART/SPI:\n");
 	printf("  -D, --device #        specify the device. (default: /dev/ttyAMA0, /dev/spidev0.0)\n");
-	printf("  -H, --host            run as the host mode\n");
+#if defined(SUPPORT_HOST_STACK)
+	printf("  -H, --host            use the network stack on host\n");
+#endif	
 	printf("  -e, --echo            enable echo for received packets (default: disable)\n");
 	printf("  -s, --script #        specify the script file.\n");
 	printf("\n");
@@ -684,11 +692,15 @@ static int raspi_cli_option (int argc, char *argv[], raspi_cli_opt_t *opt)
 
 	while (1)
 	{
+#if defined(SUPPORT_HOST_STACK)
 		ret = getopt_long(argc, argv, "D:Hes:Ub:fSc:vh", opt_info, &opt_idx);
+#else
+		ret = getopt_long(argc, argv, "D:es:Ub:fSc:vh", opt_info, &opt_idx);
+#endif		
 
 		switch (ret)
 		{
-			case -1: // end
+			case -1: /* end */
 			{
 				switch (opt->hif.type)
 				{
@@ -721,9 +733,11 @@ static int raspi_cli_option (int argc, char *argv[], raspi_cli_opt_t *opt)
 				opt->hif.device = optarg;
 				break;
 
+#if defined(SUPPORT_HOST_STACK)
 			case 'H':
 				opt->host = true;
 				break;
+#endif
 
 			case 'e':
 				opt->echo = true;

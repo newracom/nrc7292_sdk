@@ -128,6 +128,24 @@ static bool _atcmd_wifi_bssid_valid (const char *bssid)
 	return true;
 }
 
+static bool _atcmd_wifi_country_valid (atcmd_wifi_country_t country)
+{
+	if (strlen(country) == 2)
+	{
+		const char *support_country[] = ATCMD_WIFI_COUNTRY_ARRAY;
+		const int n_support_country = ATCMD_WIFI_COUNTRY_NUMBER;
+		int i;
+
+		for (i = 0 ; i < n_support_country ; i++)
+		{
+			if (strcmp(country, support_country[i]) == 0)
+				return true;
+		}
+	}
+
+	return false;
+}
+
 static tWIFI_SECURITY _atcmd_wifi_security_string_to_index (atcmd_wifi_security_t str)
 {
 	if (str)
@@ -145,18 +163,60 @@ static tWIFI_SECURITY _atcmd_wifi_security_string_to_index (atcmd_wifi_security_
 	return WIFI_SEC_MAX;
 }
 
+static int _atcmd_wifi_rf_cal_info (bool *cal_use, atcmd_wifi_country_t country)
+{
+	if (!cal_use || !country)
+		return -1;
+
+	*cal_use = !!hal_get_rf_cal_use();
+	memset(country, 0, sizeof(atcmd_wifi_country_t));
+
+	if (*cal_use)
+	{
+		TX_PWR_CAL_PARAM tx_pwr_cal;
+
+		system_api_get_rf_cal(SF_RF_CAL, (uint8_t*)&tx_pwr_cal, sizeof(tx_pwr_cal));
+
+		sprintf(country, "%c%c", tx_pwr_cal.country[0], tx_pwr_cal.country[1]);
+
+		if (!_atcmd_wifi_country_valid(country))
+			memset(country, 0, sizeof(atcmd_wifi_country_t));
+	}
+
+	return 0;
+}
+
 /**********************************************************************************************/
 
 static void _atcmd_wifi_init_info (atcmd_wifi_info_t *info)
 {
+	bool cal_use;
+	atcmd_wifi_country_t country;
+
+	if (_atcmd_wifi_rf_cal_info(&cal_use, country) != 0)
+	{
+		cal_use = false;
+		memset(country, 0, sizeof(atcmd_wifi_country_t));
+	}
+
+	_atcmd_info("RF_CAL_INFO: cal_use=%d country=%s\n", cal_use, country);
+
 	memset(info, 0, sizeof(atcmd_wifi_info_t));
 
 	info->net_id = -1;
 
 	info->event = 0;
 
-//	strcpy(info->country, ATCMD_WIFI_INIT_COUNTRY);
-	memcpy(info->country, lmac_get_country(0), 2);
+	if (cal_use && strlen(country) == 2)
+		strcpy(info->country, country);
+	else
+	{
+		memcpy(info->country, lmac_get_country(0), 2);
+
+		if (!_atcmd_wifi_country_valid(info->country))
+			strcpy(info->country, ATCMD_WIFI_INIT_COUNTRY);
+	}
+
 	info->txpower = ATCMD_WIFI_INIT_TXPOWER;
 
 	if (1)
@@ -587,29 +647,20 @@ static int _atcmd_wifi_country_set (int argc, char *argv[])
 	switch (argc)
 	{
 		case 0:
-			ATCMD_MSG_HELP("AT+WCOUNTRY=\"<country code>\"");
-/*			ATCMD_MSG_HELP("AT+WCOUNTRY=\"{%s}\"", ATCMD_WIFI_COUNTRY_STRING); */
+/*			ATCMD_MSG_HELP("AT+WCOUNTRY=\"<country code>\""); */
+			ATCMD_MSG_HELP("AT+WCOUNTRY=\"{%s}\"", ATCMD_WIFI_COUNTRY_STRING); 
 			break;
 
 		case 1:
 		{
-			const char *support_country[] = ATCMD_WIFI_COUNTRY_ARRAY;
-			int n_support_country = ATCMD_WIFI_COUNTRY_NUMBER;
 			atcmd_wifi_country_t str_country;
-			int i;
 
 			param_country = argv[0];
 
 			if (!atcmd_param_to_str(param_country, str_country, sizeof(str_country)))
 				return ATCMD_ERROR_FAIL;
 
-			for (i = 0 ; i < n_support_country ; i++)
-			{
-				if (strcmp(str_country, support_country[i]) == 0)
-					break;
-			}
-
-			if (i == n_support_country)
+			if (!_atcmd_wifi_country_valid(str_country))
 				return ATCMD_ERROR_INVAL;
 
 			if (nrc_wifi_set_country(nrc_wifi_country_from_string(str_country)) != WIFI_SUCCESS)
@@ -2608,7 +2659,7 @@ static int _atcmd_wifi_softap_run (int argc, char *argv[])
 							softap->ssid, softap->security, softap->password);
 
 		if (nrc_wifi_softap_set_conf(net_id,
-									softap->ssid, softap->channel.number,
+									softap->ssid, softap->channel.freq,
 									_atcmd_wifi_security_string_to_index(softap->security),
 									softap->password) == WIFI_SUCCESS)
 		{

@@ -34,8 +34,8 @@
 
 /**********************************************************************************************/
 
-#define IPERF_IPADDR_LEN_MIN	7	// x.x.x.x
-#define IPERF_IPADDR_LEN_MAX	15	// xxx.xxx.xxx.xxx
+#define IPERF_IPADDR_LEN_MIN	7	/* x.x.x.x */
+#define IPERF_IPADDR_LEN_MAX	15	/* xxx.xxx.xxx.xxx */
 
 #define IPERF_IPADDR_ANY		"0.0.0.0"
 
@@ -66,14 +66,14 @@ typedef struct
 #define IPERF_DEFAULT_SEND_TIME				10
 #define IPERF_DEFAULT_REPORT_INTERVAL		1
 
-#define IPERF_DEFAULT_UDP_RATE				(1024 * 1024) // bps
-#define IPERF_DEFAULT_UDP_DATAGRAM_SIZE		1470 // byte
+#define IPERF_DEFAULT_UDP_RATE				(1024 * 1024) /* bps */
+#define IPERF_DEFAULT_UDP_DATAGRAM_SIZE		1470 /* byte */
 
-#define IPERF_DEFAULT_TCP_DATA_SIZE			1440 // byte, TCP_MSS in NRC_MACSW/lib/lwip/port/lwipopts.h
+#define IPERF_DEFAULT_TCP_DATA_SIZE			1440 /* byte, TCP_MSS in NRC_MACSW/lib/lwip/port/lwipopts.h */
 
 #define IPERF_FLAG_HDR_VER1				0x80000000
 
-typedef double	iperf_time_t; // usec
+typedef double	iperf_time_t; /* usec */
 
 typedef struct
 {
@@ -119,12 +119,12 @@ typedef struct
 	int32_t mPort;
 	int32_t bufferlen;
 	int32_t mWindowSize;
-	int32_t mAmount; 		// -: -t option (sec), +: -n option (byte)
+	int32_t mAmount; 		/* -: -t option (sec), +: -n option (byte) */
 
 	/* header version 1 */
-	int32_t mRate; 			// -b option (bits/sec)
-	int32_t mUDPRateUnits; 	// 0:BW, 1:PPS (Don't use)
-	int32_t mRealTime; 		// Don't care
+	int32_t mRate; 			/* -b option (bits/sec) */
+	int32_t mUDPRateUnits; 	/* 0:BW, 1:PPS (Don't use) */
+	int32_t mRealTime; 		/* Don't care */
 } iperf_client_header_t;
 
 typedef struct
@@ -197,16 +197,16 @@ typedef iperf_client_info_t iperf_tcp_client_info_t;
 
 typedef struct
 {
-	bool server; // -s
-	bool udp; // -u
-	bool passthrough; // -P
-	bool negative; // -N
+	bool server; /* -s */
+	bool udp; /* -u */
+	bool passthrough; /* -P */
+	bool negative; /* -N */
 
-	int server_port; // -p
-	char server_ip[IPERF_IPADDR_LEN_MAX + 1]; // -c
+	int server_port; /* -p */
+	char server_ip[IPERF_IPADDR_LEN_MAX + 1]; /* -c */
 
-	int send_time; // sec, -t
-	int report_interval; // sec, -i
+	int send_time; /* -t , sec */
+	int report_interval; /* -i, sec */
 	int datagram_size;
 } iperf_opt_t;
 

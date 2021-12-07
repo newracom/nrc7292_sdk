@@ -29,13 +29,13 @@
 
 #define _hspi_log(fmt, ...)				log_printf(fmt, ##__VA_ARGS__)
 
-#define _hspi_read_debug(fmt, ...)		//_hspi_log("hspi_read: " fmt, ##__VA_ARGS__)
-#define _hspi_write_debug(fmt, ...)		//_hspi_log("hspi_write: " fmt, ##__VA_ARGS__)
+#define _hspi_read_debug(fmt, ...)		/* _hspi_log("hspi_read: " fmt, ##__VA_ARGS__) */
+#define _hspi_write_debug(fmt, ...)		/* _hspi_log("hspi_write: " fmt, ##__VA_ARGS__) */
 
 /**********************************************************************************************/
 
-//#define CONFIG_HSPI_BIG_ENDIAN
-//#define CONFIG_HSPI_REG_PRINT
+/* #define CONFIG_HSPI_BIG_ENDIAN */
+/* #define CONFIG_HSPI_REG_PRINT */
 
 static hspi_info_t g_hspi_info =
 {
@@ -176,7 +176,7 @@ static int hspi_transfer (hspi_opcode_t *opcode, char *buf, int len)
 	if (!HSPI_ACTIVE())
 		return -1;
 
-//	hspi_opcode_print(opcode);
+/*	hspi_opcode_print(opcode); */
 
 	cmd.opcode.val = _CPU_TO_BE32(opcode->val);
 	cmd.crc = (hspi_crc7((char *)&cmd.opcode, sizeof(hspi_opcode_t)) << 1) | 0x01;
@@ -238,7 +238,7 @@ static int hspi_transfer (hspi_opcode_t *opcode, char *buf, int len)
 						break;
 				}
 			}
-			else if (opcode->fixed && !opcode->write) // single read
+			else if (opcode->fixed && !opcode->write) /* single read */
 				*buf = resp.data;
 
 			break;
@@ -462,8 +462,8 @@ static int hspi_status_update (void)
 	if (ret != 0)
 		return ret;
 
-//	hspi_regs_print_status(old);
-//	hspi_regs_print_status(&new);
+/*	hspi_regs_print_status(old); */
+/*	hspi_regs_print_status(&new); */
 
 	if (new.txq.slot_cnt > 0 && new.txq.slot_cnt <= HSPI_TXQ_SLOT_NUM() &&
 			(new.txq.slot_size << 2) == HSPI_TXQ_SLOT_SIZE() &&
@@ -512,7 +512,7 @@ static int hspi_read_slot (int slot_num, int slot_size, char *buf, int *len)
 
 		if (slot->seq != seq)
 		{
-//			_hspi_log("hspi_read: slot_seq: %u -> %u\n", seq, slot->seq);
+/*			_hspi_log("hspi_read: slot_seq: %u -> %u\n", seq, slot->seq); */
 
 			seq = slot->seq;
 		}

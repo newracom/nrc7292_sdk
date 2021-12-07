@@ -1,4 +1,3 @@
-
 /*
  * MIT License
  *
@@ -32,10 +31,10 @@
 
 /**********************************************************************************************/
 
-#define ATCMD_MSG_LEN_MIN		4	// 'AT\r\n'
+#define ATCMD_MSG_LEN_MIN		4			/* 'AT\r\n' */
 #define ATCMD_MSG_LEN_MAX		128
 
-#define ATCMD_DATA_LEN_MAX		(4 * 1024) /* f/w atcmd.h ATCMD_DATA_LEN_MAX */
+#define ATCMD_DATA_LEN_MAX		(4 * 1024) 	/* f/w atcmd.h ATCMD_DATA_LEN_MAX */
 
 /**********************************************************************************************/
 
@@ -94,7 +93,7 @@ typedef struct
 
 	int id;
 	int len;
-	char remote_addr[15 + 1]; // xxx.xxx.xxx.xxx
+	char remote_addr[15 + 1]; /* xxx.xxx.xxx.xxx */
 	int remote_port;
 } atcmd_rxd_t;
 
@@ -131,6 +130,8 @@ typedef int (*atcmd_event_cb_t) (enum ATCMD_EVENT event, int argc, char *argv[])
 typedef void (*atcmd_rxd_cb_t) (atcmd_rxd_t *rxd, char *data);
 
 /**********************************************************************************************/
+
+extern char *nrc_atcmd_param_to_str (const char *param, char *str, int len);
 
 extern int nrc_atcmd_send_cmd (const char *fmt, ...);
 extern int nrc_atcmd_send_data (char *data, int len);

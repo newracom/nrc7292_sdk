@@ -29,10 +29,10 @@
 
 #define echo_info(fmt, ...)				log_info(fmt, ##__VA_ARGS__)
 #define echo_error(fmt, ...)			log_error(fmt, ##__VA_ARGS__)
-#define echo_debug(fmt, ...)			//log_debug(fmt, ##__VA_ARGS__)
+#define echo_debug(fmt, ...)			/* log_debug(fmt, ##__VA_ARGS__) */
 
-#define echo_log_push(fmt, ...)			//echo_debug("echo_push: " fmt, ##__VA_ARGS__)
-#define echo_log_pop(fmt, ...)			//echo_debug("echo_pop : " fmt, ##__VA_ARGS__)
+#define echo_log_push(fmt, ...)			/* echo_debug("echo_push: " fmt, ##__VA_ARGS__) */
+#define echo_log_pop(fmt, ...)			/* echo_debug("echo_pop : " fmt, ##__VA_ARGS__) */
 
 #define echo_log_send(log, fmt, ...)	if (log) echo_info("echo_send: " fmt, ##__VA_ARGS__)
 #define echo_log_recv(log, fmt, ...)	if (log) echo_info("echo_recv: " fmt, ##__VA_ARGS__)

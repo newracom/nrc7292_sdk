@@ -37,6 +37,14 @@
 #define ATCMD_MEM_TYPE		"RAM"
 #endif
 
+#if defined(INCLUDE_KR_MIC_CHANNEL)
+#define ATCMD_COUNTRY		"KR_MIC"
+#elif defined(INCLUDE_KR_USN_CHANNEL)
+#define ATCMD_COUNTRY		"KR_USN"
+#else
+#define ATCMD_COUNTRY		"GLOBAL"
+#endif
+
 #if defined(CONFIG_ATCMD_HSPI) || defined(CONFIG_ATCMD_UART) || defined(CONFIG_ATCMD_UART_HFC)
 #define ATCMD_NET_STACK		"LWIP"
 #elif defined(CONFIG_ATCMD_HSPI_HOST) || defined(CONFIG_ATCMD_UART_HOST) || defined(CONFIG_ATCMD_UART_HFC_HOST)
@@ -44,6 +52,12 @@
 #else
 #error "Invalid APP_NAME"
 #endif
+
+static void nrc_atcmd_build_info (void)
+{
+	_atcmd_info("ATCMD_BUILD: %s,%s,%s,%s\n",
+			ATCMD_CPU_TYPE, ATCMD_MEM_TYPE, ATCMD_COUNTRY, ATCMD_NET_STACK);
+}
 
 /*******************************************************************************/
 
@@ -118,9 +132,7 @@ static int nrc_atcmd_enable_hspi (bool *console_enable)
 	*console_enable = true;
 
 	nrc_uart_console_enable();
-
-	nrc_usr_print("AT Command for NRC Halow.[%s/%s/%s/HSPI]\n",
-					ATCMD_CPU_TYPE, ATCMD_MEM_TYPE, ATCMD_NET_STACK);
+	nrc_atcmd_build_info();
 
 	return nrc_atcmd_enable(_HIF_TYPE_HSPI, sw_id, bd_id);
 }
@@ -150,10 +162,7 @@ static int nrc_atcmd_enable_uart (bool *console_enable)
 		*console_enable = true;
 
 		nrc_uart_console_enable();
-
-		nrc_usr_print("AT Command for NRC Halow.[%s/%s/%s/UART_%s_%d_%d]\n",
-						ATCMD_CPU_TYPE, ATCMD_MEM_TYPE, ATCMD_NET_STACK,
-						hfc ? "HFC" : "", channel, baudrate);
+		nrc_atcmd_build_info();
 	}
 
 	return nrc_atcmd_enable((hfc ? _HIF_TYPE_UART_HFC : _HIF_TYPE_UART), channel, baudrate);

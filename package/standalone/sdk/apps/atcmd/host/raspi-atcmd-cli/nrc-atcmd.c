@@ -17,7 +17,7 @@ static struct
 
 	struct
 	{
-		int val; // -1: error, 0: ok, 1: don't care
+		int val; /* -1: error, 0: ok, 1: don't care */
 
 		pthread_mutex_t mutex;
 		pthread_cond_t cond;
@@ -49,7 +49,7 @@ static struct
 	}
 };
 
-static char *nrc_atcmd_param_to_str (const char *param, char *str, int len)
+char *nrc_atcmd_param_to_str (const char *param, char *str, int len)
 {
 	int param_len;
 
