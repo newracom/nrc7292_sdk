@@ -2,8 +2,11 @@
 
 ## Notice
 ### Release roadmap
+- v1.3.4_rev03 (2021.12.08)
+- v1.3.4_rev02 (2021.12.07)
+- v1.3.4_rev01 (2021.11.04)
 - v1.3.4 (2021.10.22)
-- v1.3.3 (skip)
+- v1.3.3 (skip to sync the version number with nrc7292_sw_pkg)
 - v1.3.2 (2020.09.16)
 - v1.3.1 (2020.08.05)
 - v1.3.0 (2020.07.19)
