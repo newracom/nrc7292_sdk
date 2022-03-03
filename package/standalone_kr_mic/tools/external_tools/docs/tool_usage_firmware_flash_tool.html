@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tool Usage (Firmware Flash Tool) &mdash; NRC Tools 1.6 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Appendix (Common RAM Mode Tool Setup Instructions)" href="appendix_common_ram_mode_tool_setup.html" />
+    <link rel="prev" title="Tool Usage (DM)" href="tool_usage_dm.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> NRC Tools
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="requirements.html">Setup and Requirements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="board_operation_mode_selection.html">NRC Board Operation Mode Selection and Power Supply</a></li>
+<li class="toctree-l1"><a class="reference internal" href="running_the_tools_on_mac_linux.html">Running the Tools on Windows/Mac/Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tool_usage_dut2dut.html">Tool Usage (DUT2DUT)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tool_usage_dm.html">Tool Usage (DM)</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Tool Usage (Firmware Flash Tool)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tool-version">Tool Version</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#binary-files">Binary Files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#operation">Operation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="appendix_common_ram_mode_tool_setup.html">Appendix (Common RAM Mode Tool Setup Instructions)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="appendix_noise_level_estimation.html">Appendix (Noise Level Estimation Module)</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">NRC Tools</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Tool Usage (Firmware Flash Tool)</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/tool_usage_firmware_flash_tool.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="tool-usage-firmware-flash-tool">
+<h1>Tool Usage (Firmware Flash Tool)<a class="headerlink" href="#tool-usage-firmware-flash-tool" title="Permalink to this headline"></a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline"></a></h2>
+<dl>
+<dt><em>Firmware Flash Tool</em> is a utility for running flash-related operations (reading/writing MAC addresses and uploading XIP standalone bootloader/ XIP standalone firmware) on NRC7292 modules.</dt><dd><img alt="_images/firmware_flash_tool.png" src="_images/firmware_flash_tool.png" />
+</dd>
+</dl>
+</section>
+<section id="tool-version">
+<h2>Tool Version<a class="headerlink" href="#tool-version" title="Permalink to this headline"></a></h2>
+<ul class="simple">
+<li><p>v5.2</p></li>
+</ul>
+</section>
+<section id="binary-files">
+<h2>Binary Files<a class="headerlink" href="#binary-files" title="Permalink to this headline"></a></h2>
+<dl class="simple">
+<dt><strong>2nd Bootloader (written on RAM)</strong>:</dt><dd><p>is the 2nd bootloader binary file to be temporarily written on RAM to replace the mask ROM bootloader to augment the bootloader functionalities.</p>
+</dd>
+<dt><strong>XIP Bootloader (written on flash)</strong>:</dt><dd><p>is the XIP bootloader binary file to be stored on the flash memory.</p>
+</dd>
+<dt><strong>XIP Firmware (written on flash)</strong>:</dt><dd><p>is the XIP firmware binary file to be stored on the flash memory.</p>
+</dd>
+</dl>
+</section>
+<section id="operation">
+<h2>Operation<a class="headerlink" href="#operation" title="Permalink to this headline"></a></h2>
+<ol class="arabic simple">
+<li><p>Set the DIP switch configuration to <strong>Firmware Upload / RAM Operation</strong> mode as described on the <a class="reference internal" href="board_operation_mode_selection.html#board-operation-mode-selection"><span class="std std-ref">NRC Board Operation Mode Selection and Power Supply page</span></a>.</p></li>
+<li><p>Reset the board.</p></li>
+<li><p>Select the desired procedures by using the corresponding check boxes: MAC adresss write, XIP bootloader write, and XIP firmware write.</p></li>
+<li><p>Press the <strong>START</strong> button to run the selected procedures.</p></li>
+</ol>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>To run the uploaded standalone application on the NRC7292 board, set the DIP switch configuration to <strong>Standalone Operation</strong> mode as described on the <a class="reference internal" href="board_operation_mode_selection.html#board-operation-mode-selection"><span class="std std-ref">NRC Board Operation Mode Selection and Power Supply page</span></a> and reset the board.</p>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="tool_usage_dm.html" class="btn btn-neutral float-left" title="Tool Usage (DM)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="appendix_common_ram_mode_tool_setup.html" class="btn btn-neutral float-right" title="Appendix (Common RAM Mode Tool Setup Instructions)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Newracom Inc..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
