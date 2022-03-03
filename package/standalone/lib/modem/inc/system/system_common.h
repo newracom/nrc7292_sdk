@@ -327,5 +327,8 @@ void *system_get_idle_hook();
 void *system_set_idle_hook(void *idlehook);
 
 int get_number_of_buffer(struct _SYS_BUF *packet);
+uint64_t system_get_systick_ms(void);
+uint64_t system_get_time(void);
+void system_time_reset(void);
 #define TRACE A("%s %d\n", __func__, __LINE__)
 #endif /* SYSTEM_COMMON_H */

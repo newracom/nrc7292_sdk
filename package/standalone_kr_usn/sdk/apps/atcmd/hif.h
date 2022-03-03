@@ -86,7 +86,7 @@
 
 #define _hif_malloc						pvPortMalloc
 #define _hif_free						vPortFree
-#define _hif_printf						nrc_uart_printf
+#define _hif_printf						hal_uart_printf
 
 #define _hif_log(fmt, ...)				_hif_printf("[ATHIF] " fmt, ##__VA_ARGS__)
 

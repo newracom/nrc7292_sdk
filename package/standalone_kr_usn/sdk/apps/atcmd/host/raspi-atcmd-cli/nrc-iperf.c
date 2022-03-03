@@ -570,7 +570,7 @@ static void iperf_udp_server_measure_jitter (int32_t id,
 	*transit = prev_transit;
 }
 
-static int iperf_udp_server_run (iperf_opt_t *option) 
+static int iperf_udp_server_run (iperf_opt_t *option)
 {
 	iperf_udp_server_info_t *info = &g_iperf_udp_server_info;
 	iperf_time_t current_time, elapse_time, report_time;
@@ -859,7 +859,7 @@ static void iperf_udp_client_report_from_server (iperf_server_header_t *header)
 					(errors * 100.) / datagrams);
 }
 
-static int iperf_udp_client_run (iperf_socket_t *socket, iperf_opt_t *option) 
+static int iperf_udp_client_run (iperf_socket_t *socket, iperf_opt_t *option)
 {
 	iperf_udp_client_info_t *info = &g_iperf_udp_client_info;
 	iperf_time_t start_time, stop_time, current_time, elapse_time, report_time;
@@ -1044,7 +1044,7 @@ static void iperf_tcp_server_report (iperf_time_t start_time, iperf_time_t stop_
 					byte_to_string(byte), bps_to_string(bps));
 }
 
-static int iperf_tcp_server_run (iperf_opt_t *option) 
+static int iperf_tcp_server_run (iperf_opt_t *option)
 {
 	iperf_tcp_server_info_t *info = &g_iperf_tcp_server_info;
 	iperf_time_t current_time, elapse_time, report_time;
@@ -1359,7 +1359,7 @@ static int iperf_tcp_client_run (iperf_socket_t *socket, iperf_opt_t *option) //
 
 		usleep(100 * 1000);
 	}
-			
+
 	iperf_log(" Done\n");
 
 	free((char *)datagram);
@@ -1605,7 +1605,7 @@ static int _iperf_main (int argc, char *argv[])
 					iperf_udp_server_run(&option);
 				else
 					iperf_tcp_server_run(&option);
-			
+
 				while (1)
 				{
 					iperf_log("\nPress ENTER key or Input \"quit\" : ");

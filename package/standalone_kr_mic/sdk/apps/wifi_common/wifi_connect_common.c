@@ -27,28 +27,58 @@
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
 #include "wlan_manager.h"
+#include "nrc_ps_api.h"
+
+#include "lwip/netif.h"
+extern struct netif* nrc_netif[];
+
+#define MAX_CNT 3
 
 
 static void wifi_event_handler(tWIFI_EVENT_ID event, int data_len, char* data)
 {
 	char* ip_addr = NULL;
+	tWIFI_STATUS ret = WIFI_FAIL;
+	int cnt = 0;
+
 	switch(event) {
 		case WIFI_EVT_CONNECT_SUCCESS:
 			nrc_usr_print("[%s] Receive Connection Success Event\n", __func__);
-			break;;
+			if (!netif_is_link_up(nrc_netif[0])) {
+				netif_set_link_up(nrc_netif[0]);
+			}
+
+			do {
+				ret = nrc_wifi_set_ip_address();
+				if(ret != WIFI_SUCCESS) {
+					cnt++;
+					nrc_usr_print("[%s] Fail to set IP addr(cnt %d)\n", __func__,cnt);
+				}
+				if(cnt == MAX_CNT) {
+					nrc_wifi_set_state(WIFI_STATE_TRY_DISASSOC);
+					break;
+				}
+			} while(ret != WIFI_SUCCESS);
+
+			break;
 		case WIFI_EVT_CONNECT_FAIL:
 			nrc_usr_print("[%s] Receive Connection Fail Event\n", __func__);
 			break;
 		case WIFI_EVT_GET_IP:
 			nrc_usr_print("[%s] Receive IP_GET Success Event\n", __func__);
-			if( nrc_wifi_get_ip_address(&ip_addr) == WIFI_SUCCESS)
+			if( nrc_wifi_get_ip_address(&ip_addr) == WIFI_SUCCESS) {
 				nrc_usr_print("[%s] IP Address : %s\n", __func__, ip_addr ? ip_addr : "null");
+			}
 			break;
 		case WIFI_EVT_GET_IP_FAIL:
 			nrc_usr_print("[%s] Receive IP_GET Fail Event\n", __func__);
 			break;
 		case WIFI_EVT_DISCONNECT:
 			nrc_usr_print("[%s] Receive Disconnection Event\n", __func__);
+			/* send netif down indication to LWIP */
+			if (netif_is_link_up(nrc_netif[0])) {
+				netif_set_link_down(nrc_netif[0]);
+			}
 			break;
 		case WIFI_EVT_SCAN_DONE:
 			nrc_usr_print("[%s] Receive Scan Done Event\n", __func__);
@@ -58,8 +88,9 @@ static void wifi_event_handler(tWIFI_EVENT_ID event, int data_len, char* data)
 			break;
 		case WIFI_EVT_SET_SOFT_AP_IP:
 			nrc_usr_print("[%s] Receive SET IP Event\n", __func__);
-			if( nrc_wifi_get_ip_address(&ip_addr) == WIFI_SUCCESS)
+			if( nrc_wifi_get_ip_address(&ip_addr) == WIFI_SUCCESS) {
 				nrc_usr_print("[%s] IP Address : %s\n", __func__, ip_addr);
+			}
 			break;
 		case WIFI_EVT_START_DHCP_SERVER:
 			nrc_usr_print("[%s] Receive Start DHCPS Event\n", __func__);
@@ -74,7 +105,7 @@ int wifi_init(WIFI_CONFIG *param)
 {
 	int txpower;
 
-	/* Optional: Register Wi-Fi Event Handler */
+	/* Register Wi-Fi Event Handler */
 	nrc_wifi_register_event_handler(wifi_event_handler);
 
 	/* Set IP mode config (Dynamic IP(DHCP client) or STATIC IP) */
@@ -109,6 +140,7 @@ int wifi_connect(WIFI_CONFIG *param)
 
 	/* Try to connect with ssid and security */
 	nrc_usr_print("[%s] Trying to Wi-Fi Connection...\n",__func__);
+
 	if (nrc_wifi_add_network(&index) < 0) {
 		nrc_usr_print("[%s] Fail to init \n", __func__);
 		return WIFI_INIT_FAIL;
@@ -122,6 +154,14 @@ int wifi_connect(WIFI_CONFIG *param)
 	if (strlen((char *)param->bssid) != 0){
 		if (nrc_wifi_set_bssid(index, (char *)param->bssid) != WIFI_SUCCESS) {
 			nrc_usr_print("[%s] Fail to set BSSID\n", __func__);
+			return WIFI_FAIL;
+		}
+	}
+
+	/* Set Non-S1G channel */
+	if(param->s1g_channel != 0) {
+		if(nrc_wifi_set_s1g_config(param->s1g_channel) != WIFI_SUCCESS) {
+			nrc_usr_print("[%s] Fail to set S1G channel\n", __func__);
 			return WIFI_FAIL;
 		}
 	}
@@ -145,8 +185,7 @@ int wifi_connect(WIFI_CONFIG *param)
 		nrc_usr_print("[%s] Fail to set IP Address\n", __func__);
 		return WIFI_SET_IP_FAIL;
 	}
-
-	return WIFI_SUCCESS;
+ 	return WIFI_SUCCESS;
 }
 
 int wifi_start_softap(WIFI_CONFIG *param)

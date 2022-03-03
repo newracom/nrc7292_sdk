@@ -28,7 +28,6 @@
 #include "nvs_flash.h"
 
 nvs_handle_t nvs_handle;
-char default_namespace[] = "namespace";
 
 /******************************************************************************
  * FunctionName : run_nvs_flash_test
@@ -41,16 +40,10 @@ nrc_err_t run_nvs_flash_test()
 	nvs_err_t err = NVS_OK;
 	int32_t value;
 
-	/* initialize Non-volatile storage key/value subsystem */
-	/* Application will need to call nvs_open to utilize NVS. */
-	/* There's no need to call nvs_flash_deinit(), since the system will never return. */
-	err = nvs_flash_init();
-	if (err == NVS_ERR_NVS_NO_FREE_PAGES || err == NVS_ERR_NVS_NEW_VERSION_FOUND) {
-		if ((err = nvs_flash_erase()) == NVS_OK) {
-			err = nvs_flash_init();
-		}
-	} else {
-		err = nvs_open(default_namespace, NVS_READWRITE, &nvs_handle);
+	err = nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle);
+	if (err != NVS_OK) {
+		nrc_usr_print("[%s] nvs_open failed (0x%x).\n", __func__, err);
+		return NRC_FAIL;
 	}
 
 	nrc_usr_print("[%s] Call nvs_set_i32 for foo = 0x12345678...\n", __func__);

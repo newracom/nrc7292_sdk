@@ -4,7 +4,8 @@ CSRCS += \
 	atcmd_main.c \
 	atcmd_core.c \
 	atcmd_basic.c \
-	atcmd_wifi.c
+	atcmd_wifi.c \
+	atcmd_param.c
 
 ifneq ($(findstring ATCMD_HSPI,$(APP_NAME)), )
 CSRCS += \

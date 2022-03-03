@@ -594,5 +594,17 @@ tWIFI_STATUS nrc_wifi_softap_start(int index);
  ***********************************************/
 tWIFI_STATUS nrc_wifi_softap_start_dhcp_server(void);
 
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_tx_time(uint16_t cs_time, uint32_t pause_time)
+ *
+ * @brief Set carrier sense time and pause time
+ *
+ * @param cs_time: Carrier sensing time. Listen before talk (time unit: us) (0~12480)
+ *
+ * @param pause_time: Tx pause time (time unit : us)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_tx_time(uint16_t cs_time, uint32_t pause_time);
 
 #endif /* __NRC_API_WIFI_H__ */

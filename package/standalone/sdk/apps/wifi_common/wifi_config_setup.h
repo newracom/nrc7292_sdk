@@ -39,11 +39,12 @@ typedef struct  {
 	uint32_t channel;
 	uint8_t count;
 	int interval;
+	int short_bcn_interval;
 	int duration;
 	uint8_t ip_mode;
-	uint8_t static_ip[MAX_STATIC_IP_LENGTH + 1];
-	uint8_t ap_ip[MAX_STATIC_IP_LENGTH + 1];
-	uint8_t remote_addr[MAX_STATIC_IP_LENGTH + 1];
+	uint8_t static_ip[MAX_STATIC_IP_LENGTH];
+	uint8_t ap_ip[MAX_STATIC_IP_LENGTH];
+	uint8_t remote_addr[MAX_STATIC_IP_LENGTH];
 	uint16_t remote_port;
 	uint16_t s1g_channel;
 	int tx_power;

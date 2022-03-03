@@ -88,14 +88,14 @@ static int8_t _atcmd_wifi_rssi_read (void)
 	int8_t rssi;
 
 	if (nrc_wifi_get_rssi(&rssi) != WIFI_SUCCESS)
-		return -128;
+		return ATCMD_WIFI_RSSI_MIN;
 
 	return rssi;
 }
 
 static bool _atcmd_wifi_rssi_valid (const int rssi)
 {
-	if (rssi >= -128 && rssi <= 0)
+	if (rssi >= ATCMD_WIFI_RSSI_MIN && rssi <= ATCMD_WIFI_RSSI_MAX)
 		return true;
 
 	return false;
@@ -202,8 +202,6 @@ static void _atcmd_wifi_init_info (atcmd_wifi_info_t *info)
 	_atcmd_info("RF_CAL_INFO: cal_use=%d country=%s\n", cal_use, country);
 
 	memset(info, 0, sizeof(atcmd_wifi_info_t));
-
-	info->net_id = -1;
 
 	info->event = 0;
 
@@ -371,18 +369,8 @@ static void _atcmd_wifi_event_connect_success (void)
 
 	if (event)
 	{
-/*		char param_ssid[ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_ssid_t))];
-		char param_bssid[ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_bssid_t))];
-
-		if (atcmd_str_to_param(connect->ssid, param_ssid, sizeof(param_ssid)) &&
-				atcmd_str_to_param(connect->bssid, param_bssid, sizeof(param_bssid)))
-		{
-			ATCMD_MSG_WEVENT("\"CONNECT_SUCCESS\",%s", param_ssid, param_bssid);
-		}
-		else */
-		{
-			ATCMD_MSG_WEVENT("\"CONNECT_SUCCESS\"");
-		}
+		ATCMD_MSG_WEVENT("\"CONNECT_SUCCESS\",\"%s\",\"%s\",\"%s\"",
+					connect->bssid, connect->ssid, connect->security);
 	}
 }
 
@@ -393,8 +381,6 @@ static void _atcmd_wifi_event_connect_fail (void)
 
 	if (connect->connecting)
 	{
-		g_atcmd_wifi_info->net_id = -1;
-
 		connect->connected = false;
 		connect->connecting = false;
 		connect->disconnecting = false;
@@ -409,8 +395,6 @@ static void _atcmd_wifi_event_connect_fail (void)
 	}
 	else if (!connect->connected)
 	{
-		g_atcmd_wifi_info->net_id = -1;
-
 		connect->connected = false;
 		connect->connecting = false;
 		connect->disconnecting = false;
@@ -420,18 +404,8 @@ static void _atcmd_wifi_event_connect_fail (void)
 
 	if (event)
 	{
-/*		char param_ssid[ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_ssid_t))];
-		char param_bssid[ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_bssid_t))];
-
-		if (atcmd_str_to_param(connect->ssid, param_ssid, sizeof(param_ssid)) &&
-				atcmd_str_to_param(connect->bssid, param_bssid, sizeof(param_bssid)))
-		{
-			ATCMD_MSG_WEVENT("\"CONNECT_FAIL\",%s", param_ssid, param_bssid);
-		}
-		else */
-		{
-			ATCMD_MSG_WEVENT("\"CONNECT_FAIL\"");
-		}
+		ATCMD_MSG_WEVENT("\"CONNECT_FAIL\",\"%s\",\"%s\",\"%s\"",
+					connect->bssid, connect->ssid, connect->security);
 	}
 }
 
@@ -442,8 +416,6 @@ static void _atcmd_wifi_event_disconnect (void)
 
 	if (connect->disconnecting)
 	{
-		g_atcmd_wifi_info->net_id = -1;
-
 		connect->connected = false;
 		connect->connecting = false;
 		connect->disconnecting = false;
@@ -466,18 +438,8 @@ static void _atcmd_wifi_event_disconnect (void)
 
 	if (event)
 	{
-/*		char param_ssid[ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_ssid_t))];
-		char param_bssid[ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_bssid_t))];
-
-		if (atcmd_str_to_param(connect->ssid, param_ssid, sizeof(param_ssid)) &&
-				atcmd_str_to_param(connect->bssid, param_bssid, sizeof(param_bssid)))
-		{
-			ATCMD_MSG_WEVENT("\"DISCONNECT\",%s", param_ssid, param_bssid);
-		}
-		else */
-		{
-			ATCMD_MSG_WEVENT("\"DISCONNECT\"");
-		}
+		ATCMD_MSG_WEVENT("\"DISCONNECT\",\"%s\",\"%s\",\"%s\"",
+					connect->bssid, connect->ssid, connect->security);
 	}
 }
 
@@ -539,7 +501,8 @@ static void _atcmd_wifi_event_handler (tWIFI_EVENT_ID event, int data_len, char*
 		[WIFI_EVT_GET_IP_FAIL] = "dhcp_fail",
 		[WIFI_EVT_START_SOFT_AP] = "soft_ap_start",
 		[WIFI_EVT_SET_SOFT_AP_IP] = "soft_ap_ip_set",
-		[WIFI_EVT_START_DHCP_SERVER] = "dhcp_server_start"
+		[WIFI_EVT_START_DHCP_SERVER] = "dhcp_server_start",
+		[WIFI_EVT_VENDOR_IE] = "vendor_ie"
 	};
 
 	switch(event)
@@ -558,6 +521,10 @@ static void _atcmd_wifi_event_handler (tWIFI_EVENT_ID event, int data_len, char*
 		case WIFI_EVT_SET_SOFT_AP_IP:
 		case WIFI_EVT_START_DHCP_SERVER:
 			_atcmd_info("wifi_event: %s (unused)\n", str_event[event]);
+			break;
+
+		case WIFI_EVT_VENDOR_IE:
+			/* _atcmd_info("wifi_event: %s (unused)\n", str_event[event]); */
 			break;
 
 		default:
@@ -648,7 +615,7 @@ static int _atcmd_wifi_country_set (int argc, char *argv[])
 	{
 		case 0:
 /*			ATCMD_MSG_HELP("AT+WCOUNTRY=\"<country code>\""); */
-			ATCMD_MSG_HELP("AT+WCOUNTRY=\"{%s}\"", ATCMD_WIFI_COUNTRY_STRING); 
+			ATCMD_MSG_HELP("AT+WCOUNTRY=\"{%s}\"", ATCMD_WIFI_COUNTRY_STRING);
 			break;
 
 		case 1:
@@ -1193,7 +1160,7 @@ static int _atcmd_wifi_dhcp_run (int argc, char *argv[])
 	{
 		_atcmd_info("wifi_dhcp: not connected\n");
 
-		return ATCMD_ERROR_BUSY;
+		return ATCMD_ERROR_INVAL;
 	}
 
 	if (dhcp->requesting)
@@ -1546,113 +1513,141 @@ static bool _atcmd_wifi_connect_valid_ap (char *ssid, char *bssid, tWIFI_SECURIT
 
 static int _atcmd_wifi_connect_run (int argc, char *argv[])
 {
-	bool wifi_roaming = (argc == -1) ? true : false;
 	atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
-	int net_id;
+	bool event_poll = false;
+	int net_id = -1;
+
+	switch (argc)
+	{
+		case 2:
+			net_id = *(int *)argv[1];
+
+		case 1:
+			event_poll = *(bool *)argv[0];	
+		
+		case 0:
+			break;
+
+		default:
+			_atcmd_info("wifi_connect: invalid argc\n");
+			return ATCMD_ERROR_INVAL;
+	}
+
+/*	_atcmd_debug("wifi_connect: event_poll=%d net_id=%d\n", event_poll, net_id); */
 
 	atcmd_wifi_lock();
 
-	if (nrc_wifi_get_network_index(&net_id) != WIFI_SUCCESS)
+	if (net_id < 0 && nrc_wifi_get_network_index(&net_id) != WIFI_SUCCESS)
 		goto wifi_connect_fail;
 
-	if (net_id != g_atcmd_wifi_info->net_id) {
-		_atcmd_info("wifi_connect: mismatch net_id, %d -> %d\n", net_id, g_atcmd_wifi_info->net_id);
-
-		if (net_id >= 0) {
-			_atcmd_info("wifi_connect: remove_network\n");
-
-			if (nrc_wifi_remove_network(net_id) != WIFI_SUCCESS)
-				goto wifi_connect_fail;
-		}
-
-		net_id = -1;
-		connect->connected = false;
-		connect->connecting = false;
-		connect->disconnecting = false;
-		g_atcmd_wifi_info->net_id = net_id;
-	}
-
-	if (net_id >= 0) {
-		if (connect->connecting || connect->connected) {
-			_atcmd_info("wifi_connect: busy\n");
-			atcmd_wifi_unlock();
-			return ATCMD_ERROR_BUSY;
-		}
-	} else {
+	if (net_id < 0)
+	{
 		_atcmd_info("wifi_connect: add_network\n");
 
 		if (nrc_wifi_add_network(&net_id) != WIFI_SUCCESS)
 			goto wifi_connect_fail;
 	}
+	else if (connect->connecting || connect->connected)
+	{
+		_atcmd_info("wifi_connect: %s\n", connect->connected ? "connected" : "connecting");
 
-	_atcmd_info("wifi_connect: net_id=%d\n", net_id);
+		atcmd_wifi_unlock();
 
-	if (net_id >= 0) {
+		return ATCMD_ERROR_BUSY;
+	}
+
+	if (net_id >= 0)
+	{
 		tWIFI_SECURITY security = _atcmd_wifi_security_string_to_index(connect->security);
-		uint32_t timeout_msec = _atcmd_timeout_value("WCONN");
-		uint32_t time;
 
-		_atcmd_info("wifi_connect: ssid=%s\n", connect->ssid);
+		_atcmd_info("wifi_connect: %s %s %s\n", connect->ssid, connect->bssid, connect->security);
 
 		if(strlen(connect->ssid) > 0 && nrc_wifi_set_ssid(net_id, connect->ssid) != WIFI_SUCCESS)
 			goto wifi_connect_fail;
 
-		_atcmd_info("wifi_connect: bssid=%s\n", connect->bssid);
-
 		if(strlen(connect->bssid) > 0 && nrc_wifi_set_bssid(net_id, connect->bssid) != WIFI_SUCCESS)
 			goto wifi_connect_fail;
 
-		_atcmd_info("wifi_connect: security=%s\n", connect->security);
-
 		if(nrc_wifi_set_security(net_id, security, connect->password) != WIFI_SUCCESS)
 			goto wifi_connect_fail;
-
-		g_atcmd_wifi_info->net_id = net_id;
 
 		connect->connected = false;
 		connect->connecting = true;
 		connect->disconnecting = false;
 
-		if (wifi_roaming) {
+		if (event_poll)
+		{
+			_atcmd_info("wifi_connect: event poll\n");
+
 			_atcmd_wifi_event_poll(WIFI_EVT_CONNECT_SUCCESS);
 			_atcmd_wifi_event_poll(WIFI_EVT_CONNECT_FAIL);
 		}
+		else
+		{
+			_atcmd_wifi_event_polled(WIFI_EVT_CONNECT_SUCCESS);
+			_atcmd_wifi_event_polled(WIFI_EVT_CONNECT_FAIL);
+		}
 
-		if(nrc_wifi_connect(net_id) != WIFI_SUCCESS) {
+		if(nrc_wifi_connect(net_id) != WIFI_SUCCESS)
+		{
 			connect->connecting = false;
 			goto wifi_connect_fail;
 		}
 
-		for (time = 0 ; connect->connecting ; time += 100) {
-			if (time > 0 && (time % 1000) == 0)
-				_atcmd_info("wifi_connect: %u sec\n", time / 1000);
+		if (connect->connecting)
+		{
+			uint32_t timeout_msec = _atcmd_timeout_value("WCONN");
+			uint32_t time;
 
-			if (timeout_msec > 0 && time >= timeout_msec) {
-				if (!wifi_roaming) {
-					_atcmd_wifi_event_poll(WIFI_EVT_CONNECT_SUCCESS);
-					_atcmd_wifi_event_poll(WIFI_EVT_CONNECT_FAIL);
+			_atcmd_info("wifi_connect: connecting\n");
+
+			for (time = 0 ; connect->connecting ; time += 100)
+			{
+				if (time > 0 && (time % 1000) == 0)
+					_atcmd_info("wifi_connect: %u sec\n", time / 1000);
+
+				if (timeout_msec > 0 && time >= timeout_msec)
+				{
+					if (!event_poll)
+					{
+						_atcmd_wifi_event_poll(WIFI_EVT_CONNECT_SUCCESS);
+						_atcmd_wifi_event_poll(WIFI_EVT_CONNECT_FAIL);
+					}
+
+					_atcmd_info("wifi_connect: timeout\n");
+
+					atcmd_wifi_unlock();
+
+					return ATCMD_ERROR_TIMEOUT;
 				}
-				_atcmd_info("wifi_connect: timeout\n");
-				atcmd_wifi_unlock();
 
-				return ATCMD_ERROR_TIMEOUT;
+				_delay_ms(100);
 			}
-			_delay_ms(100);
 		}
 
 		if (!connect->connected)
+		{
+			_atcmd_info("wifi_connect: not connected\n");
 			goto wifi_connect_fail;
-
+		}
+		
 		_atcmd_info("wifi_connect: done\n");
+
 		atcmd_wifi_unlock();
 
 		return ATCMD_SUCCESS;
 	}
-	_atcmd_info("wifi_connect: invalid net_id (%d)\n", net_id);
 
 wifi_connect_fail:
 
 	_atcmd_info("wifi_connect: fail\n");
+
+	if (net_id >= 0)
+	{
+		if (nrc_wifi_remove_network(-1) != WIFI_SUCCESS)
+			_atcmd_error("wifi_connect: failed nrc_wifi_remove_network()\n");
+	}
+
 	atcmd_wifi_unlock();
 
 	return ATCMD_ERROR_FAIL;
@@ -1828,86 +1823,136 @@ static atcmd_info_t g_atcmd_wifi_connect =
 
 static int _atcmd_wifi_disconnect_run (int argc, char *argv[])
 {
-	bool wifi_roaming = (argc == -1) ? true : false;
 	atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
+	bool event_poll = false;
+	int net_id = -1;
+
+	switch (argc)
+	{
+		case 2:
+			net_id = *(int *)argv[1];
+
+		case 1:
+			event_poll = *(bool *)argv[0];	
+		
+		case 0:
+			break;
+
+		default:
+			_atcmd_info("wifi_disconnect: invalid argc\n");
+			return ATCMD_ERROR_INVAL;
+	}
+
+/*	_atcmd_debug("wifi_disconnect: event_poll=%d net_id=%d\n", event_poll, net_id); */
 
 	atcmd_wifi_lock();
 
-	if (!connect->connecting && !connect->connected)
+	if (net_id < 0 && nrc_wifi_get_network_index(&net_id) != WIFI_SUCCESS)
 	{
-		_atcmd_info("wifi_disconnect: not connected\n");
+		_atcmd_info("wifi_disconnect: fail\n");
+
+		atcmd_wifi_unlock();
+
+		return ATCMD_ERROR_FAIL;
+	}
+
+	if (net_id < 0)
+	{
+		_atcmd_info("wifi_disconnect: disconnected\n");
+
+		connect->connected = false;
+		connect->connecting = false;
+		connect->disconnecting = false;
 
 		atcmd_wifi_unlock();
 
 		return ATCMD_SUCCESS;
 	}
 
-	if (!connect->disconnecting)
+	if (connect->disconnecting)
 	{
-		_atcmd_info("wifi_disconnect: run\n");
+		_atcmd_info("wifi_disconnect: busy\n");
 
-		connect->disconnecting = true;
+		atcmd_wifi_unlock();
 
-		if (connect->connecting)
+		return ATCMD_ERROR_BUSY;
+	}
+
+	_atcmd_info("wifi_disconnect: run\n");
+
+	connect->disconnecting = true;
+
+	if (connect->connecting)
+	{
+		connect->connecting = false;
+
+		_atcmd_wifi_event_polled(WIFI_EVT_CONNECT_SUCCESS);
+		_atcmd_wifi_event_polled(WIFI_EVT_CONNECT_FAIL);
+	}
+
+	if (event_poll)
+	{
+		_atcmd_info("wifi_disconnect: event poll\n");
+
+		_atcmd_wifi_event_poll(WIFI_EVT_DISCONNECT);
+	}
+	else
+	{
+		_atcmd_wifi_event_polled(WIFI_EVT_DISCONNECT);
+	}
+
+	if (nrc_wifi_disconnect(net_id) != WIFI_SUCCESS)
+	{
+		connect->disconnecting = false;
+
+		_atcmd_info("wifi_disconnect: fail\n");
+
+		atcmd_wifi_unlock();
+
+		return ATCMD_ERROR_FAIL;
+	}
+
+	if (connect->connecting || connect->connected)
+	{
+		uint32_t timeout_msec = _atcmd_timeout_value("WDISCONN");
+		uint32_t time;
+
+		_atcmd_info("wifi_disconnect: disconnecting\n");
+
+		for (time = 0 ; connect->disconnecting ; time += 100)
 		{
-			connect->connecting = false;
+			if (time > 0 && (time % 1000) == 0)
+				_atcmd_info("wifi_disconnect: %u sec\n", time / 1000);
 
-			_atcmd_wifi_event_polled(WIFI_EVT_CONNECT_SUCCESS);
-			_atcmd_wifi_event_polled(WIFI_EVT_CONNECT_FAIL);
-		}
-
-		if (wifi_roaming)
-			_atcmd_wifi_event_poll(WIFI_EVT_DISCONNECT);
-
-		if (nrc_wifi_disconnect(g_atcmd_wifi_info->net_id) != WIFI_SUCCESS)
-		{
-			connect->disconnecting = false;
-
-			_atcmd_info("wifi_disconnect: fail\n");
-
-			atcmd_wifi_unlock();
-
-			return ATCMD_ERROR_FAIL;
-		}
-
-		if (1)
-		{
-			uint32_t timeout_msec = _atcmd_timeout_value("WDISCONN");
-			uint32_t time;
-
-			for (time = 0 ; connect->disconnecting ; time += 100)
+			if (timeout_msec > 0 && time >= timeout_msec)
 			{
-				if (time > 0 && (time % 1000) == 0)
-					_atcmd_info("wifi_disconnect: %u sec\n", time / 1000);
+				if (!event_poll)
+					_atcmd_wifi_event_poll(WIFI_EVT_DISCONNECT);
 
-				if (timeout_msec > 0 && time >= timeout_msec)
-				{
-					if (!wifi_roaming)
-						_atcmd_wifi_event_poll(WIFI_EVT_DISCONNECT);
+				_atcmd_info("wifi_disconnect: timeout\n");
 
-					_atcmd_info("wifi_disconnect: timeout\n");
+				atcmd_wifi_unlock();
 
-					atcmd_wifi_unlock();
-
-					return ATCMD_ERROR_TIMEOUT;
-				}
-
-				_delay_ms(100);
+				return ATCMD_ERROR_TIMEOUT;
 			}
+
+			_delay_ms(100);
 		}
-
-		_atcmd_info("wifi_disconnect: done\n");
-
-		atcmd_wifi_unlock();
-
-		return ATCMD_SUCCESS;
+	}
+		
+	if (connect->disconnecting)
+	{
+		connect->disconnecting = false;
+		
+		if (_atcmd_wifi_event_polling(WIFI_EVT_DISCONNECT))
+			_atcmd_wifi_event_polled(WIFI_EVT_DISCONNECT);
 	}
 
-	_atcmd_info("wifi_disconnect: busy\n");
+	_atcmd_info("wifi_disconnect: done\n");
 
 	atcmd_wifi_unlock();
 
-	return ATCMD_ERROR_BUSY;
+	return ATCMD_SUCCESS;
 }
 
 static atcmd_info_t g_atcmd_wifi_disconnect =
@@ -1927,8 +1972,8 @@ static atcmd_info_t g_atcmd_wifi_disconnect =
 
 /**********************************************************************************************/
 
-#define _wifi_roaming_debug(fmt, ...)	_atcmd_debug("ROAMING: " fmt "\n", ##__VA_ARGS__)
 #define _wifi_roaming_log(fmt, ...)		_atcmd_info("ROAMING: " fmt "\n", ##__VA_ARGS__)
+#define _wifi_roaming_debug(fmt, ...)	_atcmd_debug("ROAMING: " fmt "\n", ##__VA_ARGS__)
 
 static int _atcmd_wifi_roaming_scan (void)
 {
@@ -1950,7 +1995,7 @@ static int _atcmd_wifi_roaming_scan (void)
 
 			for (i = 0 ; i < timeout_msec ; i += 100)
 			{
-				vTaskDelay(pdMS_TO_TICKS(100));
+				_delay_ms(100);
 
 				if (!scan->scanning)
 					break;
@@ -1976,12 +2021,34 @@ static int _atcmd_wifi_roaming_scan (void)
 static int _atcmd_wifi_roaming_connect (const char *bssid)
 {
 	atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
+	bool event_poll = true;
+	int net_id = -1;
+	char *argv[2] = { (char *)&event_poll, (char *)&net_id };
 
-	_wifi_roaming_log("Connecting to %s ...", bssid);
+	if (!bssid || strlen(bssid) != ATCMD_WIFI_BSSID_LEN)
+	{
+		_wifi_roaming_log("invalid bssid");
+		return -1;
+	}
 
-	strcpy(connect->bssid, bssid);
+	if (nrc_wifi_get_network_index(&net_id) != WIFI_SUCCESS)
+		return -1;
 
-	switch (_atcmd_wifi_connect_run(-1, NULL))
+	if (strcmp(bssid, connect->bssid) == 0)
+		_wifi_roaming_log("Reconnecting to %s ...", connect->bssid);
+	else
+	{
+		strcpy(connect->bssid, bssid);
+
+		_wifi_roaming_log("Connecting to %s ...", connect->bssid);
+	}
+
+/*	_wifi_roaming_debug(" - ssid: %s", connect->ssid);
+	_wifi_roaming_debug(" - security: %s", connect->security);
+	_wifi_roaming_debug(" - status: connected=%d connecting=%d disconnecting=%d",
+						connect->connected, connect->connecting, connect->disconnecting); */
+
+	switch (_atcmd_wifi_connect_run(2, argv))
 	{
 		case ATCMD_ERROR_BUSY:
 			_wifi_roaming_log(" already connecting(%d) or connected(%d)",
@@ -1999,7 +2066,7 @@ static int _atcmd_wifi_roaming_connect (const char *bssid)
 
 			for (i = 0 ; i < timeout_msec ; i += 100)
 			{
-				vTaskDelay(pdMS_TO_TICKS(100));
+				_delay_ms(100);
 
 				if (connect->connected)
 					break;
@@ -2023,10 +2090,26 @@ static int _atcmd_wifi_roaming_connect (const char *bssid)
 static int _atcmd_wifi_roaming_disconnect (void)
 {
 	atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
+	bool event_poll = true;
+	int net_id = -1;
+	char *argv[2] = { (char *)&event_poll, (char *)&net_id };
+
+	if (nrc_wifi_get_network_index(&net_id) != WIFI_SUCCESS)
+		return -1;
+
+	if (net_id < 0)
+	{
+		_wifi_roaming_debug(" network removed");
+		return 0;
+	}
 
 	_wifi_roaming_log("Disconnecting from %s ...", connect->bssid);
+/*	_wifi_roaming_debug(" - ssid: %s", connect->ssid);
+	_wifi_roaming_debug(" - security: %s", connect->security);
+	_wifi_roaming_debug(" - status: connected=%d connecting=%d disconnecting=%d",
+						connect->connected, connect->connecting, connect->disconnecting); */
 
-	switch (_atcmd_wifi_disconnect_run(-1, NULL))
+	switch (_atcmd_wifi_disconnect_run(2, argv))
 	{
 		case ATCMD_ERROR_FAIL:
 			_wifi_roaming_log(" disconnect fail");
@@ -2040,7 +2123,7 @@ static int _atcmd_wifi_roaming_disconnect (void)
 
 			for (i = 0 ; i < timeout_msec ; i += 100)
 			{
-				vTaskDelay(pdMS_TO_TICKS(100));
+				_delay_ms(100);
 
 				if (!connect->disconnecting)
 					break;
@@ -2077,9 +2160,8 @@ static bool _atcmd_wifi_roaming_valid_params (atcmd_wifi_roaming_params_t *param
 	return true;
 }
 
-static int _atcmd_wifi_roaming_check_status (void)
+static int _atcmd_wifi_roaming_check_status (bool *connected)
 {
-	const bool rssi_check = false;
 	atcmd_wifi_scan_t *scan = &g_atcmd_wifi_info->scan;
 	atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
 	atcmd_wifi_roaming_params_t *params = &g_atcmd_wifi_info->roaming.params;
@@ -2104,30 +2186,41 @@ static int _atcmd_wifi_roaming_check_status (void)
 	else if (!connect->connected)
 	{
 		_wifi_roaming_log(" disconnected");
+
+		_atcmd_wifi_roaming_disconnect();
+
+		*connected = false;
 	}
-	else if (rssi_check)
+	else
 	{
-		int8_t rssi;
+		const bool check_rssi = false;
 
-		if (nrc_wifi_get_rssi(&rssi) == WIFI_SUCCESS)
+		_wifi_roaming_log(" connected");
+
+		if (check_rssi)
 		{
-			_wifi_roaming_log(" connected, rssi %s (%d/%d)",
-					rssi > params->rssi_threshold ? "high" : "low",
-					rssi, params->rssi_threshold);
+			int8_t rssi;
 
-			if (rssi > params->rssi_threshold)
-				return 0; /* good */
+			if (nrc_wifi_get_rssi(&rssi) == WIFI_SUCCESS)
+			{
+				_wifi_roaming_log(" rssi=%d threshold=%d", rssi, params->rssi_threshold);
+
+				if (rssi > params->rssi_threshold)
+					return -1;
+			}
 		}
+
+		*connected = true;
 	}
 
-	return 1; /* scan */
+	return 0;
 }
 
-static bool _atcmd_wifi_roaming_valid_ap (SCAN_RESULT *ap)
+static bool _atcmd_wifi_roaming_valid_ap (SCAN_RESULT *ap,
+										atcmd_wifi_ssid_t ssid,
+										atcmd_wifi_security_t security)
 {
-	atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
-
-	if (strcmp(ap->ssid, connect->ssid) != 0)
+	if (strcmp(ap->ssid, ssid) != 0)
 		return false;
 
 	if (!_atcmd_wifi_bssid_valid(ap->bssid))
@@ -2138,82 +2231,79 @@ static bool _atcmd_wifi_roaming_valid_ap (SCAN_RESULT *ap)
 
 	if (strstr(ap->flags, "WPA2-PSK"))
 	{
-		if (strcmp(connect->security, "wpa2-psk") != 0)
+		if (strcmp(security, "wpa2-psk") != 0)
 			return false;
 	}
 	else if (strstr(ap->flags, "WPA3-OWE"))
 	{
-		if (strcmp(connect->security, "wpa3-owe") != 0)
+		if (strcmp(security, "wpa3-owe") != 0)
 			return false;
 	}
 	else if (strstr(ap->flags, "WPA3-SAE"))
 	{
-		if (strcmp(connect->security, "wpa3-sae") != 0)
+		if (strcmp(security, "wpa3-sae") != 0)
 			return false;
 	}
-	else if (strcmp(connect->security, "open") != 0)
+	else if (strcmp(security, "open") != 0)
 		return false;
 
 	return true;
 }
 
-static int _atcmd_wifi_roaming_compare_ap (SCAN_RESULT *ap1, SCAN_RESULT *ap2)
+static SCAN_RESULT *_atcmd_wifi_roaming_compare_ap (SCAN_RESULT *ap1, SCAN_RESULT *ap2)
 {
-	int rssi1 = atoi(ap1->sig_level);
-	int rssi2 = atoi(ap2->sig_level);
+	int rssi1 = ap1 ? atoi(ap1->sig_level) : ATCMD_WIFI_RSSI_MIN;
+	int rssi2 = ap2 ? atoi(ap2->sig_level) : ATCMD_WIFI_RSSI_MIN;
 
-	if ((rssi1 < 0 && rssi1 > 255) || (rssi2 < 0 && rssi2 > 255))
-		return -1;
+/*	_wifi_roaming_debug(" compare_ap: rssi1=%d rssi2=%d", rssi1, rssi2); */
 
-	rssi1 = (int8_t)rssi1;
-	rssi2 = (int8_t)rssi2;
-
-	if (!_atcmd_wifi_rssi_valid(rssi1) || !_atcmd_wifi_rssi_valid(rssi2))
-		return -1;
-
-	if (rssi1 >= rssi2)
-		return 0;
-
-	return 1;
+	return (rssi1 >= rssi2) ? ap1 : ap2;
 }
 
-static int _atcmd_wifi_roaming_select_ap (SCAN_RESULT **good_ap)
+static int _atcmd_wifi_roaming_select_ap (char *bssid)
 {
 	atcmd_wifi_scan_t *scan = &g_atcmd_wifi_info->scan;
 	atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
 	atcmd_wifi_roaming_t *roaming = &g_atcmd_wifi_info->roaming;
 
-	SCAN_RESULT *scan_result, *cur_ap, *new_ap;
+	SCAN_RESULT *scan_result, *cur_ap, *good_ap;
 	int i;
 
 	_wifi_roaming_log("Selecting ...");
 
-	cur_ap = new_ap = NULL;
+	cur_ap = good_ap = NULL;
 
 	for (i = 0 ; i < scan->results.n_result ; i++)
 	{
 		scan_result = &scan->results.result[i];
 
-/*		_wifi_roaming_log(" scn_ap: %s %s %s %d %s",
+/*		_wifi_roaming_debug(" scn_ap: %s %s %s %d %s",
 							scan_result->ssid, scan_result->bssid,
 							scan_result->freq, (int8_t)atoi(scan_result->sig_level),
 							scan_result->flags); */
 
-		if (!_atcmd_wifi_roaming_valid_ap(scan_result))
+		if (!_atcmd_wifi_roaming_valid_ap(scan_result, connect->ssid, connect->security))
 			continue;
 
-/*		_wifi_roaming_log(" val_ap: %s %s %s %d %s",
+/*		_wifi_roaming_debug(" val_ap: %s %s %s %d %s",
 							scan_result->ssid, scan_result->bssid,
 							scan_result->freq, (int8_t)atoi(scan_result->sig_level),
 							scan_result->flags); */
 
-		if (!cur_ap && strcmp(scan_result->bssid, connect->bssid) == 0)
-			cur_ap = scan_result;
+		if (strcmp(scan_result->bssid, connect->bssid) == 0)
+		{
+			if (!cur_ap)
+				cur_ap = scan_result;
+			else
+			{
+				_wifi_roaming_log(" cur_ap: duplicate, %s %s %s %d %s",
+							scan_result->ssid, scan_result->bssid,
+							scan_result->freq, (int8_t)atoi(scan_result->sig_level),
+							scan_result->flags);
+			}
+		}
 
-		if (new_ap && _atcmd_wifi_roaming_compare_ap(new_ap, scan_result) == 0)
-			continue;
-
-		new_ap = scan_result;
+		good_ap = _atcmd_wifi_roaming_compare_ap(good_ap, scan_result);
 	}
 
 	if (cur_ap)
@@ -2224,116 +2314,78 @@ static int _atcmd_wifi_roaming_select_ap (SCAN_RESULT **good_ap)
 							cur_ap->flags);
 	}
 
-	if (new_ap != cur_ap)
+	if (cur_ap)
 	{
-		_wifi_roaming_log(" new_ap: %s %s %s %d %s",
-							new_ap->ssid, new_ap->bssid,
-							new_ap->freq, (int8_t)atoi(new_ap->sig_level),
-							new_ap->flags);
-	}
-
-	*good_ap = cur_ap;
-
-	if (!cur_ap)
-		*good_ap = new_ap;
-	else if (new_ap && cur_ap != new_ap)
-	{
-		int cur_rssi = atoi(cur_ap->sig_level);
-		int new_rssi = atoi(new_ap->sig_level);
-
-		if (cur_rssi <= roaming->params.rssi_threshold)
+		if (!good_ap)
+			good_ap = cur_ap;
+		else if (good_ap != cur_ap)
 		{
-			if ((new_rssi - cur_rssi) >= roaming->params.rssi_level)
-				*good_ap = new_ap;
+			int rssi1 = atoi(cur_ap->sig_level);
+			int rssi2 = atoi(good_ap->sig_level);
+
+			if (rssi1 > roaming->params.rssi_threshold)
+				good_ap = cur_ap;
+			else if ((rssi2 - rssi1) < roaming->params.rssi_level)
+				good_ap = cur_ap;
 		}
 	}
 
-	if (!*good_ap)
+	if (!good_ap)
 	{
 		_wifi_roaming_log(" no APs");
+		return -1;
 	}
-	else
+	else if (good_ap != cur_ap)
 	{
 		_wifi_roaming_log(" good_ap: %s %s %s %d %s",
-							(*good_ap)->ssid, (*good_ap)->bssid,
-							(*good_ap)->freq, (int8_t)atoi((*good_ap)->sig_level),
-							(*good_ap)->flags);
+							good_ap->ssid, good_ap->bssid,
+							good_ap->freq, (int8_t)atoi(good_ap->sig_level),
+							good_ap->flags);
 	}
 
-	if (!cur_ap)
-		return -1;
-	else if (*good_ap == cur_ap)
-	{
-		if (g_atcmd_wifi_info->net_id >= 0)
-		{
-			_wifi_roaming_log(" current good");
-
-			*good_ap = NULL;
-		}
-		else
-		{
-			_wifi_roaming_log(" reconnect to current AP");
-		}
-	}
+	strcpy(bssid, good_ap->bssid);
 
 	return 0;
 }
 
-static void _atcmd_wifi_roaming_send_event (void)
-{
-	atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
-	char param_ssid[ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_ssid_t))];
-	char param_bssid[ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_bssid_t))];
-
-	if (atcmd_str_to_param(connect->ssid, param_ssid, sizeof(param_ssid)) &&
-			atcmd_str_to_param(connect->bssid, param_bssid, sizeof(param_bssid)))
-	{
-		ATCMD_MSG_WEVENT("\"ROAMING\",%s,%s", param_ssid, param_bssid);
-	}
-	else
-	{
-		ATCMD_MSG_WEVENT("\"ROAMING\"");
-	}
-}
-
 static void _atcmd_wifi_roaming_task (void *pvParameters)
 {
-	const int retry_max = 2;
+	atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
 	atcmd_wifi_roaming_t *roaming = &g_atcmd_wifi_info->roaming;
-	SCAN_RESULT *good_ap = NULL;
+	atcmd_wifi_bssid_t bssid;
+	bool connected = false;
 	int i;
 
 	_wifi_roaming_log("Task Run");
 
+	memset(bssid, 0, sizeof(atcmd_wifi_bssid_t));
+
 	while (roaming->enable)
 	{
-		vTaskDelay(pdMS_TO_TICKS(roaming->params.scan_delay));
+		_delay_ms(roaming->params.scan_delay);
 
 		if (!roaming->enable)
 			break;
 
-		if (_atcmd_wifi_roaming_check_status() <= 0)
+		if (_atcmd_wifi_roaming_check_status(&connected) != 0)
 			continue;
 
-		for (good_ap = NULL, i = 0 ; i <= retry_max ; i++)
-		{
-			if (_atcmd_wifi_roaming_scan() != 0)
-				break;
-
-			if (_atcmd_wifi_roaming_select_ap(&good_ap) == 0)
-				break;
-
-			_wifi_roaming_log("No current AP, retry=%d/%d", i, retry_max);
-		}
-
-		if (!good_ap)
+		if (_atcmd_wifi_roaming_scan() != 0)
 			continue;
 
-		if (_atcmd_wifi_roaming_disconnect() == 0)
+		if (_atcmd_wifi_roaming_select_ap(bssid) != 0)
+			continue;
+
+		if (connected)
 		{
-			if (_atcmd_wifi_roaming_connect(good_ap->bssid) == 0)
-				_atcmd_wifi_roaming_send_event();
+			if (strcmp(bssid, connect->bssid) == 0)
+				continue;
+
+			if (_atcmd_wifi_roaming_disconnect() != 0)
+				continue;
 		}
+
+		_atcmd_wifi_roaming_connect(bssid);
 	}
 
 	_wifi_roaming_log("Task Exit");
@@ -2622,39 +2674,45 @@ static int _atcmd_wifi_softap_run (int argc, char *argv[])
 {
 	atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
 	atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
-	int net_id;
+	int net_id = -1;
 
 	if (softap->active)
 	{
 		_atcmd_info("wifi_softap: busy\n");
+
 		return ATCMD_ERROR_BUSY;
 	}
 
-	if (connect->connecting || connect->connected)
-	{
-		_atcmd_info("wifi_softap: connecting or connected to AP\n");
+	atcmd_wifi_lock();
 
-		return ATCMD_ERROR_BUSY;
+	if (nrc_wifi_get_network_index(&net_id) != WIFI_SUCCESS)
+		goto wifi_softap_fail;
+
+	_atcmd_info("wifi_softap: net_id=%d\n", net_id);
+
+	if (net_id < 0)
+	{
+		_atcmd_info("wifi_softap: add_network\n");
+
+		if (nrc_wifi_add_network(&net_id) != WIFI_SUCCESS)
+			goto wifi_softap_fail;
+	}
+	else if (connect->connecting || connect->connected)
+	{
+		_atcmd_info("wifi_softap: %s to AP\n", connect->connected ? "connected" : "connecting");
+
+		goto wifi_softap_fail;
 	}
 	else if (connect->disconnecting)
 	{
 		_atcmd_info("wifi_softap: disconnecting from AP\n");
 
-		return ATCMD_ERROR_BUSY;
+		goto wifi_softap_fail;
 	}
-
-	if (g_atcmd_wifi_info->net_id >= 0)
-	{
-		net_id = g_atcmd_wifi_info->net_id;
-
-		_atcmd_info("wifi_softap: net_id=%d\n", net_id);
-	}
-	else if (nrc_wifi_add_network(&net_id) != WIFI_SUCCESS)
-		net_id = -1;
 
 	if (net_id >= 0)
 	{
-		_atcmd_info("wifi_softap_set: channel=%d,%d ssid=%s security=%s,%s\n",
+		_atcmd_info("wifi_softap: channel=%d,%d ssid=%s security=%s,%s\n",
 							softap->channel.number, softap->channel.freq,
 							softap->ssid, softap->security, softap->password);
 
@@ -2682,11 +2740,11 @@ static int _atcmd_wifi_softap_run (int argc, char *argv[])
 		goto wifi_softap_fail;
 	}
 
-	_atcmd_info("wifi_softap: invalid net_id (%d)\n", net_id);
-
 wifi_softap_fail:
 
 	_atcmd_info("wifi_softap: fail\n");
+
+	atcmd_wifi_unlock();
 
 	return ATCMD_ERROR_FAIL;
 }
@@ -2905,7 +2963,9 @@ static int _atcmd_wifi_fota_get (int argc, char *argv[])
 
 			atcmd_fota_get_params(&params);
 
-			ATCMD_MSG_INFO("WFOTA", "%d,\"%s\"", params.check_time, params.server_url);
+			ATCMD_MSG_INFO("WFOTA", "%d,\"%s\",\"%s\",0x%X",
+				params.check_time, params.server_url, params.bin_name, params.bin_crc32);
+
 			break;
 		}
 
@@ -2918,13 +2978,20 @@ static int _atcmd_wifi_fota_get (int argc, char *argv[])
 
 static int _atcmd_wifi_fota_set (int argc, char *argv[])
 {
+	char *param_check_time = NULL;
 	char *param_server_url = NULL;
+	char *param_bin_name = NULL;
+	char *param_bin_crc32 = NULL;
 
 	switch (argc)
 	{
 		case 0:
-			ATCMD_MSG_HELP("AT+WFOTA=<check_time>[,\"<server_url>\"]");
+			ATCMD_MSG_HELP("AT+WFOTA=<check_time>[,\"<server_url>\"[,\"<bin_name>\",<bin_crc32>]]");
 			break;
+
+		case 4:
+			param_bin_name = argv[2];
+			param_bin_crc32 = argv[3];
 
 		case 2:
 			param_server_url = argv[1];
@@ -2941,21 +3008,43 @@ static int _atcmd_wifi_fota_set (int argc, char *argv[])
 			atcmd_fota_params_t params;
 			int ret;
 
+			param_check_time = argv[0];
+
 			params.fw_bin_type = fw_bin_type[_hif_get_type()];
-			params.check_time = atoi(argv[0]);
 			params.event_cb = _atcmd_wifi_fota_event_callback;
+
+			params.check_time = 0;
 			strcpy(params.server_url, "");
+			strcpy(params.bin_name, "");
+			params.bin_crc32 = 0;
 
-			if (param_server_url)
-				atcmd_param_to_str(param_server_url, params.server_url, sizeof(params.server_url));
+			if (param_check_time && atcmd_param_to_int32(param_check_time, &params.check_time) != 0)
+				return ATCMD_ERROR_INVAL;
 
-			if (atcmd_fota_valid_params(&params))
+			if (param_server_url &&
+				atcmd_param_to_str(param_server_url, params.server_url, sizeof(params.server_url)) == NULL)
+				return ATCMD_ERROR_INVAL;
+
+			if (param_bin_name &&
+				atcmd_param_to_str(param_bin_name, params.bin_name, sizeof(params.bin_name)) == NULL)
+				return ATCMD_ERROR_INVAL;
+
+			if (param_bin_crc32 && atcmd_param_to_hex(param_bin_crc32, &params.bin_crc32) != 0)
+				return ATCMD_ERROR_INVAL;
+
+			switch (atcmd_fota_set_params(&params))
 			{
-				if (atcmd_fota_set_params(&params) == 0)
+				case 0:
 					break;
 
-				return ATCMD_ERROR_FAIL;
+				case -EINVAL:
+					return ATCMD_ERROR_INVAL;
+
+				default:
+					return ATCMD_ERROR_FAIL;
 			}
+
+			break;
 		}
 
 		default:

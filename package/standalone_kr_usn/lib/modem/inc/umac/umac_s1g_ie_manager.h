@@ -136,6 +136,8 @@ void 		umac_s1g_set_ie_ssid(int8_t vif_id, uint8_t *ssid, uint8_t ssid_len);
 bool	 	umac_s1g_get_ie_vendor_specific_wmm_existence();
 uint16_t	umac_s1g_get_frame_beacon_interval();
 
+void		umac_s1g_update_short_bi(SYS_BUF *buf, int8_t vif_id, bool is_tx, bool short_beacon);
+
 uint32_t	get_assoc_resp_status_code(uint8_t*);
 
 

@@ -45,6 +45,7 @@ enum nrc_uart_interrupt_e {
 extern uint8_t g_print_dev;
 
 void hal_uart_init(int vector, void(*cli_callback)(char));
+void hal_uart_enable_print(bool enabled);
 void hal_uart_printf(const char *f,...);
 void hal_uart_vprintf(const char *,va_list );
 void hal_uart_isr(int vector);

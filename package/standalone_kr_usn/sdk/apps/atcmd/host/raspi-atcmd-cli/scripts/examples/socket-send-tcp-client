@@ -9,12 +9,12 @@ AT+SLIST?
 
 WAIT 1s
 
-ECHO "Send the data. (length: 1470-byte, count: 1000)"
+ECHO "Send the data. (length: 2048-byte, count: 1000)"
 HOLD
 
 LOOP 2 1000
-AT+SSEND=0,1470
-DATA 1470 
+AT+SSEND=0,2048
+DATA 2048
 
 WAIT 2s
 

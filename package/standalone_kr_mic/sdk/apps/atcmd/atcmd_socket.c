@@ -262,19 +262,19 @@ static int __atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len
 			_atcmd_socket_send("%s_send: id=%d len=%d/%d\n",
 							str_proto_lwr[socket->protocol], socket->id, i, len);
 		}
-		else if (ret == 0 || ret == -EAGAIN)
+		else if (ret == 0 || ret == -EAGAIN || ret == -ENOBUFS)
 		{
-			ret = 0;
+			retry++;
 
-			if (++retry > retry_max)
-			{
-				_atcmd_info("%s_send: id=%d len=%d/%d retry=%d\n",
+			_atcmd_info("%s_send: id=%d len=%d/%d retry=%d\n",
 							str_proto_lwr[socket->protocol], socket->id, i, len, retry);
+
+			if (retry > retry_max)
 				break;
 
-			}
-
 			_delay_ms(10);
+
+			ret = 0;
 		}
 	}
 

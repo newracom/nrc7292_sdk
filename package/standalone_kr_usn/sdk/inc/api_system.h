@@ -103,4 +103,24 @@ nrc_err_t nrc_wifi_set_log_level(TRACE_TYPES type_id, TRACE_LEVEL level);
  ***********************************************/
 nrc_err_t nrc_wifi_get_log_level(TRACE_TYPES type_id, TRACE_LEVEL *level);
 
+/**********************************************
+ * @fn nrc_err_t nrc_get_rtc(uint64_t *rtc_time);
+ *
+ * @brief Read RTC time since boot
+ *
+ * @param rtc_time: A pointer for getting RTC (uint64)
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_get_rtc(uint64_t *rtc_time);
+
+/**********************************************
+ * @fn void nrc_reset_rtc(void);
+ *
+ * @brief Set RTC hardware to 0
+ *
+ * @return None
+ ***********************************************/
+void nrc_reset_rtc(void);
+
 #endif /* __NRC_API_SYSTEM_H__ */

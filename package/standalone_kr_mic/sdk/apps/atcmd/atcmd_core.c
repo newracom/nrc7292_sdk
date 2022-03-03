@@ -99,60 +99,6 @@ const char *atcmd_strerror (int err)
 	return "UNKNOWN";
 }
 
-/**********************************************************************************************/
-
-int atcmd_param_to_long (char *param, long *val)
-{
-	*val = strtol(param, NULL, 10);
-
-	return -errno;
-}
-
-int atcmd_param_to_ulong (char *param, unsigned long *val)
-{
-	*val = strtoul(param, NULL, 10);
-
-	return -errno;
-}
-
-char *atcmd_param_to_str (const char *param, char *str, int len)
-{
-	int param_len;
-
-	if (!param || !str || !len)
-		return NULL;
-
-	param_len = strlen(param);
-
-	if (param_len <= 2 || (param_len - 2) > (len - 1))
-		return NULL;
-
-	if (param[0] != '"' || param[param_len - 1] != '"')
-		return NULL;
-
-	memcpy(str, &param[1], param_len - 2);
-	str[param_len - 2] = '\0';
-
-	return str;
-}
-
-char *atcmd_str_to_param (const char *str, char *param, int len)
-{
-	int str_len;
-
-	if (!str || !param || !len)
-		return NULL;
-
-	str_len = strlen(str);
-	if (len < (str_len + 2 + 1))
-		return NULL;
-
-	snprintf(param, len, "\"%s\"", str);
-	param[str_len + 2] = '\0';
-
-	return param;
-}
-
 /*******************************************************************************************/
 
 static uint32_t g_atcmd_config = 0;
@@ -1281,7 +1227,10 @@ static void atcmd_process_command (char *cmd, int len)
 			}
 			else if (atcmd_compare_command(cmd, "ATZ", 3) == 0)
 			{
-				uint32_t reset_cm0 = SW_RESET_CM0_F | SW_RESET_CM0_H;
+#if 1
+				_atcmd_info("System Reset\n");
+				util_fota_reboot_firmware();
+#else
 				uint32_t reset_peri = 0;
 
 				/* reset_peri |= SW_RESET_AHB; */
@@ -1296,7 +1245,7 @@ static void atcmd_process_command (char *cmd, int len)
 				reset_peri |= SW_RESET_HOSTIF;
 				reset_peri |= SW_RESET_WIFI;
 				reset_peri |= SW_RESET_GDMA;
-				/* reset_peri |= SW_RESET_XIP; */
+				reset_peri |= SW_RESET_XIP;
 				reset_peri |= SW_RESET_UART3;
 				reset_peri |= SW_RESET_UART2;
 				reset_peri |= SW_RESET_UART1;
@@ -1311,6 +1260,7 @@ static void atcmd_process_command (char *cmd, int len)
 				reset_peri |= SW_RESET_TIMER0;
 
 				_atcmd_info("System Reset: peri=0x%08X\n", reset_peri);
+				_delay_ms(500);
 
 				RegSW_RESET = 0;
 				if (reset_peri)
@@ -1319,9 +1269,15 @@ static void atcmd_process_command (char *cmd, int len)
 					RegSW_RESET = 0;
 				}
 
-				RegSW_RESET = reset_cm0;
+#if defined(CPU_CM3)
+				RegSCFG_REMAP =  RegSCFG_REMAP & 0xFFFFFF0FL;
+				RegSW_RESET = SW_RESET_CM3_F | SW_RESET_CM3_H;
+#else
+				RegSCFG_REMAP =  RegSCFG_REMAP & 0xFFFFFFF0L;
+				RegSW_RESET = SW_RESET_CM0_F | SW_RESET_CM0_H;
+#endif
 				while(1);
-
+#endif
 				ret = ATCMD_SUCCESS;
 			}
 

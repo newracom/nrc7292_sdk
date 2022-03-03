@@ -64,7 +64,7 @@ CONFIG_FRAGMENT_FRAME=n
 
 # WATCHDOG TIMER
 ifeq ($(CONFIG_NEW_TASK_ARCH),y)
-CONFIG_WDT=y
+CONFIG_WDT=n
 endif
 
 # (only for CM3) USE PRIMASK-based INT Lock (y:PRIMASK, n:BASEPRI)
@@ -257,6 +257,7 @@ OBJ_PATH			=	$(OUT_PATH)/objs
 LIB_PATH			=	lib
 LIB_MODEM_PATH		=	$(LIB_PATH)/modem
 LIB_MODEM_INC_PATH		=	$(LIB_MODEM_PATH)/inc
+LIB_MODEM_SRC_PATH		=	$(LIB_MODEM_PATH)/src
 
 SYSTEM_INC_PATH	= $(LIB_MODEM_INC_PATH)/system
 WLAN_INC_PATH		= $(LIB_MODEM_INC_PATH)/wlan
@@ -298,6 +299,12 @@ LD_CM_FILE		=	$(LIB_MODEM_PATH)/$(LD_CM_FILE_NAME)
 LD_FILE			=	$(LIB_MODEM_PATH)/$(LD_FILE_NAME)
 
 #// --------------------------------------------------
+#// Source Files
+#// --------------------------------------------------
+VPATH	+= $(LIB_MODEM_SRC_PATH)
+CSRCS   += standalone.c
+
+#// --------------------------------------------------
 #// System/Target Dependent Define
 #// --------------------------------------------------
 # PRO_FPGA : 2STA platform and no RF
@@ -332,8 +339,10 @@ INCLUDE += -I$(SDK_PROJECT)
 VPATH += $(SDK_INC):$(SDK_APPS)
 VPATH += $(SDK_PROJECT):$(SDK_WIFI_COMMON)
 
+ifneq ($(APP_NAME),)
 include $(SDK_PROJECT)/.config
 include $(SDK_PROJECT)/Makefile
+endif
 
 #// --------------------------------------------------
 #// Build Information

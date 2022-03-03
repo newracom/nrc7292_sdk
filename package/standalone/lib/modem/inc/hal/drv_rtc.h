@@ -131,7 +131,7 @@ typedef struct {
 	volatile lpo_ctrl1_t 					ctrl1;
 } lpo_controller_t;
 
-void drv_rtc_init(void);
+void drv_rtc_init(uint8_t mode);
 void drv_rtc_deinit(void);
 
 void drv_rtc_set_int_clr();
@@ -142,9 +142,11 @@ void drv_rtc_set_mode(int mode);
 int drv_rtc_get_mode();
 void drv_rtc_clear_count(uint8_t mode);
 
+void drv_rtc_set_int(uint64_t after_ms);
 void drv_rtc_set_int_en(bool enable);
 void drv_rtc_set_cnt(uint64_t value);
 void drv_rtc_get_cnt(uint64_t *value);
+uint64_t drv_rtc_get_ms(void);
 void drv_rtc_set_ofst_comp(uint32_t value);
 void drv_rtc_set_freq_ofst_est_done_clr();
 bool drv_rtc_get_freq_ofst_est_done();

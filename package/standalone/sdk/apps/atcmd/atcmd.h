@@ -37,7 +37,7 @@
 
 #define ATCMD_VER_MAJOR			(1)
 #define ATCMD_VER_MINOR			(22)
-#define ATCMD_VER_REVISION		(1)
+#define ATCMD_VER_REVISION		(4)
 
 /**********************************************************************************************/
 
@@ -80,7 +80,7 @@
 
 #define _atcmd_malloc					pvPortMalloc
 #define _atcmd_free						vPortFree
-#define _atcmd_printf					nrc_uart_printf
+#define _atcmd_printf					hal_uart_printf
 
 #define _atcmd_log(fmt, ...)			_atcmd_printf("[ATCMD] " fmt, ##__VA_ARGS__)
 
@@ -372,8 +372,13 @@ inline uint32_t atcmd_sys_now (void)
 
 extern const char *atcmd_strerror (int err);
 
-extern int atcmd_param_to_long (char *param, long *val);
-extern int atcmd_param_to_ulong (char *param, unsigned long *val);
+extern int atcmd_param_to_int8 (const char *param, int8_t *val);
+extern int atcmd_param_to_int16 (const char *param, int16_t *val);
+extern int atcmd_param_to_int32 (const char *param, int32_t *val);
+extern int atcmd_param_to_uint8 (const char *param, uint8_t *val);
+extern int atcmd_param_to_uint16 (const char *param, uint16_t *val);
+extern int atcmd_param_to_uint32 (const char *param, uint32_t *val);
+extern int atcmd_param_to_hex (const char *param, uint32_t *val);
 extern char *atcmd_param_to_str (const char *param, char *str, int len);
 extern char *atcmd_str_to_param (const char *str, char *param, int len);
 

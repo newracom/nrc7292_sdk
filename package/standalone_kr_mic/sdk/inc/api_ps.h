@@ -36,6 +36,7 @@ typedef enum {
 	POWER_SAVE_TIM
 } POWER_SAVE_TIM_MODE;
 
+#define WAKEUP_SOURCE_NO_SLEEP    (0x0)
 #define WAKEUP_SOURCE_RTC (0x00000001L << 0)
 #define WAKEUP_SOURCE_GPIO (0x00000001L << 1)
 
@@ -61,10 +62,47 @@ typedef enum {
  * @param interval(ms): 0(Tim) or non-zero(Non-Tim : interval >= 1000ms)
  *
  * @param timeout(ms): only works in TIM mode with modem sleep
+ *			timeout > 0: sleep alone (non-tim deepsleep) mode.
  *
  * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
 nrc_err_t nrc_ps_set_sleep(POWER_SAVE_SLEEP_MODE sleep_mode, uint64_t interval, uint32_t timeout);
+
+/**********************************************
+ * @fn nrc_err_t nrc_ps_deep_sleep(uint64_t interval)
+ *
+ * @brief Command the device to go to deep sleep.
+ *
+ * @param interval: The duration (interval >= 1000ms) for sleep. The unit is ms.
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_ps_deep_sleep(uint64_t interval);
+
+/**********************************************
+ * @fn nrc_err_t nrc_ps_modem_sleep(uint64_t interval, uint32_t timeout)
+ *
+ * @brief Command the device WiFi to go to sleep.
+ *
+ * @param interval: The duration (interval >= 1000ms) for WiFi sleep. The unit is ms.
+ *
+ * @param timeout: wait time enter the modem sleep. The unit is ms.
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_ps_modem_sleep(uint64_t interval, uint32_t timeout);
+
+/**********************************************
+ * @fn nrc_err_t nrc_ps_tim_sleep(uint64_t timeout)
+ *
+ * @brief The function commands device to WiFi sleep.
+ *        The WiFi wakes up if Traffic Indication Map signal received.
+ *
+ * @param timeout: wait time enter the sleep. The unit is ms.
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_ps_tim_sleep(uint64_t timeout);
 
 /**********************************************
  * @fn nrc_err_t nrc_ps_set_modemsleep_stop(void)
@@ -102,5 +140,16 @@ nrc_err_t nrc_ps_set_gpio_wakeup_pin(bool check_debounce, int pin_number);
  * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
 nrc_err_t nrc_ps_set_wakeup_source(uint8_t wakeup_source);
+
+/**********************************************
+ * @fn nrc_err_t nrc_ps_wakeup_reason(uint8_t *reason);
+ *
+ * @brief   Get the wakeup reason
+ *
+ * @param reason: WAKEUP_SOURCE_RTC / WAKEUP_SOURCE_GPIO / WAKEUP_SOURCE_NO_SLEEP
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_ps_wakeup_reason(uint8_t *reason);
 
 #endif // __NRC_API_PS_H__

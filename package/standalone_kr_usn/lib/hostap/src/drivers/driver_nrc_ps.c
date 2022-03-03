@@ -441,6 +441,12 @@ static int wpa_ps_hook_handle_dhcp(struct retention_info *ret_info, void *param1
 	return WPA_PS_HOOK_RET_SUCCESS;
 }
 
+static int wpa_ps_hook_handle_static(struct retention_info *ret_info, void *param1, void *param2)
+{
+	ret_info->recovered = false;
+	return WPA_PS_HOOK_RET_SUCCESS;
+}
+
 typedef int (*wpa_ps_hook_handler)(struct retention_info *ret_info, void *param1, void *param2);
 static const wpa_ps_hook_handler handlers[WPA_PS_HOOK_TYPE_MAX] = {
 	[WPA_PS_HOOK_TYPE_INIT]	= wpa_ps_hook_handle_init,
@@ -451,6 +457,7 @@ static const wpa_ps_hook_handler handlers[WPA_PS_HOOK_TYPE_MAX] = {
 	[WPA_PS_HOOK_TYPE_ASSOC]	= wpa_ps_hook_handle_assoc,
 	[WPA_PS_HOOK_TYPE_PORT]	= wpa_ps_hook_handle_port,
 	[WPA_PS_HOOK_TYPE_DHCP]	= wpa_ps_hook_handle_dhcp,
+	[WPA_PS_HOOK_TYPE_STATIC]	= wpa_ps_hook_handle_static,
 };
 
 int wpa_driver_ps_hook_handle(DRV_PS_HOOK_TYPE type, void *param1, void *param2)

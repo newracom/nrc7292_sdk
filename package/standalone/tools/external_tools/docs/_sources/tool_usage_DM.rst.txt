@@ -8,7 +8,7 @@ Overview
 
 Tool Version
 ------------
-* v2.3
+* v2.4
 
 Setup
 -----

@@ -27,8 +27,10 @@
 #define __NRC_ATCMD_FOTA_H__
 /**********************************************************************************************/
 
-#define ATCMD_FOTA_URL_LEN_MAX			256
-#define ATCMD_FOTA_INFO_FILE			"fota.info"
+#define ATCMD_FOTA_SERVER_URL_LEN_MAX	128
+#define ATCMD_FOTA_BIN_NAME_LEN_MAX		128
+
+#define ATCMD_FOTA_INFO_FILE			"fota.json"
 #define ATCMD_FOTA_RECV_BUF_SIZE		(1024 * 8)
 
 #define ATCMD_FOTA_TASK_PRIORITY		ATCMD_TASK_PRIORITY
@@ -62,10 +64,8 @@ typedef struct
 
 typedef struct
 {
-#define ATCMD_FW_NAME_LEN_MAX		50
-
-	char name[ATCMD_FW_NAME_LEN_MAX + 1];
-	uint32_t crc;
+	char name[ATCMD_FOTA_BIN_NAME_LEN_MAX + 1];
+	uint32_t crc32;
 	uint32_t size;
 } fw_bin_t;
 
@@ -107,7 +107,7 @@ typedef struct
 		{
 			const char *bin_name;
 			uint32_t bin_size;
-			uint32_t bin_crc;
+			uint32_t bin_crc32;
 		} update;
 	};
 } atcmd_fota_event_t;
@@ -122,14 +122,13 @@ typedef struct
 
 typedef struct
 {
-#define ATCMD_FOTA_SERVER_URL_LEN_MAX	50
-
 	enum FW_BIN fw_bin_type;
-
-	int check_time; // sec
 	void (*event_cb) (atcmd_fota_event_t *event);
 
+	int32_t check_time; // sec
 	char server_url[ATCMD_FOTA_SERVER_URL_LEN_MAX + 1];
+	char bin_name[ATCMD_FOTA_BIN_NAME_LEN_MAX + 1];
+	uint32_t bin_crc32;
 } atcmd_fota_params_t;
 
 typedef struct
@@ -151,7 +150,6 @@ typedef struct
 
 /**********************************************************************************************/
 
-extern bool atcmd_fota_valid_params (atcmd_fota_params_t *params);
 extern int atcmd_fota_get_params (atcmd_fota_params_t *params);
 extern int atcmd_fota_set_params (atcmd_fota_params_t *params);
 extern int atcmd_fota_update_firmware (void);

@@ -5,7 +5,6 @@
 #include "utils/eloop.h"
 #include "utils/wpa_debug.h"
 #include "driver.h"
-//#include "scan.h"
 #include "l2_packet.h"
 #include "driver_nrc_tx.h"
 
@@ -113,9 +112,13 @@ int l2_packet_send(struct l2_packet_data *l2, const u8 *dst_addr, u16 proto,
 	if (!l2 || !buf || len < sizeof(struct l2_ethhdr))
 		return -1;
 
-	if (l2->l2_hdr)
-		nrc_transmit_from_8023(vif_id, (uint8_t *) buf, len);
-	else {
+	if (l2->l2_hdr){
+		ret = nrc_transmit_from_8023(vif_id, (uint8_t *) buf, len);
+		if (ret < 0) {
+			I(TT_WPAS, TAG "l2_packet_send (l2->l2_hdr) failed\n");
+			return -1;
+		}
+	} else {
 		struct l2_ethhdr *eth = (struct l2_ethhdr *) os_malloc(sizeof(*eth)
 										+ len);
 		if (eth == NULL)
@@ -125,11 +128,16 @@ int l2_packet_send(struct l2_packet_data *l2, const u8 *dst_addr, u16 proto,
 		os_memcpy(eth->h_source, l2->addr, ETH_ALEN);
 		eth->h_proto = htons(proto);
 		os_memcpy(eth + 1, buf, len);
-		nrc_transmit_from_8023(vif_id,(uint8_t *) eth, len + sizeof(*eth));
+		ret = nrc_transmit_from_8023(vif_id,(uint8_t *) eth, len + sizeof(*eth));
 		os_free(eth);
+
+		if (ret < 0) {
+			I(TT_WPAS, TAG "l2_packet_send failed\n");
+			return -1;
+		}
 	}
 
-	return ret;
+	return 0;
 }
 
 int l2_packet_get_ip_addr(struct l2_packet_data *l2, char *buf, size_t len)

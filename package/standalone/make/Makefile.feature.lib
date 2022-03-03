@@ -90,6 +90,7 @@ ifeq ($(CONFIG_WPA_SUPP), y)
 	VPATH	+= $(WPA_SUPP_PATH)
 	MAC_ADDR_SEED	= $(shell git config user.name | sed -e 's/ /_/g')
 	DEFINE	+= -DINCLUDE_WPA_SUPP -DMAC_ADDR_SEED=\"$(MAC_ADDR_SEED)\"
+	DEFINE	+= -DNRC_WPA_SUPP
 endif # CONFIG_WPA_SUPP
 
 #// --------------------------------------------------

@@ -136,7 +136,7 @@ void user_init(void)
 	nrc_err_t ret;
 	WIFI_CONFIG* param;
 
-	nrc_uart_console_enable();
+	nrc_uart_console_enable(true);
 
 	ret = run_sample_xml();
 	nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");

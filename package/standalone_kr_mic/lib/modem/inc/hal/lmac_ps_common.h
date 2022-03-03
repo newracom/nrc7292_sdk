@@ -134,8 +134,8 @@ bool lmac_ps_add_doze_cb( ps_doze_cb );
 bool lmac_ps_add_wake_cb( ps_wake_cb );
 
 //Set PS params including retention info
-void lmac_ps_set_listen_interval( uint32_t listen_interval_us );
-void lmac_ps_set_beacon_interval(uint32_t short_beacon_interval_us);
+void lmac_ps_set_listen_interval(uint8_t vif_id, uint32_t listen_interval_us );
+void lmac_ps_set_short_beacon_interval(uint32_t sbi);
 void lmac_ps_set_dtim_period(uint8_t period);
 void lmac_ps_set_long_beacon_interval(uint16_t bi);
 void lmac_ps_set_statype(uint8_t sta_type);
@@ -217,6 +217,9 @@ uint32_t lmac_ps_get_iw_power_timeout(void);
 int lmac_ps_stop();
 void lmac_ps_register_callback();
 ps_mode lmac_ps_get_psmode();
+void lmac_ps_go_sleep_alone(uint8_t mode, uint64_t duration);
+void lmac_ps_set_sync_time_ms(uint32_t time);
+uint32_t lmac_ps_get_sync_time_ms(void);
 
 bool lmac_ps_can_be_doze();
 

@@ -1,5 +1,5 @@
 <CURRENT VERSION>
-v2.3.0
+v2.5.2
 
 <VERSION HISTORY>
 v1.7.0
@@ -54,3 +54,12 @@ v2.4.0
 => Noise Estimator RXGAIN(85) setting removed.
 => Default/KR-MIC/KR-USN features combined.
 => NRC4791 feature support at compile time.
+
+v2.5.0
+=> New country codes (NZ,AU) added.
+
+v2.5.1
+=> Binary update. (EU Category-2 Blocker)
+
+v2.5.2
+=> Binary update.

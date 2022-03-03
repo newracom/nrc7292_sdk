@@ -78,7 +78,7 @@
 #define nrc_mem_malloc	pvPortMalloc
 #define nrc_mem_free	vPortFree
 
-#define nrc_usr_print	nrc_uart_printf
+#define nrc_usr_print	hal_uart_printf
 
 /* delay in millisecond */
 #define _delay_ms(x)   vTaskDelay(pdMS_TO_TICKS(x))

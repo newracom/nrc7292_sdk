@@ -262,4 +262,6 @@ void lmac_update_last_tsf(uint32_t time);
 bool lmac_check_tx_pause_flag();
 void lmac_check_lbt_pause_time(uint8_t ac);
 #endif
+uint32_t lmac_get_cs_time(void);
+void lmac_set_cs_time(uint16_t cs_time);
 #endif /* HAL_LMAC_COMMON_H */

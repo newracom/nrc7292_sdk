@@ -23,6 +23,7 @@
  *
  */
 
+#include "cJSON.h"
 
 #include "atcmd.h"
 #include "atcmd_fota.h"
@@ -122,12 +123,20 @@ static atcmd_fota_t g_atcmd_fota =
 	.params =
 	{
 		.fw_bin_type = FW_BIN_HSPI,
-		.server_url = { 0, },
-		.check_time = 0,
 		.event_cb = NULL,
+		.check_time = -1,
+		.server_url = { 0, },
+		.bin_name = { 0, },
+		.bin_crc32 = 0
 	},
 
-	.task = NULL
+	.task = NULL,
+
+	.recv_buf =
+	{
+		.addr = NULL,
+		.len = 0
+	}
 };
 
 /**********************************************************************************************/
@@ -173,7 +182,7 @@ static void _atcmd_fota_event_callback (enum FOTA_EVENT type, ...)
 			case FOTA_EVT_UPDATE:
 				event.update.bin_name = va_arg(ap, char *);
 				event.update.bin_size = va_arg(ap, uint32_t);
-				event.update.bin_crc = va_arg(ap, uint32_t);
+				event.update.bin_crc32 = va_arg(ap, uint32_t);
 				break;
 
 			case FOTA_EVT_FAIL:
@@ -268,7 +277,7 @@ static int _atcmd_fota_httpc_get (const char *server_url, const char *file_path,
 									char *buf, int buf_len,
 									void (*cb)(char *, int, int))
 {
-	static char url[ATCMD_FOTA_URL_LEN_MAX];
+	static char url[ATCMD_FOTA_SERVER_URL_LEN_MAX + ATCMD_FOTA_BIN_NAME_LEN_MAX];
 	ssl_certs_t *certs;
 	con_handle_t handle;
 	httpc_data_t data;
@@ -299,6 +308,10 @@ static int _atcmd_fota_httpc_get (const char *server_url, const char *file_path,
 	}
 
 	_atcmd_fota_debug("httpc_get: url_len=%d buf_len=%d", url_len, buf_len);
+
+	memset(&handle, 0, sizeof(con_handle_t));
+	memset(&data, 0, sizeof(httpc_data_t));
+	memset(&resp, 0, sizeof(httpc_resp_t));
 
 	data.data_in = buf;
 	data.data_in_length = buf_len;
@@ -414,20 +427,17 @@ static int _atcmd_fota_httpc_get (const char *server_url, const char *file_path,
 
 	nrc_httpc_close(&handle);
 
+	if (ret < 0 && cb)
+		cb(NULL, 0, 0);
+
 	return ret;
 }
 
 static int _atcmd_fota_info_parse (char *fota_info, atcmd_fota_info_t *info)
 {
-	const char *fw_ver_type[FW_VER_NUM] =
-	{
-		"sdk", "cmd"
-	};
-	const char *fw_bin_type[FW_BIN_NUM] =
-	{
-		"hspi", "uart", "uart_hfc"
-	};
-	const char *token_name[] =
+	cJSON *cjson = NULL;
+	cJSON *obj = NULL;
+	const char *keys[] =
 	{
 		"AT_SDK_VER", "AT_CMD_VER",
 		"AT_HSPI_BIN", "AT_HSPI_CRC",
@@ -436,25 +446,31 @@ static int _atcmd_fota_info_parse (char *fota_info, atcmd_fota_info_t *info)
 
 		NULL
 	};
-	char *token;
-	char *saveptr;
+	char *val = NULL;
 	int i;
 
 	_atcmd_fota_log("[ INFO FILE ]");
 
-	token = strtok_r(fota_info, "\n", &saveptr);
+	cjson = cJSON_Parse(fota_info);
+	if (!cjson)
+		return -1;
 
-	for (i = 0 ; token && token_name[i] ; i++)
+	for (i = 0 ; keys[i] ; i++)
 	{
-/*		_atcmd_fota_debug("fota_info: token=%s", token); */
-
-		if (strncmp(token, token_name[i], strlen(token_name[i])) != 0)
+		obj = cJSON_GetObjectItem(cjson, keys[i]);
+		if (!obj)
 		{
-			_atcmd_fota_log("!!! invalid info file !!!");
-			return -1;
+			_atcmd_fota_log("%s: no key", keys[i]);
+			continue;
 		}
 
-		token += strlen(token_name[i]);
+		if (!obj->valuestring)
+		{
+			_atcmd_fota_log("%s: no value", keys[i]);
+			continue;
+		}
+
+		val = strdup(obj->valuestring);
 
 		switch (i)
 		{
@@ -463,9 +479,9 @@ static int _atcmd_fota_info_parse (char *fota_info, atcmd_fota_info_t *info)
 			{
 				fw_ver_t *ver = &info->fw_ver[FW_VER_SDK + i];
 
-				sscanf(token, ": %d.%d.%d", &ver->major, &ver->minor, &ver->revision);
+				sscanf(val, "%d.%d.%d", &ver->major, &ver->minor, &ver->revision);
 
-				_atcmd_fota_log("%s: %d.%d.%d", token_name[i], ver->major, ver->minor, ver->revision);
+				_atcmd_fota_log("%s: %d.%d.%d", keys[i], ver->major, ver->minor, ver->revision);
 				break;
 			}
 
@@ -475,9 +491,9 @@ static int _atcmd_fota_info_parse (char *fota_info, atcmd_fota_info_t *info)
 			{
 				char *name = info->fw_bin[FW_BIN_HSPI + (i / 2) - 1].name;
 
-				sscanf(token, ": %s", name);
+				sscanf(val, "%s", name);
 
-				_atcmd_fota_log("%s: %s", token_name[i], name);
+				_atcmd_fota_log("%s: %s", keys[i], name);
 				break;
 			}
 
@@ -485,17 +501,19 @@ static int _atcmd_fota_info_parse (char *fota_info, atcmd_fota_info_t *info)
 			case 5: /* AT_UART_CRC */
 			case 7: /* AT_UART_HFC_CRC */
 			{
-				uint32_t *crc = &info->fw_bin[FW_BIN_HSPI + ((i + 1) / 2) - 2].crc;
+				uint32_t *crc32 = &info->fw_bin[FW_BIN_HSPI + ((i + 1) / 2) - 2].crc32;
 
-				sscanf(token, ": %lx", crc);
+				sscanf(val, "%lx", crc32);
 
-				_atcmd_fota_log("%s: %lx", token_name[i], *crc);
+				_atcmd_fota_log("%s: %lx", keys[i], *crc32);
 				break;
 			}
 		}
 
-		token = strtok_r(NULL, "\n", &saveptr);
+		free(val);
 	}
+
+	cJSON_Delete(cjson);
 
 	return 0;
 }
@@ -504,6 +522,18 @@ static void _atcmd_fota_fw_check_callback (char *data, int len, int total)
 {
 	static char *fota_info = NULL;
 	static uint32_t cnt = 0;
+
+	if (!data || !len || !total)
+	{
+		if (fota_info)
+		{
+			_atcmd_free(fota_info);
+			fota_info = NULL;
+		}
+
+		cnt = 0;
+		return;
+	}
 
 	if (!fota_info)
 	{
@@ -616,6 +646,13 @@ static void _atcmd_fota_fw_update_callback (char *data, int len, int total)
 	static uint32_t cnt = 0;
 	static uint32_t event = 0;
 
+	if (!data || !len || !total)
+	{
+		cnt = 0;
+		event = 0;
+		return;
+	}
+
 	if (cnt == 0)
 	{
 		_atcmd_fota_debug("erase: %d", total);
@@ -672,21 +709,17 @@ static int _atcmd_fota_fw_update (void)
 			_atcmd_fota_log("update: !!! no binary !!!");
 		else
 		{
-			_atcmd_fota_log("update: %s size=%u crc=%X", fw_bin->name, fw_bin->size, fw_bin->crc);
+			_atcmd_fota_log("update: %s size=%u crc32=%X", fw_bin->name, fw_bin->size, fw_bin->crc32);
 
 			if (fw_bin->size > max_bin_size)
 				_atcmd_fota_log("update: !!! binary size is greater than %u byte !!!", max_bin_size);
 			else
 			{
-				fota_info_t fota_info;
+				util_fota_set_info(fw_bin->size, fw_bin->crc32);
+				util_fota_set_ready(true);
 
-				fota_info.crc = fw_bin->crc;
-				fota_info.fw_length = fw_bin->size;
-
-				_atcmd_fota_event_callback(FOTA_EVT_UPDATE, fw_bin->name, fw_bin->size, fw_bin->crc);
-
-				util_fota_set_info(fota_info.fw_length, fota_info.crc);
-				util_fota_update_done(&fota_info); /* no return if success */
+				_atcmd_fota_event_callback(FOTA_EVT_UPDATE, fw_bin->name, fw_bin->size, fw_bin->crc32);
+				return 0;
 			}
 		}
 	}
@@ -697,18 +730,19 @@ static int _atcmd_fota_fw_update (void)
 static void _atcmd_fota_task (void *pvParameters)
 {
 	bool new_fw = false;
+	bool failed = false;
 
 	_atcmd_fota_log("task: run");
 
 	memset(&g_atcmd_fota.info, 0, sizeof(atcmd_fota_info_t));
 
-	while (g_atcmd_fota.enable)
+	while (g_atcmd_fota.enable && !failed)
 	{
 		if (g_atcmd_fota.params.check_time > 0)
 		{
 			_atcmd_fota_debug("task: delay=%d", g_atcmd_fota.params.check_time);
 
-			vTaskDelay(pdMS_TO_TICKS(g_atcmd_fota.params.check_time * 1000));
+			_delay_ms(g_atcmd_fota.params.check_time * 1000);
 
 			_atcmd_fota_debug("task: expire");
 
@@ -729,20 +763,38 @@ static void _atcmd_fota_task (void *pvParameters)
 
 		if (g_atcmd_fota.enable)
 		{
-			if (_atcmd_fota_fw_check(g_atcmd_fota.params.server_url, &new_fw) == 0)
+			if (strlen(g_atcmd_fota.params.bin_name) > 0)
 			{
-				if (!g_atcmd_fota.update || !new_fw)
-					continue;
+				fw_bin_t *fw_bin = &g_atcmd_fota.info.fw_bin[g_atcmd_fota.params.fw_bin_type];
 
-				_atcmd_fota_fw_update(); /* no return if success */
+				strcpy(fw_bin->name, g_atcmd_fota.params.bin_name);
+				fw_bin->crc32 = g_atcmd_fota.params.bin_crc32;
+				new_fw = true;
+			}
+			else if (_atcmd_fota_fw_check(g_atcmd_fota.params.server_url, &new_fw) != 0)
+			{
+				failed = true;
+				continue;
 			}
 
-			_atcmd_fota_log("failed");
-			_atcmd_fota_event_callback(FOTA_EVT_FAIL);
-
-			g_atcmd_fota.enable = false;
-			g_atcmd_fota.update = false;
+			if (g_atcmd_fota.update && new_fw)
+			{
+				if (_atcmd_fota_fw_update() == 0)
+					g_atcmd_fota.enable = false;
+				else
+					failed = true;
+			}
 		}
+	}
+
+	if (failed)
+	{
+		_atcmd_fota_log("failed");
+
+		g_atcmd_fota.enable = false;
+		g_atcmd_fota.update = false;
+
+		_atcmd_fota_event_callback(FOTA_EVT_FAIL);
 	}
 
 	if (g_atcmd_fota.recv_buf.addr)
@@ -762,38 +814,79 @@ static void _atcmd_fota_task (void *pvParameters)
 	vTaskDelete(NULL);
 }
 
+#if 0
+static void _atcmd_fota_print_params (atcmd_fota_params_t *params)
+{
+	_atcmd_fota_log("[ SET Parameters ]");
+	_atcmd_fota_log(" - fw_bin_type : %d", params->fw_bin_type);
+	_atcmd_fota_log(" - event_cb : %p", params->event_cb);
+	_atcmd_fota_log(" - check_time : %d", params->check_time);
+	_atcmd_fota_log(" - server_uri : %s", params->server_url);
+	_atcmd_fota_log(" - bin_name : %s", params->bin_name);
+	_atcmd_fota_log(" - bin_crc32 : %X", params->bin_crc32);
+}
+#else
+#define _atcmd_fota_print_params(params)
+#endif
+
 static bool _atcmd_fota_valid_params (atcmd_fota_params_t *params)
 {
-	if (params)
-	{
-		switch (params->fw_bin_type)
-		{
-			case FW_BIN_HSPI:
-			case FW_BIN_UART:
-			case FW_BIN_UART_HFC:
-				if (params->check_time >= 0 && params->event_cb)
-				{
-					if (strncmp(params->server_url, "http://", 7) == 0)
-						return true;
-					else if (strncmp(params->server_url, "https://", 8) == 0)
-						return true;
-					else if (strlen(params->server_url) == 0)
-						return true;
-				}
+	int len;
 
-			default:
+	if (!params)
+		return false;
+
+	_atcmd_fota_print_params(params);
+
+	switch (params->fw_bin_type)
+	{
+		case FW_BIN_HSPI:
+		case FW_BIN_UART:
+		case FW_BIN_UART_HFC:
+			if (params->event_cb)
 				break;
-		}
+
+		default:
+			return false;
 	}
 
-	return false;
+	if (params->check_time < -1)
+		return false;
+
+	len = strlen(params->server_url);
+	if (len > 0)
+	{
+		if (len > ATCMD_FOTA_SERVER_URL_LEN_MAX)
+			return false;
+
+		if (strncmp(params->server_url, "http://", 7) != 0 &&
+			strncmp(params->server_url, "https://", 8) != 0)
+			return false;
+	}
+
+	len = strlen(params->bin_name);
+	if (len > 0)
+	{
+		if (len > ATCMD_FOTA_BIN_NAME_LEN_MAX)
+			return false;
+
+		if (params->check_time != 0)
+			return false;
+
+		if (strncmp(&params->bin_name[len - 4], ".bin", 4) != 0)
+			return false;
+	}
+
+	return true;
+}
+
+static bool _atcmd_fota_support (void)
+{
+	return util_fota_is_support();
 }
 
 static int _atcmd_fota_enable (atcmd_fota_params_t *params)
 {
-	if (!_atcmd_fota_valid_params(params))
-		return -1;
-
 	if (!g_atcmd_fota.recv_buf.addr)
 	{
 		char *buf;
@@ -809,26 +902,43 @@ static int _atcmd_fota_enable (atcmd_fota_params_t *params)
 		g_atcmd_fota.recv_buf.len = ATCMD_FOTA_RECV_BUF_SIZE;
 	}
 
+	g_atcmd_fota.params.fw_bin_type = params->fw_bin_type;
+	g_atcmd_fota.params.event_cb = params->event_cb;
+
+	g_atcmd_fota.params.check_time = params->check_time;
+
 	if (strlen(params->server_url) > 0)
-		memcpy(&g_atcmd_fota.params, params, sizeof(atcmd_fota_params_t));
-	else
+		strcpy(g_atcmd_fota.params.server_url, params->server_url);
+
+	if (strlen(params->bin_name) > 0)
 	{
-		g_atcmd_fota.params.fw_bin_type = params->fw_bin_type;
-		g_atcmd_fota.params.check_time = params->check_time;
-		g_atcmd_fota.params.event_cb = params->event_cb;
+		strcpy(g_atcmd_fota.params.bin_name, params->bin_name);
+		g_atcmd_fota.params.bin_crc32 = params->bin_crc32;
 	}
 
 	if (g_atcmd_fota.enable)
 	{
 		_atcmd_fota_log("change: check_time=%d server_url=%s",
-					g_atcmd_fota.params.check_time, g_atcmd_fota.params.server_url);
+				g_atcmd_fota.params.check_time, g_atcmd_fota.params.server_url);
+
+		if (strlen(g_atcmd_fota.params.bin_name) > 0)
+		{
+			_atcmd_fota_log("        bin_name=%s bin_crc32=0x%X",
+				g_atcmd_fota.params.bin_name, g_atcmd_fota.params.bin_crc32);
+		}
 
 		vTaskResume(g_atcmd_fota.task);
 	}
 	else
 	{
 		_atcmd_fota_log("enable: check_time=%d server_url=%s",
-					g_atcmd_fota.params.check_time, g_atcmd_fota.params.server_url);
+				g_atcmd_fota.params.check_time, g_atcmd_fota.params.server_url);
+
+		if (strlen(g_atcmd_fota.params.bin_name) > 0)
+		{
+			_atcmd_fota_log("        bin_name=%s bin_crc32=0x%X",
+				g_atcmd_fota.params.bin_name, g_atcmd_fota.params.bin_crc32);
+		}
 
 		g_atcmd_fota.enable = true;
 
@@ -895,22 +1005,12 @@ static int _atcmd_fota_update (void)
 }
 /**********************************************************************************************/
 
-bool atcmd_fota_valid_params (atcmd_fota_params_t *params)
-{
-	if (params)
-	{
-		if (params->check_time == -1)
-			return true;
-		else if (_atcmd_fota_valid_params(params))
-			return true;
-	}
-
-	return false;
-}
-
 int atcmd_fota_set_params (atcmd_fota_params_t *params)
 {
-	if (!params)
+	if (!_atcmd_fota_valid_params(params))
+		return -EINVAL;
+
+	if (!_atcmd_fota_support())
 		return -1;
 
 	if (params->check_time == -1)
@@ -924,6 +1024,9 @@ int atcmd_fota_get_params (atcmd_fota_params_t *params)
 	if (!params)
 		return -1;
 
+	if (!_atcmd_fota_support())
+		return -1;
+
 	memcpy(params, &g_atcmd_fota.params, sizeof(atcmd_fota_params_t));
 
 	return 0;
@@ -931,6 +1034,9 @@ int atcmd_fota_get_params (atcmd_fota_params_t *params)
 
 int atcmd_fota_update_firmware (void)
 {
+	if (!_atcmd_fota_support())
+		return -1;
+
 	return _atcmd_fota_update();
 }
 

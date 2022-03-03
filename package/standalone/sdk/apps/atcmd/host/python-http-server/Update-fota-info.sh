@@ -1,12 +1,14 @@
 #!/bin/sh
 #
 
-SDK_VER=10.10.10
-CMD_VER=10.10.10
+FOTA_INFO_FILE="fota.json"
 
-HSPI_BIN=nrc7292_standalone_xip_ATCMD_HSPI.bin
-UART_BIN=nrc7292_standalone_xip_ATCMD_UART.bin
-UART_HFC_BIN=nrc7292_standalone_xip_ATCMD_UART_HFC.bin
+SDK_VER="10.10.10"
+CMD_VER="10.10.10"
+
+HSPI_BIN="nrc7292_standalone_xip_ATCMD_HSPI.bin"
+UART_BIN="nrc7292_standalone_xip_ATCMD_UART.bin"
+UART_HFC_BIN="nrc7292_standalone_xip_ATCMD_UART_HFC.bin"
 
 #############################################################
 
@@ -62,22 +64,27 @@ UART_HFC_CRC=$(python/crc.py $UART_HFC_BIN)
 
 echo
 echo "[ Before ]"
-cat fota.info
+cat $FOTA_INFO_FILE
 
-rm -f fota.info
+rm -f $FOTA_INFO_FILE
 
-echo "AT_SDK_VER: $SDK_VER" >> fota.info
-echo "AT_CMD_VER: $CMD_VER\n" >> fota.info
-echo "AT_HSPI_BIN: $HSPI_BIN" >> fota.info
-echo "AT_HSPI_CRC: $HSPI_CRC\n" >> fota.info
-echo "AT_UART_BIN: $UART_BIN" >> fota.info
-echo "AT_UART_CRC: $UART_CRC\n" >> fota.info
-echo "AT_UART_HFC_BIN: $UART_HFC_BIN" >> fota.info
-echo "AT_UART_HFC_CRC: $UART_HFC_CRC" >> fota.info
+echo "{" >> $FOTA_INFO_FILE
+echo "    \"AT_SDK_VER\" : \"$SDK_VER\"," >> $FOTA_INFO_FILE
+echo "    \"AT_CMD_VER\" : \"$CMD_VER\"," >> $FOTA_INFO_FILE
+echo "" >> $FOTA_INFO_FILE
+echo "    \"AT_HSPI_BIN\" : \"$HSPI_BIN\"," >> $FOTA_INFO_FILE
+echo "    \"AT_HSPI_CRC\" : \"$HSPI_CRC\"," >> $FOTA_INFO_FILE
+echo "" >> $FOTA_INFO_FILE
+echo "    \"AT_UART_BIN\" : \"$UART_BIN\"," >> $FOTA_INFO_FILE
+echo "    \"AT_UART_CRC\" : \"$UART_CRC\"," >> $FOTA_INFO_FILE
+echo "" >> $FOTA_INFO_FILE
+echo "    \"AT_UART_HFC_BIN\" : \"$UART_HFC_BIN\"," >> $FOTA_INFO_FILE
+echo "    \"AT_UART_HFC_CRC\" : \"$UART_HFC_CRC\"" >> $FOTA_INFO_FILE
+echo "}" >> $FOTA_INFO_FILE
 
 echo
 echo "[ After ]"
-cat fota.info
+cat $FOTA_INFO_FILE
 
 echo
 exit 0

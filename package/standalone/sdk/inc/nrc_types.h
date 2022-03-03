@@ -56,7 +56,7 @@ typedef uint64_t u64;
 #define MAX_PW_LENGTH 30
 #define MAX_MAC_ADDR 17
 #define MAX_WPA_RESPONSE_BUFFER_SIZE 1024
-#define WIFI_CONNECTION_TIMEOUT 30 // sec
+#define WIFI_CONNECTION_TIMEOUT 60 // sec
 
 typedef enum {
 	NRC_SUCCESS = 0,
@@ -287,6 +287,7 @@ typedef struct  {
 typedef struct  {
 	int id;
 	int nd;
+	bool ndp_preq;
 	int mode;
 } MSG_CONNECT_FORMAT;
 #define WLAN_CONNECT_FM_SIZE	sizeof (MSG_CONNECT_FORMAT)

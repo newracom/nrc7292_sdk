@@ -208,24 +208,14 @@ nrc_err_t nrc_uart_register_interrupt_handler(int ch, intr_handler_fn cb);
 
 
 /**********************************************
- * @fn nrc_err_t nrc_uart_console_enable(void)
+ * @fn nrc_err_t nrc_uart_console_enable(bool enabled)
  *
  * @brief enable uart console
  *
- * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
- ***********************************************/
-nrc_err_t nrc_uart_console_enable(void);
-
-
-/**********************************************
- * @fn nrc_err_t nrc_uart_printf(const char *f, ...)
- *
- * @brief print log on the console
- *
- * @param f: parameter point
+ * @param enabled: enable/disable console print and command handler
  *
  * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-nrc_err_t nrc_uart_printf(const char *f, ...);
+nrc_err_t nrc_uart_console_enable(bool enabled);
 
 #endif /* __NRC_API_UART_H__ */

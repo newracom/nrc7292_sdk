@@ -9,7 +9,7 @@ enum lmac_rx_policy {
 
 struct lmac_rx_h_data {
 	int8_t vif_id;
-    struct _SYS_BUF *buffer;
+	struct _SYS_BUF *buffer;
 	struct _LMAC_RXBUF *vector;
 	GenericMacHeader *mh;
 	enum lmac_rx_policy flags;

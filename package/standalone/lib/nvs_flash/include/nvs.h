@@ -81,6 +81,10 @@ void hal_uart_printf(const char *f, ...);
 #define NVS_PART_NAME_MAX_SIZE              16   /*!< maximum length of partition name (excluding null terminator) */
 #define NVS_KEY_NAME_MAX_SIZE               16   /*!< Maximal length of NVS key name (including null terminator) */
 
+/* default namespace to be used */
+/* App can have its own namespace if nvs_open is called with one */
+#define NVS_DEFAULT_NAMESPACE               "namespace"
+
 #define NVS_ERROR_CHECK(x) do {    \
 		nvs_err_t err_rc_ = (x);   \
 		(void) sizeof(err_rc_);    \

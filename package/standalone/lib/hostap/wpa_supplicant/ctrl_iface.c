@@ -3475,7 +3475,6 @@ static int wpa_supplicant_ctrl_iface_update_network(
 		wpa_config_update_psk(ssid);
 	else if (os_strcmp(name, "priority") == 0)
 		wpa_config_update_prio_list(wpa_s->conf);
-
 	return 0;
 }
 
@@ -9982,7 +9981,6 @@ static int wpas_ctrl_cmd_debug_level(const char *cmd)
 	return MSG_DEBUG;
 }
 
-
 char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 					 char *buf, size_t *resp_len)
 {
@@ -10023,6 +10021,90 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 	os_memcpy(reply, "OK\n", 3);
 	reply_len = 3;
 
+#ifdef NRC_WPA_SUPP
+		if (os_strncmp(buf, "STATUS", 6) == 0) {
+			reply_len = wpa_supplicant_ctrl_iface_status(
+				wpa_s, buf + 6, reply, reply_size);
+		} else if (os_strncmp(buf, "SET ", 4) == 0) {
+			if (wpa_supplicant_ctrl_iface_set(wpa_s, buf + 4))
+				reply_len = -1;
+		} else if (os_strncmp(buf, "GET ", 4) == 0) {
+			reply_len = wpa_supplicant_ctrl_iface_get(wpa_s, buf + 4,
+								  reply, reply_size);
+		} else if (os_strcmp(buf, "REASSOCIATE") == 0) {
+			if (wpa_s->wpa_state == WPA_INTERFACE_DISABLED)
+				reply_len = -1;
+			else
+				wpas_request_connection(wpa_s);
+		} else if (os_strcmp(buf, "RECONNECT") == 0) {
+			if (wpa_s->wpa_state == WPA_INTERFACE_DISABLED)
+				reply_len = -1;
+			else if (wpa_s->disconnected)
+				wpas_request_connection(wpa_s);
+		} else if (os_strcmp(buf, "DISCONNECT") == 0) {
+			wpas_request_disconnection(wpa_s);
+		} else if (os_strcmp(buf, "SCAN") == 0) {
+			wpas_ctrl_scan(wpa_s, NULL, reply, reply_size, &reply_len);
+		} else if (os_strncmp(buf, "SCAN ", 5) == 0) {
+			wpas_ctrl_scan(wpa_s, buf + 5, reply, reply_size, &reply_len);
+		} else if (os_strcmp(buf, "SCAN_RESULTS") == 0) {
+			reply_len = wpa_supplicant_ctrl_iface_scan_results(
+				wpa_s, reply, reply_size);
+		} else if (os_strcmp(buf, "ABORT_SCAN") == 0) {
+			if (wpas_abort_ongoing_scan(wpa_s) < 0)
+				reply_len = -1;
+		} else if (os_strncmp(buf, "SELECT_NETWORK ", 15) == 0) {
+			if (wpa_supplicant_ctrl_iface_select_network(wpa_s, buf + 15))
+				reply_len = -1;
+		} else if (os_strncmp(buf, "ENABLE_NETWORK ", 15) == 0) {
+			if (wpa_supplicant_ctrl_iface_enable_network(wpa_s, buf + 15))
+				reply_len = -1;
+		} else if (os_strncmp(buf, "DISABLE_NETWORK ", 16) == 0) {
+			if (wpa_supplicant_ctrl_iface_disable_network(wpa_s, buf + 16))
+				reply_len = -1;
+		} else if (os_strcmp(buf, "ADD_NETWORK") == 0) {
+			reply_len = wpa_supplicant_ctrl_iface_add_network(
+				wpa_s, reply, reply_size);
+		} else if (os_strncmp(buf, "REMOVE_NETWORK ", 15) == 0) {
+			if (wpa_supplicant_ctrl_iface_remove_network(wpa_s, buf + 15))
+				reply_len = -1;
+		} else if (os_strncmp(buf, "SET_NETWORK ", 12) == 0) {
+			if (wpa_supplicant_ctrl_iface_set_network(wpa_s, buf + 12))
+				reply_len = -1;
+		} else if (os_strncmp(buf, "GET_NETWORK ", 12) == 0) {
+			reply_len = wpa_supplicant_ctrl_iface_get_network(
+				wpa_s, buf + 12, reply, reply_size);
+		} else if (os_strncmp(buf, "SCAN_SSID ", 10) == 0) {
+			   if (wpa_supplicant_ctrl_iface_scan_ssid(wpa_s, buf + 10) < 0)
+				   reply_len = -1;
+		} else if (os_strncmp(buf, "NDP_PREQ ", 9) == 0) {
+			   if (wpa_supplicant_ctrl_iface_ndp_preq(wpa_s, buf + 9) < 0)
+				   reply_len = -1;
+#ifdef CONFIG_AP
+		} else if (os_strncmp(buf, "DEAUTHENTICATE ", 15) == 0) {
+			if (ap_ctrl_iface_sta_deauthenticate(wpa_s, buf + 15))
+				reply_len = -1;
+		} else if (os_strncmp(buf, "DISASSOCIATE ", 13) == 0) {
+			if (ap_ctrl_iface_sta_disassociate(wpa_s, buf + 13))
+				reply_len = -1;
+#endif /* CONFIG_AP */
+#ifdef CONFIG_WPS
+		} else if (os_strcmp(buf, "WPS_PBC") == 0) {
+			int res = wpa_supplicant_ctrl_iface_wps_pbc(wpa_s, NULL);
+			if (res == -2) {
+				os_memcpy(reply, "FAIL-PBC-OVERLAP\n", 17);
+				reply_len = 17;
+			} else if (res)
+				reply_len = -1;
+#endif
+		} else if (os_strncmp(buf, "VENDOR ", 7) == 0) {
+			reply_len = wpa_supplicant_vendor_cmd(wpa_s, buf + 7, reply,
+						reply_size);
+		} else {
+			os_memcpy(reply, "UNKNOWN COMMAND\n", 16);
+			reply_len = 16;
+		}
+#else
 	if (os_strcmp(buf, "PING") == 0) {
 		os_memcpy(reply, "PONG\n", 5);
 		reply_len = 5;
@@ -10837,6 +10919,7 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 		os_memcpy(reply, "UNKNOWN COMMAND\n", 16);
 		reply_len = 16;
 	}
+#endif /* NRC_WPA_SUPP */
 
 	if (reply_len < 0) {
 		os_memcpy(reply, "FAIL\n", 5);

@@ -47,7 +47,10 @@ static void *raspi_cli_recv_thread (void *arg)
 		if (ret > 0)
 			nrc_atcmd_recv(buf, ret);
 		else if (ret < 0 && ret != -EAGAIN)
+		{
 			log_error("raspi_hif_read(), %s\n", strerror(-ret));
+			exit(0);
+		}
 
 		usleep(1 * 1000);
 	}
@@ -378,6 +381,9 @@ static int raspi_cli_run_script (char *script)
 	log_info("\n");
 	log_info("DONE: %s\n", script);
 
+	if (fclose(fp) != 0)
+		log_info("FERR: %s, %s\n", script, strerror(errno));
+
 	free(script);
 
 	return 0;
@@ -615,14 +621,14 @@ static void raspi_cli_help (char *cmd)
 #else
 	printf("  $ %s -U [-D <device>] [-b <baudrate>] [-d] [-f] [-s <script>]\n", cmd);
 	printf("  $ %s -S [-D <device>] [-c <clock>] [-s <script>]\n", cmd);
-#endif	
+#endif
 	printf("\n");
 
 	printf("UART/SPI:\n");
 	printf("  -D, --device #        specify the device. (default: /dev/ttyAMA0, /dev/spidev0.0)\n");
 #if defined(SUPPORT_HOST_STACK)
 	printf("  -H, --host            use the network stack on host\n");
-#endif	
+#endif
 	printf("  -e, --echo            enable echo for received packets (default: disable)\n");
 	printf("  -s, --script #        specify the script file.\n");
 	printf("\n");
@@ -646,7 +652,7 @@ static void raspi_cli_help (char *cmd)
 static int raspi_cli_option (int argc, char *argv[], raspi_cli_opt_t *opt)
 {
 #define DEFAULT_SPI_DEVICE		"/dev/spidev0.0"
-#define DEFAULT_SPI_CLOCK		16000000
+#define DEFAULT_SPI_CLOCK		20000000
 
 #define DEFAULT_UART_DEVICE		"/dev/ttyAMA0"
 #define DEFAULT_UART_BAUDRATE	115200
@@ -696,7 +702,7 @@ static int raspi_cli_option (int argc, char *argv[], raspi_cli_opt_t *opt)
 		ret = getopt_long(argc, argv, "D:Hes:Ub:fSc:vh", opt_info, &opt_idx);
 #else
 		ret = getopt_long(argc, argv, "D:es:Ub:fSc:vh", opt_info, &opt_idx);
-#endif		
+#endif
 
 		switch (ret)
 		{

@@ -131,7 +131,7 @@ static int nrc_atcmd_enable_hspi (bool *console_enable)
 
 	*console_enable = true;
 
-	nrc_uart_console_enable();
+	nrc_uart_console_enable(true);
 	nrc_atcmd_build_info();
 
 	return nrc_atcmd_enable(_HIF_TYPE_HSPI, sw_id, bd_id);
@@ -161,7 +161,7 @@ static int nrc_atcmd_enable_uart (bool *console_enable)
 	{
 		*console_enable = true;
 
-		nrc_uart_console_enable();
+		nrc_uart_console_enable(true);
 		nrc_atcmd_build_info();
 	}
 

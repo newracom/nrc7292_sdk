@@ -40,7 +40,7 @@
 
 #define _lwip_ping_delay					_delay_ms
 
-#define _lwip_ping_printf(fmt, ...)			nrc_uart_printf("[PING] " fmt, ##__VA_ARGS__)
+#define _lwip_ping_printf(fmt, ...)			hal_uart_printf("[PING] " fmt, ##__VA_ARGS__)
 
 #define _lwip_ping_error(fmt, ...)			_lwip_ping_printf(fmt, ##__VA_ARGS__)
 #define _lwip_ping_debug(fmt, ...)			/*_lwip_ping_printf(fmt, ##__VA_ARGS__) */

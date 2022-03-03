@@ -285,7 +285,7 @@ void user_init(void)
 	nrc_err_t ret;
 	WIFI_CONFIG* param;
 
-	nrc_uart_console_enable();
+	nrc_uart_console_enable(true);
 
 	param = nrc_mem_malloc(WIFI_CONFIG_SIZE);
 	memset(param, 0x0, WIFI_CONFIG_SIZE);

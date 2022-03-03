@@ -60,6 +60,7 @@ bool drv_pmc_busy(void);
 uint32_t drv_pmc_current_status(void);
 void drv_pmc_set_int_status(uint32_t status);
 uint32_t drv_pmc_history(void);
+uint8_t drv_pmc_get_wakeup_reason(uint32_t status);
 
 void drv_pmc_pwr_sw_mask(uint32_t pwr, bool set);
 void drv_pmc_pwr_sw_manual_en(uint32_t pwr, bool set);
@@ -76,6 +77,8 @@ void drv_pmc_set_pwr_alarm_cnt(uint32_t cnt);
 uint32_t drv_pmc_get_pwr_alarm_cnt(void);
 
 const char *drv_scfg_get_boot_reason_str(uint8_t reason);
+void drv_scfg_store_boot_reason();
+uint8_t drv_get_boot_reason();
 uint8_t drv_scfg_get_boot_reason();
 void drv_scfg_clr_boot_reason();
 

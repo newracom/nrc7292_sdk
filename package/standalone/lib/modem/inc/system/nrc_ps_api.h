@@ -24,6 +24,7 @@ enum ps_ucode_wake_reason {
 	PS_WAKE_EXT_INT_2,
 	PS_WAKE_BEACON_LOSS,		//5 abnormal
 	PS_WAKE_INVALID_RET_INFO,	//6 abnormal
+	PS_WAKE_RTC_TIMEOUT,
 #if defined(NRC7292)
 	PS_WAKE_HSPI,
 #endif
@@ -296,15 +297,15 @@ struct ret_wowlaninfo {
 #if defined (INCLUDE_WOWLAN_PATTERN)
 //WoWLAN uses extra 132B for patten match in Ucode
 #if defined(NRC7292)
-#define RET_RESERVED_SIZE 7
+#define RET_RESERVED_SIZE 4
 #else
-#define RET_RESERVED_SIZE 9
+#define RET_RESERVED_SIZE 6
 #endif
 #else //INCLUDE_WOWLAN_PATTERN
 #if defined(NRC7292)
-#define RET_RESERVED_SIZE 139
+#define RET_RESERVED_SIZE 136
 #else
-#define RET_RESERVED_SIZE 141
+#define RET_RESERVED_SIZE 138
 #endif
 #endif // //INCLUDE_WOWLAN_PATTERN
 #define RET_UCODE_HDR_SIZE 16
@@ -330,6 +331,9 @@ struct retention_info {
 	struct ret_wowlanptns	wowlan_patterns[WOWLAN_MAX_PATTERNS]; //wowlan patterns (65B * 2)
 	struct ret_wowlaninfo	wowlan_info;		//wowlan info (2B)
 #endif
+#if !defined(INCLUDE_RTC_ALWAYS_ON)
+	uint32_t				sync_time_ms;		//time for recovery (4B)
+#endif
 	uint8_t					pmk[RET_PMK_SIZE];	//PMK(PSK) (32B)
 	uint32_t				sig_a;				//sig a (4B)
 	uint32_t				sig_b;				//sig b (4B)
@@ -338,6 +342,7 @@ struct retention_info {
 	uint64_t				ps_duration;		//Power save duration (8B) (in ms unit)
 	uint32_t				wdt_cnt;			//WDT Reset Count (4B)
 	bool					recovered;			//recovery status(1B) (true:recovered, false:not recovered)
+	bool					sleep_alone;		//sleep without connection(1B) (true:alone false:with AP)
 	uint8_t					reserved[RET_RESERVED_SIZE];		//avaiable
 	uint8_t     			ucode_hdr[RET_UCODE_HDR_SIZE];		//ucode header (don't touch. should be located at the end)
 } __attribute__ ((packed));
@@ -400,6 +405,8 @@ int nrc_ps_config_wakeup_source(uint8_t wakeup_source);
 int nrc_ps_get_wakeup_pin(bool *check_debounce, int *pin_number);
 int nrc_ps_get_power_indication_pin(bool *enable, int *pin_number);
 int nrc_ps_get_wakeup_source(uint8_t *wakeup_source);
+int nrc_ps_get_wakeup_reason(uint8_t *wakeup_reason);
+int nrc_ps_get_wakeup_count(uint32_t *wakeup_count);
 #endif
 
 #endif /*__NRC_PS_API_H__*/

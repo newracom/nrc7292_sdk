@@ -28,6 +28,11 @@
 #include "wifi_config_setup.h"
 #include "wlan_manager.h"
 
+#ifdef SUPPORT_NVS_FLASH
+#include <nvs.h>
+#include "nvs_config.h"
+#endif
+
 /******************************************************************************
  * FunctionName : set_wifi_config
  * Description  : set configuration for sample application
@@ -36,20 +41,69 @@
  *******************************************************************************/
 void set_wifi_config(WIFI_CONFIG *param)
 {
-	memset(param, 0x0, WIFI_CONFIG_SIZE);
-	memcpy(param->ssid, STR_SSID, sizeof(STR_SSID));
-	memcpy(param->country, COUNTRY_CODE, sizeof(COUNTRY_CODE));
-	memcpy(param->remote_addr, NRC_REMOTE_ADDRESS, sizeof(NRC_REMOTE_ADDRESS));
-	param->remote_port = NRC_REMOTE_PORT;
-	param->security_mode = NRC_WIFI_SECURE;
-#if defined(NRC_WIFI_SECURE) && (NRC_WIFI_SECURE == WIFI_SEC_WPA2)
-	memcpy(param->password, NRC_WIFI_PASSWORD, sizeof(NRC_WIFI_PASSWORD));
+#ifdef SUPPORT_NVS_FLASH
+	nvs_handle_t nvs_handle;
+	nvs_err_t err = NVS_OK;
+	size_t length = 0;
+
+	err = nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle);
+	if (err != NVS_OK) {
+		nrc_usr_print("[%s] nvs_open failed (0x%x).\n", __func__, err);
+		return;
+	}
 #endif
+	memset(param, 0x0, WIFI_CONFIG_SIZE);
+
+#ifdef SUPPORT_NVS_FLASH
+	length = sizeof(param->ssid);
+	if (nvs_get_str(nvs_handle, NVS_SSID, (char *) param->ssid, &length) != NVS_OK)
+#endif
+	{
+		memcpy(param->ssid, STR_SSID, sizeof(STR_SSID));
+	}
+
+	memcpy(param->country, COUNTRY_CODE, sizeof(COUNTRY_CODE));
+
+#ifdef SUPPORT_NVS_FLASH
+	length = sizeof(param->remote_addr);
+	if (nvs_get_str(nvs_handle, NVS_REMOTE_ADDRESS, (char *) param->remote_addr, &length) != NVS_OK)
+#endif
+	{
+		memcpy(param->remote_addr, NRC_REMOTE_ADDRESS, sizeof(NRC_REMOTE_ADDRESS));
+	}
+#ifdef SUPPORT_NVS_FLASH
+	if (nvs_get_u16(nvs_handle, NVS_REMOTE_PORT, &param->remote_port) != NVS_OK)
+#endif
+	{
+		param->remote_port = NRC_REMOTE_PORT;
+	}
+#ifdef SUPPORT_NVS_FLASH
+	if (nvs_get_u8(nvs_handle, NVS_WIFI_SECURITY, &param->security_mode) != NVS_OK)
+#endif
+	{
+		param->security_mode = NRC_WIFI_SECURE;
+	}
+	if ((param->security_mode == WIFI_SEC_WPA2) || (param->security_mode == WIFI_SEC_WPA3_SAE)) {
+#ifdef SUPPORT_NVS_FLASH
+		length = sizeof(param->password);
+		if (nvs_get_str(nvs_handle, NVS_WIFI_PASSWORD, (char *) param->password, &length) != NVS_OK)
+#endif
+		{
+			memcpy(param->password, NRC_WIFI_PASSWORD, sizeof(NRC_WIFI_PASSWORD));
+		}
+	}
+
 	param->tx_power = TX_POWER;
 	param->count = NRC_WIFI_TEST_COUNT;
 	param->interval = NRC_WIFI_TEST_INTERVAL;
+	param->short_bcn_interval = NRC_WIFI_TEST_INTERVAL / 10;
 	param->duration = NRC_WIFI_TEST_DURATION;
-	param->ip_mode = NRC_WIFI_IP_MODE;
+#ifdef SUPPORT_NVS_FLASH
+	if (nvs_get_u8(nvs_handle, NVS_IP_MODE, &param->ip_mode) != NVS_OK)
+#endif
+	{
+		param->ip_mode = NRC_WIFI_IP_MODE;
+	}
 #if NRC_WIFI_SCAN_LIST
 	param->scan_freq_num = NRC_WIFI_SCAN_FREQ_NUM;
 	for (int i=0; i < param->scan_freq_num; i++)
@@ -57,7 +111,17 @@ void set_wifi_config(WIFI_CONFIG *param)
 #endif
 
 #if (NRC_WIFI_IP_MODE == WIFI_STATIC_IP)
-	memcpy(param->static_ip, NRC_STATIC_IP, sizeof(NRC_STATIC_IP));
+#ifdef SUPPORT_NVS_FLASH
+	length = sizeof(param->static_ip);
+	if (nvs_get_str(nvs_handle, NVS_STATIC_IP, (char *) param->static_ip, &length) != NVS_OK)
+#endif
+	{
+		memcpy(param->static_ip, NRC_STATIC_IP, sizeof(NRC_STATIC_IP));
+	}
+#endif /* #if (NRC_WIFI_IP_MODE == WIFI_STATIC_IP) */
+
+#ifdef SUPPORT_NVS_FLASH
+	nvs_close(nvs_handle);
 #endif
 }
 
@@ -69,17 +133,73 @@ void set_wifi_config(WIFI_CONFIG *param)
  *******************************************************************************/
 void set_wifi_softap_config(WIFI_CONFIG *param)
 {
-	memset(param, 0x0, WIFI_CONFIG_SIZE);
-	memcpy(param->ap_ip, NRC_AP_IP, sizeof(NRC_AP_IP));
-	memcpy(param->ssid, STR_SSID, sizeof(STR_SSID));
-	memcpy(param->country, COUNTRY_CODE, sizeof(COUNTRY_CODE));
-	param->security_mode = NRC_WIFI_SECURE;
-#if defined(NRC_WIFI_SECURE) && (NRC_WIFI_SECURE == WIFI_SEC_WPA2)
-	memcpy(param->password, NRC_WIFI_PASSWORD, sizeof(NRC_WIFI_PASSWORD));
+#ifdef SUPPORT_NVS_FLASH
+	nvs_handle_t nvs_handle;
+	nvs_err_t err = NVS_OK;
+	size_t length = 0;
+
+	err = nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle);
+	if (err != NVS_OK) {
+		nrc_usr_print("[%s] nvs_open failed (0x%x).\n", __func__, err);
+		return;
+	}
 #endif
+	memset(param, 0x0, WIFI_CONFIG_SIZE);
+
+#ifdef SUPPORT_NVS_FLASH
+	length = sizeof(param->ap_ip);
+	if (nvs_get_str(nvs_handle, NVS_STATIC_IP, (char *) param->ap_ip, &length) != NVS_OK)
+#endif
+	{
+		memcpy(param->ap_ip, NRC_AP_IP, sizeof(NRC_AP_IP));
+	}
+
+#ifdef SUPPORT_NVS_FLASH
+	length = sizeof(param->ssid);
+	if (nvs_get_str(nvs_handle, NVS_SSID, (char *) param->ssid, &length) != NVS_OK)
+#endif
+	{
+		memcpy(param->ssid, STR_SSID, sizeof(STR_SSID));
+	}
+	memcpy(param->country, COUNTRY_CODE, sizeof(COUNTRY_CODE));
+
+#ifdef SUPPORT_NVS_FLASH
+	if (nvs_get_u8(nvs_handle, NVS_WIFI_SECURITY, &param->security_mode) != NVS_OK)
+#endif
+	{
+		param->security_mode = NRC_WIFI_SECURE;
+	}
+
+	if ((param->security_mode == WIFI_SEC_WPA2) || (param->security_mode == WIFI_SEC_WPA3_SAE)) {
+#ifdef SUPPORT_NVS_FLASH
+		length = sizeof(param->password);
+		if (nvs_get_str(nvs_handle, NVS_WIFI_PASSWORD, (char *) param->password, &length) != NVS_OK)
+#endif
+		{
+			memcpy(param->password, NRC_WIFI_PASSWORD, sizeof(NRC_WIFI_PASSWORD));
+		}
+	}
+
 	param->tx_power = TX_POWER;
-	param->dhcp_server = NRC_WIFI_SOFTAP_DHCP_SERVER;
+
+#ifdef SUPPORT_NVS_FLASH
+	if (nvs_get_u8(nvs_handle, NVS_DHCP_SERVER_ON_WLAN, &param->dhcp_server) != NVS_OK)
+#endif
+	{
+		param->dhcp_server = NRC_WIFI_SOFTAP_DHCP_SERVER;
+	}
 	param->count = NRC_WIFI_TEST_COUNT;
+
 	param->interval = NRC_WIFI_TEST_INTERVAL;
-	param->channel = NRC_AP_SET_CHANNEL;
+
+#ifdef SUPPORT_NVS_FLASH
+	if (nvs_get_u32(nvs_handle, NVS_WIFI_CHANNEL, &param->channel) != NVS_OK)
+#endif
+	{
+		param->channel = NRC_AP_SET_CHANNEL;
+	}
+
+#ifdef SUPPORT_NVS_FLASH
+	nvs_close(nvs_handle);
+#endif
 }

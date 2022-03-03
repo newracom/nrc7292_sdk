@@ -75,6 +75,12 @@
 #define ATCMD_WIFI_ROAMING_TASK_PRIORITY		ATCMD_TASK_PRIORITY
 #define ATCMD_WIFI_ROAMING_TASK_STACK_SIZE		((4 * 1024) / sizeof(StackType_t))
 
+/*
+ * RSSI
+ */
+#define ATCMD_WIFI_RSSI_MAX		0
+#define ATCMD_WIFI_RSSI_MIN		-128
+
 /**********************************************************************************************/
 
 typedef uint32_t atcmd_wifi_event_t;
@@ -162,8 +168,6 @@ typedef struct
 
 typedef struct
 {
-	int net_id;
-
 	atcmd_wifi_event_t event;
 
 	atcmd_wifi_country_t country;

@@ -67,24 +67,23 @@ static err_t low_level_output( struct netif *netif, struct pbuf *p )
 {
 	struct pbuf *q;
 	err_t xReturn = ERR_OK;
-	const int MAX_FRAME_NUM = 4;
+	const int MAX_FRAME_NUM = 10;
 	uint8_t *frames[MAX_FRAME_NUM];
 	uint16_t frame_len[MAX_FRAME_NUM];
 	int i = 0;
 
-	for( q = p; q != NULL; q = q->next )
-	{
+	for( q = p; q != NULL; q = q->next ) {
 		frames[i] = q->payload;
 		frame_len[i] = q->len;
 		i++;
 	}
-	nrc_transmit_from_8023_mb(netif->num, frames, frame_len, i);
+	V(TT_NET, "[%s] netif->num = %d, output frames = %d, frame_len = %d...\n", __func__, netif->num, i, frame_len[0]);
+	xReturn = nrc_transmit_from_8023_mb(netif->num, frames, frame_len, i);
 	LINK_STATS_INC(link.xmit);
 
-	return ERR_OK;
+	return  xReturn;
 }
 
-#if 1
 void lwif_input_from_net80211_pbuf(struct pbuf* p)
 {
 	struct eth_hdr      *ethhdr;
@@ -110,6 +109,7 @@ void lwif_input_from_net80211_pbuf(struct pbuf* p)
 		case ETHTYPE_PPPOE:
 #endif /* PPPOE_SUPPORT */
 		/* full packet send to tcpip_thread to process */
+			V(TT_NET, "[%s] send packet to tcpip thread to process...\n", __func__);
 			if (netif->input(p, netif)!=ERR_OK) {
 				LWIP_DEBUGF(NETIF_DEBUG, ("ethernetif_input: IP input error\n"));
 				pbuf_free(p);
@@ -123,9 +123,6 @@ void lwif_input_from_net80211_pbuf(struct pbuf* p)
 			break;
 	}
 }
-#endif
-
-
 
 void lwif_input(uint8_t vif_id, void *buffer, int data_len)
 {

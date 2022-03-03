@@ -198,7 +198,7 @@ void user_init(void)
 	nrc_err_t ret;
 
 	//Enable Console for Debugging
-	nrc_uart_console_enable();
+	nrc_uart_console_enable(true);
 
 	//Wifi config
 	param = nrc_mem_malloc(WIFI_CONFIG_SIZE);
