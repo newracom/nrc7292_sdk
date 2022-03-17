@@ -266,11 +266,12 @@ static int __atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len
 		{
 			retry++;
 
-			_atcmd_info("%s_send: id=%d len=%d/%d retry=%d\n",
-							str_proto_lwr[socket->protocol], socket->id, i, len, retry);
-
 			if (retry > retry_max)
+			{
+				_atcmd_info("%s_send: id=%d len=%d/%d retry=%d\n",
+							str_proto_lwr[socket->protocol], socket->id, i, len, retry);
 				break;
+			}
 
 			_delay_ms(10);
 
@@ -473,8 +474,6 @@ static void _atcmd_socket_recv_data (atcmd_socket_t *socket, atcmd_rxd_t *rxd)
 static int _atcmd_socket_event_handler (int type, int id, ...)
 {
 	va_list ap;
-	int len = 0;
-	int err = 0;
 	int ret = 0;
 
 	va_start(ap, id);
@@ -492,41 +491,52 @@ static int _atcmd_socket_event_handler (int type, int id, ...)
 			break;
 
 		case ATCMD_SOCKET_EVENT_SEND_IDLE:
-			len = va_arg(ap, int);
+		{
+			uint32_t done = va_arg(ap, uint32_t);
+			uint32_t drop = va_arg(ap, uint32_t);
+			uint32_t wait = va_arg(ap, uint32_t);
 
-			_atcmd_info("SEVENT: SEND_IDLE, id=%d len=%u\n", id, len);
-			ATCMD_MSG_SEVENT("\"SEND_IDLE\",%d,%u", id, len);
+			_atcmd_info("SEVENT: SEND_IDLE, id=%d done=%u drop=%u wait=%u\n", id, done, drop, wait);
+			ATCMD_MSG_SEVENT("\"SEND_IDLE\",%d,%u,%u,%u", id, done, drop, wait);
 			break;
+		}
 
 		case ATCMD_SOCKET_EVENT_SEND_DROP:
-			len = va_arg(ap, int);
+		{
+			uint32_t drop = va_arg(ap, uint32_t);
 
-			_atcmd_info("SEVENT: SEND_DROP, id=%d len=%u\n", id, len);
-			ATCMD_MSG_SEVENT("\"SEND_DROP\",%d,%u", id, len);
+			_atcmd_info("SEVENT: SEND_DROP, id=%d drop=%u\n", id, drop);
+			ATCMD_MSG_SEVENT("\"SEND_DROP\",%d,%u", id, drop);
 			break;
+		}
 
 		case ATCMD_SOCKET_EVENT_SEND_EXIT:
-			len = va_arg(ap, int);
+		{
+			uint32_t done = va_arg(ap, uint32_t);
+			uint32_t drop = va_arg(ap, uint32_t);
 
-			_atcmd_info("SEVENT: SEND_EXIT, id=%d len=%u\n", id, len);
-			ATCMD_MSG_SEVENT("\"SEND_EXIT\",%d,%u", id, len);
+			_atcmd_info("SEVENT: SEND_EXIT, id=%d done=%u drop=%u\n", id, done, drop);
+			ATCMD_MSG_SEVENT("\"SEND_EXIT\",%d,%u,%u", id, done, drop);
 			break;
+		}
 
 		case ATCMD_SOCKET_EVENT_SEND_ERROR:
-			len = va_arg(ap, int);
-			err = va_arg(ap, int);
+		{
+			int err = va_arg(ap, int);
 
-			_atcmd_info("SEVENT: SEND_ERROR, id=%d len=%u err=%d,%s\n",
-					id, len, err, atcmd_strerror(err));
-			ATCMD_MSG_SEVENT("\"SEND_ERROR\",%d,%u,%d", id, len, err);
+			_atcmd_info("SEVENT: SEND_ERROR, id=%d err=%d,%s\n", id, err, atcmd_strerror(err));
+			ATCMD_MSG_SEVENT("\"SEND_ERROR\",%d,%d", id, err);
 			break;
+		}
 
 		case ATCMD_SOCKET_EVENT_RECV_ERROR:
-			err = va_arg(ap, int);
+		{
+			int err = va_arg(ap, int);
 
 			_atcmd_info("SEVENT: RECV_ERROR, id=%d err=%d,%s\n", id, err, atcmd_strerror(err));
 			ATCMD_MSG_SEVENT("\"RECV_ERROR\",%d,%d", id, err);
 			break;
+		}
 
 		default:
 			_atcmd_info("SEVENT: invalid type (%d)\n", type);
@@ -1552,23 +1562,23 @@ int atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len, int *er
 	return _atcmd_socket_send_data(socket, data, len, err);
 }
 
-int atcmd_socket_event_send_idle (int id, int len)
+int atcmd_socket_event_send_idle (int id, uint32_t done, uint32_t drop, uint32_t wait)
 {
-	return _atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_IDLE, id, len);
+	return _atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_IDLE, id, done, drop, wait);
 }
 
-int atcmd_socket_event_send_drop (int id, int len)
+int atcmd_socket_event_send_drop (int id, uint32_t drop)
 {
-	return _atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_DROP, id, len);
+	return _atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_DROP, id, drop);
 }
 
-int atcmd_socket_event_send_exit (int id, int len)
+int atcmd_socket_event_send_exit (int id, uint32_t done, uint32_t drop)
 {
-	return _atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_EXIT, id, len);
+	return _atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_EXIT, id, done, drop);
 }
 
-int atcmd_socket_event_send_error (int id, int len, int err)
+int atcmd_socket_event_send_error (int id, int err)
 {
-	return _atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_ERROR, id, len, err);
+	return _atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_ERROR, id, err);
 }
 

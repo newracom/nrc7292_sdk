@@ -413,11 +413,12 @@ typedef struct
 {
 	bool enable;
 	bool idle;
-	bool error;
 	bool passthrough;
 
-	int32_t len;
 	uint32_t cnt;
+	uint32_t send_len;
+	uint32_t send_done;
+	uint32_t send_drop;
 #ifndef CONFIG_ATCMD_WITHOUT_LWIP
 	atcmd_socket_t socket;
 #endif
@@ -429,13 +430,13 @@ typedef struct
 static atcmd_data_mode_t g_atcmd_data_mode =
 {
 	.enable = false,
-
 	.idle = true,
-	.error= false,
 	.passthrough = false,
 
 	.cnt = 0,
-	.len = 0,
+	.send_len = 0,
+	.send_done = 0,
+	.send_drop = 0,
 #ifndef CONFIG_ATCMD_WITHOUT_LWIP
 	.socket =
 	{
@@ -472,11 +473,12 @@ int atcmd_data_mode_enable (int32_t len, uint32_t timeout)
 
 	g_atcmd_data_mode.enable = true;
 	g_atcmd_data_mode.idle = false;
-	g_atcmd_data_mode.error = false;
 	g_atcmd_data_mode.passthrough = (len <= 0) ? true : false;
 
 	g_atcmd_data_mode.cnt = 0;
-	g_atcmd_data_mode.len = abs(len);
+	g_atcmd_data_mode.send_len = abs(len);
+	g_atcmd_data_mode.send_done = 0;
+	g_atcmd_data_mode.send_drop = 0;
 #ifndef CONFIG_ATCMD_WITHOUT_LWIP
 	memcpy(&g_atcmd_data_mode.socket, socket, sizeof(atcmd_socket_t));
 #endif
@@ -498,11 +500,12 @@ void atcmd_data_mode_disable (void)
 	g_atcmd_data_mode.enable = false;
 
 	g_atcmd_data_mode.idle = true;
-	g_atcmd_data_mode.error = false;
 	g_atcmd_data_mode.passthrough = false;
 
 	g_atcmd_data_mode.cnt = 0;
-	g_atcmd_data_mode.len = 0;
+	g_atcmd_data_mode.send_len = 0;
+	g_atcmd_data_mode.send_done = 0;
+	g_atcmd_data_mode.send_drop = 0;
 #ifndef CONFIG_ATCMD_WITHOUT_LWIP
 	atcmd_socket_reset(&g_atcmd_data_mode.socket);
 #endif
@@ -573,14 +576,21 @@ static void atcmd_data_mode_task (void *pvParameters)
 				continue;
 			}
 
+			_atcmd_info("data_mode: timeout=%ums\n", elapsed_time);
+
 			if (!g_atcmd_data_mode.idle)
 			{
 				if (g_atcmd_data_mode.enable && g_atcmd_data_mode.send_timeout > 0)
 				{
 #ifndef CONFIG_ATCMD_WITHOUT_LWIP
-					atcmd_socket_event_send_idle(g_atcmd_data_mode.socket.id, g_atcmd_data_mode.cnt);
+					atcmd_socket_event_send_idle(g_atcmd_data_mode.socket.id,
+										g_atcmd_data_mode.send_done,
+										g_atcmd_data_mode.send_drop,
+										g_atcmd_data_mode.cnt);
 #else
-					atcmd_host_event_send_idle(g_atcmd_data_mode.cnt);
+					atcmd_host_event_send_idle(g_atcmd_data_mode.send_done,
+										g_atcmd_data_mode.send_drop,
+										g_atcmd_data_mode.cnt);
 #endif
 
 					g_atcmd_data_mode.idle = true;
@@ -1512,16 +1522,61 @@ int atcmd_receive_command (char *buf, int len)
 	return i;
 }
 
+static int _atcmd_receive_data (char *buf, int len)
+{
+	int err = 0;
+	int ret = 0;
+
+	if (!buf || len <= 0)
+		return 0;
+
+#ifndef CONFIG_ATCMD_WITHOUT_LWIP
+	ret = atcmd_socket_send_data(&g_atcmd_data_mode.socket, buf, len, &err);
+#else
+	ret = atcmd_host_send_data(buf, len, &err);
+#endif
+
+	if (err)
+	{
+#ifndef CONFIG_ATCMD_WITHOUT_LWIP
+		atcmd_socket_event_send_error(g_atcmd_data_mode.socket.id, err);
+#else
+		atcmd_host_event_send_error(err);
+#endif
+	}
+
+	if (ret != len)
+	{
+		_atcmd_error("send(%d) != ret(%d)\n", len, ret);
+
+		g_atcmd_data_mode.send_drop += len - ret;
+
+#ifndef CONFIG_ATCMD_WITHOUT_LWIP
+		atcmd_socket_event_send_drop(g_atcmd_data_mode.socket.id, len - ret);
+#else
+		atcmd_host_event_send_drop(len - ret);
+#endif
+	}
+
+	return ret;
+}
+
 static int atcmd_receive_data (char *buf, int len)
 {
-	uint32_t *rx_cnt;
+#ifndef CONFIG_ATCMD_WITHOUT_LWIP
+	static char _buf[ATCMD_DATA_LEN_MAX];
+#else
+	static char _buf[ATCMD_PACKET_LEN_MAX];
+#endif
+	uint32_t *cnt = NULL;
+	int data_len = 0;
 	int err = 0;
 	int ret = 0;
 
 	if (!g_atcmd_data_mode.enable || !len)
 	   return 0;
 
-	rx_cnt = &g_atcmd_data_mode.cnt;
+	cnt = &g_atcmd_data_mode.cnt;
 
 	if (g_atcmd_data_mode.idle)
 	{
@@ -1542,12 +1597,24 @@ static int atcmd_receive_data (char *buf, int len)
 			{
 				ATCMD_MSG_RETURN(NULL, ATCMD_SUCCESS);
 
-#ifndef CONFIG_ATCMD_WITHOUT_LWIP
-				atcmd_socket_event_send_exit(g_atcmd_data_mode.socket.id, *rx_cnt);
-#else
-				atcmd_host_event_send_exit(*rx_cnt);
-#endif
+				if (g_atcmd_data_mode.send_len > 0)
+				{
+					if (*cnt > 0)
+					{
+						_atcmd_info("SEND: timeout, %d\n", *cnt);
 
+						g_atcmd_data_mode.send_done += _atcmd_receive_data(_buf, *cnt);
+					}
+				}
+				
+#ifndef CONFIG_ATCMD_WITHOUT_LWIP
+				atcmd_socket_event_send_exit(g_atcmd_data_mode.socket.id, 
+											g_atcmd_data_mode.send_done, 
+											g_atcmd_data_mode.send_drop);
+#else
+				atcmd_host_event_send_exit(g_atcmd_data_mode.send_done, 
+											g_atcmd_data_mode.send_drop);
+#endif
 				cnt_exit_cmd = 0;
 				atcmd_data_mode_disable();
 
@@ -1567,84 +1634,37 @@ static int atcmd_receive_data (char *buf, int len)
 
 	atcmd_data_mode_task_resume();
 
-	if (g_atcmd_data_mode.error)
+	if (g_atcmd_data_mode.send_len > 0)
 	{
-#ifndef CONFIG_ATCMD_WITHOUT_LWIP
-		atcmd_socket_event_send_drop(g_atcmd_data_mode.socket.id, len);
-#else
-		atcmd_host_event_send_drop(len);
-#endif
-		return len;
-	}
+		data_len = g_atcmd_data_mode.send_len;
 
-	if (g_atcmd_data_mode.len > 0)
-	{
-#ifndef CONFIG_ATCMD_WITHOUT_LWIP
-		static char _buf[ATCMD_DATA_LEN_MAX];
-#else
-		static char _buf[ATCMD_PACKET_LEN_MAX];
-#endif
+		if ((*cnt + len) > data_len)
+			len = data_len - *cnt;
 
-		if ((*rx_cnt + len) > g_atcmd_data_mode.len)
-			len = g_atcmd_data_mode.len - *rx_cnt;
-
-		if ((*rx_cnt + len) < g_atcmd_data_mode.len)
-			memcpy(_buf + *rx_cnt, buf, len);
-		else
+		if ((*cnt + len) < data_len)
 		{
-			if (*rx_cnt > 0)
-			{
-				memcpy(_buf + *rx_cnt, buf, len);
-				buf = _buf;
-			}
-
-#ifndef CONFIG_ATCMD_WITHOUT_LWIP
-			ret = atcmd_socket_send_data(&g_atcmd_data_mode.socket, buf, g_atcmd_data_mode.len, &err);
-#else
-			ret = atcmd_host_send_data(buf, g_atcmd_data_mode.len, &err);
-#endif
-
-			if (ret != g_atcmd_data_mode.len)
-				_atcmd_error("ret(%d) != len(%d)\n", ret, g_atcmd_data_mode.len);
+			memcpy(_buf + *cnt, buf, len);
+			*cnt += len;
+			return len;
 		}
-
-		ret = len;
+			
+		if (*cnt > 0)
+		{
+			memcpy(_buf + *cnt, buf, len);
+			buf = _buf;
+		}
 	}
 	else if (g_atcmd_data_mode.passthrough)
-	{
-#ifndef CONFIG_ATCMD_WITHOUT_LWIP
-		ret = atcmd_socket_send_data(&g_atcmd_data_mode.socket, buf, len, &err);
-#else
-		ret = atcmd_host_send_data(buf, len, &err);
-#endif
+		data_len = len;
 
-		if (ret != len)
-			_atcmd_error("ret(%d) != len(%d)\n", ret, len);
-	}
+	g_atcmd_data_mode.send_done += _atcmd_receive_data(buf, data_len);
 
-	*rx_cnt += ret;
+	if (g_atcmd_data_mode.passthrough)
+		*cnt = 0;
+	else
+		atcmd_data_mode_disable();
 
-	if (err)
-	{
-#ifndef CONFIG_ATCMD_WITHOUT_LWIP
-		atcmd_socket_event_send_error(g_atcmd_data_mode.socket.id, *rx_cnt, err);
-#else
-		atcmd_host_event_send_error(*rx_cnt, err);
-#endif
-		g_atcmd_data_mode.error = true;
-
-		return len;
-	}
-
-	if (g_atcmd_data_mode.len > 0 && *rx_cnt == g_atcmd_data_mode.len)
-	{
-		if (g_atcmd_data_mode.passthrough)
-			*rx_cnt = 0;
-		else
-			atcmd_data_mode_disable();
-	}
-
-	return ret;
+	return len;
 }
 
 void atcmd_receive (char *buf, int len)

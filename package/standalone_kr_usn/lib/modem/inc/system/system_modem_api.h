@@ -117,6 +117,11 @@ uint32_t system_modem_api_get_cs_time(void);
 void     system_modem_api_set_tx_pause_time(uint32_t value);
 uint32_t system_modem_api_get_tx_pause_time(void);
 bool     system_modem_api_set_tx_time(uint16_t cs_time, uint32_t pause_time);
+bool     system_modem_api_get_duty_cycle(uint32_t *window, uint32_t *duration, uint32_t *margin);
+bool     system_modem_api_enable_duty_cycle(uint32_t window, uint32_t duration, uint32_t margin);
+bool     system_modem_api_disable_duty_cycle(void);
+bool     system_modem_api_set_cca_threshold(int vif_id, int cca_threshold);
+int      system_modem_api_get_cca_threshold(int vif_id);
 void     system_modem_api_set_tx_suppress_dur(uint32_t value);
 void     system_modem_api_set_tx_suppress_cmd(uint32_t value);
 uint32_t system_api_get_version(void);
@@ -126,7 +131,7 @@ uint32_t system_api_get_buffer_length(void);
 void system_api_set_promiscuous_mode(bool enable);
 void system_api_set_bypass_beacon(bool enable);
 
-void system_modem_api_set_mcs(int vif_id, uint8_t mcs);
+bool system_modem_api_set_mcs(int vif_id, uint8_t mcs);
 uint8_t system_modem_api_get_mcs(int vif_id);
 
 #if defined(INCLUDE_BD_SUPPORT)

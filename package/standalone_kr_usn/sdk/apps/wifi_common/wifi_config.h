@@ -113,7 +113,7 @@ uint16_t nrc_scan_freq_list[NRC_WIFI_SCAN_FREQ_NUM]={9255,9275,9270};
 #else
 #ifndef NRC_WIFI_SCAN_FREQ_NUM
 #define NRC_WIFI_SCAN_FREQ_NUM 5
-uint16_t nrc_scan_freq_list[NRC_WIFI_SCAN_FREQ_NUM]={9180,9200,9185,9225,9215};
+uint16_t nrc_scan_freq_list[NRC_WIFI_SCAN_FREQ_NUM]={9055,9175,9090,9250,9220};
 #endif /* NRC_WIFI_SCAN_FREQ_NUM */
 #endif /* !INCLUDE_KR_MIC_CHANNEL */
 #endif /* NRC_WIFI_SCAN_LIST */

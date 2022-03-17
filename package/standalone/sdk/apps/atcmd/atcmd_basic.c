@@ -131,18 +131,10 @@ static int _atcmd_basic_uart_get (int argc, char *argv[])
 
 			_hif_uart_get_info(&uart);
 
-#ifdef CONFIG_HIF_UART_CH2_ONLY
 			ATCMD_MSG_INFO("UART", "%d,%d,%d,%d,%d",
 							uart.baudrate,
 							uart.data_bits + 5, uart.stop_bits + 1, uart.parity,
 							uart.hfc);
-#else
-			ATCMD_MSG_INFO("UART", "%d,%d,%d,%d,%d%d",
-							uart.channel, uart.baudrate,
-							uart.data_bits + 5, uart.stop_bits + 1, uart.parity,
-							uart.hfc);
-#endif
-
 			break;
 		}
 
@@ -186,6 +178,7 @@ static int _atcmd_basic_uart_set (int argc, char *argv[])
 				.stop_bits = UART_SB1,
 				.parity = UART_PB_NONE,
 			};
+			int ret;
 
 			param_baudrate = argv[0];
 			param_hfc = argv[1];
@@ -201,13 +194,11 @@ static int _atcmd_basic_uart_set (int argc, char *argv[])
 					return ATCMD_ERROR_INVAL;
 			}
 
-			if (!_hif_uart_baudrate_valid(uart.baudrate))
-				return ATCMD_ERROR_INVAL;
-
-			if (_hif_uart_change(&uart) != 0)
+			ret = _hif_uart_change(&uart);
+			if (ret == 0)
+				break;
+			else if (ret == -1)
 				return ATCMD_ERROR_FAIL;
-
-			break;
 		}
 
 		default:

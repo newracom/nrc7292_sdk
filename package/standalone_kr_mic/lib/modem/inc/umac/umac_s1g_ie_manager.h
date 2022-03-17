@@ -140,6 +140,9 @@ void		umac_s1g_update_short_bi(SYS_BUF *buf, int8_t vif_id, bool is_tx, bool sho
 
 uint32_t	get_assoc_resp_status_code(uint8_t*);
 
+#if defined(SOFT_AP_BSS_MAX_IDLE)
+bool umac_s1g_set_softap_ie_bss_max_idle(int period);
+#endif /* defined(SOFT_AP_BSS_MAX_IDLE) */
 
 // IE Structure Verification
 bool validate_frame_ie_structure_mul(struct byte_stream *bs, struct _SYS_BUF *buf, bool is_tx, uint16_t offset, const char *msg);
@@ -164,4 +167,5 @@ static inline bool umac_s1g_beacon_is_short(SYS_BUF* buf, bool is_tx)
 	return false;
 }
 #endif /* defined(INCLUDE_S1G_HOOK) */
+uint16_t umac_convert_usf(int interval);
 #endif /* UMAC_S1G_IE_MANAGER_H */

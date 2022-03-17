@@ -607,4 +607,66 @@ tWIFI_STATUS nrc_wifi_softap_start_dhcp_server(void);
  ***********************************************/
 tWIFI_STATUS nrc_wifi_set_tx_time(uint16_t cs_time, uint32_t pause_time);
 
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_bss_max_idle(int index, int period, int retry_cnt);
+ *
+ * @brief Set BSS MAX IDLE period and retry count
+ *
+ * @param index: network index
+ *
+ * @param period: bss max idle period. (period value should be between 0 and 2,147,483,647)
+ *
+ * @param retry_cnt: retry count for receiving keep alive packet from STA. (retry_cnt value should be between 1 and 100)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_bss_max_idle(int index, int period, int retry_cnt);
+
+
+/**********************************************
+ * @fn  tWIFI_STATUS nrc_wifi_enable_duty_cycle(uint32_t window, uint32_t duration, uint32_t margin)
+  *
+ * @brief Enable duty cycle
+ *
+ * @param window: duty cycle window in usec.
+ *
+ * @param duration: specify allowed tx duration within duty cycle window in usec.
+ *
+ * @param margin: duty margin in usec.
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_enable_duty_cycle(uint32_t window, uint32_t duration, uint32_t margin);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_disable_duty_cycle(void)
+ *
+ * @brief Disable duty cycle
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_disable_duty_cycle(void);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_cca_threshold(int cca_threshold)
+ *
+ * @brief Set CCA threshold
+ *
+ * @param cca_threshold: CCA threshold.(unit: dBm) (-100 ~ -70)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_cca_threshold(int cca_threshold);
+
+/**********************************************
+ * @fn  tWIFI_STATUS nrc_wifi_set_mcs(uint8_t mcs)
+ *
+ * @brief Set MCS, which is applied when rate control is disabled
+ *
+ * @param MCS : Modulation Coding Scheme (0 ~ 10)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_mcs(uint8_t mcs);
+
 #endif /* __NRC_API_WIFI_H__ */

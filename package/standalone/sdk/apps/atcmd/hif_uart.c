@@ -33,8 +33,8 @@
  *	FIFO depth -> TX: 16x8, RX: 16x12
  * 	FIFO level -> 0:1/8, 1:1/4, 2:1/2, 3:3/4, 4:7/8
  */
-#define _HIF_UART_RX_HW_FIFO_LEVEL			2
-#define _HIF_UART_TX_HW_FIFO_LEVEL			0
+#define _HIF_UART_RX_HW_FIFO_LEVEL		2
+#define _HIF_UART_TX_HW_FIFO_LEVEL		0
 
 /*********************************************************************************************/
 
@@ -129,26 +129,32 @@ static int _hif_uart_fifo_create (_hif_info_t *info)
 	_hif_buf_t *tx_fifo = &info->tx_fifo;
 
 	if (rx_fifo->size > 0)
-		g_hif_uart_rx_fifo = _hif_fifo_create(rx_fifo->addr, rx_fifo->size, true);
-
-	if (tx_fifo->size > 0)
-		g_hif_uart_tx_fifo = _hif_fifo_create(tx_fifo->addr, tx_fifo->size, false);
-
-#ifdef CONFIG_HIF_UART_TX_POLLING
-	if (!g_hif_uart_rx_fifo || g_hif_uart_tx_fifo)
-#else
-	if (!g_hif_uart_rx_fifo && !g_hif_uart_tx_fifo)
-#endif
 	{
-		_hif_error("_hif_fifo_create() failed, rx=%p(%d) tx=%p(%d)\n",
-			   			g_hif_uart_rx_fifo, rx_fifo->size,
-						g_hif_uart_tx_fifo, tx_fifo->size);
+		g_hif_uart_rx_fifo = _hif_fifo_create(rx_fifo->addr, rx_fifo->size, true);
+		if (!g_hif_uart_rx_fifo)
+		{
+			_hif_error("_hif_fifo_create() failed, rx_addr=%p rx_size=%d\n",
+			   			rx_fifo->addr, rx_fifo->size);
 
-		_hif_uart_fifo_delete();
-		return -1;
+			return -1;
+		}
 	}
 
-	_hif_debug("UART FIFO: rx=%p, tx=%p\n", g_hif_uart_rx_fifo, g_hif_uart_tx_fifo);
+	if (tx_fifo->size > 0)
+	{
+		g_hif_uart_tx_fifo = _hif_fifo_create(tx_fifo->addr, tx_fifo->size, false);
+		if (!g_hif_uart_tx_fifo)
+		{
+			_hif_error("_hif_fifo_create() failed, tx_addr=%p tx_size=%d\n",
+			   			tx_fifo->addr, tx_fifo->size);
+	
+			_hif_uart_fifo_delete();
+			return -1;
+		}
+	}
+
+/*	_hif_debug("UART FIFO: rx=%p, tx=%p\n", g_hif_uart_rx_fifo, g_hif_uart_tx_fifo); */
+
 	_hif_info("UART FIFO: rx=%u, tx=%u\n",
 				g_hif_uart_rx_fifo ? g_hif_uart_rx_fifo->size : 0,
 				g_hif_uart_tx_fifo ? g_hif_uart_tx_fifo->size : 0);
@@ -236,7 +242,7 @@ static int _hif_uart_rx_dma_update_fifo (void)
 
 static int _hif_uart_rx_dma_register (int uart_channel, uint32_t mem_addr, uint32_t mem_size)
 {
-	const uint32_t slot_size = CONFIG_HIF_UART_RX_SLOT_SIZE;
+	const uint32_t slot_size = CONFIG_HIF_UART_SLOT_SIZE;
 	const int hsuart_peri_id[] =
 	{
 		HIF_DMA_PERI_HSUART0_RX,
@@ -372,22 +378,32 @@ static void _hif_uart_dma_unregister (void)
 
 /*********************************************************************************************/
 
-bool _hif_uart_channel_valid (int channel)
+static bool _hif_uart_channel_valid (int channel, bool hfc)
 {
 	switch (channel)
 	{
-#ifndef CONFIG_HIF_UART_CH2_ONLY
-		case 0:
-		case 3:
-#endif
+#ifdef NRC7292		
 		case 2:
-			return true;
+#else			
+		case 1:
+#endif			
+			break;
+
+		default:
+			_hif_error("invalid channel %d\n", channel);
+			return false;
 	}
 
-	return false;
+	if (channel != 2 && hfc)
+	{
+		_hif_error("channel %d dose not support rts/cts pins\n", channel);
+		return false;
+	}
+
+	return true;	
 }
 
-bool _hif_uart_baudrate_valid (int baudrate)
+static bool _hif_uart_baudrate_valid (int baudrate, bool hfc)
 {
 	switch (baudrate)
 	{
@@ -395,8 +411,9 @@ bool _hif_uart_baudrate_valid (int baudrate)
 		case 38400:
 		case 57600:
 		case 115200:
+			break;
+
 		case 230400:
-		case 380400:
 		case 460800:
 		case 500000:
 		case 576000:
@@ -405,10 +422,16 @@ bool _hif_uart_baudrate_valid (int baudrate)
 		case 1152000:
 		case 1500000:
 		case 2000000:
-			return true;
+			if (hfc)
+				break;
+			
+			_hif_error("Hardware flow control must be enabled to use baudrate %d.\n", baudrate);
+
+		default:
+			return false;
 	}
 
-	return false;
+	return true;
 }
 
 static int _hif_uart_channel_to_vector (int channel)
@@ -475,8 +498,6 @@ int _hif_uart_putc (char data)
 
 	return 0;
 }
-
-static int _hif_uart_dma_read (char *buf, int len);
 
 int _hif_uart_read (char *buf, int len)
 {
@@ -589,7 +610,7 @@ static void _hif_uart_rx_isr (void)
 	}
 }
 
-#ifndef CONFIG_HIF_UART_TX_POLLING
+#if 0
 static void _hif_uart_tx_isr (void)
 {
 	static char buf[16 + 1];
@@ -645,10 +666,8 @@ static void _hif_uart_isr (int vector)
 		if (status & (MIS_RX|MIS_RT))
 			_hif_uart_rx_isr();
 
-#ifndef CONFIG_HIF_UART_TX_POLLING
-		if (status & MIS_TX)
-			_hif_uart_tx_isr();
-#endif
+/*		if (status & MIS_TX)
+			_hif_uart_tx_isr(); */
 	}
 }
 
@@ -848,18 +867,11 @@ static void _hif_uart_pin_disable (int channel)
 
 static int _hif_uart_enable (_hif_uart_t *uart)
 {
-	if (!uart || !_hif_uart_channel_valid(uart->channel))
-		return -1;
+	bool tx_irq = false;
+	bool rx_irq = true;
 
-	if (uart->channel != 2)
-	{
-		if (uart->hfc)
-		{
-			_hif_info("UART Enable: Channel %d can not use hardware flow control.\n",
-							uart->channel);
-			return -1;
-		}
-	}
+	if (!uart)
+		return -1;
 
 	_hif_info("UART Enable: channel=%d badurate=%d data=%d stop=%d parity=%s fifo=%d,%d hfc=%s\r\n",
 			uart->channel, uart->baudrate, uart->data_bits + 5, uart->stop_bits + 1,
@@ -871,13 +883,20 @@ static int _hif_uart_enable (_hif_uart_t *uart)
 						uart->hfc, UART_FIFO_ENABLE);
 
 	nrc_hsuart_fifo_level(uart->channel, _HIF_UART_TX_HW_FIFO_LEVEL, _HIF_UART_RX_HW_FIFO_LEVEL);
-
+	
 	if (uart->hfc == UART_HFC_DISABLE)
-		nrc_hsuart_interrupt(uart->channel, false, false); 	 /* tx_empty, rx_done & rx_timeout */
-	else
 	{
-		nrc_hsuart_int_clr(uart->channel, true, true, true); /* tx_empty, rx_done, rx_timeout */
-		nrc_hsuart_interrupt(uart->channel, false, true); 	 /* tx_empty, rx_done & rx_timeout */
+		tx_irq = false;
+		rx_irq = false;
+	}
+
+	_hif_info("UART Enable: rx_irq=%s tx_irq=%s\r\n", rx_irq ? "on" : "off", tx_irq ? "on" : "off");
+
+	nrc_hsuart_int_clr(uart->channel, true, true, true); /* tx_empty, rx_done, rx_timeout */
+	nrc_hsuart_interrupt(uart->channel, tx_irq, rx_irq); /* tx_empty, rx_done & rx_timeout */
+
+	if (tx_irq || rx_irq)
+	{
 		system_register_isr(_hif_uart_channel_to_vector(uart->channel), _hif_uart_isr);
 		system_irq_unmask(_hif_uart_channel_to_vector(uart->channel));
 	}
@@ -891,7 +910,7 @@ static int _hif_uart_enable (_hif_uart_t *uart)
 
 static void _hif_uart_disable (void)
 {
-	if (_hif_uart_channel_valid(g_hif_uart.channel))
+	if (_hif_uart_channel_valid(g_hif_uart.channel, g_hif_uart.hfc))
 	{
 		int channel = g_hif_uart.channel;
 
@@ -926,10 +945,10 @@ int _hif_uart_open (_hif_info_t *info)
 							uart->channel, uart->baudrate,
 							uart->hfc == UART_HFC_ENABLE ? "on" : "off");
 
-				if (!_hif_uart_channel_valid(uart->channel))
+				if (!_hif_uart_channel_valid(uart->channel, uart->hfc))
 					goto uart_open_fail;
 
-				if (!_hif_uart_baudrate_valid(uart->baudrate))
+				if (!_hif_uart_baudrate_valid(uart->baudrate, uart->hfc))
 					goto uart_open_fail;
 
 				if (_hif_uart_fifo_create(info) != 0 || _hif_uart_enable(uart) != 0)
@@ -960,7 +979,7 @@ uart_open_fail:
 
 void _hif_uart_close (void)
 {
-	if (_hif_uart_channel_valid(g_hif_uart.channel))
+	if (_hif_uart_channel_valid(g_hif_uart.channel, g_hif_uart.hfc))
 	{
 		_hif_info("UART Close: channel=%d", g_hif_uart.channel);
 
@@ -979,9 +998,11 @@ int _hif_uart_change (_hif_uart_t *new)
 	_hif_uart_t old;
 
 	if (new)
-	{
-		if (!_hif_uart_channel_valid(new->channel))
+	{	
+		if (!_hif_uart_channel_valid(new->channel, new->hfc))
 			_hif_info("UART Change: invalid channel=%d\n", new->channel);
+		else if (!_hif_uart_baudrate_valid(new->baudrate, new->hfc))
+			_hif_info("UART Change: invalid baudrate=%d\n", new->baudrate);
 		else
 		{
 			_hif_uart_get_info(&old);
@@ -994,46 +1015,44 @@ int _hif_uart_change (_hif_uart_t *new)
 			_hif_info(" - parity: %d->%d\n", old.parity, new->parity);
 			_hif_info(" - hfc: %d->%d\n", old.hfc, new->hfc);
 
-			if (new->channel != 2 && new->hfc == UART_HFC_ENABLE)
-				_hif_info("UART Change: channel %d can not use hardware flow control.\n", new->channel);
-			else
+			if (old.hfc == UART_HFC_DISABLE)
+				_hif_uart_dma_unregister();
+
+			_hif_uart_disable();
+
+			if (_hif_uart_enable(new) == 0)
 			{
-				if (old.hfc == UART_HFC_DISABLE)
-	   				_hif_uart_dma_unregister();
+				int ret = 0;
 
-				_hif_uart_disable();
-
-				if (_hif_uart_enable(new) == 0)
+				if (new->hfc == UART_HFC_DISABLE)
 				{
-					int ret = 0;
+					_hif_fifo_reset(g_hif_uart_rx_fifo);
+					_hif_fifo_reset(g_hif_uart_tx_fifo);
 
-					if (new->hfc == UART_HFC_DISABLE)
-					{
-						_hif_fifo_reset(g_hif_uart_rx_fifo);
-						_hif_fifo_reset(g_hif_uart_tx_fifo);
-
-						ret = _hif_uart_dma_register(new->channel, g_hif_uart_rx_fifo, g_hif_uart_tx_fifo);
-					}
-
-					if (ret == 0)
-					{
-						_hif_info("UART Change: success\n");
-						return 0;
-					}
-
-					_hif_uart_disable();
+					ret = _hif_uart_dma_register(new->channel, g_hif_uart_rx_fifo, g_hif_uart_tx_fifo);
 				}
 
-				_hif_uart_enable(&old);
+				if (ret == 0)
+				{
+					_hif_info("UART Change: success\n");
 
-				if (old.hfc == UART_HFC_DISABLE)
-					_hif_uart_dma_register(old.channel, g_hif_uart_rx_fifo, g_hif_uart_tx_fifo);
+					return 0;
+				}
+
+				_hif_uart_disable();
 			}
+
+			_hif_uart_enable(&old);
+
+			if (old.hfc == UART_HFC_DISABLE)
+				_hif_uart_dma_register(old.channel, g_hif_uart_rx_fifo, g_hif_uart_tx_fifo);
+
+			_hif_info("UART Change: fail\n");
+
+			return -1;
 		}
 	}
 
-	_hif_info("UART Change: fail\n");
-
-	return -1;
+	return -2; /* invalid */
 }
 

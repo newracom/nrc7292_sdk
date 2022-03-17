@@ -57,6 +57,15 @@ static inline int wpa_drv_set_ndp_preq(struct wpa_supplicant *wpa_s,
 	return -1;
 }
 
+static inline int wpa_drv_set_bss_max_idle(struct wpa_supplicant *wpa_s,
+							int period, int retry)
+{
+	if (wpa_s->driver->set_bss_max_idle) {
+		return wpa_s->driver->set_bss_max_idle(wpa_s->drv_priv, period, retry);
+	}
+	return -1;
+}
+
 static inline int wpa_drv_authenticate(struct wpa_supplicant *wpa_s,
 				       struct wpa_driver_auth_params *params)
 {

@@ -33,7 +33,8 @@ static lwip_socket_info_t *g_lwip_socket_info = NULL;
 
 static int __lwip_socket_error (const char *func, const int line, int _errno_)
 {
-	_lwip_socket_log("%s::%d, %s (%d)\n", func, line, strerror(_errno_), _errno_);
+	if (_errno_ != ENOBUFS)
+		_lwip_socket_log("%s::%d, %s (%d)\n", func, line, strerror(_errno_), _errno_);
 
 	errno = _errno_;
 

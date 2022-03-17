@@ -248,6 +248,7 @@ typedef enum {
 	WLAN_CMD_SCAN_FREQ,
 	WLAN_CMD_ABORT_SCAN,
 	WLAN_CMD_WPS_PBC,
+	WLAN_CMD_SET_BSS_MAX_IDLE,
 	WLAN_CMD_MAX,
 } tWLAN_CMD_ID;
 
@@ -363,6 +364,14 @@ typedef struct  {
 	uint16_t s1g_channel;
 } MSG_S1G_CONF_FORMAT;
 #define WLAN_S1G_CONF_SIZE	sizeof (MSG_S1G_CONF_FORMAT)
+
+typedef struct  {
+	int id;
+	int nd;
+	int period;
+	int retry_cnt;
+} MSG_SOFTAP_BSS_MAX_IDLE_FORMAT;
+#define WLAN_SOFTAP_BSS_MAX_IDLE_SIZE	sizeof (MSG_SOFTAP_BSS_MAX_IDLE_FORMAT)
 
 typedef void (*intr_handler_fn)(int vector);
 

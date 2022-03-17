@@ -87,16 +87,6 @@ nrc_err_t nrc_i2c_stop(void);
 
 
 /**********************************************
- * @fn nrc_err_t nrc_i2c_waitack(void)
- *
- * @brief Wait ACK or NACK of I2C
- *
- * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
- ***********************************************/
-nrc_err_t nrc_i2c_waitack(void);
-
-
-/**********************************************
  * @fn nrc_err_t nrc_i2c_writebyte(uint8_t data)
  *
  * @brief Write data

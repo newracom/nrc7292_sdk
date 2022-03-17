@@ -32,14 +32,11 @@
 #define TEST_INTERVAL 3000 /* msec */
 
 #define LIS331HH		(0x30) /* VDD:3.3v, VIL(<0.2*VDD), VIH(>0.8*VDD), VOL(<0.1*VDD), VOH(>0.9*VDD) */
-//#define BME680		  (0x76 << 1) /* VDD:3.3v */
 //#define L3G4200D		(0xD0) /* VDD:3.3v */
 //#define ADXL345		 (0x53 << 1) /* VDD:3.3v */
 
 #if defined( LIS331HH )
 #define TEST_SAD		LIS331HH
-#elif defined( BME680 )
-#define TEST_SAD		BME680
 #elif defined( L3G4200D )
 #define TEST_SAD		L3G4200D
 #elif defined( ADXL345 )
@@ -51,13 +48,10 @@ void i2c_read_reg(uint8_t sad, uint8_t reg, uint8_t *value)
 {
 	nrc_i2c_start();
 	nrc_i2c_writebyte(sad);
-	nrc_i2c_waitack();
 	nrc_i2c_writebyte(reg);
-	nrc_i2c_waitack();
 
 	nrc_i2c_start();
 	nrc_i2c_writebyte(sad|0x1);
-	nrc_i2c_waitack();
 	nrc_i2c_readbyte(value, false);
 	nrc_i2c_stop();
 }
@@ -66,13 +60,10 @@ void i2c_read_regs(uint8_t sad, uint8_t reg, uint8_t *value, uint8_t length)
 {
 	nrc_i2c_start();
 	nrc_i2c_writebyte(sad);
-	nrc_i2c_waitack();
 	nrc_i2c_writebyte(reg);
-	nrc_i2c_waitack();
 
 	nrc_i2c_start();
 	nrc_i2c_writebyte(sad|0x1);
-	nrc_i2c_waitack();
 	for (int i = 0; i < length; i++) {
 		nrc_i2c_readbyte(value + i, (length - 1) != i);
 	}
@@ -83,11 +74,8 @@ void i2c_write_reg(uint8_t sad, uint8_t reg, uint8_t value)
 {
 	nrc_i2c_start();
 	nrc_i2c_writebyte(sad);
-	nrc_i2c_waitack();
 	nrc_i2c_writebyte(reg);
-	nrc_i2c_waitack();
 	nrc_i2c_writebyte(value);
-	nrc_i2c_waitack();
 	nrc_i2c_stop();
 }
 
@@ -209,21 +197,6 @@ nrc_err_t run_sample_i2c(int count, int interval)
 		/* CTRL_REG1 default value : 0x07 */
 		if (value1 == 0x07){
 			nrc_usr_print("[%s] Slave Device: LIS331HH\n  - CTRL_REG1=0x%02x\n", __func__, value1);
-		} else {
-			nrc_usr_print("[%s] ERROR..........(0x%02x)\n", __func__, value1);
-			return NRC_FAIL;
-		}
-		_delay_ms(interval);
-	}
-
-#elif defined( BME680 )
-	/* Chip-DI default value : 0x61 */
-	nrc_usr_print("[%s] Slave Device: BME680\n  - Chip-ID=0x61\n", __func__);
-	for(i=0; i<count; i++)
-	{
-		i2c_read_reg(TEST_SAD, 0xD0, &value1);
-		if (value1 == 0x61) {
-			nrc_usr_print("[%s] WORKS FINE!!!!!\n", __func__);
 		} else {
 			nrc_usr_print("[%s] ERROR..........(0x%02x)\n", __func__, value1);
 			return NRC_FAIL;

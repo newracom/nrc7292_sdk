@@ -1073,7 +1073,11 @@ static void wpa_supplicant_scan(void *eloop_ctx, void *timeout_ctx)
 			wpa_set_scan_ssids(wpa_s, &params, max_ssids);
 
 		for (tssid = wpa_s->conf->ssid;
+#ifdef NRC_WPA_SUPP
+		     tssid;		// For scanning in channel list
+#else
 		     wpa_s->last_scan_req != MANUAL_SCAN_REQ && tssid;
+#endif
 		     tssid = tssid->next) {
 			if (wpas_network_disabled(wpa_s, tssid))
 				continue;

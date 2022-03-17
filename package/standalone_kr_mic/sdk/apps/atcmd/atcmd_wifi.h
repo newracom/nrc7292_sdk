@@ -60,6 +60,9 @@
 #define ATCMD_WIFI_INIT_PING_COUNT		5
 #define ATCMD_WIFI_INIT_PING_SIZE		64
 
+#define ATCMD_WIFI_BSS_MAX_IDLE_PERIOD_DEFAULT	0
+#define ATCMD_WIFI_BSS_MAX_IDLE_RETRY_DEFAULT	0
+
 
 /*
  * Country Code
@@ -143,11 +146,19 @@ typedef struct
 	bool active;
 	bool dhcp_server;
 
+	int net_id;
+
 	struct
 	{
 		int number;
 		int freq;
 	} channel; /* S1G */
+
+	struct
+	{
+		int period;
+		int retry;
+	} bss_max_idle;
 
 	atcmd_wifi_ssid_t ssid;
 	atcmd_wifi_security_t security;

@@ -3321,6 +3321,34 @@ static int wpa_supplicant_ctrl_iface_ndp_preq(
 	return wpa_drv_set_ndp_preq(wpa_s, enable);
 }
 
+static int wpa_supplicant_ctrl_iface_bss_max_idle(
+		struct wpa_supplicant *wpa_s, char *cmd)
+{
+	int softap_bss_max_idle_period = 0;
+	int softap_bss_max_idle_retry = 3;
+
+	char *ptr = strtok(cmd, " ");
+	softap_bss_max_idle_period = atoi(ptr);
+
+	// retry count
+	if (ptr != NULL){
+		ptr = strtok(NULL, " ");
+		softap_bss_max_idle_retry = atoi(ptr);
+	}
+
+	if (softap_bss_max_idle_period < 0 || softap_bss_max_idle_period > 2147483647) {
+		wpa_printf(MSG_ERROR,"[BSS_MAX_IDLE] period value should be between 0 and 2,147,483,647 (value:%d)", softap_bss_max_idle_period);
+		return -1;
+	}
+
+	if (softap_bss_max_idle_retry <= 0 || softap_bss_max_idle_retry > 100) {
+		wpa_printf(MSG_ERROR,"[BSS_MAX_IDLE] retry_cnt value should be between 1 and 100 (value:%d)", softap_bss_max_idle_retry);
+		return -1;
+	}
+
+	return wpa_drv_set_bss_max_idle(wpa_s, softap_bss_max_idle_period, softap_bss_max_idle_retry);
+}
+
 static int wpa_supplicant_ctrl_iface_disable_network(
 	struct wpa_supplicant *wpa_s, char *cmd)
 {
@@ -10080,6 +10108,11 @@ char * wpa_supplicant_ctrl_iface_process(struct wpa_supplicant *wpa_s,
 		} else if (os_strncmp(buf, "NDP_PREQ ", 9) == 0) {
 			   if (wpa_supplicant_ctrl_iface_ndp_preq(wpa_s, buf + 9) < 0)
 				   reply_len = -1;
+#if defined(SOFT_AP_BSS_MAX_IDLE)
+		} else if (os_strncmp(buf, "BSS_MAX_IDLE ", 13) == 0) {
+			if (wpa_supplicant_ctrl_iface_bss_max_idle(wpa_s, buf + 13) < 0)
+				reply_len = -1;
+#endif /* defined(SOFT_AP_BSS_MAX_IDLE) */
 #ifdef CONFIG_AP
 		} else if (os_strncmp(buf, "DEAUTHENTICATE ", 15) == 0) {
 			if (ap_ctrl_iface_sta_deauthenticate(wpa_s, buf + 15))

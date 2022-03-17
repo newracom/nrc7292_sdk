@@ -248,9 +248,6 @@ static void _hif_dma_inttc_isr (int vector)
 				if (g_dmac_inttc_isr[channel])
 					g_dmac_inttc_isr[channel](channel);
 			}
-
-			if (!status)
-				break;
 		}
 	}
 }
@@ -280,9 +277,6 @@ static void _hif_dma_interr_isr (int vector)
 				if (g_dmac_interr_isr[channel])
 					g_dmac_interr_isr[channel](channel);
 			}
-
-			if (!status)
-				break;
 		}
 	}
 }

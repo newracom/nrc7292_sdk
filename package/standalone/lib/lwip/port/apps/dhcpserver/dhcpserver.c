@@ -219,8 +219,15 @@ static u8_t* add_offer_options(u8_t* optptr)
 	*optptr++ = 0x05;
 	*optptr++ = 0xdc;
 #else
+#ifdef NRC_LWIP
+	/* 1500Bytes: Linux STA follows this MTU when tansmitting frame */
+	*optptr++ = 0x05;
+	*optptr++ = 0xdc;
+#else
+	/* 576Bytes */
 	*optptr++ = 0x02;
 	*optptr++ = 0x40;
+#endif
 #endif
 
 	*optptr++ = DHCP_OPTION_PERFORM_ROUTER_DISCOVERY;

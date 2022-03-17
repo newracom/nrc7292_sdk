@@ -40,6 +40,50 @@ enum {
 // HAL Function
 struct      cipher_def; // declare
 
+// cca threshold register type
+typedef struct {
+	uint32_t cca_threshold_reg2;
+	uint32_t cca_threshold_reg3;
+} cca_thresthold_reg_t;
+
+#define CCA_THRESHOLD_MIN	(-100)
+#define CCA_THRESHOLD_MAX	(-70)
+#define CCA_THRESHOLD_SIZE (CCA_THRESHOLD_MAX - CCA_THRESHOLD_MIN + 1)
+
+static volatile const cca_thresthold_reg_t cca_threshold_2m[CCA_THRESHOLD_SIZE] = {
+	{0x00009c9f, 0x9c9c9f9f},	/* - 100 dBm */
+	{0x00009da0, 0x9d9da0a0},	/* - 99 dBm */
+	{0x00009ea1, 0x9e9ea1a1},	/* - 98 dBm */
+	{0x00009fa2, 0x9f9fa2a2},	/* - 97 dBm */
+	{0x0000a0a3, 0xa0a0a3a3},	/* - 96 dBm */
+	{0x0000a1a4, 0xa1a1a4a4},	/* - 95 dBm */
+	{0x0000a2a5, 0xa2a2a5a5},	/* - 94 dBm */
+	{0x0000a3a6, 0xa3a3a6a6},	/* - 93 dBm */
+	{0x0000a4a7, 0xa4a4a7a7},	/* - 92 dBm */
+	{0x0000a5a8, 0xa5a5a8a8},	/* - 91 dBm */
+	{0x0000a6a9, 0xa6a6a9a9},	/* - 90 dBm */
+	{0x0000a7aa, 0xa7a7aaaa},	/* - 89 dBm */
+	{0x0000a8ab, 0xa8a8abab},	/* - 98 dBm */
+	{0x0000a9ac, 0xa9a9acac},	/* - 87 dBm */
+	{0x0000aaad, 0xaaaaadad},	/* - 86 dBm */
+	{0x0000abae, 0xababaeae},	/* - 85 dBm */
+	{0x0000acaf, 0xacacafaf},	/* - 84 dBm */
+	{0x0000adb0, 0xadadb0b0},	/* - 83 dBm */
+	{0x0000aeb1, 0xaeaeb1b1},	/* - 82 dBm */
+	{0x0000afb2, 0xafafb2b2},	/* - 81 dBm */
+	{0x0000b0b3, 0xb0b0b3b3},	/* - 80 dBm */
+	{0x0000b1b4, 0xb1b1b4b4},	/* - 79 dBm */
+	{0x0000b2b5, 0xb2b2b5b5},	/* - 78 dBm */
+	{0x0000b3b6, 0xb3b3b6b6},	/* - 77 dBm */
+	{0x0000b4b7, 0xb4b4b7b7},	/* - 76 dBm */
+	{0x0000b5b8, 0xb5b5b8b8},	/* - 75 dBm */
+	{0x0000b6b9, 0xb6b6b9b9},	/* - 74 dBm */
+	{0x0000b7ba, 0xb7b7baba},	/* - 73 dBm */
+	{0x0000b8bb, 0xb8b8bbbb},	/* - 72 dBm */
+	{0x0000b9bc, 0xb9b9bcbc},	/* - 71 dBm */
+	{0x0000babd, 0xbababdbd},	/* - 70 dBm */
+};
+
 void        lmac_init(int vector);
 void        lmac_start(void);
 void        lmac_idle_hook(void);
@@ -202,10 +246,15 @@ void lmac_show_test_config_modem_recovery();
 uint32_t get_idle_hook_count();
 void lmac_update_stats(uint8_t dir, void *hdr, uint8_t mcs, uint8_t status);
 uint8_t get_run_rx_gain_auto_test();
-uint32_t lmac_get_tsf_h(int vif_id);
-uint32_t lmac_get_tsf_l(int vif_id);
+int lmac_get_cca_device_type(void);
+bool lmac_set_cca_device_type(int device_type);
+bool lmac_set_cca_threshold_default(void);
+bool lmac_set_cca_threshold(int bw, int cca_threshold);
+int lmac_get_cca_threshoald(void);
 void lmac_set_mcs(int vif_id, uint8_t mcs);
 uint8_t lmac_get_mcs(int vif_id);
+uint32_t lmac_get_tsf_h(int vif_id);
+uint32_t lmac_get_tsf_l(int vif_id);
 void lmac_set_prim_ch_bw(uint8_t vif_id, uint8_t v);
 uint8_t lmac_get_prim_ch_loc(uint8_t vif_id);
 void lmac_set_prim_ch_loc(uint8_t vif_id, uint8_t v);

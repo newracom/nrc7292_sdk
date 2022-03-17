@@ -335,7 +335,6 @@ static int raspi_cli_run_script (char *script)
 		else if (memcmp(cmd, "LOOP ", 5) == 0) /* LOOP <line> <count> */
 		{
 			char *param[2];
-			int i;
 
 			param[0] = cmd + 5;
 			param[1] = NULL;

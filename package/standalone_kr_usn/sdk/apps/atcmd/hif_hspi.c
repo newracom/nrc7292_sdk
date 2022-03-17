@@ -32,12 +32,8 @@
 #error "Not defined CONFIG_HIF_HSPI_SLOT_NUM"
 #endif
 
-#if !defined(CONFIG_HIF_HSPI_RX_SLOT_SIZE)
-#error "Not defined CONFIG_HIF_HSPI_RX_SLOT_SIZE"
-#endif
-
-#if !defined(CONFIG_HIF_HSPI_TX_SLOT_SIZE)
-#error "Not defined CONFIG_HIF_HSPI_TX_SLOT_SIZE"
+#if !defined(CONFIG_HIF_HSPI_SLOT_SIZE)
+#error "Not defined CONFIG_HIF_HSPI_SLOT_SIZE"
 #endif
 
 #define _hspi_read_info(fmt, ...)		/* _hif_info("hspi_read: " fmt, ##__VA_ARGS__) */
@@ -165,11 +161,11 @@ typedef struct
 /**********************************************************************************************/
 
 #define _HSPI_RX_SLOT_NUM				CONFIG_HIF_HSPI_SLOT_NUM
-#define _HSPI_RX_SLOT_SIZE				CONFIG_HIF_HSPI_RX_SLOT_SIZE
+#define _HSPI_RX_SLOT_SIZE				CONFIG_HIF_HSPI_SLOT_SIZE
 #define _HSPI_RX_SLOT_DATA_LEN_MAX		(_HSPI_RX_SLOT_SIZE - _HSPI_SLOT_HDR_SIZE)
 
 #define _HSPI_TX_SLOT_NUM				CONFIG_HIF_HSPI_SLOT_NUM
-#define _HSPI_TX_SLOT_SIZE				CONFIG_HIF_HSPI_TX_SLOT_SIZE
+#define _HSPI_TX_SLOT_SIZE				CONFIG_HIF_HSPI_SLOT_SIZE
 #define _HSPI_TX_SLOT_DATA_LEN_MAX		(_HSPI_TX_SLOT_SIZE - _HSPI_SLOT_HDR_SIZE)
 
 static volatile _hspi_sys_reg_t *g_hspi_sys_reg = (volatile _hspi_sys_reg_t *)HIF_BASE_ADDR;

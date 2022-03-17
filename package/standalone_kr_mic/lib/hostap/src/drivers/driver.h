@@ -4277,6 +4277,8 @@ struct wpa_driver_ops {
 	 * This callback is used to let the driver enable or disable NDP Probe Request
 	 */
 	int (*set_ndp_preq)(void *priv, int enabled);
+
+	int (*set_bss_max_idle)(void *priv, int period, int retry);
 };
 
 /**

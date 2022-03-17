@@ -73,10 +73,10 @@ extern int atcmd_socket_enable (void);
 extern void atcmd_socket_disable (void);
 extern int atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len, int *err);
 
-extern int atcmd_socket_event_send_idle (int id, int len);
-extern int atcmd_socket_event_send_drop (int id, int len);
-extern int atcmd_socket_event_send_exit (int id, int len);
-extern int atcmd_socket_event_send_error (int id, int len, int err);
+extern int atcmd_socket_event_send_idle (int id, uint32_t done, uint32_t drop, uint32_t wait);
+extern int atcmd_socket_event_send_drop (int id, uint32_t drop);
+extern int atcmd_socket_event_send_exit (int id, uint32_t done, uint32_t drop);
+extern int atcmd_socket_event_send_error (int id, int err);
 
 /**********************************************************************************************/
 #endif /* #ifndef __NRC_ATCMD_SOCKET_H__ */

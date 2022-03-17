@@ -306,11 +306,27 @@ endif
 #// --------------------------------------------------
 NVS_FLASH    = $(LIB_PATH)/nvs_flash
 
-INCLUDE += -I$(NVS_FLASH)/src -I$(NVS_FLASH)/include
+INCLUDE += -I$(NVS_FLASH)/src
+INCLUDE += -I$(NVS_FLASH)/include
 
 ifeq ($(CONFIG_NVS_FLASH), y)
     VPATH   += $(NVS_FLASH)/src
 
     include $(NVS_FLASH)/nvs_flash.make
 	DEFINE	+= -DSUPPORT_NVS_FLASH
+endif
+
+#// --------------------------------------------------
+#// LIB
+#// BME680
+#// --------------------------------------------------
+BME680_BASE    = $(LIB_PATH)/bme680
+
+INCLUDE += -I$(BME680_BASE)
+
+ifeq ($(CONFIG_BME680), y)
+    VPATH   += $(BME680_BASE)
+
+    include $(BME680_BASE)/bme680.make
+	DEFINE	+= -DSUPPORT_BME680
 endif

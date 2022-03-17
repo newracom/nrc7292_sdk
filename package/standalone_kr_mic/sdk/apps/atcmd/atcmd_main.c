@@ -146,8 +146,13 @@ static int nrc_atcmd_enable_uart (bool *console_enable)
 #define CONFIG_ATCMD_UART_BAUDRATE 	115200
 #endif
 
+#ifdef NRC7292	
 	const uint32_t console = NRC_UART_CH3;
-	uint32_t channel = 2;
+	uint32_t channel = NRC_UART_CH2;
+#else
+	const uint32_t console = NRC_UART_CH0;
+	uint32_t channel = NRC_UART_CH1;
+#endif	
 	uint32_t baudrate = CONFIG_ATCMD_UART_BAUDRATE;
 	int hfc = false;
 

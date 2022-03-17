@@ -6,7 +6,7 @@
 #include "system_common.h"
 #include "driver_nrc.h"
 
-#define PRINT_BUFFER_SIZE 512
+#define PRINT_BUFFER_SIZE 1024
 
 #ifdef CONFIG_NO_STDOUT_DEBUG
 #ifdef wpa_printf

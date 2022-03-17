@@ -36,17 +36,16 @@
 
 /**********************************************************************************************/
 
-/* #define CONFIG_HIF_DEBUG */
-/* #define CONFIG_HIF_LOOPBACK */
-
 #define CONFIG_HIF_RX_TASK_PRIORITY			CONFIG_ATCMD_TASK_PRIORITY
 #define CONFIG_HIF_RX_TASK_STACK_SIZE		((4 * 1024) / sizeof(StackType_t))
-#define CONFIG_HIF_RX_TASK_SUSPEND_TIME		1000 // msec
-
-#define CONFIG_HIF_UART_TX_POLLING
-#define CONFIG_HIF_UART_CH2_ONLY
 
 /**********************************************************************************************/
+
+#if defined(CONFIG_ATCMD_NRC7392)
+#define CONFIG_HIF_FIFO_MEM_SIZE		(4 * 1024)
+#else
+#define CONFIG_HIF_FIFO_MEM_SIZE		(32 * 1024)
+#endif
 
 /*
  *	RX: target from host
@@ -54,32 +53,22 @@
  */
 
 /* HSPI */
-#if defined(CONFIG_ATCMD_NRC7392)
-#define CONFIG_HIF_HSPI_SLOT_NUM		8	/* Don't chagne */
-#else
-#define CONFIG_HIF_HSPI_SLOT_NUM		32	/* Don't chagne */
-#endif
-#define CONFIG_HIF_HSPI_RX_SLOT_SIZE	512 /* Don't change */
-#define CONFIG_HIF_HSPI_TX_SLOT_SIZE	512 /* Don't change */
+#define CONFIG_HIF_HSPI_SLOT_SIZE		512 /* Don't change */
+#define CONFIG_HIF_HSPI_SLOT_NUM		((CONFIG_HIF_FIFO_MEM_SIZE / CONFIG_HIF_HSPI_SLOT_SIZE) / 2)
 
 /* HSUART */
-#if defined(CONFIG_ATCMD_NRC7392)
-#define CONFIG_HIF_UART_RX_SLOT_NUM		8	/* Don't change */
-#else
-#define CONFIG_HIF_UART_RX_SLOT_NUM		32	/* Don't change */
-#endif
-#define CONFIG_HIF_UART_RX_SLOT_SIZE	512 /* Don't change */
+#define CONFIG_HIF_UART_SLOT_SIZE		128	/* Don't change */
 
-#define CONFIG_HIF_UART_TX_SLOT_NUM		0 	/* Don't chagne */
-#define CONFIG_HIF_UART_TX_SLOT_SIZE	0 	/* Don't change */
+#define CONFIG_HIF_UART_RX_SLOT_NUM		(CONFIG_HIF_FIFO_MEM_SIZE / CONFIG_HIF_UART_SLOT_SIZE)
+#define CONFIG_HIF_UART_TX_SLOT_NUM		0
 
 #if defined(CONFIG_ATCMD_HSPI) || defined(CONFIG_ATCMD_HSPI_HOST)
-#define CONFIG_HIF_RX_FIFO_SIZE		(CONFIG_HIF_HSPI_RX_SLOT_SIZE * CONFIG_HIF_HSPI_SLOT_NUM)
-#define CONFIG_HIF_TX_FIFO_SIZE		(CONFIG_HIF_HSPI_TX_SLOT_SIZE * CONFIG_HIF_HSPI_SLOT_NUM)
+#define CONFIG_HIF_RX_FIFO_SIZE			(CONFIG_HIF_HSPI_SLOT_SIZE * CONFIG_HIF_HSPI_SLOT_NUM)
+#define CONFIG_HIF_TX_FIFO_SIZE			(CONFIG_HIF_HSPI_SLOT_SIZE * CONFIG_HIF_HSPI_SLOT_NUM)
 #elif defined(CONFIG_ATCMD_UART) || defined(CONFIG_ATCMD_UART_HFC) || \
       defined(CONFIG_ATCMD_UART_HOST) || defined(CONFIG_ATCMD_UART_HFC_HOST)
-#define CONFIG_HIF_RX_FIFO_SIZE		(CONFIG_HIF_UART_RX_SLOT_SIZE * CONFIG_HIF_UART_RX_SLOT_NUM)
-#define CONFIG_HIF_TX_FIFO_SIZE		(CONFIG_HIF_UART_TX_SLOT_SIZE * CONFIG_HIF_UART_TX_SLOT_NUM)
+#define CONFIG_HIF_RX_FIFO_SIZE			(CONFIG_HIF_UART_SLOT_SIZE * CONFIG_HIF_UART_RX_SLOT_NUM)
+#define CONFIG_HIF_TX_FIFO_SIZE			(CONFIG_HIF_UART_SLOT_SIZE * CONFIG_HIF_UART_TX_SLOT_NUM)
 #endif
 
 /**********************************************************************************************/
@@ -89,17 +78,10 @@
 #define _hif_printf						hal_uart_printf
 
 #define _hif_log(fmt, ...)				_hif_printf("[ATHIF] " fmt, ##__VA_ARGS__)
-
 #define _hif_info(fmt, ...)				_hif_log(fmt, ##__VA_ARGS__)
 #define _hif_error(fmt, ...)			_hif_log("%s: " fmt, __func__, ##__VA_ARGS__)
-
-#ifdef CONFIG_HIF_DEBUG
 #define _hif_debug(fmt, ...)			_hif_log(fmt, ##__VA_ARGS__)
 #define _hif_trace()					_hif_log("%s::%d\r\n", __func__, __LINE__)
-#else
-#define _hif_debug(fmt, ...)
-#define _hif_trace()
-#endif
 
 /**********************************************************************************************/
 
@@ -213,8 +195,6 @@ extern int _hif_uart_change (_hif_uart_t *uart);
 extern int _hif_uart_read (char *buf, int len);
 extern int _hif_uart_write (char *buf, int len);
 extern void _hif_uart_get_info (_hif_uart_t *info);
-extern bool _hif_uart_channel_valid (int channel);
-extern bool _hif_uart_baudrate_valid (int baudrate);
 
 extern int _hif_hspi_open (_hif_info_t *info);
 extern void _hif_hspi_close (void);
@@ -228,7 +208,7 @@ extern int _hif_read (char *buf, int len);
 extern int _hif_write (char *buf, int len);
 extern int _hif_read_isr (char *buf, int len);
 extern int _hif_write_isr (char *buf, int len);
-extern void _hif_rx_suspend (void);
+extern int _hif_rx_suspend (int time);
 extern void _hif_rx_resume (void);
 extern void _hif_rx_resume_isr (void);
 

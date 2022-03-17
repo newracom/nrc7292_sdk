@@ -265,7 +265,7 @@ static void _hif_rx_task (void *pvParameters)
 		if (ret > 0 && params->cb)
 			params->cb(buf, ret);
 		else
-			_hif_rx_suspend();
+			_hif_rx_suspend(100);
 	}
 }
 
@@ -303,14 +303,22 @@ static void _hif_rx_task_delete (void)
 	}
 }
 
-void _hif_rx_suspend (void)
+int _hif_rx_suspend (int time)
 {
 	if (g_hif_rx_task)
 	{
+		if (time <= 0)
+		{
+			_hif_error("invalid time (%d)\n", time);
+			return -1;
+		}
+
 		atcmd_trace_task_suspend(ATCMD_TRACE_TASK_HIF_RX);
 
-		ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(CONFIG_HIF_RX_TASK_SUSPEND_TIME));
+		return ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(time));
 	}
+
+	return -1;
 }
 
 void _hif_rx_resume (void)
@@ -363,7 +371,7 @@ int _hif_open (_hif_info_t *info)
 	if (!info)
 		return -1;
 
-	_hif_debug("Open: type=%d\n", info->type);
+/*	_hif_debug("Open: type=%d\n", info->type); */
 
 	if (!_hif_valid_type(info->type))
 		return -1;
@@ -388,14 +396,6 @@ int _hif_open (_hif_info_t *info)
 #endif
 	info->tx_fifo.size = CONFIG_HIF_TX_FIFO_SIZE;
 
-#ifdef CONFIG_HIF_UART_TX_POLLING
-	if (info->type == _HIF_TYPE_UART || info->type == _HIF_TYPE_UART_HFC)
-	{
-		info->tx_fifo.addr = NULL;
-		info->tx_fifo.size = 0;
-	}
-#endif
-
 	if (open[info->type](info) != 0)
 	{
 		_hif_close();
@@ -407,7 +407,7 @@ int _hif_open (_hif_info_t *info)
 
 	_hif_set_type(info->type);
 
-	_hif_debug("Open: success\n");
+/*	_hif_debug("Open: success\n"); */
 
 	return 0;
 }
@@ -430,7 +430,7 @@ void _hif_close (void)
 	if (_hif_get_type() == _HIF_TYPE_NONE)
 		return;
 
-	_hif_debug("Close\n");
+/*	_hif_debug("Close\n"); */
 
 	_hif_rx_task_delete();
 

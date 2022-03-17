@@ -73,6 +73,8 @@ extern uint8_t g_standalone_addr[6];
 #define WLAN_CCMP_KEY_LEN_BIT	128
 #define WLAN_BIP_KEY_LEN_BIT	128
 
+#define NRC_WPA_BUFFER_ALLOC_TRY (30)
+
 enum ccmp_key_index {
 	WLAN_KEY_PTK =0,
 	WLAN_KEY_GTK_1 =1,
@@ -190,6 +192,8 @@ struct nrc_wpa_bdf {
 	uint8_t data[NRC_WPA_BD_MAX_DATA_LENGTH];
 };
 
+SYS_BUF * alloc_sys_buf_try(int hif_len, int nTry);
+
 struct nrc_wpa_if *wpa_driver_get_interface(int vif);
 struct nrc_wpa_sta* nrc_wpa_find_sta(struct nrc_wpa_if *intf,
 						const uint8_t addr[ETH_ALEN]);
@@ -213,7 +217,14 @@ int nrc_raw_transmit(struct nrc_wpa_if* intf, uint8_t *frm, const uint16_t len,
 				const int ac);
 int nrc_get_sec_hdr_len(struct nrc_wpa_key *key);
 void nrc_start_keep_alive(struct nrc_wpa_if* intf);
-
+#if defined(SOFT_AP_BSS_MAX_IDLE)
+void softap_bss_timer_stop(uint16_t aid);
+void softap_bss_timer_start(uint16_t aid);
+void softap_bss_max_idle_period_update(int period);
+int softap_get_bss_max_idle_period(void);
+void softap_bss_max_idle_retry_update(int retry);
+void refresh_bss_max_idle_by_maddr(uint8_t vif_id, uint8_t* addr);
+#endif /* defined(SOFT_AP_BSS_MAX_IDLE) */
 // Helper functions
 static inline bool is_wep(uint8_t cipher)
 {
