@@ -79,35 +79,6 @@ static atcmd_info_t g_atcmd_basic_version =
 
 /**********************************************************************************************/
 
-
-static int _atcmd_basic_host_get (int argc, char *argv[])
-{
-#ifndef CONFIG_ATCMD_WITHOUT_LWIP
-	ATCMD_MSG_INFO("HOST", "%d", false);
-#else
-	ATCMD_MSG_INFO("HOST", "%d", true);
-#endif
-
-	return ATCMD_SUCCESS;
-}
-
-static atcmd_info_t g_atcmd_basic_host =
-{
-	.list.next = NULL,
-	.list.prev = NULL,
-
-	.group = ATCMD_GROUP_BASIC,
-
-	.cmd = "HOST",
-	.id = ATCMD_BASIC_HOST,
-
-	.handler[ATCMD_HANDLER_RUN] = NULL,
-	.handler[ATCMD_HANDLER_GET] = _atcmd_basic_host_get,
-	.handler[ATCMD_HANDLER_SET] = NULL,
-};
-
-/**********************************************************************************************/
-
 #if defined(CONFIG_ATCMD_UART) || defined(CONFIG_ATCMD_UART_HFC) || \
 	defined(CONFIG_ATCMD_UART_HOST) || defined(CONFIG_ATCMD_UART_HFC_HOST)
 
@@ -859,7 +830,6 @@ static atcmd_group_t g_atcmd_group_basic =
 static atcmd_info_t *g_atcmd_basic[] =
 {
 	&g_atcmd_basic_version,
-	&g_atcmd_basic_host,
 #if defined(CONFIG_ATCMD_UART) || defined(CONFIG_ATCMD_UART_HFC) || \
 	defined(CONFIG_ATCMD_UART_HOST) || defined(CONFIG_ATCMD_UART_HFC_HOST)
 	&g_atcmd_basic_uart,

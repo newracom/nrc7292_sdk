@@ -27,18 +27,18 @@
 
 /**********************************************************************************************/
 
-static int _atcmd_param_to_int (const char *str, long int *val)
+static int _atcmd_param_to_int (const char *param, long int *val)
 {
 	char *end = NULL;
 	char buf[16];
 	long int ret;
 
-	if (!str || !val)
+	if (!param || !val)
 		return -1;
 
-	ret = strtol(str, &end, 10);
+	ret = strtol(param, &end, 10);
 
-	if (end != (str + strlen(str)))
+	if (end != (param + strlen(param)))
 		return -1;
 
 	if (errno == ERANGE && (ret == LONG_MIN || ret == LONG_MAX))
@@ -46,7 +46,7 @@ static int _atcmd_param_to_int (const char *str, long int *val)
 
 	snprintf(buf, sizeof(buf), "%ld", ret);
 
-	if (strcmp(str, buf) != 0)
+	if (strcmp(param, buf) != 0)
 		return -1;
 
 	*val = ret;
@@ -56,11 +56,11 @@ static int _atcmd_param_to_int (const char *str, long int *val)
 	return 0;
 }
 
-int atcmd_param_to_int8 (const char *str, int8_t *val)
+int atcmd_param_to_int8 (const char *param, int8_t *val)
 {
 	long int _val;
 
-	if (_atcmd_param_to_int(str, &_val) != 0)
+	if (_atcmd_param_to_int(param, &_val) != 0)
 		return -1;
 
 	if (_val < CHAR_MIN || _val > CHAR_MAX)
@@ -73,11 +73,11 @@ int atcmd_param_to_int8 (const char *str, int8_t *val)
 	return 0;
 }
 
-int atcmd_param_to_int16 (const char *str, int16_t *val)
+int atcmd_param_to_int16 (const char *param, int16_t *val)
 {
 	long int _val;
 
-	if (_atcmd_param_to_int(str, &_val) != 0)
+	if (_atcmd_param_to_int(param, &_val) != 0)
 		return -1;
 
 	if (_val < SHRT_MIN || _val > SHRT_MAX)
@@ -90,11 +90,11 @@ int atcmd_param_to_int16 (const char *str, int16_t *val)
 	return 0;
 }
 
-int atcmd_param_to_int32 (const char *str, int32_t *val)
+int atcmd_param_to_int32 (const char *param, int32_t *val)
 {
 	long int _val;
 
-	if (_atcmd_param_to_int(str, &_val) != 0)
+	if (_atcmd_param_to_int(param, &_val) != 0)
 		return -1;
 
 /*	if (_val < INT_MIN || _val > INT_MAX)
@@ -109,21 +109,21 @@ int atcmd_param_to_int32 (const char *str, int32_t *val)
 
 /**********************************************************************************************/
 
-static int _atcmd_param_to_uint (const char *str, unsigned long int *val)
+static int _atcmd_param_to_uint (const char *param, unsigned long int *val)
 {
 	char *end = NULL;
 	char buf[16];
 	unsigned long int ret;
 
-	if (!str || !val)
+	if (!param || !val)
 		return -1;
 
-	if (str[0] == '-')
+	if (param[0] == '-')
 		return -1;
 
-	ret = strtol(str, &end, 10);
+	ret = strtol(param, &end, 10);
 
-	if (end != (str + strlen(str)))
+	if (end != (param + strlen(param)))
 		return -1;
 
 	if (errno == ERANGE && ret == ULONG_MAX)
@@ -131,7 +131,7 @@ static int _atcmd_param_to_uint (const char *str, unsigned long int *val)
 
 	snprintf(buf, sizeof(buf), "%lu", ret);
 
-	if (strcmp(str, buf) != 0)
+	if (strcmp(param, buf) != 0)
 		return -1;
 
 	*val = ret;
@@ -141,11 +141,11 @@ static int _atcmd_param_to_uint (const char *str, unsigned long int *val)
 	return 0;
 }
 
-int atcmd_param_to_uint8 (const char *str, uint8_t *val)
+int atcmd_param_to_uint8 (const char *param, uint8_t *val)
 {
 	unsigned long int _val;
 
-	if (_atcmd_param_to_uint(str, &_val) != 0)
+	if (_atcmd_param_to_uint(param, &_val) != 0)
 		return -1;
 
 	if (_val > UCHAR_MAX)
@@ -158,11 +158,11 @@ int atcmd_param_to_uint8 (const char *str, uint8_t *val)
 	return 0;
 }
 
-int atcmd_param_to_uint16 (const char *str, uint16_t *val)
+int atcmd_param_to_uint16 (const char *param, uint16_t *val)
 {
 	unsigned long int _val;
 
-	if (_atcmd_param_to_uint(str, &_val) != 0)
+	if (_atcmd_param_to_uint(param, &_val) != 0)
 		return -1;
 
 	if (_val > USHRT_MAX)
@@ -175,11 +175,11 @@ int atcmd_param_to_uint16 (const char *str, uint16_t *val)
 	return 0;
 }
 
-int atcmd_param_to_uint32 (const char *str, uint32_t *val)
+int atcmd_param_to_uint32 (const char *param, uint32_t *val)
 {
 	unsigned long int _val;
 
-	if (_atcmd_param_to_uint(str, &_val) != 0)
+	if (_atcmd_param_to_uint(param, &_val) != 0)
 		return -1;
 
 /*	if (_val > UINT_MAX)
@@ -190,6 +190,38 @@ int atcmd_param_to_uint32 (const char *str, uint32_t *val)
 /*	_atcmd_debug("%s: %lu\n", __func__, *val); */
 
 	return 0;
+}
+
+/**********************************************************************************************/
+
+float atcmd_param_to_float (const char *param, float *val)
+{
+	char *end = NULL;
+	char buf[16];
+	float ret;
+
+	if (!param || !val)
+		return -1;
+
+	ret = strtof(param, &end);
+
+	if (end != (param + strlen(param)))
+		return -1;
+
+	if (errno == ERANGE)
+		return -1;
+
+	snprintf(buf, sizeof(buf), "%.6f", ret);
+
+	if (strncmp(param, buf, strlen(param)) != 0)
+		return -1;
+
+	*val = ret;
+
+/*	_atcmd_debug("%s: %f\n", __func__, *val); */
+
+	return 0;
+
 }
 
 /**********************************************************************************************/

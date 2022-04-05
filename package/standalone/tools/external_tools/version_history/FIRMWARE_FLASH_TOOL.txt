@@ -1,5 +1,5 @@
 <CURRENT VERSION>
-v5.2.0
+v5.3.0
 
 <VERSION HISTORY>
 v3.0.0
@@ -40,3 +40,7 @@ v5.2.0
 => Support for selective upload procedures.
 => UI change.
 => More detailed error messages.
+
+v5.3.0
+=> Binary update.
+=> NRC4791/NRC5291 support.

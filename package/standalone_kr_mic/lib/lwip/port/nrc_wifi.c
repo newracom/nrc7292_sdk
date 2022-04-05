@@ -16,6 +16,12 @@
 #include "netif/conf_wl.h"
 #include "standalone.h"
 
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+#include "nrc_eth_if.h"
+
+extern struct netif br_netif;
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
+
 struct netif* nrc_netif[MAX_IF];
 char* hostname;
 bool default_hostname;
@@ -61,20 +67,30 @@ int dhcp_run(int vif)
 int wifi_station_dhcpc_start(int vif)
 {
 	int8_t ret;
+	struct netif *target_if;
+
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+	if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+		A("[%s] starting dhcp client on bridge...\n", __func__);
+		target_if = &br_netif;
+	} else {
+		target_if = nrc_netif[vif];
+	}
+#else
+	target_if = nrc_netif[vif];
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 
 	if(wifi_station_dhcpc_status(vif)){
-		//dhcp_release(nrc_netif[vif]);
-		dhcp_stop(nrc_netif[vif]);
-		dhcp_cleanup(nrc_netif[vif]);
+		dhcp_stop(target_if);
+		dhcp_cleanup(target_if);
 		dhcpc_start_flag[vif] = false;
 
-		ip_addr_set_zero(&nrc_netif[vif]->ip_addr);
-		ip_addr_set_zero(&nrc_netif[vif]->netmask);
-		ip_addr_set_zero(&nrc_netif[vif]->gw);
+		ip_addr_set_zero(&target_if->ip_addr);
+		ip_addr_set_zero(&target_if->netmask);
+		ip_addr_set_zero(&target_if->gw);
 	}
 
-	ret = dhcp_start(nrc_netif[vif]);
-
+	ret = dhcp_start(target_if);
 	if(!ret){
 		dhcpc_start_flag[vif] = true;
 	}else{
@@ -124,30 +140,37 @@ void wifi_ifconfig_help_display(void)
 
 void wifi_ifconfig_display(WIFI_INTERFACE if_index)
 {
-	struct netif *netif_temp = nrc_netif[if_index];
+	struct netif *netif = nrc_netif[if_index];
+	int i = 0;
 
-	A("wlan%d     ", if_index);
+	/* LWIP netif default index starts from 1, so adjust it by subtracting 1 */
+	A("wlan%d      ", netif_get_index(netif) - 1);
 	A("HWaddr ");
-	A(MAC_STR,MAC_VALUE(netif_temp->hwaddr) );
-	A("   MTU:%d\n", netif_temp->mtu);
-	A("          inet addr:");
-	A(IP4_ADDR_STR,IP4_ADDR_VALUE(&(netif_temp->ip_addr)) );
-	A("   Mask:");
-	A(IP4_ADDR_STR,IP4_ADDR_VALUE(&(netif_temp->netmask)) );
-	A("   Gw:");
-	A(IP4_ADDR_STR,IP4_ADDR_VALUE(&(netif_temp->gw)) );
+	A(MAC_STR,MAC_VALUE(netif->hwaddr) );
+	A("   MTU:%d\n", netif->mtu);
+	A("           inet:");
+	ip_addr_debug_print_val(LWIP_DBG_ON, (netif->ip_addr));
+	A("\tnetmask:");
+	ip_addr_debug_print_val(LWIP_DBG_ON, (netif->netmask));
+	A("\tgateway:");
+	ip_addr_debug_print_val(LWIP_DBG_ON, (netif->gw));
 	A("\n");
 }
 
 
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
+bool support_ethernet_accesspoint(void)
+{
+	return true;
+}
+
 extern struct netif eth_netif;
 
 void eth_ifconfig_display(void)
 {
 	struct netif *netif_temp = &eth_netif;
 
-	A("eth\n");
+	A("eth        ");
 	A("HWaddr ");
 	A(MAC_STR,MAC_VALUE(netif_temp->hwaddr) );
 	A("   MTU:%d\n", netif_temp->mtu);
@@ -159,26 +182,45 @@ void eth_ifconfig_display(void)
 	A(IP4_ADDR_STR,IP4_ADDR_VALUE(&(netif_temp->gw)) );
 	A("\n");
 }
-#endif
+
+void br_ifconfig_display(void)
+{
+	struct netif *netif_temp = &br_netif;
+	A("br         ");
+	A("HWaddr ");
+	A(MAC_STR,MAC_VALUE(netif_temp->hwaddr) );
+	A("   MTU:%d\n", netif_temp->mtu);
+	A("          inet addr:");
+	A(IP4_ADDR_STR,IP4_ADDR_VALUE(&(netif_temp->ip_addr)) );
+	A("   Mask:");
+	A(IP4_ADDR_STR,IP4_ADDR_VALUE(&(netif_temp->netmask)) );
+	A("   Gw:");
+	A(IP4_ADDR_STR,IP4_ADDR_VALUE(&(netif_temp->gw)) );
+	A("\n");
+}
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 
 static void wifi_ifconfig_display_all()
 {
 	int i;
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
+	if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+		br_ifconfig_display( );
+		A("\n");
+	}
 	eth_ifconfig_display( );
 	A("\n");
-#else
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 	for(i = 0; i < MAX_IF; i++) {
 		wifi_ifconfig_display(i);
 		A("\n");
 	}
-#endif
 }
 
 bool wifi_ifconfig(int num_param, char *params[])
 {
 	char *if_name = params[0];
-	int if_idx = 0;
+	int if_idx = -1;
 	struct netif *nif = NULL;
 	ip_addr_t dnsserver;
 
@@ -194,15 +236,23 @@ bool wifi_ifconfig(int num_param, char *params[])
 
 	if (strcmp(if_name, "wlan0") == 0) {
 		if_idx = 0;
+		nif = nrc_netif[if_idx];
 	} else if (strcmp(if_name, "wlan1") == 0) {
 		if_idx = 1;
+		nif = nrc_netif[if_idx];
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+	} else if (strcmp(if_name, "eth") == 0) {
+		if_idx = 2;
+		nif = &eth_netif;
+	} else if (strcmp(if_name, "br") == 0) {
+		if_idx = 3;
+		nif = &br_netif;
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 	} else {
 		A("%s is unsupported. run iperf -h\n",
 			params[0] == NULL ?	"NULL" : params[0]);
 		return false;
 	}
-
-	nif = nrc_netif[if_idx];
 
 	if (num_param == 1) {
 		// pass
@@ -224,7 +274,15 @@ bool wifi_ifconfig(int num_param, char *params[])
 	inet_pton(AF_INET, WIFI_SECONDARY_DNS_SERVER, &dnsserver);
 	dns_setserver(1, &dnsserver);
 
-	wifi_ifconfig_display(if_idx);
+	if ((if_idx == 0) || (if_idx == 1)) {
+		wifi_ifconfig_display(if_idx);
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+	} else if (if_idx == 2) {
+		eth_ifconfig_display();
+	} else if (if_idx == 3) {
+		br_ifconfig_display();
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
+	}
 
 	return true;
 }
@@ -267,9 +325,10 @@ bool wifi_set_opmode(WIFI_MODE opmode)
 
 enum dhcp_status wifi_softap_dhcps_status(void)
 {
-	int vif = dhcps_get_interface();
-	if(dhcps_get_interface() == 0 || dhcps_get_interface() == 1)
-		return dhcps_start_flag[vif];
+	struct netif *net_if = dhcps_get_interface();
+
+	if (net_if->dhcps_pcb)
+		return DHCP_STARTED;
 	else
 		return DHCP_STOPPED;
 }
@@ -380,14 +439,54 @@ int setup_wifi_ap_mode(int vif, int updated_lease_time)
 	netif_set_default( nrc_netif[vif] );
 
 #if LWIP_DHCPS
-	dhcps_start(&ipinfo[vif], vif);
+	dhcps_start(&ipinfo[vif], nrc_netif[vif]);
 	if(updated_lease_time > 0)
 		wifi_softap_set_dhcps_lease_time(updated_lease_time);
-	dhcps_start_flag[vif] = DHCP_STARTED;
 #endif
 
 	return 0;
 }
+
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+int start_dhcps_on_if(struct netif *net_if, int updated_lease_time)
+{
+	int vif = 0;
+	struct ip_info ipinfo;
+
+	vif = net_if->num;
+	A("%s netif name : %c%c%d\n", __func__, net_if->name[0], net_if->name[1], net_if->num);
+	A("%s vif:%d :%d min\n", __func__, vif, updated_lease_time);
+
+	if(ip_addr_isany_val(net_if->ip_addr)){
+		/* Set default IP address */
+		IP4_ADDR(&net_if->ip_addr, 192, 168, 50, 1);
+		IP4_ADDR(&net_if->gw, 192, 168, 50, 1);
+		IP4_ADDR(&net_if->netmask, 255, 255, 255, 0);
+	}
+
+	A("ip:%s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&net_if->ip_addr)));
+	A("gw:%s\n",ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&net_if->gw)));
+	A("netmask:%s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&net_if->netmask)));
+
+#if LWIP_DNS && LWIP_DHCPS
+	captdnsInit();
+#endif
+
+	netif_set_default( net_if );
+
+#if LWIP_DHCPS
+	ipinfo.ip = net_if->ip_addr;
+	ipinfo.gw = net_if->gw;
+	ipinfo.netmask = net_if->netmask;
+
+	dhcps_start(&ipinfo, net_if);
+	if(updated_lease_time > 0)
+		wifi_softap_set_dhcps_lease_time(updated_lease_time);
+#endif
+
+	return 0;
+}
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 
 void set_dhcp_status(bool status)
 {
@@ -445,6 +544,7 @@ static void lwip_handle_interfaces(void * param)
 		/* set MAC hardware address to be used by lwIP */
 		get_standalone_macaddr(i, nrc_netif[i]->hwaddr);
 		netif_add(nrc_netif[i], NETIF_ADDRS, NULL, wlif_init, tcpip_input);
+		netif_set_flags(nrc_netif[i], NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET);
 		netif_set_status_callback(nrc_netif[i], status_callback);
 		netif_set_link_callback(nrc_netif[i], link_callback);
 
@@ -455,7 +555,6 @@ static void lwip_handle_interfaces(void * param)
 	/* bring it up */
 		netif_set_up( nrc_netif[i] );
 	}
-
 }
 
 /* Initialisation required by lwIP. */

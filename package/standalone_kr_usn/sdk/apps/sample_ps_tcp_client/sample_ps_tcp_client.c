@@ -48,9 +48,17 @@
 #endif /* WAKEUP_GPIO_PIN */
 
 #if READ_I2C_SENSOR_ENABLE
-#define I2C_SCL 16
-#define I2C_SDA 17
-#define LIS331HH		(0x30) /* VDD:3.3v, VIL(<0.2*VDD), VIH(>0.8*VDD), VOL(<0.1*VDD), VOH(>0.9*VDD) */
+#define LIS331HH	(0x30) /* VDD:3.3v, VIL(<0.2*VDD), VIH(>0.8*VDD), VOL(<0.1*VDD), VOH(>0.9*VDD) */
+
+#define SENSOR_I2C_CHANNEL I2C_MASTER_0
+#define SENSOR_I2C_SCL 16
+#define SENSOR_I2C_SDA 17
+#define SENSOR_I2C_CLOCK 200000
+#define SENSOR_I2C_CLOCK_SOURCE 0 /* 0:Clock controller 1:PCLK */
+#define SENSOR_I2C_DATA_WIDTH I2C_8BIT
+#define SENSOR_I2C_ADDR LIS331HH
+
+i2c_device_t tempsensor_i2c;
 #endif
 
 static nvs_handle_t nvs_handle;
@@ -127,19 +135,27 @@ static int connect_to_server(WIFI_CONFIG *param)
 }
 
 #if READ_I2C_SENSOR_ENABLE
-static void i2c_read_reg(uint8_t sad, uint8_t reg, uint8_t *value)
+static void i2c_read_reg(i2c_device_t* i2c, uint8_t sad, uint8_t reg, uint8_t *value)
 {
-	nrc_i2c_start();
-	nrc_i2c_writebyte(sad);
-	nrc_i2c_waitack();
-	nrc_i2c_writebyte(reg);
-	nrc_i2c_waitack();
+	nrc_i2c_start(i2c);
+	nrc_i2c_writebyte(i2c, sad);
+	nrc_i2c_writebyte(i2c, reg);
 
-	nrc_i2c_start();
-	nrc_i2c_writebyte(sad|0x1);
-	nrc_i2c_waitack();
-	nrc_i2c_readbyte(value, false);
-	nrc_i2c_stop();
+	nrc_i2c_start(i2c);
+	nrc_i2c_writebyte(i2c, sad|0x1);
+	nrc_i2c_readbyte(i2c, value, false);
+	nrc_i2c_stop(i2c);
+}
+
+void sensor_i2c_config(i2c_device_t* i2c)
+{
+	i2c->pin_sda = SENSOR_I2C_SDA;
+	i2c->pin_scl = SENSOR_I2C_SCL;
+	i2c->clock_source =SENSOR_I2C_CLOCK_SOURCE;
+	i2c->controller = SENSOR_I2C_CHANNEL;
+	i2c->clock = SENSOR_I2C_CLOCK;
+	i2c->width = SENSOR_I2C_DATA_WIDTH;
+	i2c->address = SENSOR_I2C_ADDR;
 }
 #endif
 
@@ -156,12 +172,10 @@ static nrc_err_t collect_sensor_data()
 #if READ_I2C_SENSOR_ENABLE
 	uint8_t value1;
 
-#if defined( LIS331HH )
-	/* SCL = 200kHz */
-	nrc_i2c_init(I2C_SCL, I2C_SDA, 200000);
-	nrc_i2c_enable(true);
-#endif
-	i2c_read_reg(LIS331HH, 0x20, &value1);
+	sensor_i2c_config(&tempsensor_i2c);
+	nrc_i2c_init(&tempsensor_i2c);
+	nrc_i2c_enable(&tempsensor_i2c, true);
+	i2c_read_reg(&tempsensor_i2c, SENSOR_I2C_ADDR, 0x20, &value1);
 
 	/* CTRL_REG1 default value : 0x07 */
 	if (value1 == 0x07){

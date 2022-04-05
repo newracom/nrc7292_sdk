@@ -63,8 +63,11 @@ struct nrc_wpa;
 #define WLAN_ACTION_S1G_TWT_TEARDOWN		7
 #define WLAN_ACTION_S1G_TWT_INFO			11
 
+#if defined(INCLUDE_BD_SUPPORT)
 #define NRC_WPA_BD_HEADER_LENGTH	16
 #define NRC_WPA_BD_MAX_DATA_LENGTH	546
+#endif /* defined(INCLUDE_BD_SUPPORT) */
+
 
 extern uint8_t g_standalone_addr[6];
 
@@ -180,17 +183,35 @@ struct nrc_wpa_log_event {
 	int level;
 };
 
+#if defined(INCLUDE_BD_SUPPORT_TARGET_VERSION)
+#define NRC_DRIVER_BD_MAX_CH_LIST		45
+struct wpa_bd_ch_table {
+	uint16_t    s1g_freq;
+	uint16_t    nons1g_freq;
+	uint8_t     s1g_freq_index;
+	uint16_t    nons1g_freq_index;
+};
+
+struct wpa_bd_supp_param {
+	uint8_t num_ch;
+	uint8_t s1g_ch_index[NRC_DRIVER_BD_MAX_CH_LIST];
+	uint16_t nons1g_ch_freq[NRC_DRIVER_BD_MAX_CH_LIST];
+};
+#endif /* defined(INCLUDE_BD_SUPPORT_TARGET_VERSION) */
+
+#if defined(INCLUDE_BD_SUPPORT)
 struct nrc_wpa_bdf {
 	uint8_t	ver_major;
 	uint8_t	ver_minor;
 	uint16_t total_len;
 
-	uint16_t num_country;
+	uint16_t num_data_groups;
 	uint16_t reserved[4];
 	uint16_t checksum_data;
 
 	uint8_t data[NRC_WPA_BD_MAX_DATA_LENGTH];
 };
+#endif /* defined(INCLUDE_BD_SUPPORT) */
 
 SYS_BUF * alloc_sys_buf_try(int hif_len, int nTry);
 

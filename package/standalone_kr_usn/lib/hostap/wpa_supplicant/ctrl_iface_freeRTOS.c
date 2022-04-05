@@ -87,15 +87,19 @@ size_t ctrl_iface_receive_response(int vif_id, char *cmd, char *ret)
 		return 0;
 	}
 
-	reply[reply_len] = 0;
+	if (reply[reply_len - 1] == '\n')
+		reply[--reply_len] = '\0'; /* remove new line */
+	else
+		reply[reply_len] = '\0';
+
 	wpa_printf(MSG_INFO, "reply_len: %d\nreply: %s\n", reply_len, reply);
 
-	memcpy(ret, reply, reply_len - 1);
-	ret[reply_len - 1] = '\0';
+	memcpy(ret, reply, reply_len);
+	ret[reply_len] = '\0';
 
 	os_free(reply);
 
-	return reply_len - 1;
+	return reply_len;
 }
 
 int ctrl_iface_receive(int vif_id, char *cmd)
@@ -129,8 +133,7 @@ int ctrl_iface_receive(int vif_id, char *cmd)
 			else {
 				wpa_printf(MSG_DEBUG, "WPA: Control interface response (%d)", reply_len);
 
-				if (wpa_debug_level <= MSG_DEBUG)
-				{
+				if (wpa_debug_level <= MSG_DEBUG) {
 					char temp;
 
 					for (i = 0 ; i < reply_len ; i += PRINT_BUFFER_SIZE) {

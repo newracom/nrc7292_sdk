@@ -313,4 +313,8 @@ void lmac_check_lbt_pause_time(uint8_t ac);
 #endif
 uint32_t lmac_get_cs_time(void);
 void lmac_set_cs_time(uint16_t cs_time);
+#if defined(INCLUDE_BD_SUPPORT_TARGET_VERSION)
+bool lmac_get_bd_block(void);
+void lmac_set_bd_block(bool flag);
+#endif /* defined(INCLUDE_BD_SUPPORT_TARGET_VERSION) */
 #endif /* HAL_LMAC_COMMON_H */

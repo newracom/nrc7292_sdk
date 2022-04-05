@@ -12,6 +12,9 @@
 #include "netif/conf_wl.h"
 #include "driver_nrc_tx.h"
 #include "nrc_wifi.h"
+#if defined(SUPPORT_ETHERNET_ACCESSPOINT)
+#include "nrc_eth_if.h"
+#endif
 
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
@@ -21,6 +24,9 @@
 #define netifINTERFACE_TASK_PRIORITY        ( configMAX_PRIORITIES - 2 )
 #define netifGUARD_BLOCK_TIME               ( 250 )
 
+/* descriptive abbreviation */
+#define IFNAME0 'w'
+#define IFNAME1 'l'
 
 /* The time to block waiting for input. */
 #define BLOCK_TIME_WAITING_FOR_INPUT    ( ( TickType_t ) 100 )
@@ -33,6 +39,9 @@ struct wlif
 
 extern struct netif* nrc_netif[MAX_IF];
 extern struct netif eth_netif;
+#if defined(SUPPORT_ETHERNET_ACCESSPOINT)
+extern struct netif br_netif;
+#endif
 /**
  * In this function, the hardware should be initialized.
  * Called from wlif_init().
@@ -124,14 +133,16 @@ void lwif_input_from_net80211_pbuf(struct pbuf* p)
 	}
 }
 
-void lwif_input(uint8_t vif_id, void *buffer, int data_len)
+void lwif_input(uint8_t vif_id, void *buffer, int data_len, bool is_ap)
 {
-	struct eth_hdr      *ethhdr;
+	struct eth_hdr *ethhdr;
 	struct netif *netif = nrc_netif[vif_id];
-	struct pbuf         *p = NULL, *q;
+	struct pbuf *p = NULL, *q;
 	int remain = data_len;
 	int offset = 0;
 	int len = data_len;
+	struct etharp_hdr *arp_hdr;
+	struct ip_hdr *ip_hdr;
 
 	p = pbuf_alloc( PBUF_RAW, len, PBUF_POOL );
 
@@ -160,28 +171,65 @@ void lwif_input(uint8_t vif_id, void *buffer, int data_len)
 	switch (htons(ethhdr->type)) {
 		/* IP or ARP packet? */
 		case ETHTYPE_ARP:
+#if defined(SUPPORT_ETHERNET_ACCESSPOINT)
+			if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+				u32 target_ip_addr;
+				arp_hdr = (struct etharp_hdr *)(p->payload + SIZEOF_ETH_HDR);
+				V(TT_NET, "[ARP][%s] ", htons(arp_hdr->opcode) == 1 ? "REQ" : "REP");
+				V(TT_NET, "dst("MACSTR"), src("MACSTR")\n", MAC2STR(ethhdr->dest.addr), MAC2STR(ethhdr->src.addr));
+				target_ip_addr = arp_hdr->dipaddr.addrw[1];
+				target_ip_addr = (target_ip_addr << 16) | arp_hdr->dipaddr.addrw[0];
+				if (!is_ap) { // br0 mac == wlan0 mac
+					if (htons(arp_hdr->opcode) == 1) { // ARP Request
+						if (!memcmp(arp_hdr->shwaddr.addr, netif->hwaddr, 6)) {
+							goto pbuf_free;
+						} else {
+							if (target_ip_addr != br_netif.ip_addr.addr &&
+								!(ethhdr->dest.addr[0] & 1)) {
+								memcpy(ethhdr->dest.addr, get_peer_mac()->addr, 6);
+							}
+						}
+					} else { // ARP Reply
+						if (!memcmp(arp_hdr->dhwaddr.addr, netif->hwaddr, 6) &&
+							target_ip_addr != br_netif.ip_addr.addr) {
+							memcpy(ethhdr->dest.addr, get_peer_mac()->addr, 6);
+							memcpy(arp_hdr->dhwaddr.addr, get_peer_mac()->addr, 6);
+						}
+					}
+				}
+				goto next;
+			}
+#endif
 #if PPPOE_SUPPORT
 		/* PPPoE packet? */
 		case ETHTYPE_PPPOEDISC:
 		case ETHTYPE_PPPOE:
 #endif /* PPPOE_SUPPORT */
 		case ETHTYPE_IP:
-		/* full packet send to tcpip_thread to process */
-#ifdef SUPPORT_ETHERNET_ACCESSPOINT
-			LWIP_DEBUGF(NETIF_DEBUG, ("[%s] calling eth_netif.linkoutput...\n", __func__));
-			eth_netif.linkoutput(&eth_netif, p);
-			pbuf_free(p);
-			p = NULL;
-#else
+#if LWIP_IPV6
+		case ETHTYPE_IPV6:
+#endif	//LWIP_IPV6
+#if defined(SUPPORT_ETHERNET_ACCESSPOINT)
+			if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+				ip_hdr = (struct ip_hdr *)(p->payload + SIZEOF_ETH_HDR);
+				if (!is_ap) { // br0 mac == wlan0 mac
+					if (ip_hdr->dest.addr != 0 && ip_hdr->dest.addr != 0xffffffff &&
+						ip_hdr->dest.addr != br_netif.ip_addr.addr) {
+						memcpy(ethhdr->dest.addr, get_peer_mac()->addr, 6);
+					}
+				}
+			}
+next:
+#endif
+			/* full packet send to tcpip_thread to process */
 			if (netif->input(p, netif)!=ERR_OK) {
 				LWIP_DEBUGF(NETIF_DEBUG, ("ethernetif_input: IP input error\n"));
-				pbuf_free(p);
-				p = NULL;
+				goto pbuf_free;
 			}
-#endif
 			break;
 
 		default:
+pbuf_free:
 			pbuf_free(p);
 			p = NULL;
 			break;

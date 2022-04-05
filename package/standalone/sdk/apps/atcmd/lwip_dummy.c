@@ -49,7 +49,7 @@ void reset_ip_address(int vif)
 
 }
 
-void lwif_input(uint8_t vif_id, void *buffer, int data_len)
+void lwif_input(uint8_t vif_id, void *buffer, int data_len, bool is_ap)
 {
 	atcmd_socket_recv_data((char *)buffer, data_len);
 }

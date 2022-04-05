@@ -747,9 +747,13 @@ static int _atcmd_socket_open (atcmd_socket_t *socket)
 		if (socket->protocol != g_atcmd_socket[i].protocol)
 			continue;
 
+		if (socket->local_port == 0)
+			continue;
+
 		if (socket->local_port == g_atcmd_socket[i].local_port)
 		{
 			_atcmd_info("%s_open: existing socket\n", str_proto_lwr[socket->protocol]);
+			_atcmd_socket_print(&g_atcmd_socket[i]);
 
 			return -EINVAL;
 		}

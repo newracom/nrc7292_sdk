@@ -24,8 +24,8 @@
  */
 
 
-#include "hif.h"
 #include "atcmd.h"
+
 
 /**********************************************************************************************/
 
@@ -58,10 +58,11 @@ extern int errno;
 
 static struct
 {
-	int num;
+	int val;
 	const char *str;
 } g_atcmd_errors[] =
 {
+	{ 0,			"OK"			},
 	{ EPERM,		"EPERM"			},	// 1
 	{ EBADF,		"EBADF"			},	// 9
 	{ EAGAIN,		"EAGAIN"		},	// 11
@@ -80,23 +81,23 @@ static struct
 	{ EHOSTUNREACH,	"EHOSTUNREACH"	},	// 113
 	{ EINPROGRESS, 	"EINPROGRESS" 	},	// 115
 
-	{ 0, NULL }
+	{ -1, "UNKNOWN" }
 };
 
 const char *atcmd_strerror (int err)
 {
 	int i;
 
-	if (err == 0)
-		return "OK";
+	if (err < 0)
+		err *= -1;
 
-	for (i = 0 ; g_atcmd_errors[i].num ; i++)
+	for (i = 0 ; g_atcmd_errors[i].val >= 0 ; i++)
 	{
-		if (-err == g_atcmd_errors[i].num)
-			return g_atcmd_errors[i].str;
+		if (g_atcmd_errors[i].val == err)
+			break;
 	}
 
-	return "UNKNOWN";
+	return g_atcmd_errors[i].str;
 }
 
 /*******************************************************************************************/
@@ -1837,7 +1838,6 @@ int atcmd_enable (_hif_info_t *info)
 		atcmd_history_disable();
 
 	atcmd_user_enable();
-	atcmd_test_enable();
 #ifndef CONFIG_ATCMD_WITHOUT_LWIP
 	atcmd_socket_enable();
 #else
@@ -1874,7 +1874,6 @@ void atcmd_disable (void)
 #else
 	atcmd_host_disable();
 #endif
-	atcmd_test_disable();
 	atcmd_user_disable();
 
 	atcmd_data_mode_task_delete();

@@ -43,7 +43,7 @@ static bool renew = false;
 #define DHCPS_LEASE_TIME_DEF	(120)
 u32_t dhcps_lease_time = DHCPS_LEASE_TIME_DEF;  //minute
 
-static int softap_if_id = -1; // index of SOFTAP_IF
+static struct netif *softap_if = NULL; // SOFTAP_IF network interface
 
 /******************************************************************************
  * FunctionName : node_insert_to_list
@@ -178,7 +178,9 @@ static u8_t* add_offer_options(u8_t* optptr)
 	if (dhcps_router_enabled(offer)) {
 		struct ip_info if_ip;
 		bzero(&if_ip, sizeof(struct ip_info));
-		wifi_get_ip_info(softap_if_id, &if_ip);
+		if_ip.ip = softap_if->ip_addr;
+		if_ip.netmask = softap_if->netmask;
+		if_ip.gw = softap_if->gw;
 
 		*optptr++ = DHCP_OPTION_ROUTER;
 		*optptr++ = 4;
@@ -848,12 +850,10 @@ static void wifi_softap_init_dhcps_lease(u32_t ip)
  *              : info  -- The current ip info
  * Returns      : none
 *******************************************************************************/
-void dhcps_start(struct ip_info* info, int vif)
+void dhcps_start(struct ip_info* info, struct netif *net_if)
 {
-	struct netif* apnetif = nrc_netif[vif];
-
-	if (apnetif->dhcps_pcb != NULL) {
-		udp_remove(apnetif->dhcps_pcb);
+	if (net_if->dhcps_pcb != NULL) {
+		udp_remove(net_if->dhcps_pcb);
 	}
 
 	pcb_dhcps = udp_new();
@@ -862,7 +862,7 @@ void dhcps_start(struct ip_info* info, int vif)
 		LWIP_DEBUGF(DHCPS_DEBUG | LWIP_DBG_TRACE, ("dhcps_start(): could not obtain pcb\n"));
 	}
 
-	apnetif->dhcps_pcb = pcb_dhcps;
+	net_if->dhcps_pcb = pcb_dhcps;
 
 	IP4_ADDR(&broadcast_dhcps, 255, 255, 255, 255);
 
@@ -873,7 +873,7 @@ void dhcps_start(struct ip_info* info, int vif)
 	udp_recv(pcb_dhcps, handle_dhcp, NULL);
 	LWIP_DEBUGF(DHCPS_DEBUG | LWIP_DBG_TRACE, ("dhcps:dhcps_start->udp_recv function Set a receive callback handle_dhcp for UDP_PCB pcb_dhcps\n"));
 
-	softap_if_id = vif;
+	softap_if = net_if;
 }
 
 /******************************************************************************
@@ -884,13 +884,11 @@ void dhcps_start(struct ip_info* info, int vif)
 *******************************************************************************/
 void dhcps_stop(void)
 {
-	struct netif* apnetif = nrc_netif[softap_if_id];
-
 	udp_disconnect(pcb_dhcps);
 
-	if (apnetif->dhcps_pcb != NULL) {
-		udp_remove(apnetif->dhcps_pcb);
-		apnetif->dhcps_pcb = NULL;
+	if (softap_if->dhcps_pcb != NULL) {
+		udp_remove(softap_if->dhcps_pcb);
+		softap_if->dhcps_pcb = NULL;
 	}
 
 	list_node* pnode = NULL;
@@ -906,7 +904,7 @@ void dhcps_stop(void)
 		mem_free(pback_node);
 		pback_node = NULL;
 	}
-	softap_if_id = -1;
+	softap_if = NULL;
 }
 
 bool wifi_softap_set_dhcps_lease(struct dhcps_lease* please)
@@ -915,6 +913,7 @@ bool wifi_softap_set_dhcps_lease(struct dhcps_lease* please)
 	u32_t softap_ip = 0;
 	u32_t start_ip = 0;
 	u32_t end_ip = 0;
+	int softap_if_id =0;
 
 	u8_t opmode = wifi_get_opmode();
 
@@ -1136,7 +1135,7 @@ int dhcps_status(void)
 	pnode = plist;
 	A("\n-------------------------- DHCP Server Status ------------------------------\n");
 	A(" DHCP Server:%s   \tInterface:%d\n",
-		wifi_softap_dhcps_status()== DHCP_STARTED ? "On":"Off", dhcps_get_interface());
+	  wifi_softap_dhcps_status()== DHCP_STARTED ? "On":"Off", (dhcps_get_interface())->num);
 	A(" Lease Time:%d(min)\tMax Lease Number:%d\n", dhcps_lease_time, DHCPS_MAX_LEASE);
 	while (pnode != NULL) {
 		pdhcps_pool = pnode->pnode;
@@ -1153,9 +1152,9 @@ int dhcps_status(void)
 	return 0;
 }
 
-int dhcps_get_interface(void)
+struct netif *dhcps_get_interface(void)
 {
-	return softap_if_id;
+	return softap_if;
 }
 
 #endif

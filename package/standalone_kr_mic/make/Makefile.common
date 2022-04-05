@@ -28,7 +28,7 @@ firmware: $(OUT_PATH) $(OBJ_PATH) $(OBJS)
 	@echo "Linking $(OUT_PATH)/$(OUTPUT).elf"
 ifneq ($(findstring lib, $(ALIAS)), )
 	@echo "Linking library : $(LIB_FULL_NAME)"
-	@$(CC) $(LFLAGS) -o $(OUT_PATH)/$(OUTPUT).elf $(OBJS) $(LIB_FLAG)
+	@$(CC) $(LFLAGS) -o $(OUT_PATH)/$(OUTPUT).elf $(LIB_FLAG) $(OBJS)
 else
 	@$(CC) $(LFLAGS) -o $(OUT_PATH)/$(OUTPUT).elf $(OBJS)
 endif

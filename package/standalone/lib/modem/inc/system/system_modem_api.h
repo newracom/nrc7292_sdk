@@ -136,8 +136,8 @@ uint8_t system_modem_api_get_mcs(int vif_id);
 
 #if defined(INCLUDE_BD_SUPPORT)
 bool system_modem_api_set_bd_data(int vif_id, struct wim_bd_param* p);
-void system_modem_api_set_tx_power(int vif_id, uint32_t ch_freq);
-bool system_modem_api_get_bdf_data(uint32_t address, uint8_t *buffer, size_t size);
+void system_modem_api_set_tx_power(int vif_id, uint16_t ch_freq);
+unsigned char* system_modem_api_get_bdf_data(unsigned int* size);
 bool system_modem_api_is_bdf_use(void);
 #endif /* defined(INCLUDE_BD_SUPPORT) */
 #if defined(STANDARD_11AH)
@@ -157,6 +157,7 @@ int  system_api_set_freq_bw_prim(uint32_t lo_freq_hz, int rx_bw_index, int tx_bw
 void system_api_sflash_write(uint32_t address, struct _SYS_BUF *packet, size_t size);
 uint16_t system_api_sflash_read(uint32_t sf_address, struct byte_stream *bs, int size);
 #endif /* defined(SF_WRITABLE) */
+uint16_t system_modem_api_get_hw_version();
 #endif /* defined(STANDARD_11AH) */
 
 void system_modem_api_update_probe_resp(uint8_t* probe, uint16_t len);
@@ -186,4 +187,8 @@ void system_modem_api_set_tx_suppress_stop(uint32_t setting);
 void system_modem_api_set_cca_ed_threshold(int vif_id);
 #endif //#if definded (INCLUDE_AH_JPPC)
 
+#if defined(INCLUDE_BD_SUPPORT_TARGET_VERSION)
+bool system_modem_api_get_bd_block_flag();
+void system_modem_api_set_bd_block_flag(bool flag);
+#endif /* defined(INCLUDE_BD_SUPPORT_TARGET_VERSION) */
 #endif //__SYSTEM_MODEM_API_H__

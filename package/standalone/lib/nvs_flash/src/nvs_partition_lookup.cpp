@@ -16,8 +16,6 @@ nvs_err_t lookup_nvs_partition(const char* label, NVSPartition **p)
 
 	if (strcmp (label, "USER_CONFIG_1") == 0) {
 		address = SF_USER_CONFIG_1;
-	} else if (strcmp (label, "USER_CONFIG_2") == 0) {
-		address = SF_USER_CONFIG_3;
 	} else {
 		NVS_LOGD(TAG, "[%s] NVS_ERR_NVS_PART_NOT_FOUND...", __func__);
 		return NVS_ERR_NVS_PART_NOT_FOUND;

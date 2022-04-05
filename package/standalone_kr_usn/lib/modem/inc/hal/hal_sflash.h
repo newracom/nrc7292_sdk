@@ -23,6 +23,7 @@ extern "C" {
 #define GD25LQ40C_JEDEC_ID (0xC86013)
 #define MX25V8035F_JEDEC_ID (0xC22314)
 #define MX25U1633F_JEDEC_ID (0xC22535)
+#define MX25R3235F_JEDEC_ID (0xC22816)
 
 /* ----------------------------------
  * W26XX JEDEC ID
@@ -58,7 +59,28 @@ enum sf_burst_len_e {
 	SF_BURST_64 = 0x03
 };
 
+uint32_t nrc_sf_get_size(void);
+static uint32_t half_addr_sf = 0;
+
 enum sf_store_area_e {
+#if defined(SUPPORT_4MB_FLASH)
+	SF_BOOTLOADER = 0x0,
+	SF_FW = 0x10000,
+	SF_FW_INFO = 0x190000,
+	SF_CORE_DUMP = 0x191000,
+	SF_USER_CONFIG_1 = 0x195000,/*200KB*/
+	SF_USER_CONFIG_2 = 0x1C7000,/*200KB*/
+	SF_USER_CONFIG_3 = 0x1F9000,/*200KB*/
+	SF_USER_CONFIG_4 = 0x22B000,/*200KB*/
+	SF_RESERVED = 0x25D000,/*120KB*/
+	SF_BDF = 0x27B000, /*4KB*/
+	SF_SYSTEM_CONFIG = 0x27C000,
+	SF_MAC_ADDR = 0x27C000, /*not used*/
+	SF_MAC_ADDR_MC = 0x27C008,/*not used*/
+	SF_RF_CAL = 0x27D000,
+	SF_FOTA = 0x27E000,
+	SF_FOTA_INFO = 0x3FE000
+#else
 	SF_BOOTLOADER = 0x0,
 	SF_FW = 0x10000,
 	SF_FW_INFO = 0xF5000,
@@ -72,7 +94,10 @@ enum sf_store_area_e {
 	SF_MAC_ADDR_MC = 0xFE008,
 	SF_RF_CAL = 0xFF000,
 	SF_FOTA = 0x100000,
+	SF_USER_DATA = 0x1E5000,
+	SF_BDF = 0x1FE000,
 	SF_FOTA_INFO = 0x1FF000
+#endif
 };
 
 enum sf_reg_override_ctrl {
@@ -104,6 +129,9 @@ typedef struct {
 	uint32_t bdf_use :8; /*enable/disable the usage of bdf data*/
 	uint32_t hw_version:16; /* HW Version */
 	struct sf_reg_override rf_pllldo12_tr;
+	uint32_t brd_rev_value:7;
+	uint32_t disable_gpio_brd_rev:1;
+	uint32_t reserved:24;
 } sf_sys_config_t;
 
 typedef struct {
@@ -160,6 +188,10 @@ bool nrc_sf_update_bdf(uint32_t length);
 bool nrc_sf_is_bdf_use(void);
 bool nrc_sf_update_bdf_use(uint8_t bdf_use);
 uint16_t nrc_sf_get_hw_version(void);
+bool nrc_sf_update_disable_gpio_brd_rev(uint8_t value);
+bool nrc_sf_get_disable_gpio_brd_rev(void);
+bool nrc_sf_update_brd_rev(uint8_t version);
+uint8_t nrc_sf_get_brd_rev(void);
 
 #ifdef __cplusplus
 } // extern "C"

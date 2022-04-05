@@ -34,22 +34,20 @@
 
 #include "bme680.h"
 
-//#define BME680_SPI
-#define BME680_I2C
+#define BME680_SPI
+//#define BME680_I2C
 
 struct bme680_dev sensor;
-struct bme680_field_data data;
-
-static uint16_t bme680_meas_period;
-static int bme680_sequence_number = 0;
 
 #if defined(BME680_SPI)
+static spi_device_t bme680_spi;
+
 static int8_t spi_read(uint8_t dev_id, uint8_t reg, uint8_t *data, uint16_t len)
 {
 	unsigned short i = 0;
 
 	while (len--) {
-		if (nrc_spi_readbyte_value(reg + i, data + i) != NRC_SUCCESS)
+		if (nrc_spi_readbyte_value(&bme680_spi, reg + i, data + i) != NRC_SUCCESS)
 			return -1;
 		++i;
 	}
@@ -61,7 +59,7 @@ static int8_t spi_write(uint8_t dev_id, uint8_t reg, uint8_t *data, uint16_t len
 	unsigned short i = 0;
 
 	while (len--) {
-		nrc_spi_writebyte_value(reg, *(data + i));
+		nrc_spi_writebyte_value(&bme680_spi, reg, *(data + i));
 		++i;
 		reg = *(data + i);
 		++i;
@@ -69,20 +67,19 @@ static int8_t spi_write(uint8_t dev_id, uint8_t reg, uint8_t *data, uint16_t len
 	return BME680_OK;
 }
 
-static int spi_init(void)
+static int spi_init(spi_device_t* spi)
 {
 	int count = 0;
 	uint8_t data;
-
-	nrc_spi_init(SPI_MODE3, SPI_BIT8, 1000000);
-	nrc_spi_enable(true);
+	nrc_spi_master_init(spi);
+	nrc_spi_enable(spi, true);
 	_delay_ms(100);
 
 	while (1)
 	{
-		nrc_spi_writebyte_value(0x73, 0x00);
+		nrc_spi_writebyte_value(spi, 0x73& BME680_SPI_WR_MSK, 0x00);
 
-		if (nrc_spi_readbyte_value(0x73|0x80, &data) != NRC_SUCCESS)
+		if (nrc_spi_readbyte_value(spi, 0x73|BME680_SPI_RD_MSK, &data) != NRC_SUCCESS)
 			return -1;
 
 		if (data == 0)	{
@@ -98,7 +95,7 @@ static int spi_init(void)
 		}
 	}
 
-	if (nrc_spi_readbyte_value(0x73|0x80, &data) != NRC_SUCCESS)
+	if (nrc_spi_readbyte_value(spi, 0x73|BME680_SPI_RD_MSK, &data) != NRC_SUCCESS)
 		return -1;
 
 	nrc_usr_print("[%s] spi_mem_page default value=0x%02x\n", __func__, data);
@@ -110,44 +107,49 @@ static int spi_init(void)
 #define BME680_I2C_SCL    16
 #define BME680_I2C_SDA    17
 #define BME680_I2C_CLOCK  100000
+#define BME680_I2C_CLOCK_SOURCE 0 /* 0:clock controller, 1:PCLK */
 #define I2C_XACT_DELAY_MS 1
+
+i2c_device_t bme_i2c;
 
 static int8_t i2c_read(uint8_t dev_id, uint8_t reg, uint8_t *data, uint16_t len)
 {
-    nrc_i2c_start();
-    nrc_i2c_writebyte((dev_id<<1) | 0x00);
-    nrc_i2c_writebyte(reg);
-    nrc_i2c_stop();
-    _delay_ms(I2C_XACT_DELAY_MS);
+	nrc_i2c_start(&bme_i2c );
+	nrc_i2c_writebyte(&bme_i2c, (dev_id<<1) | 0x00);
+	nrc_i2c_writebyte(&bme_i2c, reg);
+	nrc_i2c_stop(&bme_i2c);
+	_delay_ms(I2C_XACT_DELAY_MS);
 
-    nrc_i2c_start();
-    nrc_i2c_writebyte((dev_id<<1) | 0x01);
-    for(int i=0;i<len;i++)
-        nrc_i2c_readbyte(data++, i < len - 1);
+	nrc_i2c_start(&bme_i2c);
+	nrc_i2c_writebyte(&bme_i2c, (dev_id<<1) | 0x01);
+	for(int i=0;i<len;i++)
+		nrc_i2c_readbyte(&bme_i2c, data++, i < len - 1);
 
-    nrc_i2c_stop();
-    _delay_ms(I2C_XACT_DELAY_MS);
+	nrc_i2c_stop(&bme_i2c);
+	_delay_ms(I2C_XACT_DELAY_MS);
+
 	return BME680_OK;
 }
 
 static int8_t i2c_write(uint8_t dev_id, uint8_t reg, uint8_t *data, uint16_t len)
 {
-    nrc_i2c_start();
-    nrc_i2c_writebyte((dev_id<<1) | 0x00);
-    nrc_i2c_writebyte(reg);
-    for(int i=0;i<len;i++)
-        nrc_i2c_writebyte(*data++);
-    nrc_i2c_stop();
-    _delay_ms(I2C_XACT_DELAY_MS);
+	nrc_i2c_start(&bme_i2c);
+	nrc_i2c_writebyte(&bme_i2c, (dev_id<<1) | 0x00);
+	nrc_i2c_writebyte(&bme_i2c, reg);
+	for(int i=0;i<len;i++)
+		nrc_i2c_writebyte(&bme_i2c, *data++);
+	nrc_i2c_stop(&bme_i2c);
+	_delay_ms(I2C_XACT_DELAY_MS);
+
 	return BME680_OK;
 }
 
 
-static int i2c_init(void)
+static int i2c_init(i2c_device_t* i2c)
 {
-	nrc_i2c_init(BME680_I2C_SCL, BME680_I2C_SDA, BME680_I2C_CLOCK);
-	nrc_i2c_enable(true);
-    return BME680_OK;
+	nrc_i2c_init(i2c);
+	nrc_i2c_enable(i2c, true);
+	return BME680_OK;
 }
 #endif
 
@@ -161,12 +163,13 @@ static int bme680_setting(struct bme680_dev  *sensor)
 	uint8_t set_required_settings = 0;
 	int8_t rslt = 0;
 
-	sensor->dev_id = BME680_I2C_ADDR_PRIMARY;
 #if defined(BME680_SPI)
+	sensor->dev_id = 0;
 	sensor->intf = BME680_SPI_INTF;
 	sensor->read = spi_read;
 	sensor->write = spi_write;
 #elif defined(BME680_I2C)
+	sensor->dev_id = BME680_I2C_ADDR_PRIMARY;
 	sensor->intf = BME680_I2C_INTF;
 	sensor->read = i2c_read;
 	sensor->write = i2c_write;
@@ -214,12 +217,36 @@ static int bme680_setting(struct bme680_dev  *sensor)
 static int sensor_init()
 {
 #if defined(BME680_SPI)
-	if(spi_init() != 0) {
+
+	/* Set BME680 spi */
+	bme680_spi.pin_miso = 12;
+	bme680_spi.pin_mosi = 13;
+	bme680_spi.pin_cs =14;
+	bme680_spi.pin_sclk = 15;
+	bme680_spi.frame_bits = SPI_BIT8;
+	bme680_spi.clock = 1000000;
+	bme680_spi.mode = SPI_MODE3;
+	bme680_spi.controller = SPI_CONTROLLER_SPI0;
+	bme680_spi.bit_order = SPI_MSB_ORDER;
+	bme680_spi.irq_save_flag = 0;
+	bme680_spi.isr_handler = NULL;
+
+	if(spi_init(&bme680_spi) != 0) {
 		nrc_usr_print ("[%s] Failed to init SPI\n", __func__);
 		return NRC_FAIL;
 	}
 #elif defined(BME680_I2C)
-	if(i2c_init() != 0) {
+
+	/* Set BME680 i2c */
+	bme_i2c.pin_sda = BME680_I2C_SDA;
+	bme_i2c.pin_scl = BME680_I2C_SCL;
+	bme_i2c.clock_source =BME680_I2C_CLOCK_SOURCE;
+	bme_i2c.controller = I2C_MASTER_0;
+	bme_i2c.clock = BME680_I2C_CLOCK;
+	bme_i2c.width = I2C_8BIT;
+	bme_i2c.address = BME680_I2C_ADDR_PRIMARY;
+
+	if(i2c_init(&bme_i2c) != 0) {
 		nrc_usr_print ("[%s] Failed to init I2C\n", __func__);
 		return NRC_FAIL;
 	}
@@ -232,16 +259,18 @@ static int sensor_init()
 	return NRC_SUCCESS;
 }
 
-static void update_sensor_data()
+static void update_sensor_data(uint16_t duration, struct bme680_dev *dev)
 {
-	if (sensor.power_mode == BME680_FORCED_MODE)
-		bme680_set_sensor_mode(&sensor);
+	struct bme680_field_data data;
 
-	_delay_ms(bme680_meas_period);
-	bme680_get_sensor_data(&data, &sensor);
+	if (dev->power_mode == BME680_FORCED_MODE)
+		bme680_set_sensor_mode(dev);
 
-	nrc_usr_print("{\"seq\" : \"%ld\",\t\"T\" : \"%.2f\", \"H\" : \"%.2f\"}\n",
-		bme680_sequence_number++,
+	_delay_ms(duration);
+	bme680_get_sensor_data(&data, dev);
+
+	nrc_usr_print("{\"Dev\" : \"%x\",\t\"T\" : \"%.2f\", \"H\" : \"%.2f\"}\n",
+		dev,
 		((float) data.temperature) / 100.0,
 		((float) data.humidity) / 1000.0);
 }
@@ -254,18 +283,20 @@ static void update_sensor_data()
  *******************************************************************************/
 void user_init(void)
 {
-    nrc_uart_console_enable(true);
+	uint16_t bme680_meas_period;
 
-    if(sensor_init() == NRC_FAIL)   {
-        nrc_usr_print("[%s] sensor init failed!!!\n");
-        return;
-    }
+	nrc_uart_console_enable(true);
 
-    bme680_get_profile_dur(&bme680_meas_period, &sensor);
-    nrc_usr_print("meas period = %dms\n", bme680_meas_period);
-    while(1)
-    {
-        update_sensor_data();
-        _delay_ms(1000);
-    }
+	if(sensor_init() == NRC_FAIL)   {
+		nrc_usr_print("[%s] sensor init failed!!!\n");
+		return;
+	}
+
+	bme680_get_profile_dur(&bme680_meas_period, &sensor);
+	nrc_usr_print("meas period = %dms\n", bme680_meas_period);
+	while(1)
+	{
+		update_sensor_data(bme680_meas_period, &sensor);
+		_delay_ms(1000);
+	}
 }

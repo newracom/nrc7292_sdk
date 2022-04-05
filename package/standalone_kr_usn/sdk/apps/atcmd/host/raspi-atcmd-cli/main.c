@@ -29,7 +29,13 @@
 #include "raspi-hif.h"
 #include "nrc-atcmd.h"
 #include "nrc-iperf.h"
-#include "nrc-echo.h"
+
+
+#define DEFAULT_SPI_DEVICE		"/dev/spidev0.0"
+#define DEFAULT_SPI_CLOCK		20000000
+
+#define DEFAULT_UART_DEVICE		"/dev/ttyAMA0"
+#define DEFAULT_UART_BAUDRATE	115200
 
 /**********************************************************************************************/
 
@@ -63,8 +69,8 @@ static int raspi_cli_run_script (char *script)
 #define script_debug_call(fmt, ...)		/* log_debug(fmt, ##__VA_ARGS__) */
 #define script_debug_loop(fmt, ...)		/* log_debug(fmt, ##__VA_ARGS__) */
 
-#define SCRIPT_FILE_LEN_MAX		128
 #define SCRIPT_CMD_LEN_MAX		256
+#define SCRIPT_FILE_LEN_MAX		128
 
 	union loop
 	{
@@ -142,12 +148,7 @@ static int raspi_cli_run_script (char *script)
 	memset(&loop, 0, sizeof(loop));
 
 	for (i = 0 ; i < sizeof(data) ; i++)
-	{
-		if ((i % 16) < 10)
-			data[i] = '0' + (i % 16);
-		else
-			data[i] = 'A' + ((i % 16) - 10);
-	}
+		data[i] = i & 0xff;
 
 	for (prev_cmd_len = cmd_line = 0 ; !feof(fp); cmd_line++)
 	{
@@ -209,33 +210,10 @@ static int raspi_cli_run_script (char *script)
 			if (nrc_atcmd_send_cmd(cmd) < 0)
 				goto error_exit;
 		}
-		else if (memcmp(cmd, "HOST ", 5) == 0) /* HOST {0|1} */
-		{
-			if ((cmd_len - 5) > 1)
-				goto invalid_line;
-
-			switch (cmd[cmd_len - 1])
-			{
-				case '0':
-					log_info("HOST: 0\n");
-					nrc_atcmd_network_stack_target();
-					break;
-
-#if !defined(SUPPORT_HOST_STACK)
-				case '1':
-					log_info("HOST: 1\n");
-					nrc_atcmd_network_stack_host();
-					break;
-#endif
-				default:
-					goto invalid_line;
-			}
-		}
 		else if (memcmp(cmd, "DATA ", 5) == 0) /* DATA <length> */
 		{
 			int data_len;
 			int ret;
-			int i;
 
 			data_len = strtol(cmd + 5, NULL, 10);
 			if (errno == ERANGE || data_len <= 0)
@@ -493,45 +471,23 @@ static void raspi_cli_run_loop (void)
 			if (strlen(param) == 0)
 			{
 				log_info("ATCMD_LOG_%s\n", nrc_atcmd_log_is_on() ? "ON" : "OFF");
-				log_info("ECHO_LOG_%s\n", nrc_echo_log_is_on() ? "ON" : "OFF");
 				continue;
 			}
-			else if (memcmp(param, " atcmd ", 7) == 0)
+			else if (strcmp(param, "on") == 0)
 			{
-				param += 7;
-
-				if (strcmp(param, "on") == 0)
-				{
-					log_info("ATCMD_LOG_ON\n");
-					nrc_atcmd_log_on();
-					continue;
-				}
-				else if (strcmp(param, "off") == 0)
-				{
-					log_info("ATCMD_LOG_OFF\n");
-					nrc_atcmd_log_off();
-					continue;
-				}
+				log_info("ATCMD_LOG_ON\n");
+				nrc_atcmd_log_on();
+				continue;
 			}
-			else if (memcmp(param, " echo ", 6) == 0)
+			else if (strcmp(param, "off") == 0)
 			{
-				param += 6;
 
-				if (strcmp(param, "on") == 0)
-				{
-					log_info("ECHO_LOG_ON\n");
-					nrc_echo_log_on();
-					continue;
-				}
-				else if (strcmp(param, "off") == 0)
-				{
-					log_info("ECHO_LOG_OFF\n");
-					nrc_echo_log_off();
-					continue;
-				}
+				log_info("ATCMD_LOG_OFF\n");
+				nrc_atcmd_log_off();
+				continue;
 			}
 
-			log_info("Usage: log [{atcmd|echo} {on|off}]\n");
+			log_info("Usage: log {on|off}\n");
 			continue;
 		}
 
@@ -595,16 +551,14 @@ typedef struct
 		uint32_t flags;
 	} hif;
 
-	bool host;
-	bool echo;
 	char *script;
 } raspi_cli_opt_t;
 
 static void raspi_cli_version (void)
 {
-#define RASPI_CLI_VERSION	"1.2.2"
+	const char *version = "1.2.3";
 
-	printf("raspi-atcmd-cli version %s\n", RASPI_CLI_VERSION);
+	printf("raspi-atcmd-cli version %s\n", version);
  	printf("Copyright (c) 2019-2020  <NEWRACOM LTD>\n");
 }
 
@@ -614,33 +568,24 @@ static void raspi_cli_help (char *cmd)
 
 	printf("\n");
 	printf("Usage:\n");
-#if defined(SUPPORT_HOST_STACK)
-	printf("  $ %s -U [-H] [-D <device>] [-b <baudrate>] [-d] [-f] [-s <script>]\n", cmd);
-	printf("  $ %s -S [-H] [-D <device>] [-c <clock>] [-s <script>]\n", cmd);
-#else
 	printf("  $ %s -U [-D <device>] [-b <baudrate>] [-d] [-f] [-s <script>]\n", cmd);
 	printf("  $ %s -S [-D <device>] [-c <clock>] [-s <script>]\n", cmd);
-#endif
 	printf("\n");
 
 	printf("UART/SPI:\n");
-	printf("  -D, --device #        specify the device. (default: /dev/ttyAMA0, /dev/spidev0.0)\n");
-#if defined(SUPPORT_HOST_STACK)
-	printf("  -H, --host            use the network stack on host\n");
-#endif
-	printf("  -e, --echo            enable echo for received packets (default: disable)\n");
+	printf("  -D, --device #        specify the device. (default: %s, %s)\n", DEFAULT_SPI_DEVICE, DEFAULT_UART_DEVICE);
 	printf("  -s, --script #        specify the script file.\n");
 	printf("\n");
 
 	printf("UART:\n");
 	printf("  -U  --uart            use the UART to communicate with the target.\n");
-	printf("  -b, --baudrate #      specify the baudrate for the UART. (default: 38,400 bps)\n");
-	printf("  -f  --flowctrl        enable RTS/CTS signals for the hardware flow control on the UART. (default: disable)\n");
+	printf("  -b, --baudrate #      specify the baudrate for the UART. (default: %d bps)\n", DEFAULT_UART_BAUDRATE);
+	printf("  -f  --flowctrl        enable RTS/CTS signals for the hardware flow control on the UART. (default: off)\n");
 	printf("\n");
 
 	printf("SPI:\n");
 	printf("  -S  --spi             use the SPI to communicate with the target.\n");
-	printf("  -c, --clock #         specify the clock frequency for the SPI. (default: 16,000,000 Hz)\n");
+	printf("  -c, --clock #         specify the clock frequency for the SPI. (default: %d Hz)\n", DEFAULT_SPI_CLOCK);
 	printf("\n");
 
 	printf("Miscellaneous:\n");
@@ -650,18 +595,10 @@ static void raspi_cli_help (char *cmd)
 
 static int raspi_cli_option (int argc, char *argv[], raspi_cli_opt_t *opt)
 {
-#define DEFAULT_SPI_DEVICE		"/dev/spidev0.0"
-#define DEFAULT_SPI_CLOCK		20000000
-
-#define DEFAULT_UART_DEVICE		"/dev/ttyAMA0"
-#define DEFAULT_UART_BAUDRATE	115200
-
 	struct option opt_info[] =
 	{
 		/* UART/SPI */
 		{ "device",				required_argument,		0,		'D' },
-		{ "host",				no_argument,			0,		'H' },
-		{ "echo",				no_argument,			0,		'e' },
 		{ "script",				required_argument,		0,		's' },
 
 		/* UART */
@@ -691,17 +628,11 @@ static int raspi_cli_option (int argc, char *argv[], raspi_cli_opt_t *opt)
 	opt->hif.device = NULL;
 	opt->hif.speed = 0;
 	opt->hif.flags = 0;
-	opt->host = false;
-	opt->echo = false;
 	opt->script = NULL;
 
 	while (1)
 	{
-#if defined(SUPPORT_HOST_STACK)
-		ret = getopt_long(argc, argv, "D:Hes:Ub:fSc:vh", opt_info, &opt_idx);
-#else
-		ret = getopt_long(argc, argv, "D:es:Ub:fSc:vh", opt_info, &opt_idx);
-#endif
+		ret = getopt_long(argc, argv, "D:s:Ub:fSc:vh", opt_info, &opt_idx);
 
 		switch (ret)
 		{
@@ -736,16 +667,6 @@ static int raspi_cli_option (int argc, char *argv[], raspi_cli_opt_t *opt)
 			/* UART/SPI */
 			case 'D':
 				opt->hif.device = optarg;
-				break;
-
-#if defined(SUPPORT_HOST_STACK)
-			case 'H':
-				opt->host = true;
-				break;
-#endif
-
-			case 'e':
-				opt->echo = true;
 				break;
 
 			case 's':
@@ -821,24 +742,10 @@ int main (int argc, char *argv[])
 	if (raspi_cli_open(opt.hif.type, opt.hif.device, opt.hif.speed, opt.hif.flags) != 0)
 		return -1;
 
-	log_info("[ MODE ]\n");
-   	log_info("  - host: %s\n",opt.host ? "on" : "off");
-   	log_info("  - echo: %s\n",opt.echo ? "on" : "off");
 	log_info("\n");
-
-	if (opt.host)
-		nrc_atcmd_network_stack_host();
-	else
-		nrc_atcmd_network_stack_target();
-
-	if (opt.echo)
-		nrc_echo_enable();
 
 	if (raspi_cli_run_script(opt.script) == 0)
 		raspi_cli_run_loop();
-
-	if (opt.echo)
-		nrc_echo_disable();
 
 	raspi_cli_close();
 

@@ -41,10 +41,10 @@
 
 /**********************************************************************************************/
 
-#if defined(CONFIG_ATCMD_NRC7392)
-#define CONFIG_HIF_FIFO_MEM_SIZE		(4 * 1024)
-#else
+#if defined(NRC7292)
 #define CONFIG_HIF_FIFO_MEM_SIZE		(32 * 1024)
+#else
+#define CONFIG_HIF_FIFO_MEM_SIZE		(4 * 1024)
 #endif
 
 /*

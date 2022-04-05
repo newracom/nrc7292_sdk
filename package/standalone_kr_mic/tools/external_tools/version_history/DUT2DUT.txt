@@ -1,5 +1,5 @@
 <CURRENT VERSION>
-v2.5.2
+v2.5.3
 
 <VERSION HISTORY>
 v1.7.0
@@ -62,4 +62,7 @@ v2.5.1
 => Binary update. (EU Category-2 Blocker)
 
 v2.5.2
+=> Binary update.
+
+v2.5.3
 => Binary update.

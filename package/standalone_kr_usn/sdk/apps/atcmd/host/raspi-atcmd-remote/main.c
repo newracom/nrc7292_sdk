@@ -40,8 +40,6 @@
 
 /***************************************************************************************/
 
-#define RASPI_REMOTE_VERSION	"1.0.0"
-
 typedef struct
 {
 #define REMOTE_UDP 		(1 << 0)
@@ -73,6 +71,7 @@ typedef struct
 	};
 
 	bool echo;
+	bool verbose;
 } remote_opt_t;
 
 /***************************************************************************************/
@@ -204,38 +203,69 @@ static int remote_delete (int sockfd)
 
 static void remote_loop (int sockfd, remote_opt_t *opt)
 {
+	bool udp = !!(opt->mode & REMOTE_UDP);
 	struct sockaddr_in from;
-	int from_len;
+	int from_len = sizeof(struct sockaddr_in);
 	char buf[4096];
+	uint32_t cnt;
+	uint32_t len;
 	int ret;
 
-	while (1)
+	if (!udp)
 	{
-		ret = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr *)&from, (socklen_t *)&from_len);
-		if (ret <= 0)
-		{
-			if (errno == EAGAIN)
-				ret = 0;
-			else
-			{
-				perror("recvfrom()");
-				break;
-			}
-		}
-
-		printf("RECV: addr=%s port=%d len=%d\n", inet_ntoa(from.sin_addr), ntohs(from.sin_port), ret);
-
-		if (!opt->echo)
-			continue;
-
-		ret = sendto(sockfd, buf, ret, 0, (struct sockaddr *)&from, (socklen_t)from_len);
+		ret = getpeername(sockfd, (struct sockaddr *)&from, (socklen_t *)&from_len);
 		if (ret < 0)
 		{
-			perror("sendto()");
+			perror("getpeername()");
+			return;
+		}
+	}
+
+	for (cnt = len = 0 ; ; )	
+	{
+		if (udp)
+			ret = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr *)&from, (socklen_t *)&from_len);
+		else
+			ret = recv(sockfd, buf, sizeof(buf), 0);
+
+		if (ret == 0)
+			continue;
+		else if (ret < 0)
+		{
+			if (errno == EAGAIN)
+				continue;
+			else if (errno != 0)
+				perror("recvfrom()");
+
 			break;
 		}
 
-		printf("SEND: addr=%s port=%d len=%d\n", inet_ntoa(from.sin_addr), ntohs(from.sin_port), ret);
+		cnt++;
+		len += ret;
+
+		if (opt->verbose)
+			printf("RECV: addr=%s port=%d len=%d (%u, %u)\n", inet_ntoa(from.sin_addr), ntohs(from.sin_port), ret, cnt, len);
+		else
+			printf("RECV: %d (%u)\n", ret, len);
+
+		if (opt->echo)
+		{
+			if (udp)
+				ret = sendto(sockfd, buf, ret, 0, (struct sockaddr *)&from, (socklen_t)from_len);
+			else
+				ret = send(sockfd, buf, ret, 0);
+
+			if (ret < 0)
+			{
+				perror("sendto()");
+				break;
+			}
+
+			if (opt->verbose)
+				printf("SEND: addr=%s port=%d len=%d\n", inet_ntoa(from.sin_addr), ntohs(from.sin_port), ret);
+			else
+				printf("SEND: %d\n", ret);
+		}
 	}
 }
 
@@ -243,7 +273,9 @@ static void remote_loop (int sockfd, remote_opt_t *opt)
 
 static void remote_version (void)
 {
-	printf("raspi-atcmd-remote version %s\n", RASPI_REMOTE_VERSION);
+	const char *version = "1.1.0";
+
+	printf("raspi-atcmd-remote version %s\n", version);
  	printf("Copyright (c) 2019-2020  <NEWRACOM LTD>\n");
 }
 
@@ -308,6 +340,11 @@ static int remote_option (int argc, char *argv[], remote_opt_t *opt)
 	opt->mode = 0;
 	opt->port = 50000;
 	opt->echo = false;
+#ifdef CONFIG_VERBOSE	
+	opt->verbose = true;
+#else
+	opt->verbose = false;
+#endif
 
 	while (1)
 	{

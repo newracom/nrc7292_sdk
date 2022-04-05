@@ -8,6 +8,8 @@
 #include "lwip/snmp.h"
 #include "lwip/dhcp.h"
 #include "netif/etharp.h"
+#include "netif/bridgeif.h"
+
 #include "nrc_wifi.h"
 #include "driver_nrc.h"
 #ifdef ETH_DRIVER_ENC28J60
@@ -21,9 +23,20 @@
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
 
+#include "nrc_eth_if.h"
+
 struct netif eth_netif;
+struct netif br_netif;
+bridgeif_initdata_t bridge_data;
+#if defined(SUPPORT_ETHERNET_ACCESSPOINT)
+struct eth_addr peer_mac;
+#endif
 
 static esp_eth_mac_t *nrc_eth_mac;
+static nrc_eth_mode_t eth_mode = NRC_ETH_MODE_AP;
+static nrc_network_mode_t network_mode = NRC_NETWORK_MODE_BRIDGE;
+bool eth_dhcp_started = false;
+
 extern struct netif* nrc_netif[MAX_IF];
 
 static void print_buffer(uint8_t *buffer, uint32_t size)
@@ -105,11 +118,19 @@ static err_t eth_init( struct netif *netif )
 
 static void status_callback(struct netif *eth_if)
 {
+	struct netif *target_if;
+
+	if (network_mode == NRC_NETWORK_MODE_BRIDGE) {
+		target_if = &br_netif;
+	} else {
+		target_if = eth_if;
+	}
+
 	if (netif_is_up(eth_if)) {
-		I(TT_NET, "[%s] netif_is_up, local interface IP is %s\n",
+		if (!ip4_addr_isany_val(*netif_ip4_addr(target_if))) {
+			I(TT_NET, "[%s] netif_is_up, local interface IP is %s\n",
 					  __func__,
-					  ip4addr_ntoa(netif_ip4_addr(eth_if)));
-		if (!ip4_addr_isany_val(*netif_ip4_addr(eth_if))) {
+					  ip4addr_ntoa(netif_ip4_addr(target_if)));
 			I(TT_NET, "[%s] IP is ready\n", __func__);
 		}
 	} else {
@@ -129,6 +150,8 @@ static void link_callback(struct netif *eth_if)
 static void nrc_bind_eth_if(esp_eth_mac_t *mac)
 {
     ip4_addr_t ipaddr, netmask, gw;
+	const struct eth_addr ethbroadcast = {{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}};
+
     ip4_addr_set_zero(&gw);
     ip4_addr_set_zero(&ipaddr);
     ip4_addr_set_zero(&netmask);
@@ -139,15 +162,37 @@ static void nrc_bind_eth_if(esp_eth_mac_t *mac)
 
     /* set MAC hardware address to be used by lwIP */
     mac->get_addr(mac, eth_netif.hwaddr);
-//    netif_add(&eth_netif, &ipaddr, &netmask, &gw, NULL, eth_init, tcpip_input);
     netif_add(&eth_netif, &ipaddr, &netmask, &gw, NULL, eth_init, ethernet_input);
     netif_set_status_callback(&eth_netif, status_callback);
     netif_set_link_callback(&eth_netif, link_callback);
 
-    netif_set_default(&eth_netif);
 
+	netif_set_flags(&eth_netif, NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET);
     /* bring it up */
     netif_set_up(&eth_netif);
+
+	if (network_mode == NRC_NETWORK_MODE_BRIDGE) {
+		if (eth_mode == NRC_ETH_MODE_AP) {
+			memcpy(bridge_data.ethaddr.addr, eth_netif.hwaddr, 6);
+		} else {
+			memcpy(bridge_data.ethaddr.addr, nrc_netif[0]->hwaddr, 6);
+		}
+		bridge_data.max_ports = 2;
+		bridge_data.max_fdb_dynamic_entries = 128;
+		bridge_data.max_fdb_static_entries = 16;
+
+		netif_add(&br_netif, &ipaddr, &netmask, &gw, &bridge_data, bridgeif_init, ethernet_input);
+		bridgeif_add_port(&br_netif, &eth_netif);
+		bridgeif_add_port(&br_netif, nrc_netif[0]);
+
+		bridgeif_fdb_add(&br_netif, &ethbroadcast, BR_FLOOD);
+		netif_set_default(&br_netif);
+		netif_set_up(&br_netif);
+	} else {
+		if (eth_mode == NRC_ETH_MODE_AP) {
+			netif_set_default(&eth_netif);
+		}
+	}
 }
 
 static nrc_err_t eth_copy_buffer_to_pbuf(uint8_t *buffer, uint32_t length, struct pbuf **p)
@@ -181,17 +226,19 @@ static nrc_err_t eth_stack_input_handler(esp_eth_handle_t eth_handle, uint8_t *b
 	struct nrc_wpa_if *intf = wpa_driver_get_interface(0);
 	struct nrc_wpa_sta *sta = NULL;
 
-	if (intf) {
-		V(TT_NET, "[%s] nrc_wpa_if found...\n", __func__);
-		if (intf->is_ap) {
-			sta = nrc_wpa_find_sta(intf, ethhdr->dest.addr);
-			if (sta) {
-				V(TT_NET, "[%s] station found ...\n", __func__);
+	if (eth_mode == NRC_ETH_MODE_AP) {
+		if (intf) {
+			V(TT_NET, "[%s] nrc_wpa_if found...\n", __func__);
+			if (intf->is_ap) {
+				sta = nrc_wpa_find_sta(intf, ethhdr->dest.addr);
+				if (sta) {
+					V(TT_NET, "[%s] station found ...\n", __func__);
+				} else {
+					V(TT_NET, "[%s] station not found...\n", __func__);
+				}
 			} else {
-				V(TT_NET, "[%s] station not found...\n", __func__);
+				V(TT_NET, "[%s] nrc_wpa_if not AP...\n", __func__);
 			}
-		} else {
-			V(TT_NET, "[%s] nrc_wpa_if not AP...\n", __func__);
 		}
 	}
 	V(TT_NET, "[%s] buffer of size %d received...\n", __func__, length);
@@ -207,66 +254,17 @@ static nrc_err_t eth_stack_input_handler(esp_eth_handle_t eth_handle, uint8_t *b
 	switch (htons(ethhdr->type)) {
 		/* IP or ARP packet? */
 		case ETHTYPE_ARP:
-			hdr = (struct etharp_hdr *) (buffer + sizeof(struct eth_hdr));
-			V(TT_NET, "[%s] arp: ip in header 0x%x 0x%x\n",  __func__, hdr->dipaddr.addrw[0], hdr->dipaddr.addrw[1]);
-			IPADDR_WORDALIGNED_COPY_TO_IP4_ADDR_T(&dipaddr, &hdr->dipaddr);
-			IPADDR_WORDALIGNED_COPY_TO_IP4_ADDR_T(&sipaddr, &hdr->sipaddr);
-			V(TT_NET, "[%s] arp: dest ip received %s\n",  __func__, ip4addr_ntoa(&dipaddr));
-			V(TT_NET, "[%s] arp: src ip received %s\n",  __func__, ip4addr_ntoa(&sipaddr));
-			V(TT_NET, "[%s] arp: my ip addr %s\n", __func__, ip4addr_ntoa(netif_ip4_addr(&eth_netif)));
-
-			if ((memcmp(ethhdr->dest.addr, eth_broadcast, ETH_HWADDR_LEN) == 0)
-				 && (memcmp(ethhdr->src.addr, eth_netif.hwaddr, ETH_HWADDR_LEN) == 0)) {
-				V(TT_NET, "[%s] arp packet sent by us, dropping...\n", __func__);
-			} else if (ip4_addr_cmp(&dipaddr, netif_ip4_addr(&eth_netif))) {
-				V(TT_NET, "[%s] arp packet destined to us...\n", __func__);
-				if (eth_copy_buffer_to_pbuf(buffer, length, &p) == NRC_FAIL) {
-					free(buffer);
-					return NRC_FAIL;
-				} else {
-					eth_netif.input(p, &eth_netif);
-				}
-			} else {
-				if (sta) {
-					if (netif_is_up(nrc_netif[SOFTAP_IF])) {
-						V(TT_NET, "[%s] arp packet destined to someone else sending to softAP IF...\n", __func__);
-						nrc_transmit_from_8023(nrc_netif[SOFTAP_IF]->num, buffer, length);
-					}
-				}
-			}
-			break;
 #if PPPOE_SUPPORT
 		/* PPPoE packet? */
 		case ETHTYPE_PPPOEDISC:
 		case ETHTYPE_PPPOE:
 #endif /* PPPOE_SUPPORT */
 		case ETHTYPE_IP:
-			iphdr = (struct ip_hdr *) (buffer + sizeof(struct eth_hdr));
-			IPADDR_WORDALIGNED_COPY_TO_IP4_ADDR_T(&dipaddr, &iphdr->dest);
-			IPADDR_WORDALIGNED_COPY_TO_IP4_ADDR_T(&sipaddr, &iphdr->src);
-			V(TT_NET, "[%s] destination address %s\n", __func__, ip4addr_ntoa(&dipaddr));
-			V(TT_NET, "[%s] source address %s\n", __func__, ip4addr_ntoa(&sipaddr));
-			/* full packet send to tcpip_thread to process */
-            if (((memcmp(ethhdr->dest.addr, eth_broadcast, ETH_HWADDR_LEN) == 0)
-                 && (memcmp(ethhdr->src.addr, eth_netif.hwaddr, ETH_HWADDR_LEN) == 0)) ||
-				(memcmp(ethhdr->dest.addr, eth_netif.hwaddr, ETH_HWADDR_LEN) == 0)) {
-				V(TT_NET, "[%s] IP packet received for us...\n", __func__);
-				if (eth_copy_buffer_to_pbuf(buffer, length, &p) == NRC_FAIL) {
-					free(buffer);
-					return NRC_FAIL;
-				} else {
-					eth_netif.input(p, &eth_netif);
-				}
-			} else if(ip4_addr_cmp(&sipaddr, netif_ip4_addr(&eth_netif))
-					  && (sta == NULL)) {
-				V(TT_NET, "[%s] IP packet sent by us received, not sending to softAP IF...\n", __func__);
+			if (eth_copy_buffer_to_pbuf(buffer, length, &p) == NRC_FAIL) {
+				free(buffer);
+				return NRC_FAIL;
 			} else {
-				if (sta) {
-					if (netif_is_up(nrc_netif[SOFTAP_IF])) {
-						V(TT_NET, "[%s] IP packet received for someone else sending to softAP IF...\n", __func__);
-						nrc_transmit_from_8023(nrc_netif[SOFTAP_IF]->num, buffer, length);
-					}
-				}
+				eth_netif.input(p, &eth_netif);
 			}
 			break;
 
@@ -283,20 +281,42 @@ static nrc_err_t eth_linkup_handler(esp_eth_handle_t eth_handle)
 {
 	I(TT_NET, "[%s] ethernet link detected...\n", __func__);
 	netif_set_link_up(&eth_netif);
-	dhcp_start(&eth_netif);
+
+	if (eth_mode == NRC_ETH_MODE_AP) {
+		if (network_mode == NRC_NETWORK_MODE_BRIDGE) {
+			dhcp_start(&br_netif);
+		} else {
+			dhcp_start(&eth_netif);
+		}
+		eth_dhcp_started = true;
+	} else {
+		eth_dhcp_started = false;
+	}
 	return NRC_SUCCESS;
 }
 
 static nrc_err_t eth_linkdown_handler(esp_eth_handle_t eth_handle)
 {
 	I(TT_NET, "[%s] ethernet disconnected...\n", __func__);
-	dhcp_stop(&eth_netif);
-	dhcp_cleanup(&eth_netif);
 
-	ip4_addr_set_zero(&eth_netif.ip_addr);
-	ip4_addr_set_zero(&eth_netif.netmask);
-	ip4_addr_set_zero(&eth_netif.gw);
-
+	if (network_mode == NRC_NETWORK_MODE_BRIDGE) {
+		if (eth_mode == NRC_ETH_MODE_AP) {
+			if (eth_dhcp_started) {
+				dhcp_stop(&br_netif);
+				dhcp_cleanup(&br_netif);
+			}
+		}
+#if defined(SUPPORT_ETHERNET_ACCESSPOINT)
+		else {
+			memset(peer_mac.addr, 0, ETH_HWADDR_LEN);
+		}
+#endif
+	} else {
+		if (eth_dhcp_started) {
+			dhcp_stop(&eth_netif);
+			dhcp_cleanup(&eth_netif);
+		}
+	}
 	netif_set_link_down(&eth_netif);
 	return NRC_SUCCESS;
 }
@@ -307,7 +327,37 @@ void nrc_eth_raw_transmit(uint8_t *buffer, uint32_t length)
 	nrc_eth_mac->transmit(nrc_eth_mac, buffer, length);
 }
 
-nrc_err_t ethernet_init(void)
+nrc_err_t set_ethernet_mode(nrc_eth_mode_t mode)
+{
+	eth_mode = mode;
+
+	if (eth_mode == NRC_ETH_MODE_STA) {
+		if (eth_dhcp_started) {
+			dhcp_stop(&eth_netif);
+			dhcp_cleanup(&eth_netif);
+		}
+	}
+	return NRC_SUCCESS;
+}
+
+nrc_eth_mode_t get_ethernet_mode()
+{
+	return eth_mode;
+}
+
+nrc_err_t set_network_mode(nrc_network_mode_t mode)
+{
+	network_mode = mode;
+
+	return NRC_SUCCESS;
+}
+
+nrc_network_mode_t get_network_mode()
+{
+	return network_mode;
+}
+
+nrc_err_t ethernet_init(uint8_t *mac_addr)
 {
     eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
     mac_config.smi_mdc_gpio_num = -1;
@@ -341,13 +391,18 @@ nrc_err_t ethernet_init(void)
     /* ENC28J60 doesn't burn any factory MAC address, we need to set it manually.
        02:00:00 is a Locally Administered OUI range so should not be used except when testing on a LAN under your control.
     */
-    mac->set_addr(mac, (uint8_t[]) {
+	if (mac_addr == NULL) {
+		mac->set_addr(mac, (uint8_t[]) {
 #ifdef ETH_DRIVER_ENC28J60
         0x02, 0x00, 0x00, 0x12, 0x28, 0x60
 #else
-        0x02, 0x00, 0x00, 0x12, 0x55, 0x00
+		0x02, 0x00, 0x00, 0x12, 0x55, 0x00
 #endif
-    });
+		});
+	} else {
+		mac->set_addr(mac, mac_addr);
+	}
+
     /* set ethernet interface in promiscuous mode to act as bridge */
 	mac->set_promiscuous(mac, true);
 
@@ -359,5 +414,18 @@ nrc_err_t ethernet_init(void)
 		nrc_usr_print("[%s] Error starting ethernet...\n", __func__);
 		return NRC_FAIL;
 	}
+
 	return NRC_SUCCESS;
 }
+
+#if defined(SUPPORT_ETHERNET_ACCESSPOINT)
+void set_peer_mac(const uint8_t *eth)
+{
+	memcpy(peer_mac.addr, eth, ETH_HWADDR_LEN);
+}
+
+struct eth_addr *get_peer_mac()
+{
+	return &peer_mac;
+}
+#endif

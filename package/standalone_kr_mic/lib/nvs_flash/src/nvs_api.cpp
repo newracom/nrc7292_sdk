@@ -153,8 +153,6 @@ extern "C" nvs_err_t nvs_flash_erase_partition(const char *part_name)
 	uint32_t address;
 	if (strcmp (part_name, "USER_CONFIG_1") == 0) {
 		address = SF_USER_CONFIG_1;
-	} else if (strcmp (part_name, "USER_CONFIG_2") == 0) {
-		address = SF_USER_CONFIG_3;
 	} else {
 		return NVS_ERR_NVS_PART_NOT_FOUND;
 	}

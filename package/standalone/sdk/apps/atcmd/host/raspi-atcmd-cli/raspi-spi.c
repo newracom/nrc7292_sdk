@@ -66,15 +66,15 @@ static int raspi_spi_get_mode (uint32_t *mode)
 #endif
 }
 
-static int raspi_spi_set_lsb_first (uint8_t lsb_first)
+/* static int raspi_spi_set_lsb_first (uint8_t lsb_first)
 {
 	return raspi_spi_ioctl(SPI_IOC_WR_LSB_FIRST, &lsb_first);
-}
+} */
 
-static int raspi_spi_get_lsb_first (uint8_t *lsb_first)
+/* static int raspi_spi_get_lsb_first (uint8_t *lsb_first)
 {
 	return raspi_spi_ioctl(SPI_IOC_RD_LSB_FIRST, lsb_first);
-}
+} */
 
 static int raspi_spi_set_bits_per_word (uint8_t bits_per_word)
 {

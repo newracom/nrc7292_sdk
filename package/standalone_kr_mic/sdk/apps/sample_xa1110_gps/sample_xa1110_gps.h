@@ -25,20 +25,21 @@
 
 #define GPS_USE_RPI_PINS 0 // 0: Standalone Mode, 1: Raspberry Pi Test Mode
 
-#define GPS_I2C_CHANNEL 0
+#define GPS_I2C_CHANNEL I2C_MASTER_0
 #define GPS_I2C_ADDRESS 0x10
 #define GPS_I2C_SCL     16
 #define GPS_I2C_SDA     17
 #define GPS_I2C_CLOCK   400000
-#define GPS_I2C_ADDRESS 0x10
+#define GPS_I2C_CLOCK_SOURCE 0 /* 0:Clock controller 1:PCLK */
+#define GPS_I2C_DATA_WIDTH I2C_8BIT
 
 #define GPS_LINE_BUF_SIZE 255
 
 //#define GPS_HANDLE_PARSED_FIELD_ENABLED 1
 //#define GPS_SINGLE_TARGET_HEADER  "$GNGGA"  // Comment this out to handle all headers.
 
-static int  gps_init();
-static int  gps_read_byte(int loc);
+static void gps_init(i2c_device_t* i2c);
+static int gps_read_byte(i2c_device_t* i2c);
 static void gps_handle_headered_line(char *s);
 static void gps_handle_parsed_field(char *header, int field_index, char *data);
 

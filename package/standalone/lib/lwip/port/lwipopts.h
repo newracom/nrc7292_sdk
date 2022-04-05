@@ -293,7 +293,7 @@ a lot of data that needs to be copied, this should be set high. */
 /* Define IP_FORWARD to 1 if you wish to have the ability to forward
    IP packets across network interfaces. If you are going to run lwIP
    on a device with only one network interface, define this to 0. */
-#define IP_FORWARD              0
+#define IP_FORWARD              1
 
 /* IP reassembly and segmentation.These are orthogonal even
  * if they both deal with IP fragments */
@@ -339,7 +339,7 @@ a lot of data that needs to be copied, this should be set high. */
 #define SYS_STATS  1
 #endif /* STATS */
 
-#define LWIP_PROVIDE_ERRNO 1
+#define LWIP_ERRNO_STDINCLUDE 1
 
 /* Used with IP headers only */
 #define LWIP_CHKSUM_ALGORITHM 1
@@ -373,6 +373,11 @@ a lot of data that needs to be copied, this should be set high. */
 #define LWIP_FREERTOS_SYS_ARCH_PROTECT_USES_MUTEX     1
 #define LWIP_FREERTOS_SYS_ARCH_NOT_USE_RECURSIVE_MUTEX 1
 
-#define	ETHARP_SUPPORT_STATIC_ENTRIES	1
+#define ETHARP_SUPPORT_STATIC_ENTRIES	1
 
+#define LWIP_NUM_NETIF_CLIENT_DATA 1
+
+/* allow to use thread-safe functions to add/remove netif in list,
+ and to start/stop dhcp clients, using new functions from netifapi.h. */
+#define LWIP_NETIF_API 1
 #endif /* __LWIPOPTS_H__ */

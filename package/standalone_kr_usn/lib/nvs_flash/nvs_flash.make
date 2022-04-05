@@ -12,6 +12,8 @@ SRCS += \
 	nvs_storage.cpp \
 	nvs_types.cpp \
 	cpp_config.cpp
-#	nvs_encrypted_partition.cpp \
+#	nvs_encrypted_partition.cpp
+
+CSRCS += util_cmd_nvs.c
 
 # DEFINE += -DNVS_DEBUG

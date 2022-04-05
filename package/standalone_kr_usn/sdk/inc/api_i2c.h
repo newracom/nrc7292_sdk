@@ -26,82 +26,114 @@
 #ifndef __NRC_API_I2C_H__
 #define __NRC_API_I2C_H__
 
+typedef enum {
+	I2C_MASTER_0,
+	I2C_MASTER_1,
+	I2C_MASTER_2,
+	I2C_MASTER_MAX
+}I2C_CONTROLLER_ID;
+
+typedef enum {
+	I2C_WIDTH_8BIT,
+	I2C_WIDTH_16BIT
+}I2C_WIDTH;
+
+typedef enum {
+	I2C_CLOCK_CONTROLLER,
+	I2C_CLOCK_PCLK
+}I2C_CLOCK_SOURCE;
+
+typedef struct i2c_device {
+	uint8_t pin_sda; /* SDA pin */
+	uint8_t pin_scl; /* SCL pin */
+	uint8_t clock_source; /* clock source, 0:clock controller, 1:PCLK */
+	uint8_t controller; /* ID of i2c controller to use */
+	uint32_t clock; /* i2c clock (hz) */
+	uint32_t width; /* i2c data width */
+	uint32_t address; /* i2c address */
+} i2c_device_t;
 
 /**********************************************
- * @fn nrc_err_t nrc_i2c_init(uint32_t clk)
+ * @fn nrc_err_t nrc_i2c_init(i2c_device_t* i2c)
  *
  * @brief Initialize I2C controller
  *
- * @param scl: Clock line for i2c
- *
- * @param sda: Data line for i2c
- *
- * @param clk: Clock speed of I2C controller. It can be set up to 400,000Hz.
+ * @param i2c_device_t* : i2c device config
  *
  * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-nrc_err_t nrc_i2c_init(uint8_t scl, uint8_t sda, uint32_t clk);
+nrc_err_t nrc_i2c_init(i2c_device_t* i2c);
 
 
 /**********************************************
- * @fn nrc_err_t nrc_i2c_enable(bool enable)
+ * @fn nrc_err_t nrc_i2c_enable(i2c_device_t* i2c, bool enable)
  *
  * @brief Enable or disable I2C. And, DO NOT disable I2C while a transaction is in progress.
  * Please disable I2C only after a transaction is stopped.
+ *
+ * @param i2c_device_t* : i2c device config
  *
  * @param enable: true(enable) or false(disable)
  *
  * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-nrc_err_t nrc_i2c_enable(bool enable);
+nrc_err_t nrc_i2c_enable(i2c_device_t* i2c, bool enable);
 
 
 /**********************************************
- * @fn nrc_err_t nrc_i2c_reset(void)
+ * @fn nrc_err_t nrc_i2c_reset(i2c_device_t* i2c)
  *
  * @brief Reset I2C controller
  *
- * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
- ***********************************************/
-nrc_err_t nrc_i2c_reset(void);
-
-
-/**********************************************
- * @fn nrc_err_t nrc_i2c_start(void)
- *
- * @brief Start I2C operation
+ * @param i2c_device_t* : i2c device config
  *
  * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-nrc_err_t nrc_i2c_start(void);
+nrc_err_t nrc_i2c_reset(i2c_device_t* i2c);
 
 
 /**********************************************
- * @fn nrc_err_t nrc_i2c_stop(void)
+ * @fn nrc_err_t nrc_i2c_start(i2c_device_t* i2c)
+ *
+ * @param i2c_device_t* : i2c device config
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_i2c_start(i2c_device_t* i2c);
+
+
+/**********************************************
+ * @fn nrc_err_t nrc_i2c_stop(i2c_device_t* i2c)
  *
  * @brief Stop I2C operation
  *
+ * @param i2c_device_t* : i2c device config
+ *
  * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-nrc_err_t nrc_i2c_stop(void);
+nrc_err_t nrc_i2c_stop(i2c_device_t* i2c);
 
 
 /**********************************************
- * @fn nrc_err_t nrc_i2c_writebyte(uint8_t data)
+ * @fn nrc_err_t nrc_i2c_writebyte(i2c_device_t* i2c, uint8_t data)
  *
  * @brief Write data
+ *
+ * @param i2c_device_t* : i2c device config
  *
  * @param data: data to write
  *
  * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-nrc_err_t nrc_i2c_writebyte(uint8_t data);
+nrc_err_t nrc_i2c_writebyte(i2c_device_t* i2c, uint8_t data);
 
 
 /**********************************************
- * @fn bool nrc_i2c_readbyte(uint8_t *data, bool ack)
+ * @fn bool nrc_i2c_readbyte(i2c_device_t* i2c, uint8_t *data, bool ack)
  *
  * @brief Read data using I2C
+ *
+ * @param i2c_device_t* : i2c device config
  *
  * @param data: data to read
  *
@@ -109,5 +141,5 @@ nrc_err_t nrc_i2c_writebyte(uint8_t data);
  *
  * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-nrc_err_t nrc_i2c_readbyte(uint8_t *data, bool ack);
+nrc_err_t nrc_i2c_readbyte(i2c_device_t* i2c, uint8_t *data, bool ack);
 #endif /* __NRC_API_I2C_H__ */

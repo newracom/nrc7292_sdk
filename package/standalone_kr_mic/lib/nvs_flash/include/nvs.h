@@ -38,7 +38,7 @@ void hal_uart_printf(const char *f, ...);
 
 /* Use User_Config_1, User_Config_2, and User_config_3 */
 #define SPI_SECTORS_USED                    3
-#define SPI_FLASH_SEC_SIZE                  4096
+#define SPI_FLASH_SEC_SIZE                  (1024 * 4)
 #define MIN_PARTITION_SIZE                  (SPI_FLASH_SEC_SIZE * SPI_SECTORS_USED)
 
 #define NVS_OK                              0

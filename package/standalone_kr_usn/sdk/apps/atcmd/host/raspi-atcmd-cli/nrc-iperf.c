@@ -37,19 +37,6 @@ extern void print_hex_dump (const void *buf, size_t len, int ascii);
 
 /**********************************************************************************************/
 
-static int iperf_get_time (iperf_time_t *time)
-{
-	struct timespec s_time;
-
-	if (clock_gettime(CLOCK_REALTIME, &s_time) != 0)
-		return -errno;
-
-	*time = s_time.tv_sec;
-	*time += (s_time.tv_nsec / 1000) / 1000000.;
-
-	return 0;
-}
-
 static uint32_t byte_to_bps (iperf_time_t time, uint32_t byte)
 {
 	return (8 * byte) / time;
@@ -99,6 +86,55 @@ static char *bps_to_string (uint32_t bps)
 
 /**********************************************************************************************/
 
+static int iperf_get_time (iperf_time_t *time)
+{
+	struct timespec s_time;
+
+	if (clock_gettime(CLOCK_REALTIME, &s_time) != 0)
+		return -errno;
+
+	*time = s_time.tv_sec;
+	*time += (s_time.tv_nsec / 1000) / 1000000.;
+
+	return 0;
+}
+
+static bool iperf_is_ip4addr (const char *addr)
+{
+	char c;
+	int len;
+	int dot;
+	int i;
+
+	if (!addr)
+		return false;
+
+	len = strlen(addr);
+	if (len < STR_IP4ADDR_LEN_MIN || len > STR_IP4ADDR_LEN_MAX)
+		return false;
+
+	for (dot = 0, i = 0 ; i < len ; i++)
+	{
+		c = addr[i];
+
+		if (c == '.')
+		{		
+			dot++;
+			continue;
+		}
+
+		if (c < '0' || c > '9')
+			return false;
+	}
+
+	if (c == '.' || dot != 3)
+		return false;
+
+	return true;
+}
+
+/**********************************************************************************************/
+
 static bool g_iperf_socket_send_idle = true;
 static bool g_iperf_socket_send_passthrough = false;
 static int s_socket_id = -1;
@@ -112,7 +148,7 @@ static void iperf_tcp_client_recv_callback (atcmd_rxd_t *rxd, char *data);
 static void iperf_tcp_server_event_callback (enum ATCMD_EVENT event, int argc, char *argv[]);
 static void iperf_tcp_client_event_callback (enum ATCMD_EVENT event, int argc, char *argv[]);
 
-static void iperf_socket_print (iperf_socket_t *socket)
+/* static void iperf_socket_print (iperf_socket_t *socket)
 {
 	iperf_log("[ socket info ]\n");
 	iperf_log(" - id: %d\n", socket->id);
@@ -121,7 +157,7 @@ static void iperf_socket_print (iperf_socket_t *socket)
 	iperf_log(" - local_port: %u\n", socket->local_port);
 	iperf_log(" - remote_port: %u\n", socket->remote_port);
 	iperf_log(" - remote_addr: %s\n", socket->remote_addr);
-}
+} */
 
 static void iperf_socket_init (iperf_socket_t *socket)
 {
@@ -739,7 +775,7 @@ static void iperf_udp_server_recv_callback (atcmd_rxd_t *rxd, char *data)
 	socket.protocol = IPERF_PROTO_UDP;
 	socket.local_port = 0;
 	socket.remote_port = rxd->remote_port;
-	nrc_atcmd_param_to_str(rxd->remote_addr, socket.remote_addr, IPERF_IPADDR_LEN_MAX);
+	nrc_atcmd_param_to_str(rxd->remote_addr, socket.remote_addr, sizeof(socket.remote_addr));
 
 /*	iperf_debug("server_rx, id=%d len=%d remote=%s,%d\n",
 				rxd->id, rxd->len, rxd->remote_addr, rxd->remote_port); */
@@ -841,7 +877,7 @@ static void iperf_udp_client_report (iperf_time_t start_time, iperf_time_t end_t
 					byte_to_string(byte), bps_to_string(bps));
 }
 
-static void iperf_udp_client_report_from_server (iperf_server_header_t *header)
+/* static void iperf_udp_client_report_from_server (iperf_server_header_t *header)
 {
 	iperf_time_t time = ntohl(header->stop_sec) + (ntohl(header->stop_usec) / 1000000.);
 	int32_t byte = ntohl(header->total_len2);
@@ -857,7 +893,7 @@ static void iperf_udp_client_report_from_server (iperf_server_header_t *header)
 					jitter / 1000.,
 					errors, datagrams,
 					(errors * 100.) / datagrams);
-}
+} */
 
 static int iperf_udp_client_run (iperf_socket_t *socket, iperf_opt_t *option)
 {
@@ -979,7 +1015,7 @@ static void iperf_udp_client_recv_callback (atcmd_rxd_t *rxd, char *data)
 	socket.protocol = IPERF_PROTO_UDP;
 	socket.local_port = 0;
 	socket.remote_port = rxd->remote_port;
-	nrc_atcmd_param_to_str(rxd->remote_addr, socket.remote_addr, IPERF_IPADDR_LEN_MAX);
+	nrc_atcmd_param_to_str(rxd->remote_addr, socket.remote_addr, sizeof(socket.remote_addr));
 
 /*	iperf_debug("client_rx, id=%d len=%d remote=%s,%d\n",
 				rxd->id, rxd->len, rxd->remote_addr, rxd->remote_port); */
@@ -1126,6 +1162,11 @@ static void iperf_tcp_server_recv (iperf_socket_t *socket, char *buf, int len)
 
 			info->start_time = rx_time;
 			info->start = true;
+			
+			memcpy(&info->client, socket, sizeof(iperf_socket_t));
+			
+			iperf_log(" Connected with client: %s port %u\n",
+							info->client.remote_addr, info->client.remote_port);
 		}
 
 		info->recv_byte += len;
@@ -1136,20 +1177,25 @@ static void iperf_tcp_server_recv (iperf_socket_t *socket, char *buf, int len)
 
 static void iperf_tcp_server_recv_callback (atcmd_rxd_t *rxd, char *data)
 {
-	iperf_socket_t socket;
+	iperf_tcp_server_info_t *info = &g_iperf_tcp_server_info;
 
-	iperf_socket_init(&socket);
+	if (info->client.id > 0 && info->client.id == rxd->id)
+	{	
+		iperf_socket_t socket;
 
-	socket.id = rxd->id;
-	socket.protocol = IPERF_PROTO_TCP;
-	socket.local_port = 0;
-	socket.remote_port = rxd->remote_port;
-	nrc_atcmd_param_to_str(rxd->remote_addr, socket.remote_addr, IPERF_IPADDR_LEN_MAX);
+		iperf_socket_init(&socket);
 
-/*	iperf_debug("server_rx, id=%d len=%d remote=%s,%d\n",
-				rxd->id, rxd->len, rxd->remote_addr, rxd->remote_port); */
+		socket.id = rxd->id;
+		socket.protocol = IPERF_PROTO_TCP;
+		socket.local_port = 0;
+		socket.remote_port = rxd->remote_port;
+		nrc_atcmd_param_to_str(rxd->remote_addr, socket.remote_addr, sizeof(socket.remote_addr));
 
-	iperf_tcp_server_recv(&socket, data, rxd->len);
+/*		iperf_debug("server_rx, id=%d len=%d remote=%s,%d\n",
+			rxd->id, rxd->len, rxd->remote_addr, rxd->remote_port); */
+
+		iperf_tcp_server_recv(&socket, data, rxd->len);
+	}
 }
 
 static void iperf_tcp_server_event_callback (enum ATCMD_EVENT event, int argc, char *argv[])
@@ -1169,7 +1215,7 @@ static void iperf_tcp_server_event_callback (enum ATCMD_EVENT event, int argc, c
 
 			info->client.id = atoi(argv[0]);
 
-			iperf_log(" Connected with client: id=%d\n", info->client.id);
+/*			iperf_log(" Connected with client: id=%d\n", info->client.id); */
 			break;
 
 		case ATCMD_SEVENT_CLOSE:
@@ -1378,7 +1424,7 @@ static void iperf_tcp_client_recv_callback (atcmd_rxd_t *rxd, char *data)
 	socket.protocol = IPERF_PROTO_TCP;
 	socket.local_port = 0;
 	socket.remote_port = rxd->remote_port;
-	nrc_atcmd_param_to_str(rxd->remote_addr, socket.remote_addr, IPERF_IPADDR_LEN_MAX);
+	nrc_atcmd_param_to_str(rxd->remote_addr, socket.remote_addr, sizeof(socket.remote_addr));
 
 	iperf_debug("client_rx, id=%d len=%d remote=%s,%d\n",
 				rxd->id, rxd->len, rxd->remote_addr, rxd->remote_port);
@@ -1412,7 +1458,7 @@ static void iperf_option_init (iperf_opt_t *option)
 {
 	memset(option, 0, sizeof(iperf_opt_t));
 
-	option->server = false;
+	option->server = true;
 	option->udp = false;
 	option->passthrough = false;
 	option->negative = false;
@@ -1474,14 +1520,21 @@ static int iperf_option_parse (int argc, char *argv[], iperf_opt_t *option)
 {
 	static struct option opt_info[] =
 	{
-		{ "server",			no_argument,			0, 	's' },
-		{ "client",			required_argument,		0, 	'c' },
+		/* Client/Server */
+		{ "interval",		required_argument,		0, 	'i' },
 		{ "port",			required_argument,		0, 	'p' },
 		{ "udp",			no_argument,			0, 	'u' },
+
+		/* Server */
+		{ "server",			no_argument,			0, 	's' },
+
+		/* Client */
+		{ "client",			required_argument,		0, 	'c' },
 		{ "time",			required_argument,		0, 	't' },
-		{ "interval",		required_argument,		0, 	'i' },
 		{ "passthrough",	no_argument,	    	0, 	'P' },
 		{ "negative",		no_argument,			0, 	'N' },
+
+		/* Miscellaneous */
 		{ "help",			no_argument,			0,	'h' },
 
 		{ 0, 0, 0, 0 }
@@ -1493,7 +1546,7 @@ static int iperf_option_parse (int argc, char *argv[], iperf_opt_t *option)
 
 	for (optind = 0 ; ; )
 	{
-		ret = getopt_long(argc, argv, "sc:p:ut:i:PNh", opt_info, &opt_idx);
+		ret = getopt_long(argc, argv, "i:p:usc:t:PNh", opt_info, &opt_idx);
 
 		switch (ret)
 		{
@@ -1509,13 +1562,11 @@ static int iperf_option_parse (int argc, char *argv[], iperf_opt_t *option)
 			   	iperf_option_print(option);
 				return 0;
 
-			case 's': // server
-				option->server = true;
-				break;
-
-			case 'c': // client
-				option->server = false;
-				strncpy(option->server_ip, optarg, IPERF_IPADDR_LEN_MAX);
+			/*
+			 * Client/Server 
+			 */
+			case 'i': // interval
+				option->report_interval = atoi(optarg);
 				break;
 
 			case 'p': // port
@@ -1526,12 +1577,30 @@ static int iperf_option_parse (int argc, char *argv[], iperf_opt_t *option)
 				option->udp = true;
 				break;
 
-			case 't': // time
-				option->send_time = atoi(optarg);
+			/*
+			 * Server 
+			 */
+			case 's': // server
+				option->server = true;
 				break;
 
-			case 'i': // interval
-				option->report_interval = atoi(optarg);
+			/*
+			 * Client 
+			 */
+			case 'c': // client
+				option->server = false;
+
+				if (strlen(optarg) > IPERF_IPADDR_LEN_MAX)
+					return -1;
+
+				if (!iperf_is_ip4addr(optarg))
+					return -1;
+
+				strcpy(option->server_ip, optarg);
+				break;
+
+			case 't': // time
+				option->send_time = atoi(optarg);
 				break;
 
 			case 'P': // passthrough
@@ -1542,9 +1611,12 @@ static int iperf_option_parse (int argc, char *argv[], iperf_opt_t *option)
 				option->negative = true;
 				break;
 
+			/*
+			 * Miscellaneous 
+			 */
 			case 'h': // help
 				iperf_option_help(argv[0]);
-				return -1;
+				return 1;
 
 			default:
 				iperf_error("ret=%c(0x%X), optind=%d optopt=%c\n", ret, ret, optind, optopt);
@@ -1566,21 +1638,37 @@ static int _iperf_main (int argc, char *argv[])
 
 	iperf_log("\r\n");
 
-	if (iperf_option_parse(argc, argv, &option) != 0)
-		return -1;
+	switch (iperf_option_parse(argc, argv, &option))
+	{
+		case 0:
+			break;
 
-	iperf_socket_init(&socket);
+		case 1: /* help */
+			return 0;
 
+		default:
+			iperf_log("invalid option\n");
+			return -1;
+	}
+
+/*	iperf_socket_init(&socket); */
+
+	socket.id = -1;
 	socket.protocol = option.udp ? IPERF_PROTO_UDP : IPERF_PROTO_TCP;
 	if (option.server)
+	{
 		socket.local_port = option.server_port;
+		socket.remote_port = 0;
+		strcpy(socket.remote_addr, IPERF_IPADDR_ANY);
+	}
 	else
 	{
 		if (option.udp)
 			socket.local_port = IPERF_DEFAULT_CLIENT_PORT;
-
+		else
+			socket.local_port = 0;
 		socket.remote_port = option.server_port;
-		strncpy(socket.remote_addr, option.server_ip, IPERF_IPADDR_LEN_MAX);
+		strcpy(socket.remote_addr, option.server_ip);
 	}
 
 /*	iperf_socket_print(&socket); */

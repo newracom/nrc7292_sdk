@@ -161,6 +161,22 @@ tWIFI_STATUS nrc_wifi_set_scan_freq(int index, uint16_t *freq, uint8_t num_freq)
 
 
 /**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_scan_freq(int index, uint16_t *freq, uint8_t *num_freq)
+ *
+ * @brief Set scan list for scan AP
+ *
+ * @param index: network index
+ *
+ * @param freq: freq list to scan
+ *
+ * @param num_freq: num of freq
+
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_scan_freq(int index, uint16_t *freq, uint8_t *num_freq);
+
+
+/**********************************************
  * @fn tWIFI_STATUS nrc_wifi_get_bssid(char *bssid)
  *
  * @brief Get the BSSID of the AP to establish connection

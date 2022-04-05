@@ -76,6 +76,8 @@ const CHANNEL_MAPPING_TABLE *get_s1g_channel_item_by_channel_number(uint8_t inde
 uint8_t APGetChID(const uint16_t nons1g_freq);
 uint8_t APGetS1GChID(const uint16_t nons1g_freq);
 uint8_t APGetOperClass(const uint8_t s1g_freq_index);
+uint8_t STAGetS1GChNum(uint8_t center_freq_index);
+uint16_t STAGetS1GFreq(const uint16_t nons1g_freq);
 uint8_t STAGetNonS1GChNum(uint8_t center_freq_index);
 uint16_t STAGetNoneS1GFreq(const uint16_t s1g_freq);
 uint8_t GetS1GCCAType(uint16_t center_freq);
@@ -87,5 +89,6 @@ void UpdateChannelTable(uint16_t size, uint8_t *table);
 void ShowChannelTable();
 bool CheckSupportS1GFreq(const uint16_t s1g_freq);
 bool SetChannelByIdx(uint8_t index);
+uint32_t GetS1GFreqByNonS1GFreq(const uint16_t nons1g_freq);
 #endif /* !defined(CUNIT) */
 #endif    // UMAC_S1G_CHANNEL_H

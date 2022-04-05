@@ -67,6 +67,18 @@ ifeq ($(CONFIG_NEW_TASK_ARCH),y)
 CONFIG_WDT=n
 endif
 
+# CLI
+CONFIG_CLI=y
+
+# DEBUG (DEBUG, TRACKER, Statistics, etc.)
+CONFIG_DEBUG=y
+
+# PRINT Console LOG
+CONFIG_LOG=y
+
+# USE CENTER LO for 1M BW
+CONFIG_1MBW_CENTER_LO=y
+
 # (only for CM3) USE PRIMASK-based INT Lock (y:PRIMASK, n:BASEPRI)
 CONFIG_PRIMASK_INT_LOCK=n
 
@@ -91,10 +103,42 @@ else
 CONFIG_RUNRAM=y
 endif
 
+CONFIG_UCODE=y
+CONFIG_WPS_PS_HOOK=y
+
+# GDMA COPY for Data & BSS
+CONFIG_DMA_COPY=y
+
+ifneq ($(findstring usn, $(ALIAS)), )
+# USE KR USN BAND
+CONFIG_KR_USN_CHANNEL=y
+# USE KR MIC BAND should be disabled (mutually exclusive betwen KR MIC and USN band)
+CONFIG_KR_MIC_CHANNEL=n
+endif
+
+# Use KR Wireless MIC Band
+ifneq ($(findstring mic, $(ALIAS)), )
+# Use KR Wireless MIC Band
+CONFIG_KR_MIC_CHANNEL=y
+# Use 2MBW TX under 4MBW operation
+CONFIG_4M_OP_2M_TX=n
+# USE KR USN BAND should be disabled (mutually exclusive betwen KR MIC and USN band)
+CONFIG_KR_USN_CHANNEL=n
+endif
+
+# Support Channel Switch Annoucement on STA
+CONFIG_STA_CSA_SUPPORT=y
+
 # RELEASE FW
 CONFIG_CLI=n
 CONFIG_DEBUG=n
 CONFIG_LOG=n
+
+# RTC Always On
+CONFIG_RTC_ALWAYS_ON=y
+
+# Duty Cycle
+CONFIG_DUTYCYCLE=y
 
 #// --------------------------------------------------
 #// 3rd party library
@@ -109,6 +153,35 @@ ifeq ($(CONFIG_ONLY_STA),y)
 CONFIG_SOFT_AP	=	n
 else
 CONFIG_SOFT_AP	=	y
+endif
+CONFIG_HTTP_SERVER =	y
+
+#// --------------------------------------------------
+#// APP Core
+#// --------------------------------------------------
+SDK_DIR 	=  sdk
+SDK_INC	= $(SDK_DIR)/inc
+SDK_APPS	= $(SDK_DIR)/apps
+SDK_WIFI_COMMON = $(SDK_APPS)/wifi_common
+
+ifneq ($(findstring ATCMD,$(APP_NAME)),ATCMD)
+PROJECT_FOLDER = $(APP_NAME)
+else
+PROJECT_FOLDER = atcmd
+endif
+
+SDK_PROJECT = $(SDK_APPS)/$(PROJECT_FOLDER)
+
+INCLUDE	+= -I$(SDK_INC)
+INCLUDE += -I$(SDK_WIFI_COMMON)
+INCLUDE += -I$(SDK_PROJECT)
+
+VPATH += $(SDK_INC):$(SDK_APPS)
+VPATH += $(SDK_PROJECT):$(SDK_WIFI_COMMON)
+
+ifneq ($(APP_NAME),)
+include $(SDK_PROJECT)/.config
+include $(SDK_PROJECT)/Makefile
 endif
 
 #// --------------------------------------------------
@@ -183,6 +256,7 @@ DEFINE				+=	-DINCLUDE_TRACE_ERROR
 DEFINE				+=	-DINCLUDE_TRACE_ALWAYS
 DEFINE				+=	-DINCLUDE_TRACE_ASSERT
 else
+DEFINE				+=	-DINCLUDE_TRACE_ERROR
 DEFINE				+=	-DINCLUDE_TRACE_ALWAYS
 DEFINE				+=	-DINCLUDE_TRACE_ASSERT
 endif
@@ -234,6 +308,8 @@ DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM0=8
 DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM1=8
 DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM2=8
 DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM3=9
+
+DEFINE                          +=	-DLMAC_MODEM_RECOVERY_TIME_MS=10000
 
 #// --------------------------------------------------
 #// Common Tool
@@ -317,34 +393,6 @@ DEFINE	+= -DconfigTOTAL_HEAP_SIZE=404720
 endif
 
 #// --------------------------------------------------
-#// APP Core
-#// --------------------------------------------------
-SDK_DIR 	=  sdk
-SDK_INC	= $(SDK_DIR)/inc
-SDK_APPS	= $(SDK_DIR)/apps
-SDK_WIFI_COMMON = $(SDK_APPS)/wifi_common
-
-ifneq ($(findstring ATCMD,$(APP_NAME)),ATCMD)
-PROJECT_FOLDER = $(APP_NAME)
-else
-PROJECT_FOLDER = atcmd
-endif
-
-SDK_PROJECT = $(SDK_APPS)/$(PROJECT_FOLDER)
-
-INCLUDE	+= -I$(SDK_INC)
-INCLUDE += -I$(SDK_WIFI_COMMON)
-INCLUDE += -I$(SDK_PROJECT)
-
-VPATH += $(SDK_INC):$(SDK_APPS)
-VPATH += $(SDK_PROJECT):$(SDK_WIFI_COMMON)
-
-ifneq ($(APP_NAME),)
-include $(SDK_PROJECT)/.config
-include $(SDK_PROJECT)/Makefile
-endif
-
-#// --------------------------------------------------
 #// Build Information
 #// --------------------------------------------------
 PWD := $(shell pwd)
@@ -384,5 +432,6 @@ NMFLAGS	= -S --demangle --size-sort -s -r
 
 #// --------------------------------------------------
 
+include make/Makefile.feature
 include make/Makefile.feature.lib
 include make/Makefile.common

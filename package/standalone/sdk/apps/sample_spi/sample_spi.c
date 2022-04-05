@@ -33,6 +33,8 @@
 #define TEST_COUNT 10
 #define TEST_INTERVAL 2000 /* msec */
 
+static spi_device_t sensor_spi;
+
 /******************************************************************************
  * FunctionName : run_sample_spi
  * Description  : sample test for spi
@@ -46,8 +48,21 @@ nrc_err_t run_sample_spi(int count, int interval)
 
 	nrc_usr_print("[%s] Sample App for SPI API \n",__func__);
 
-	nrc_spi_init(SPI_MODE3, SPI_BIT8, 1000000);
-	nrc_spi_enable(true);
+	/* Set sensor   spi */
+	sensor_spi.pin_miso = 12;
+	sensor_spi.pin_mosi = 13;
+	sensor_spi.pin_cs =14;
+	sensor_spi.pin_sclk = 15;
+	sensor_spi.frame_bits = SPI_BIT8;
+	sensor_spi.clock = 1000000;
+	sensor_spi.mode = SPI_MODE3;
+	sensor_spi.controller = SPI_CONTROLLER_SPI0;
+	sensor_spi.bit_order = SPI_MSB_ORDER;
+	sensor_spi.irq_save_flag = 0;
+	sensor_spi.isr_handler = NULL;
+
+	nrc_spi_master_init(&sensor_spi);
+	nrc_spi_enable(&sensor_spi, true);
 	_delay_ms(100);
 
 #if defined (L3G4200D)
@@ -56,7 +71,7 @@ nrc_err_t run_sample_spi(int count, int interval)
 	for(i=0; i<count; i++) {
 		_delay_ms(interval);
 
-		if (nrc_spi_readbyte_value(read_addr, &data) == NRC_SUCCESS){
+		if (nrc_spi_readbyte_value(&sensor_spi, read_addr, &data) == NRC_SUCCESS){
 			nrc_usr_print("[%s] WORKS FINE!!!!! data:0x%02x\n", __func__, data);
 		} else {
 			nrc_usr_print("[%s] ERROR..........\n", __func__);
@@ -64,15 +79,12 @@ nrc_err_t run_sample_spi(int count, int interval)
 		}
 	}
 #elif defined (BME680)
-	uint8_t read_addr = 0x73|0x80;
-	uint8_t write_addr = 0x73;
-
-	nrc_spi_readbyte_value(read_addr, &data);
+	nrc_spi_readbyte_value(&sensor_spi, 0x73|BME680_SPI_RD_MSK, &data);
 	nrc_usr_print("[%s] BME680 : spi_mem_page default value=0x%02x\n", __func__, data);
 	while (1)
 	{
-		nrc_spi_writebyte_value(write_addr, 0x00);
-		if (nrc_spi_readbyte_value(read_addr, &data) == NRC_SUCCESS ) {
+		nrc_spi_writebyte_value(&sensor_spi, 0x73& BME680_SPI_WR_MSK, 0x00);
+		if (nrc_spi_readbyte_value(&sensor_spi, 0x73|BME680_SPI_RD_MSK, &data) == NRC_SUCCESS ) {
 			nrc_usr_print("[%s] spi_mem_page changed successfully!! data:0x%02x\n", __func__, data);
 			break;
 		} else  {
@@ -86,7 +98,7 @@ nrc_err_t run_sample_spi(int count, int interval)
 	nrc_usr_print("[%s] BME680 Chid_ID is 0x61.\n", __func__);
 	for(i=0; i<count; i++) {
 		_delay_ms(interval);
-		if (nrc_spi_readbyte_value(read_addr, &data) == NRC_SUCCESS){
+		if (nrc_spi_readbyte_value(&sensor_spi, 0x73|BME680_SPI_RD_MSK, &data) == NRC_SUCCESS){
 			nrc_usr_print("[%s] WORKS FINE!!!!! data:0x%02x\n", __func__, data);
 		}else {
 			nrc_usr_print("[%s] ERROR..........\n", __func__);
@@ -100,7 +112,7 @@ nrc_err_t run_sample_spi(int count, int interval)
 	nrc_usr_print("[AT45DBXX]\n");
 	for(i=0; i<count; i++) {
 		_delay_ms(interval);
-		if (nrc_spi_read_values(read_addr, rx, 4) == NRC_SUCCESS) {
+		if (nrc_spi_read_values(&sensor_spi, read_addr, rx, 4) == NRC_SUCCESS) {
 			nrc_usr_print("[%s] 0x%08x, 0x%08x, 0x%08x, 0x%08x \n", __func__,
 			rx[0], rx[1], rx[2], rx[3]);
 
@@ -120,7 +132,7 @@ nrc_err_t run_sample_spi(int count, int interval)
 
 	for(i=0; i<count; i++) {
 		_delay_ms(interval);
-		if (nrc_spi_read_values(read_addr, rx, 4) == NRC_SUCCESS) {
+		if (nrc_spi_read_values(&sensor_spi, read_addr, rx, 4) == NRC_SUCCESS) {
 			nrc_usr_print("[%s] 0x%08x, 0x%08x, 0x%08x, 0x%08x \n", __func__,
 			rx[0], rx[1], rx[2], rx[3]);
 

@@ -60,8 +60,8 @@
 #define ATCMD_WIFI_INIT_PING_COUNT		5
 #define ATCMD_WIFI_INIT_PING_SIZE		64
 
-#define ATCMD_WIFI_BSS_MAX_IDLE_PERIOD_DEFAULT	0
-#define ATCMD_WIFI_BSS_MAX_IDLE_RETRY_DEFAULT	0
+#define ATCMD_WIFI_BSS_MAX_IDLE_PERIOD	0
+#define ATCMD_WIFI_BSS_MAX_IDLE_RETRY	0
 
 
 /*
@@ -99,8 +99,17 @@ typedef char atcmd_wifi_password_t[ATCMD_WIFI_PASSWORD_LEN_MAX + 1];
 
 typedef struct
 {
-	bool scanning;
+#define ATCMD_WIFI_CHANNELS_MAX		50
 
+	int n_freq;
+	uint16_t freq[ATCMD_WIFI_CHANNELS_MAX];
+} atcmd_wifi_channels_t;
+
+typedef struct
+{
+#define ATCMD_WIFI_SCAN_SET_PARAM_MAX	15
+
+	bool scanning;
 	SCAN_RESULTS results;
 } atcmd_wifi_scan_t;
 
@@ -182,6 +191,7 @@ typedef struct
 	atcmd_wifi_event_t event;
 
 	atcmd_wifi_country_t country;
+	atcmd_wifi_channels_t channels;
 	atcmd_wifi_power_t txpower;
 
 	atcmd_wifi_scan_t scan;

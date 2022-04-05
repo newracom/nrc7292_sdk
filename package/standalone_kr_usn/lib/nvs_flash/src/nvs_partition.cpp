@@ -28,12 +28,6 @@ const char *NVSPartition::get_partition_name()
 {
 	if (mAddress == SF_USER_CONFIG_1) {
 		return "USER_CONFIG_1";
-	} else if (mAddress == SF_USER_CONFIG_2) {
-		return "USER_CONFIG_2";
-	} else if (mAddress == SF_USER_CONFIG_3) {
-		return "USER_CONFIG_3";
-	} else if (mAddress == SF_USER_CONFIG_4) {
-		return "USER_CONFIG_4";
 	} else {
 		return "UNKNOWN Partition";
 	}

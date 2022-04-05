@@ -52,5 +52,7 @@ typedef enum
 	true = 1
 } bool;
 
+#define STR_IP4ADDR_LEN_MIN		7
+#define STR_IP4ADDR_LEN_MAX		15
 /**********************************************************************************************/
 #endif /* #ifndef __COMMON_H__ */

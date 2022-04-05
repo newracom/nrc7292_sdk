@@ -1,0 +1,16 @@
+
+AT
+AT+WDISCONN
+
+ECHO "Run an AP in WPA2-PSK."
+ECHO " - SSID : halow_softap_wpa2"
+ECHO " - Password : 12345678"
+ECHO " - IP : 192.168.200.1"
+ECHO " - DHCP Server"
+HOLD
+
+AT+WSCAN
+AT+WDISCONN
+AT+WCONN="halow_softap_wpa2","wpa2-psk","12345678"
+AT+WCONN?
+AT+WDHCP

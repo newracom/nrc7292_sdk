@@ -105,13 +105,13 @@ extern u32_t dhcps_lease_time;
 
 #define   dhcps_router_enabled(offer)	((offer & OFFER_ROUTER) != 0)
 
-void dhcps_start(struct ip_info* info, int vif);
+void dhcps_start(struct ip_info* info, struct netif *net_if);
 void dhcps_stop(void);
 
 void dhcps_coarse_tmr(void);
 
 int dhcps_status(void);
-int dhcps_get_interface(void);
+struct netif *dhcps_get_interface(void);
 bool wifi_softap_set_dhcps_lease_time(u32_t minute);
 bool wifi_softap_reset_dhcps_lease_time(void);
 u32_t wifi_softap_get_dhcps_lease_time(void); // minute

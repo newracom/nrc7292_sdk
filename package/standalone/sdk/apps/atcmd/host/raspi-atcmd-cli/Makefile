@@ -5,9 +5,6 @@ CC ?= gcc
 
 APP := raspi-atcmd-cli
 
-CFLAGS = -pthread -Wall -Wno-unused-function
-LFLAGS = -lpthread
-
 SRCS = \
 	raspi-spi.c \
 	raspi-uart.c \
@@ -15,8 +12,10 @@ SRCS = \
 	nrc-hspi.c \
 	nrc-atcmd.c \
 	nrc-iperf.c \
-	nrc-echo.c \
 	main.c
+
+CFLAGS = -pthread -Wall #-Wno-unused-function
+LFLAGS = -lpthread
 
 #########################################################
 

@@ -25,6 +25,7 @@
 
 #include "atcmd.h"
 
+
 #if defined(CPU_CM3)
 #define ATCMD_CPU_TYPE		"CM3"
 #else
@@ -200,3 +201,8 @@ void user_init(void)
 			nrc_usr_print("Exit AT Command for NRC Halow\n");
 	}
 }
+
+CMD(atcmd,
+    NULL,
+    "AT Command",
+    "atcmd <subcmd> [options]");

@@ -1,0 +1,25 @@
+ECHO "Run TCP server. (IPv4)"
+ECHO " - IP : 192.168.200.1"
+ECHO " - Port : 50000"
+HOLD
+
+AT
+WAIT 1s
+
+AT+SCLOSE
+AT+SOPEN="tcp","192.168.200.1",50000
+AT+SLIST?
+
+ECHO "Send data to server. (length: 1024-byte, count: 1024)"
+HOLD
+
+AT+SSEND=0,0
+LOOP 1 1024
+DATA 1024
+
+WAIT 5s
+AT
+
+WAIT 2s
+AT+SCLOSE
+AT+SLIST?

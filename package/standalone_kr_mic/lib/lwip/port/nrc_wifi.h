@@ -100,6 +100,7 @@ int dhcp_run(int vif);
 #endif /* LWIP_DHCP */
 
 int setup_wifi_ap_mode(int vif, int updated_lease_time);
+int start_dhcps_on_if(struct netif *net_if, int updated_lease_time);
 
 #if defined(SUPPORT_MBEDTLS) && defined(SUPPORT_AES_SAMPLE_TEST)
 int aes_sample_test(void);

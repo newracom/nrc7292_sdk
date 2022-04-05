@@ -26,98 +26,107 @@
 #include "nrc_sdk.h"
 #include "sample_xa1110_gps.h"
 
-static int gps_init()
+i2c_device_t xa1110_i2c;
+
+void gps_i2c_set_config(i2c_device_t* i2c)
 {
-	nrc_i2c_init(GPS_I2C_SCL, GPS_I2C_SDA, GPS_I2C_CLOCK);
-	nrc_i2c_enable(true);
-    return GPS_I2C_CHANNEL;
+	i2c->pin_sda = GPS_I2C_SDA;
+	i2c->pin_scl = GPS_I2C_SCL;
+	i2c->clock_source =GPS_I2C_CLOCK_SOURCE;
+	i2c->controller = GPS_I2C_CHANNEL;
+	i2c->clock = GPS_I2C_CLOCK;
+	i2c->width = GPS_I2C_DATA_WIDTH;
+	i2c->address = GPS_I2C_ADDRESS;
 }
 
-static int gps_read_byte(int loc)
+static void gps_init(i2c_device_t* i2c)
 {
-    uint8_t value;
-    nrc_i2c_start();
-    nrc_i2c_writebyte((GPS_I2C_ADDRESS<<1)|0x01);
-    nrc_i2c_readbyte(&value, false);
-    nrc_i2c_stop();
-    _delay_ms(1);
-    return value;
+	nrc_i2c_init(i2c);
+	nrc_i2c_enable(i2c, true);
+}
+
+static int gps_read_byte(i2c_device_t* i2c)
+{
+	uint8_t value;
+	nrc_i2c_start(i2c);
+	nrc_i2c_writebyte(i2c, (GPS_I2C_ADDRESS<<1)|0x01);
+	nrc_i2c_readbyte(i2c, &value, false);
+	nrc_i2c_stop(i2c);
+	_delay_ms(1);
+	return value;
 }
 
 static void gps_handle_headered_line(char *s)
 {
-    nrc_usr_print("%s\n", s);
+	nrc_usr_print("%s\n", s);
 }
 
 static void gps_handle_parsed_field(char *header, int field_index, char *data)
 {
 #if GPS_HANDLE_PARSED_FIELD_ENABLED
-    nrc_usr_print("[%s-%02d:%s]\n", header, field_index, data);
+	nrc_usr_print("[%s-%02d:%s]\n", header, field_index, data);
 #endif
 }
 
 static void gps_process_byte(int b)
 {
-    if (b == '\n')
-        return;
-    else if (b == '\r')
-    {
-        gps_line_buf[gps_line_buf_index] = '\0';
-        gps_process_line(gps_line_buf);
-        gps_line_buf[0] = '\0';
-        gps_line_buf_index = 0;
-    }
-    else if (gps_line_buf_index < GPS_LINE_BUF_SIZE)
-         gps_line_buf[gps_line_buf_index++] = b;
+	if (b == '\n') {
+		return;
+	} else if (b == '\r') {
+		gps_line_buf[gps_line_buf_index] = '\0';
+		gps_process_line(gps_line_buf);
+		gps_line_buf[0] = '\0';
+		gps_line_buf_index = 0;
+	} else if (gps_line_buf_index < GPS_LINE_BUF_SIZE) {
+		gps_line_buf[gps_line_buf_index++] = b;
+	}
 }
 
 static void gps_process_line(char *s)
 {
-    if(*s != '$')
-        return;
-    int checksum = 0;
-    char *x = s + 1;
-    char c;
-    while ((c = *x++) != '\0' && c != '*')
-        checksum ^= c;
-    if (c != '*')
-        return;
-    if (*x == '\0' || *(x+1) == '\0')
-        return;
-    if (checksum != strtol(x, '\0', 16))
-        return;
-    if (1
+	if(*s != '$')
+		return;
+	int checksum = 0;
+	char *x = s + 1;
+	char c;
+	while ((c = *x++) != '\0' && c != '*')
+		checksum ^= c;
+	if (c != '*')
+		return;
+	if (*x == '\0' || *(x+1) == '\0')
+		return;
+	if (checksum != strtol(x, '\0', 16))
+		return;
+	if (1
 #ifdef GPS_SINGLE_TARGET_HEADER
-            && strncmp(GPS_SINGLE_TARGET_HEADER, s, strlen(GPS_SINGLE_TARGET_HEADER)) == 0
+		&& strncmp(GPS_SINGLE_TARGET_HEADER, s, strlen(GPS_SINGLE_TARGET_HEADER)) == 0
 #endif
-       )
-    {
-        gps_handle_headered_line(s);
-        gps_parse_csv_fields(s);
-    }
+	) {
+		gps_handle_headered_line(s);
+		gps_parse_csv_fields(s);
+	}
 }
 
 static void gps_parse_csv_fields(char *s)
 {
-    char c;
-    int field_index = 1;
-    char *header = s;
-    char *field_buf_start = s;
-    int i = 0;
-    while(1)
-    {
-        c = s[i];
-        if (c == ',' || c == '\0')
-        {
-            if (c == ',')
-                s[i] = '\0';
-            gps_handle_parsed_field(header, field_index++, field_buf_start);
-            if(c == '\0')
-                return;
-            field_buf_start = &s[i+1];
-        }
-        i++;
-    }
+	char c;
+	int field_index = 1;
+	char *header = s;
+	char *field_buf_start = s;
+	int i = 0;
+	while(1)
+	{
+		c = s[i];
+		if (c == ',' || c == '\0') {
+			if (c == ',')
+				s[i] = '\0';
+			gps_handle_parsed_field(header, field_index++, field_buf_start);
+			if(c == '\0')
+				return;
+			field_buf_start = &s[i+1];
+		}
+		i++;
+	}
 }
 
 /******************************************************************************
@@ -128,12 +137,14 @@ static void gps_parse_csv_fields(char *s)
  *******************************************************************************/
 nrc_err_t run_sample_i2c()
 {
-    int i = 0;
-    nrc_usr_print("[%s] Sample App for I2C \n", __func__);
-    int loc = gps_init();
-    while(1)
-        gps_process_byte(gps_read_byte(loc));
-    return NRC_SUCCESS;
+	int i = 0;
+	nrc_usr_print("[%s] Sample App for I2C \n", __func__);
+
+	gps_i2c_set_config(&xa1110_i2c);
+	gps_init(&xa1110_i2c);
+	while(1)
+		gps_process_byte(gps_read_byte(&xa1110_i2c));
+	return NRC_SUCCESS;
 }
 
 
@@ -150,4 +161,3 @@ void user_init(void)
 	ret = run_sample_i2c();
 	nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
 }
-

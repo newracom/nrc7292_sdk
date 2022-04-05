@@ -6,8 +6,6 @@
 #define GPIO_27 27
 #define GPIO_28 28
 #define GPIO_29 29
-#define GPIO_30 30
-#define GPIO_31 31
 
 // GPIO[27:29]
 #define NRC7292_A_VALUE 7 /* 0b111 */
@@ -158,6 +156,7 @@ void nrc_gpio_test();
 void nrc_gpio_set_deepsleep();
 void nrc_gpio_set_modemsleep();
 int nrc_gpio_get_brd_rev(void);
+int nrc_get_brd_rev(void);
 
 void nrc_gprf_config_dir(gpio_io_t *gprf);
 void nrc_gprf_get_dir(gpio_io_t *gprf);

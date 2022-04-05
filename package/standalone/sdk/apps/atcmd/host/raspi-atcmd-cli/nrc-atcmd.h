@@ -36,6 +36,9 @@
 
 #define ATCMD_DATA_LEN_MAX		(4 * 1024) 	/* f/w atcmd.h ATCMD_DATA_LEN_MAX */
 
+#define ATCMD_IPADDR_LEN_MIN	STR_IP4ADDR_LEN_MIN
+#define ATCMD_IPADDR_LEN_MAX	STR_IP4ADDR_LEN_MAX
+
 /**********************************************************************************************/
 
 enum ATCMD_RET_TYPE
@@ -93,7 +96,7 @@ typedef struct
 
 	int id;
 	int len;
-	char remote_addr[15 + 1]; /* xxx.xxx.xxx.xxx */
+	char remote_addr[ATCMD_IPADDR_LEN_MAX + 1];
 	int remote_port;
 } atcmd_rxd_t;
 
@@ -143,9 +146,6 @@ extern int nrc_atcmd_unregister_callback (int type);
 extern void nrc_atcmd_log_on (void);
 extern void nrc_atcmd_log_off (void);
 extern bool nrc_atcmd_log_is_on (void);
-
-extern void nrc_atcmd_network_stack_host (void);
-extern void nrc_atcmd_network_stack_target (void);
 
 /**********************************************************************************************/
 #endif /* #ifndef __NRC_H__ */

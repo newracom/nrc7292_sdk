@@ -8,7 +8,7 @@ Overview
 
 Tool Version
 ------------
-* v5.2
+* v5.3
 
 Binary Files
 ------------

@@ -54,6 +54,10 @@ static const char *module_name()
 int standalone_main()
 {
 	//get_standalone_macaddr(g_standalone_addr);
+#if defined(INCLUDE_BD_SUPPORT_TARGET_VERSION)
+	// Set default flag for blocking operation when an invalid board data or channel
+	lmac_set_bd_block(false);
+#endif /* defined(INCLUDE_BD_SUPPORT_TARGET_VERSION) */
 	CREATE_TASK(wpa_supplicant, NRC_TASK_PRIORITY, wpas_task_main);
 #if defined(SUPPORT_LWIP)
 	wifi_lwip_init();
@@ -122,7 +126,6 @@ void get_standalone_macaddr(int vif_id, uint8_t *mac) {
 	#error "Consider one method to assign MAC address."
 #endif
 
-#if defined(NRC7292)
 	/* Step 1. check mac address in serial flash for vif_id.
 	 * Step 2. if vif_id's mac address doesn't exist in serial flash,
 	 * then check the other vif_id's mac address.
@@ -141,7 +144,6 @@ void get_standalone_macaddr(int vif_id, uint8_t *mac) {
 			return;
 		}
 	}
-#endif
 
 #if defined(MAC_ADDR_STANDALONE)
 	int i = 0;

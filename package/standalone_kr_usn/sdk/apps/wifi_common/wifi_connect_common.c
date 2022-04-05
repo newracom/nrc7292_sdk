@@ -30,6 +30,10 @@
 #include "nrc_ps_api.h"
 
 #include "lwip/netif.h"
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+#include "nrc_eth_if.h"
+#endif
+
 extern struct netif* nrc_netif[];
 
 #define MAX_CNT 3
@@ -47,7 +51,11 @@ static void wifi_event_handler(tWIFI_EVENT_ID event, int data_len, char* data)
 			if (!netif_is_link_up(nrc_netif[0])) {
 				netif_set_link_up(nrc_netif[0]);
 			}
-
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+			if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+				break;
+			}
+#endif
 			do {
 				ret = nrc_wifi_set_ip_address();
 				if(ret != WIFI_SUCCESS) {
@@ -59,7 +67,6 @@ static void wifi_event_handler(tWIFI_EVENT_ID event, int data_len, char* data)
 					break;
 				}
 			} while(ret != WIFI_SUCCESS);
-
 			break;
 		case WIFI_EVT_CONNECT_FAIL:
 			nrc_usr_print("[%s] Receive Connection Fail Event\n", __func__);
@@ -109,7 +116,7 @@ int wifi_init(WIFI_CONFIG *param)
 	nrc_wifi_register_event_handler(wifi_event_handler);
 
 	/* Set IP mode config (Dynamic IP(DHCP client) or STATIC IP) */
-	if (nrc_wifi_set_ip_mode((bool)param->ip_mode, (char *)param->static_ip)<0) {
+	if (nrc_wifi_set_ip_mode((bool)param->ip_mode, (char *)param->static_ip) < 0) {
 		nrc_usr_print("[%s] Fail to set static IP \n", __func__);
 		return WIFI_SET_IP_FAIL;
 	}
@@ -182,6 +189,13 @@ int wifi_connect(WIFI_CONFIG *param)
 	}
 
 	if (nrc_wifi_set_ip_address() != WIFI_SUCCESS) {
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+	/* Do not set ip on bridge interface */
+	/* TODO: incomplete. Should be fixed if bridge needs IP */
+	if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+		return WIFI_SUCCESS;
+	}
+#endif
 		nrc_usr_print("[%s] Fail to set IP Address\n", __func__);
 		return WIFI_SET_IP_FAIL;
 	}

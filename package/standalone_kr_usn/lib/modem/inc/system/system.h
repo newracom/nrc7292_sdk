@@ -308,8 +308,7 @@
 #define HSUART2_BASE_ADDR 		(SYSTEM_APB1_BASE + 0x1000)
 #define HSUART3_BASE_ADDR 		(SYSTEM_APB1_BASE + 0x2000)
 #define RegHSUART_DR(base)		(*((volatile uint32_t *)(base + 0x00)))
-#define RegHSUART_RSR(base) 	(*((volatile uint32_t *)(base + 0x04)))
-#define RegHSUART_ECR(base) 	(*((volatile uint32_t *)(base + 0x04)))
+#define RegHSUART_RSRECR(base) (*((volatile uint32_t *)(base + 0x04)))
 #define RegHSUART_FR(base)  	(*((volatile uint32_t *)(base + 0x18)))
 #define RegHSUART_IBRD(base)	(*((volatile uint32_t *)(base + 0x24)))
 #define RegHSUART_FBRD(base)	(*((volatile uint32_t *)(base + 0x28)))
@@ -390,6 +389,9 @@
 #define IMSC_DCDM   BIT2
 #define IMSC_CTSM   BIT1
 #define IMSC_RIM    BIT0
+
+#define DR_DATA_MASK        (0xFF)
+#define RSRECR_ERR_MASK     (0x0F)
 
 //===================================================================================================================
 // SSP (PrimeCell SSP PL022) Defines

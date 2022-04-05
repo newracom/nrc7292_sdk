@@ -5,7 +5,7 @@ CC ?= gcc
 
 APP := raspi-atcmd-remote
 
-CFLAGS = -Wall -Wno-unused-function
+CFLAGS = -Wall -Wno-unused-function -DCONFIG_VERBOSE
 LFLAGS =
 
 SRCS = main.c

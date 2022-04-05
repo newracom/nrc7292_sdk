@@ -37,24 +37,15 @@
 
 #define ATCMD_VER_MAJOR			(1)
 #define ATCMD_VER_MINOR			(22)
-#define ATCMD_VER_REVISION		(6)
+#define ATCMD_VER_REVISION		(7)
 
 /**********************************************************************************************/
-
-#ifndef CONFIG_ATCMD_CLI
-/* #define CONFIG_ATCMD_CLI */
-#endif
-
-#ifndef CONFIG_ATCMD_HOST
-/* #define CONFIG_ATCMD_HOST */
+#if defined(CONFIG_SAE) && defined(CONFIG_OWE)
+#define CONFIG_ATCMD_WPA3
 #endif
 
 #ifndef CONFIG_ATCMD_USER
 /* #define CONFIG_ATCMD_USER */
-#endif
-
-#ifndef CONFIG_ATCMD_TEST
-/* #define CONFIG_ATCMD_TEST */
 #endif
 
 #ifndef CONFIG_ATCMD_DEBUG
@@ -100,10 +91,10 @@
 #define ATCMD_DATA_LEN_MAX				CONFIG_ATCMD_DATA_LEN_MAX
 
 #define ATCMD_RXBUF_SIZE				ATCMD_DATA_LEN_MAX /* uplink */
-#if defined(CONFIG_ATCMD_NRC7392)
-#define ATCMD_TXBUF_SIZE				(ATCMD_DATA_LEN_MAX / 2) /* donwlink */
-#else
+#if defined(NRC7292)
 #define ATCMD_TXBUF_SIZE				ATCMD_DATA_LEN_MAX /* donwlink */
+#else
+#define ATCMD_TXBUF_SIZE				(ATCMD_DATA_LEN_MAX / 2) /* donwlink */
 #endif
 
 #define ATCMD_IP4_ADDR_LEN_MIN			7
@@ -176,8 +167,6 @@ enum ATCMD_GROUP_ID
 	ATCMD_GROUP_BASIC = 0,	/* AT+	*/
 	ATCMD_GROUP_WIFI,		/* AT+W	*/
 	ATCMD_GROUP_SOCKET,		/* AT+S	*/
-	ATCMD_GROUP_HOST,		/* AT+H	*/
-	ATCMD_GROUP_TEST,		/* AT+T	*/
 	ATCMD_GROUP_USER		/* AT+U	*/
 };
 
@@ -186,7 +175,6 @@ enum ATCMD_ID
 /* 	ATCMD_GROUP_BASIC
  *************************/
 	ATCMD_BASIC_VERSION = 0,
-	ATCMD_BASIC_HOST,
 	ATCMD_BASIC_UART,
 	ATCMD_BASIC_GPIOCFG,
 	ATCMD_BASIC_GPIOVAL,
@@ -208,7 +196,6 @@ enum ATCMD_ID
 	ATCMD_WIFI_LBT,
 	ATCMD_WIFI_IPADDR,
 	ATCMD_WIFI_DHCP,
-	ATCMD_WIFI_DHCPS,
 	ATCMD_WIFI_SCAN,
 	ATCMD_WIFI_CONNECT,
 	ATCMD_WIFI_DISCONNECT,
@@ -221,6 +208,7 @@ enum ATCMD_ID
 	ATCMD_WIFI_SOFTAP,
 	ATCMD_WIFI_BSS_MAX_IDLE,
 	ATCMD_WIFI_STAINFO,
+	ATCMD_WIFI_DHCPS,
 
 /* 	ATCMD_GROUP_SOCKET
  *************************/
@@ -235,11 +223,6 @@ enum ATCMD_ID
  *************************/
 	ATCMD_HOST_SEND,
 	ATCMD_HOST_TIMEOUT,
-
-/* 	ATCMD_GROUP_TEST
- *************************/
-	ATCMD_TEST_MIN,
-	ATCMD_TEST_MAX = ATCMD_TEST_MIN + 100,
 
 /* 	ATCMD_GROUP_USER
  *************************/
@@ -358,16 +341,8 @@ extern int atcmd_msg_vsnprint (int type, char *buf, int len, const char *fmt, va
 
 #include "atcmd_basic.h"
 #include "atcmd_wifi.h"
-
-#if defined(CONFIG_ATCMD_HOST)
-#include "atcmd_host.h"
-#else
 #include "atcmd_socket.h"
-#endif
-
 #include "atcmd_user.h"
-#include "atcmd_test.h"
-#include "atcmd_cli.h"
 
 /**********************************************************************************************/
 
@@ -384,6 +359,7 @@ extern int atcmd_param_to_int32 (const char *param, int32_t *val);
 extern int atcmd_param_to_uint8 (const char *param, uint8_t *val);
 extern int atcmd_param_to_uint16 (const char *param, uint16_t *val);
 extern int atcmd_param_to_uint32 (const char *param, uint32_t *val);
+extern float atcmd_param_to_float (const char *param, float *val);
 extern int atcmd_param_to_hex (const char *param, uint32_t *val);
 extern char *atcmd_param_to_str (const char *param, char *str, int len);
 extern char *atcmd_str_to_param (const char *str, char *param, int len);
@@ -416,6 +392,21 @@ extern void atcmd_disable (void);
 
 extern int atcmd_user_register (const char *cmd, int id, atcmd_handler_t handler[]);
 extern int atcmd_user_unregister (int id);
+
+#ifndef CONFIG_ATCMD_TRACE
+#define atcmd_trace_init()	0
+#define atcmd_trace_exit()
+
+#define atcmd_trace_task_loop(id)
+#define atcmd_trace_task_suspend(id)
+#define atcmd_trace_task_resume(id)
+
+#define atcmd_trace_mutex_take(id)
+#define atcmd_trace_mutex_give(id)
+
+#define atcmd_trace_func_call(id)
+#define atcmd_trace_func_return(id)
+#endif
 
 /**********************************************************************************************/
 #endif /* #ifndef __NRC_ATCMD_H__ */

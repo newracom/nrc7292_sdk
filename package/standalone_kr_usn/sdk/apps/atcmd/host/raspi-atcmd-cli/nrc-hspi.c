@@ -274,7 +274,7 @@ static int hspi_reg_read (char addr, char *data, int len)
 	return -1;
 }
 
-static int hspi_reg_write (char addr, char data)
+/* static int hspi_reg_write (char addr, char data)
 {
 	if (HSPI_ACTIVE())
 	{
@@ -286,7 +286,7 @@ static int hspi_reg_write (char addr, char data)
 	}
 
 	return -1;
-}
+} */
 
 static int hspi_regs_read_sys (hspi_sys_t *sys)
 {

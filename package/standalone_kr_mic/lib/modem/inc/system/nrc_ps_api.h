@@ -265,7 +265,7 @@ struct ret_drvinfo {
 	uint8_t		fw_boot_mode:2; //FW boot mode (1B) : 0(XIP), 1 or 2(ROM, it must be distinguished in the code based on the core type)
 	uint8_t		do_reset:1;		//FW reboot mode in uCode (1B) : 0(reboot with jump), 1(reboot with reset)
 	uint8_t		cqm_off:1;
-	uint8_t		reserved:4;
+	uint8_t		brd_rev:4;
 } __attribute__ ((packed));
 #define RET_DRV_INFO_SIZE sizeof(struct ret_drvinfo)
 

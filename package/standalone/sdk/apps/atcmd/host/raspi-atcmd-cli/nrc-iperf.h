@@ -34,12 +34,10 @@
 
 /**********************************************************************************************/
 
-#define IPERF_IPADDR_LEN_MIN	7	/* x.x.x.x */
-#define IPERF_IPADDR_LEN_MAX	15	/* xxx.xxx.xxx.xxx */
+#define IPERF_IPADDR_LEN_MIN	STR_IP4ADDR_LEN_MIN
+#define IPERF_IPADDR_LEN_MAX	STR_IP4ADDR_LEN_MAX
 
 #define IPERF_IPADDR_ANY		"0.0.0.0"
-
-#define IPERF_IS_CLIENT(addr, port)	(strlen(addr) >= IPERF_IPADDR_LEN_MIN && port > 0)
 
 enum IPERF_PROTO
 {
@@ -197,16 +195,20 @@ typedef iperf_client_info_t iperf_tcp_client_info_t;
 
 typedef struct
 {
-	bool server; /* -s */
+	/* Client/Server */
+	int report_interval; /* -i, sec */
+	int server_port; /* -p */
 	bool udp; /* -u */
+
+	/* Server */
+	bool server; /* -s */
+
+	/* Client */
+	char server_ip[IPERF_IPADDR_LEN_MAX + 1]; /* -c */
+	int send_time; /* -t , sec */
 	bool passthrough; /* -P */
 	bool negative; /* -N */
 
-	int server_port; /* -p */
-	char server_ip[IPERF_IPADDR_LEN_MAX + 1]; /* -c */
-
-	int send_time; /* -t , sec */
-	int report_interval; /* -i, sec */
 	int datagram_size;
 } iperf_opt_t;
 
