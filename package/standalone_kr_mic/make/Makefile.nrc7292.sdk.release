@@ -36,9 +36,7 @@ CONFIG_PMF_SWENC=n
 CONFIG_BITMAP_ENCODING=y
 
 # SW-Based NDP ACK Generation (Reversing Scrambler Value)
-ifeq ($(CONFIG_BITMAP_ENCODING),y)
-CONFIG_REVERSE_SCRAMBLER=n
-endif
+CONFIG_REVERSE_SCRAMBLER=y
 
 # Board data
 CONFIG_BD=y
