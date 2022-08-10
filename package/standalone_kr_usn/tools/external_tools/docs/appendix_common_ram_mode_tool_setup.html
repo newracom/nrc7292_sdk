@@ -14,12 +14,11 @@
         <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
         <script src="_static/jquery.js"></script>
         <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Appendix (Noise Level Estimation Module)" href="appendix_noise_level_estimation.html" />
-    <link rel="prev" title="Tool Usage (Firmware Flash Tool)" href="tool_usage_firmware_flash_tool.html" /> 
+    <link rel="search" title="Search" href="search.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -38,15 +37,11 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
-<ul class="current">
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="requirements.html">Setup and Requirements</a></li>
 <li class="toctree-l1"><a class="reference internal" href="board_operation_mode_selection.html">NRC Board Operation Mode Selection and Power Supply</a></li>
 <li class="toctree-l1"><a class="reference internal" href="running_the_tools_on_mac_linux.html">Running the Tools on Windows/Mac/Linux</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tool_usage_dut2dut.html">Tool Usage (DUT2DUT)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tool_usage_dm.html">Tool Usage (DM)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tool_usage_firmware_flash_tool.html">Tool Usage (Firmware Flash Tool)</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Appendix (Common RAM Mode Tool Setup Instructions)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="appendix_noise_level_estimation.html">Appendix (Noise Level Estimation Module)</a></li>
 </ul>
 
         </div>
@@ -74,19 +69,19 @@
            <div itemprop="articleBody">
              
   <section id="appendix-common-ram-mode-tool-setup-instructions">
-<span id="common-ram-mode-tool-setup"></span><h1>Appendix (Common RAM Mode Tool Setup Instructions)<a class="headerlink" href="#appendix-common-ram-mode-tool-setup-instructions" title="Permalink to this headline"></a></h1>
+<span id="common-ram-mode-tool-setup"></span><h1>Appendix (Common RAM Mode Tool Setup Instructions)<a class="headerlink" href="#appendix-common-ram-mode-tool-setup-instructions" title="Permalink to this heading"></a></h1>
 <ol class="arabic">
 <li><p>Follow the steps described on the <a class="reference internal" href="requirements.html#requirements"><span class="std std-ref">Requirements</span></a> page.</p></li>
 <li><p>Set the DIP switch configuration to <strong>Firmware Upload / RAM Operation</strong> mode as described on the <a class="reference internal" href="board_operation_mode_selection.html#board-operation-mode-selection"><span class="std std-ref">NRC Board Operation Mode Selection and Power Supply page</span></a>.</p></li>
 <li><p>Press the reset button on the board.</p></li>
 <li><dl>
-<dt>On the program menu, access the menu item <strong>SERIAL -&gt; UPLOAD FIRMWARE</strong> to open the in-built firmware uploader module.</dt><dd><img alt="_images/serial_menu.png" src="_images/serial_menu.png" />
+<dt>On the program menu, access the menu item <strong>SERIAL -&gt; UPLOAD FIRMWARE</strong> to open the in-built firmware uploader module.</dt><dd><img alt="_images/serial_menu.png" class="align-center" src="_images/serial_menu.png" />
 </dd>
 </dl>
 </li>
 <li><p>Provide the paths to the boot binary (default: nrc7292_boot.bin) and the firmware binary (default: nrc7292_lmactest_freertos.bin), and upload the firmware to the board.</p></li>
 <li><dl>
-<dt>After the firmware upload procedure is complete, exit the firmware uploader dialog and access the menu item <strong>SERIAL -&gt; CONNECT</strong> to connect the PC to the module via a UART serial channel.</dt><dd><img alt="_images/firmware_uploader_ram_mode.png" src="_images/firmware_uploader_ram_mode.png" />
+<dt>After the firmware upload procedure is complete, exit the firmware uploader dialog and access the menu item <strong>SERIAL -&gt; CONNECT</strong> to connect the PC to the module via a UART serial channel.</dt><dd><img alt="_images/firmware_uploader_ram_mode.png" class="align-center" src="_images/firmware_uploader_ram_mode.png" />
 </dd>
 </dl>
 </li>
@@ -96,10 +91,7 @@
 
            </div>
           </div>
-          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="tool_usage_firmware_flash_tool.html" class="btn btn-neutral float-left" title="Tool Usage (Firmware Flash Tool)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="appendix_noise_level_estimation.html" class="btn btn-neutral float-right" title="Appendix (Noise Level Estimation Module)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
-    </div>
+          <footer>
 
   <hr/>
 

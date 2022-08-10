@@ -8,7 +8,10 @@ Overview
 
 Tool Version
 ------------
-* v5.3
+* v5.6
+
+.. warning::
+   Baudrate must be left unchanged at 460800 for default 2nd bootloaders.
 
 Binary Files
 ------------
@@ -18,15 +21,26 @@ Binary Files
 **XIP Bootloader (written on flash)**:
     is the XIP bootloader binary file to be stored on the flash memory.
 
+.. warning::
+   The XIP bootloader only needs to be flahsed once. The XIP bootloader upload check box should be toggled on for the first-time setup. By default, the option is toggled off.
+
 **XIP Firmware (written on flash)**:
     is the XIP firmware binary file to be stored on the flash memory.
 
-Operation
----------
+Basic Functionality
+-------------------
 1. Set the DIP switch configuration to **Firmware Upload / RAM Operation** mode as described on the :ref:`NRC Board Operation Mode Selection and Power Supply page <board_operation_mode_selection>`.
-2. Reset the board.
+2. Select the flash size, and the format option. If **FULL** format option is selected, the entire XIP firmware sector will be deleted. If **QUICK** format option is selected, only the chunk size of the firmware binary size will be deleted from the XIP firmware sector.
 3. Select the desired procedures by using the corresponding check boxes: MAC adresss write, XIP bootloader write, and XIP firmware write.
-4. Press the **START** button to run the selected procedures.
+4. Reset the board, and press the **START** button to run the selected procedures.
+
+Advanced Functionality
+----------------------
+Starting from v5.4, it is possible to run the flashing operation while having the DIP switch configured to **Standalone** mode. This can save time during standalone application development/debugging process as there is no need to switch back and forth between the two configurations to update firmware and test out the new standalone application. The steps below describe how to utilize this funcionality:
+    1. Set the DIP switch configuration to **Standalone** mode as described on the :ref:`NRC Board Operation Mode Selection and Power Supply page <board_operation_mode_selection>`.
+    2. Select the flash size, and the format option. If **FULL** format option is selected, the entire XIP firmware sector will be deleted. If **QUICK** format option is selected, only the chunk size of the firmware binary size will be deleted from the XIP firmware sector.
+    3. Select the desired procedures by using the corresponding check boxes: MAC adresss write, XIP bootloader write, and XIP firmware write.
+    4. Reset the board, and **immediately** press the *START* button to run the selected procedures. If approximately 2 seconds pass without any input from the tool, the NRC module will start running the firmware instead.
 
 .. warning::
    To run the uploaded standalone application on the NRC7292 board, set the DIP switch configuration to **Standalone Operation** mode as described on the :ref:`NRC Board Operation Mode Selection and Power Supply page <board_operation_mode_selection>` and reset the board.

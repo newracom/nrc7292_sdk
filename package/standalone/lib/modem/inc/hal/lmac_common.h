@@ -241,6 +241,7 @@ void set_sig_mcs(TXVECTOR* vector, uint8_t mcs);
 void set_sig_doppler(TXVECTOR* vector , uint8_t doppler);
 void lmac_set_bpn_register(uint8_t bpn);
 void lmac_show_test_config_modem_recovery();
+uint8_t lmac_set_txpwr_resp_frame(uint8_t bandwidth);
 #endif /* defined(STANDARD_11AH) */
 
 uint32_t get_idle_hook_count();

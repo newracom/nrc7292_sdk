@@ -1,0 +1,80 @@
+<CURRENT VERSION>
+v5.6.0
+
+<VERSION HISTORY>
+v3.0.0
+=> First Java version (ported from C# version)
+
+v3.1.0
+=> Newrafc (Python -> Java) ported
+
+v3.2.0
+=> JRE version check (1.8 only).
+
+v3.3.0
+=> MAC address write functionality removed.
+=> XIP boot binary specification.
+
+v3.3.1
+=> Bug fix: Wrong F/W binary reference fix
+
+v4.0.0
+=> Bypassing Boot-XIP binary segment transplant from Firmware-XIP binary segment [Byte Offset: 8,...,263]
+
+v4.1.0
+=> Newrafc timeout 5000 ms -> 20000 ms
+
+v5.0.0
+=> Renamed the program from "Firmware Downloader" to "Standalone XIP Firmware Flash Tool".
+=> Major internal code restructuring.
+=> Flash Support (MX25U1633F)
+
+v5.1.0
+=> Modified the tool to use an external bootloader file.
+
+v5.2.0
+=> Binary update.
+=> Renamed from XIP Firmware Flash Tool to Firmware Flash Tool.
+=> Support for multiple operations per single power cycle.
+=> Abort functionality added.
+=> Support for selective upload procedures.
+=> UI change.
+=> More detailed error messages.
+
+v5.3.0
+=> Binary update.
+=> NRC4791/NRC5291 support.
+
+v5.4.0
+=> Binary update.
+=> Added standalone DIP switch firmware update mode.
+=> Improved error description.
+
+v5.4.1
+- Binary update.
+
+v5.4.2
+- Binary update (Flash quad mode issue fix)
+
+v5.4.3
+- Binary update (Auto-start: 5s->2s)
+
+v5.4.4
+- CM0/CM3 compilation option
+
+v5.4.5
+- Binary update (Auto-start: 2s->5s, reverted)
+- XIP bootloader upload default value changed (enabled -> disabled)
+
+v5.5.0
+- Binary update
+- Default parameter configuration save option
+- Flash size selection option
+- Quick (firmware size) / Deep (sector) format option
+- XIP bootloader upload default value reverted (disabled -> enabled).
+
+v5.5.1
+- Boot Binary update (+Jedec-ID MX25R1635F)
+
+v5.6.0
+- Baudrate parameterization added. (Default: 460800)
