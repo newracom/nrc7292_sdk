@@ -345,3 +345,18 @@ ifeq ($(CONFIG_SHT30), y)
     include $(SHT30_BASE)/sht30.make
 	DEFINE	+= -DSUPPORT_SHT30
 endif
+
+#// --------------------------------------------------
+#// LIB
+#// SGP30
+#// --------------------------------------------------
+SGP30_BASE    = $(LIB_PATH)/sgp30
+
+INCLUDE += -I$(SGP30_BASE)
+
+ifeq ($(CONFIG_SGP30), y)
+    VPATH   += $(SGP30_BASE)
+
+    include $(SGP30_BASE)/sgp30.make
+	DEFINE	+= -DSUPPORT_SGP30
+endif
