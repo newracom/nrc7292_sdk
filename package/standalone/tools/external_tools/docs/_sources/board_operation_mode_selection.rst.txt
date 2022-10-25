@@ -11,7 +11,6 @@ The DIP switch on the NRC board can be configured to select one of the following
 ----------------------------------
     
     .. image:: images/dip_switch_download.png
-        :align: center
 
 DIP Switch Configuration: **HHHLLH**
 
@@ -23,7 +22,6 @@ A 5V adapter is used to directly supply power to the NRC board.
 -----------------------
     
     .. image:: images/dip_switch_standalone.png
-        :align: center
 
 DIP Switch Configuration: **HLLHLH**
 
@@ -36,7 +34,6 @@ A 5V adapter is used to directly supply power to the NRC board.
 ------------------------------
 
     .. image:: images/dip_switch_host.png
-        :align: center
 
 DIP Switch Configuration: **HHLLLH**
 

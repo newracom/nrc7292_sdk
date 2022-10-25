@@ -330,3 +330,18 @@ ifeq ($(CONFIG_BME680), y)
     include $(BME680_BASE)/bme680.make
 	DEFINE	+= -DSUPPORT_BME680
 endif
+
+#// --------------------------------------------------
+#// LIB
+#// SHT30
+#// --------------------------------------------------
+SHT30_BASE    = $(LIB_PATH)/sht30
+
+INCLUDE += -I$(SHT30_BASE)
+
+ifeq ($(CONFIG_SHT30), y)
+    VPATH   += $(SHT30_BASE)
+
+    include $(SHT30_BASE)/sht30.make
+	DEFINE	+= -DSUPPORT_SHT30
+endif

@@ -7,10 +7,14 @@ NRC Tools Documentation
 =====================================
 
 .. toctree::
-    :maxdepth: 2
-    :caption: Contents:
- 
-    requirements
-    board_operation_mode_selection
-    running_the_tools_on_mac_linux
-    tool_usage_firmware_flash_tool
+   :maxdepth: 2
+   :caption: Contents:
+
+   requirements
+   board_operation_mode_selection
+   running_the_tools_on_mac_linux
+   tool_usage_dut2dut
+   tool_usage_dm
+   tool_usage_firmware_flash_tool
+   appendix_common_ram_mode_tool_setup
+   appendix_noise_level_estimation

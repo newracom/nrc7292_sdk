@@ -2,6 +2,7 @@
 
 ## Notice
 ### Release roadmap
+- v1.3.4_rev09 (2022.10.24)
 - v1.3.4_rev08 (2022.08.09)
 - v1.3.4_rev07 (2022.07.19)
 - v1.3.4_rev06 (2022.04.05)
@@ -17,7 +18,7 @@
 - v1.3.0 (2020.07.19)
 
 ### Latest release
-- [NRC7292_Standalone_SDK_v1.3.4_rev08](https://github.com/newracom/nrc7292_sdk/releases/tag/v1.3.4_rev08)
+- [NRC7292_Standalone_SDK_v1.3.4_rev09](https://github.com/newracom/nrc7292_sdk/releases/tag/v1.3.4_rev09)
 
 ### Release package contents
 - standalone: NRC7292 standalone SDK package for global regulatory domains
