@@ -1,6 +1,7 @@
 # NRC7292 Standalone SDK Package
 
 ## Notice
+- Please do not use package/standalone/tools/external_tools/FirmwareFlashTool.exe of v1.3.4 rev08. Use other revision's one instead.
 ### Release roadmap
 - v1.3.4_rev09 (2022.10.24)
 - v1.3.4_rev08 (2022.08.09)
