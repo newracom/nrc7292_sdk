@@ -7,8 +7,13 @@
 #include "umac_s1g_elementhook.h"
 #include "umac_info.h"
 
+#if ! defined(INCLUDE_IBSS)
 #define MAX_HOOKS		18
 #define MAX_ELEM_HOOKS	18
+#else
+#define MAX_HOOKS		20
+#define MAX_ELEM_HOOKS	20
+#endif
 
 typedef struct {
 

@@ -5,8 +5,8 @@ SECTIONS
 		KEEP(*(.isr_vector))
 		/* *(.text) */
 		/* *(.text*) */
-		*(EXCLUDE_FILE(*lmac*.c.o *umac_s1g*.c.o *ec*.c.o *bignum*.c.o).text)
-		*(EXCLUDE_FILE(*lmac*.c.o *umac_s1g*.c.o *ec*.c.o *bignum*.c.o).text*)
+		*(EXCLUDE_FILE(*lmac*.c.o *umac_s1g*.c.o *aes*.c.o *pk*.c.o *rsa*.c.o *ecd*.c.o *ecp*.c.o *ecj*.c.o *bignum*.c.o).text)
+		*(EXCLUDE_FILE(*lmac*.c.o *umac_s1g*.c.o *aes*.c.o *pk*.c.o *rsa*.c.o *ecd*.c.o *ecp*.c.o *ecj*.c.o *bignum*.c.o).text*)
 
 		. = ALIGN(4);
 		PROVIDE_HIDDEN (__preinit_array_start = .);
@@ -46,7 +46,7 @@ SECTIONS
 		*(.glue_7t)
 		*(.gnu.linkonce.r.*)
 		*(.gnu.linkonce.d.*);
-/*		
+/*
 		*(.data.impure_data);
 		*(.data._impure_ptr);
 */
@@ -54,10 +54,10 @@ SECTIONS
 		KEEP(*(.eh_frame*))
 		. = ALIGN(4);
 		_etext = .;
-		
+
 	} > FLASH
 
-	.ARM.extab : 
+	.ARM.extab :
 	{
 		*(.ARM.extab* .gnu.linkonce.armextab.*)
 	} > FLASH
@@ -72,7 +72,7 @@ SECTIONS
 	. = ALIGN(4);
 	PROVIDE(__etext = .);
 
-	.data : 
+	.data :
 	{
 		__data_load__ = LOADADDR(.data);
 		__data_start__ = .;
@@ -82,7 +82,12 @@ SECTIONS
 		/* executed on ram (object unit) */
 		KEEP(*lmac*.c.o(.text* .rodata*))
 		KEEP(*umac_s1g*.c.o(.text* .rodata*))
-		KEEP(*ec*.c.o(.text* .rodata*))
+		KEEP(*aes*.c.o(.text* .rodata*))
+		KEEP(*pk*.c.o(.text* .rodata*))
+		KEEP(*rsa*.c.o(.text* .rodata*))
+		KEEP(*ecd*.c.o(.text* .rodata*))
+		KEEP(*ecp*.c.o(.text* .rodata*))
+		KEEP(*ecj*.c.o(.text* .rodata*))
 		KEEP(*bignum*.c.o(.text* .rodata*))
 		. = ALIGN(4);
 
@@ -95,7 +100,7 @@ SECTIONS
 		__sfc_code_nc_end__ = .;
 		*(.sfc_code_c*)
 		. = ALIGN(4);
-		
+
 		*(.data)
 		*(.data*)
 		. = ALIGN(4);
@@ -115,7 +120,7 @@ SECTIONS
 
 	PROVIDE(__dstart__ = __data_start__);
 
-	.bssreloc (NOLOAD)  : 
+	.bssreloc (NOLOAD)  :
 	{
 		PROVIDE(__bss_start__ = .);
 		. = ALIGN(4);
@@ -124,7 +129,7 @@ SECTIONS
 		*(COMMON)
 		. = ALIGN(4);
 		PROVIDE(__bss_end__ = .);
-	} > RAM 
+	} > RAM
 
 	PROVIDE(__ebss = .);
 	. = ALIGN(4);
@@ -138,6 +143,14 @@ SECTIONS
 		PROVIDE(__buffer_pool_end__ = .);
 	} > RAM
 
+	.retention_info (NOLOAD) :
+	{
+		PROVIDE(__retention_info_start__ = .);
+		*(.retention_info*);
+		. = ALIGN(4);
+		PROVIDE(__retention_info_end__ = .);
+	} > RETENTION_INFO
+
 	.retain :
 	{
 		__retention_load__ = LOADADDR(.retain);
@@ -147,24 +160,12 @@ SECTIONS
 		PROVIDE(__retention_end__ = .);
 	} > RETENTION AT>FLASH
 
-
-	PROVIDE(end = .); 
-
-
+	PROVIDE(end = .);
 	PROVIDE(__CODE_START = ORIGIN(FLASH));
-	PROVIDE(__DATA_END = ORIGIN(FLASH) + LENGTH(FLASH));
 	PROVIDE(__DATA_START = ORIGIN(RAM));
 	PROVIDE(__DATA_END = ORIGIN(RAM) + LENGTH(RAM));
-	PROVIDE(__CODE_START = ORIGIN(FLASH));
-	PROVIDE(__DATA_END = ORIGIN(FLASH) + LENGTH(FLASH));
-	PROVIDE(__DATA_START = ORIGIN(RAM));
-	PROVIDE(__DATA_END = ORIGIN(RAM) + LENGTH(RAM) - STACK_SIZE);
-	PROVIDE(__STACK_TOP = ORIGIN(RAM) + LENGTH(RAM));
-	PROVIDE(__STACK_LIMIT = ORIGIN(RAM) + LENGTH(RAM) - STACK_SIZE);
-/*
-	PROVIDE(__STACK_TOP = ORIGIN(RETENTION) + LENGTH(RETENTION));
-	PROVIDE(__STACK_LIMIT = ORIGIN(RETENTION) + LENGTH(RETENTION) - STACK_SIZE);
-*/	
+	PROVIDE(__STACK_TOP = ORIGIN(RAM) + LENGTH(RAM) + STACK_SIZE);
+	PROVIDE(__STACK_LIMIT = ORIGIN(RAM) + LENGTH(RAM));
 	PROVIDE(__MEASURE_CPU_START = __measure_cpu_start);
 	PROVIDE(__MEASURE_CPU_END = __measure_cpu_end);
 }

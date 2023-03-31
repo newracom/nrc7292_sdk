@@ -26,7 +26,7 @@ all: firmware
 firmware: $(OUT_PATH) $(OBJ_PATH) $(OBJS)
 	@echo "Link Script : $(LD_FILE)"
 	@echo "Linking $(OUT_PATH)/$(OUTPUT).elf"
-ifneq ($(findstring lib, $(ALIAS)), )
+ifneq ($(findstring lib, $(LINKOPT)), )
 	@echo "Linking library : $(LIB_FULL_NAME)"
 	@$(CC) $(LFLAGS) -o $(OUT_PATH)/$(OUTPUT).elf $(LIB_FLAG) $(OBJS)
 else
@@ -46,8 +46,8 @@ endif
 
 $(OBJ_PATH)/%.o:%.cpp
 	@echo "compile $<"
-	@$(CC) -E -MMD $(CFLAGS) $(CPPFLAGS) -c $< -o $@.i
-	@$(CC) -MMD $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+	@$(CC) -E -MMD $(CPPFLAGS) $(CFLAGS) -c $< -o $@.i
+	@$(CC) -MMD $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 $(OBJ_PATH)/%.c.o:%.c
 	@ $(if $(print_CFLAGS),echo "CFLAGS: $(print_CFLAGS)" $(eval print_CFLAGS:=))

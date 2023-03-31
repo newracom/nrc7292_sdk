@@ -1,0 +1,18 @@
+
+AT+WCOUNTRY="US"
+AT+WCOUNTRY?
+AT+WTXPOWER?
+
+AT+WDISCONN
+
+ECHO "Run an AP in WPA3-SAE."
+ECHO " - SSID : halow_atcmd_sae"
+ECHO " - Password : 12345678"
+ECHO " - IP : 192.168.200.1"
+ECHO " - DHCP Server"
+HOLD
+
+AT+WSCAN
+AT+WDHCP=1
+AT+WCONN="halow_atcmd_sae","sae","12345678"
+AT+WCONN?

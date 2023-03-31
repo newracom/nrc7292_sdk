@@ -1,0 +1,22 @@
+Sample MQTT utilize TLS connection as default. A user can undefine or comment out the line "#define USE_MQTTS" to use plain TCP connection.
+
+Preparation.
+
+-- Certificate preparation.
+sample_mqtt utilized generate-CA.sh (originated from https://github.com/owntracks/tools/raw/master/TLS/generate-CA.sh) to generate self signed certificates.
+
+CA certificate is located as certs/ca.crt and imported into sample_mqtt.c as const char ca_cert[].
+Sample client certificate is located as certs/sample_mqtt.crt and imported into sample_mqtt.c as const char client_cert[].
+Sample client private key is located as certs/sample_mqtt.key and imported into sample_mqtt.c as const char client_pk[].
+
+-- Broker configuration.
+To simplify the test, use mosquitto on the broker.
+
+On Ubuntu system
+1. sudo apt-get install mosquitto
+2. copy certs/ca.crt to /etc/mosquitto/ca_certificates/
+3. copy certs/broker.crt to /etc/mosquitto/certs/
+4. copy certs/mosquitto-tls.conf to /etc/mosquitto/conf.d/
+5. restart mosquitto by "sudo systemctl restart mosquitto"
+
+-- Once the broker is ready, then build sample_mqtt and update the firmware.

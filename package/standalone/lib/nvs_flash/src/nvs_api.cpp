@@ -157,11 +157,12 @@ extern "C" nvs_err_t nvs_flash_erase_partition(const char *part_name)
 		return NVS_ERR_NVS_PART_NOT_FOUND;
 	}
 
-	if (nrc_sf_erase(address, MIN_PARTITION_SIZE) == true) {
-		return NVS_OK;
-	} else {
-		return NVS_FAIL;
+	for (int i = 0; i < MIN_PARTITION_SIZE / 4096; i++) {
+		if (nrc_sf_erase(address + (i * 4096), 4096) != true) {
+			return NVS_FAIL;
+		}
 	}
+	return NVS_OK;
 }
 
 extern "C" nvs_err_t nvs_flash_erase_partition_ptr(uint32_t address, size_t size)

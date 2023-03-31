@@ -108,6 +108,14 @@ extern void vClearInterruptMaskFromISR( uint32_t ulMask )  __attribute__((naked)
 
 #define portNOP()
 
+/*--------------------	Run Time Stats -----------------------*/
+#ifdef NRC_FREERTOS
+extern uint32_t drv_lmac_get_tsf_lo(int vif_id);
+#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()
+#define portGET_RUN_TIME_COUNTER_VALUE() drv_lmac_get_tsf_lo(0)
+#define portALT_GET_RUN_TIME_COUNTER_VALUE(x) do {x = (uint32_t)drv_lmac_get_tsf_lo(0);} while(0)
+#endif /* NRC_FREERTOS */
+
 #ifdef __cplusplus
 }
 #endif

@@ -147,7 +147,7 @@ static void wpa_supplicant_assoc_try(struct wpa_supplicant *wpa_s,
 	} else {
 		/* Start from the beginning of the SSID list. */
 		wpa_s->prev_scan_ssid = WILDCARD_SSID_SCAN;
-	}
+	}	
 	wpa_supplicant_associate(wpa_s, NULL, ssid);
 }
 
@@ -923,7 +923,7 @@ static void wpa_supplicant_scan(void *eloop_ctx, void *timeout_ctx)
 		wpa_s->connect_without_scan = NULL;
 		if (ssid) {
 			wpa_printf(MSG_DEBUG, "Start a pre-selected network "
-				   "without scan step");
+				   "without scan step");			
 			wpa_supplicant_associate(wpa_s, NULL, ssid);
 			return;
 		}
@@ -1966,7 +1966,9 @@ struct wpabuf * wpa_scan_get_vendor_ie_multi(const struct wpa_scan_res *res,
  * better. */
 static int wpa_scan_result_compar(const void *a, const void *b)
 {
+#ifndef MIN
 #define MIN(a,b) a < b ? a : b
+#endif
 	struct wpa_scan_res **_wa = (void *) a;
 	struct wpa_scan_res **_wb = (void *) b;
 	struct wpa_scan_res *wa = *_wa;

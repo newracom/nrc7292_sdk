@@ -1,0 +1,29 @@
+*******************************************************************
+*
+* ChangeLog : SDK-NRC7292
+*
+*******************************************************************
+
+[2023-03-30]
+    Change summary for version 1.4:
+
+    New features
+	* Passive receiving mode (v1.4)
+
+    Changes
+	* FW refactoring with following updates (v1.4)
+	  o SDK API updates
+	  o AT-CMD updates
+	  o Duty cycle support
+	  o Power save enhancement: deep sleep optimization
+	  o Remove modem sleep support
+	  o Support for multiple regulatory domains with a single firmware
+	  o Regulatory domain updates: KR MIC, JP
+	  o ARM GNU toolchain upgrade to version 10.3-2021.10
+	  o Sample application updates
+
+    Known Issues
+	* The initial connection time for WPA3-SAE/OWE can be quite lengthy (> 15 seconds) 
+	  due to the substantial computational load required by software for large number operations.
+	* The SoftAP disable/enable sequence on the standalone mode is not supported.
+

@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2020 Newracom, Inc.
+ * Copyright (c) 2022 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,46 +25,57 @@
 
 #include "nrc_sdk.h"
 
-#define TEST_COUNT 10
-#define TEST_INTERVAL 2000 /* msec */
-
-#define GREEN_LED_PIN	GPIO_02
-#define RED_LED_PIN	GPIO_03
-
 #define USE_GPIO_INTERRUPT
 
+#define TEST_COUNT 100
+#define TEST_INTERVAL 2000 /* msec */
+
+#ifdef NRC7292
+/* NRC7292 EVK : Green on GPIO 8 and Red on GPIO 9 */
+#define GREEN_LED_PIN GPIO_08
+#define RED_LED_PIN	GPIO_09
+#else
+/* NRC7394 EVK : Geen on GPIO 10 and RED on GPIO 11 */
+#define GREEN_LED_PIN GPIO_10
+#define RED_LED_PIN	GPIO_11
+#endif
+
 #ifdef USE_GPIO_INTERRUPT
+#ifdef NRC7292
+/* Use GPIO 10 to control Green LED, and GPIO 11 to Red LED */
 #define GPIO_INT0_PIN	GPIO_10
 #define GPIO_INT1_PIN	GPIO_11
+#else
+/* Use GPIO 24 to control Green LED, and GPIO 28 to Red LED */
+#define GPIO_INT0_PIN	GPIO_24
+#define GPIO_INT1_PIN	GPIO_28
+#endif
+
 void gpio_intr_handler0(int vector)
 {
-	int input_high;
+	int green = 0;
 
-	if (nrc_gpio_inputb(GPIO_INT0_PIN, &input_high))
-		return;
-
-   	if (input_high) {
-		nrc_usr_print("[%s] GREEN LED ON \n", __func__);
-		nrc_gpio_outputb(GREEN_LED_PIN, 1);
-	} else {
-		nrc_usr_print("[%s] GREEN LED OFF \n", __func__);
+	nrc_gpio_inputb(GREEN_LED_PIN, &green);
+	if (green) {
+		nrc_usr_print("[%s] green on, turning off \n", __func__);
 		nrc_gpio_outputb(GREEN_LED_PIN, 0);
+	} else {
+		nrc_usr_print("[%s] green off, turning on \n", __func__);
+		nrc_gpio_outputb(GREEN_LED_PIN, 1);
 	}
 }
 
 void gpio_intr_handler1(int vector)
 {
-	int input_high;
+	int red = 0;
 
-	if (nrc_gpio_inputb(GPIO_INT1_PIN, &input_high))
-		return;
-
-   	if (input_high) {
-		nrc_usr_print("[%s] RED LED ON \n", __func__);
-		nrc_gpio_outputb(RED_LED_PIN, 1);
-	} else {
-		nrc_usr_print("[%s] RED LED OFF \n", __func__);
+	nrc_gpio_inputb(RED_LED_PIN, &red);
+   	if (red) {
+		nrc_usr_print("[%s] red on, turning off \n", __func__);
 		nrc_gpio_outputb(RED_LED_PIN, 0);
+	} else {
+		nrc_usr_print("[%s] red off, turning on \n", __func__);
+		nrc_gpio_outputb(RED_LED_PIN, 1);
 	}
 }
 #endif /* USE_GPIO_INTERRUPT */
@@ -99,14 +110,23 @@ nrc_err_t run_sample_gpio(int count, int interval)
 	gpio_conf.gpio_mode = GPIO_PULL_DOWN;
 	gpio_conf.gpio_alt= GPIO_FUNC;
 	nrc_gpio_config(&gpio_conf);
-	nrc_gpio_register_interrupt_handler(GPIO_INT1_PIN , gpio_intr_handler1);
+#if defined(NRC7393)||defined(NRC7394)
+	/* level & edge triggering, high or low signal interrupt can be */
+	/* configurable on NRC7394 SoC */
+	/* Configure debounce to true to ignore glitch */
+	nrc_gpio_trigger_config(INT_VECTOR1, TRIGGER_EDGE, TRIGGER_HIGH, true);
+#endif
+	nrc_gpio_register_interrupt_handler(INT_VECTOR1, GPIO_INT1_PIN , gpio_intr_handler1);
 
 	gpio_conf.gpio_pin = GPIO_INT0_PIN;
 	gpio_conf.gpio_dir = GPIO_INPUT;
 	gpio_conf.gpio_mode = GPIO_PULL_DOWN;
 	gpio_conf.gpio_alt= GPIO_FUNC;
 	nrc_gpio_config(&gpio_conf);
-	nrc_gpio_register_interrupt_handler(GPIO_INT0_PIN , gpio_intr_handler0);
+#if defined(NRC7393)||defined(NRC7394)
+	nrc_gpio_trigger_config(INT_VECTOR0, TRIGGER_EDGE, TRIGGER_HIGH, true);
+#endif
+	nrc_gpio_register_interrupt_handler(INT_VECTOR0, GPIO_INT0_PIN , gpio_intr_handler0);
 #endif /* USE_GPIO_INTERRUPT */
 
 #ifdef USE_GPIO_INTERRUPT
@@ -129,7 +149,6 @@ nrc_err_t run_sample_gpio(int count, int interval)
 	return NRC_SUCCESS;
 }
 
-
 /******************************************************************************
  * FunctionName : user_init
  * Description  : Start Code for User Application, Initialize User function
@@ -138,11 +157,8 @@ nrc_err_t run_sample_gpio(int count, int interval)
  *******************************************************************************/
 void user_init(void)
 {
-	nrc_err_t ret;
-
 	//Enable Console for Debugging
 	nrc_uart_console_enable(true);
 
-	ret = run_sample_gpio(TEST_COUNT, TEST_INTERVAL);
-	nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
+	run_sample_gpio(TEST_COUNT, TEST_INTERVAL);
 }

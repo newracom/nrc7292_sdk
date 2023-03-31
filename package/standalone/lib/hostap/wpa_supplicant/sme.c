@@ -34,12 +34,17 @@
 #include "driver_nrc_ps.h"
 #endif
 
-#if 0//def CONFIG_SAE //TBD:softAP-SAE
+#if 1//def CONFIG_SAE //TBD:softAP-SAE
 #define SME_AUTH_TIMEOUT 15
 #define SME_ASSOC_TIMEOUT 15
 #else
+#if !defined(INCLUDE_WLAN_STABLE_CONN)
 #define SME_AUTH_TIMEOUT 5
 #define SME_ASSOC_TIMEOUT 5
+#else
+#define SME_AUTH_TIMEOUT 15
+#define SME_ASSOC_TIMEOUT 15
+#endif
 #endif /* CONFIG_SAE */
 
 static void sme_auth_timer(void *eloop_ctx, void *timeout_ctx);
@@ -552,6 +557,11 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 		}
 	}
 #endif /* CONFIG_FST */
+	
+#if defined(INCLUDE_SCAN_DEBUG)
+	wpa_printf(MSG_DEBUG,
+		   "[sme_send_authentication] call sme_auth_handle_rrm\n");
+#endif		   
 
 	sme_auth_handle_rrm(wpa_s, bss);
 
@@ -834,8 +844,10 @@ no_fils:
 		return;
 	}
 
+#if 1 // for test
 	eloop_register_timeout(SME_AUTH_TIMEOUT, 0, sme_auth_timer, wpa_s,
 			       NULL);
+#endif
 
 	/*
 	 * Association will be started based on the authentication event from
@@ -855,6 +867,9 @@ static void sme_auth_start_cb(struct wpa_radio_work *work, int deinit)
 		if (work->started)
 			wpa_s->connect_work = NULL;
 
+#if defined(INCLUDE_SCAN_DEBUG)
+		wpa_printf(MSG_DEBUG, "[sme_auth_start_cb] deinit\n");
+#endif		
 		wpas_connect_work_free(cwork);
 		return;
 	}
@@ -864,7 +879,7 @@ static void sme_auth_start_cb(struct wpa_radio_work *work, int deinit)
 	if (cwork->bss_removed ||
 	    !wpas_valid_bss_ssid(wpa_s, cwork->bss, cwork->ssid) ||
 	    wpas_network_disabled(wpa_s, cwork->ssid)) {
-		wpa_dbg(wpa_s, MSG_DEBUG, "SME: BSS/SSID entry for authentication not valid anymore - drop connection attempt");
+		wpa_dbg(wpa_s, MSG_DEBUG, "SME: BSS/SSID entry for authentication not valid anymore - drop connection attempt");		
 		wpas_connect_work_done(wpa_s);
 		return;
 	}
@@ -872,7 +887,9 @@ static void sme_auth_start_cb(struct wpa_radio_work *work, int deinit)
 	/* Starting new connection, so clear the possibly used WPA IE from the
 	 * previous association. */
 	wpa_sm_set_assoc_wpa_ie(wpa_s->wpa, NULL, 0);
-
+#if defined(INCLUDE_SCAN_DEBUG)
+	wpa_printf(MSG_DEBUG, "[%s] auth path\n", __func__);
+#endif	
 	sme_send_authentication(wpa_s, cwork->bss, cwork->ssid, 1);
 }
 
@@ -888,7 +905,9 @@ void sme_authenticate(struct wpa_supplicant *wpa_s,
 		wpa_dbg(wpa_s, MSG_DEBUG, "SME: Reject sme_authenticate() call since connect_work exist");
 		return;
 	}
-
+#if defined(INCLUDE_SCAN_DEBUG)
+	wpa_printf(MSG_DEBUG, "[%s] auth path\n", __func__);	
+#endif
 	if (radio_work_pending(wpa_s, "sme-connect")) {
 		/*
 		 * The previous sme-connect work might no longer be valid due to
@@ -914,10 +933,14 @@ void sme_authenticate(struct wpa_supplicant *wpa_s,
 	wpa_s->sme.sae.send_confirm = 0;
 	wpa_s->sme.sae_group_index = 0;
 #endif /* CONFIG_SAE */
-
+		
 	if (radio_add_work(wpa_s, bss->freq, "sme-connect", 1,
-			   sme_auth_start_cb, cwork) < 0)
+			   sme_auth_start_cb, cwork) < 0) {		
 		wpas_connect_work_free(cwork);
+	}
+#if defined(INCLUDE_SCAN_DEBUG)	
+	wpa_printf(MSG_DEBUG, "[%s] add sme_auth_start_cb() done\n", __func__);
+#endif	
 }
 
 
@@ -1113,7 +1136,7 @@ static int sme_sae_auth(struct wpa_supplicant *wpa_s, u16 auth_transaction,
 		wpabuf_free(wpa_s->sme.sae_token);
 		wpa_s->sme.sae_token = wpabuf_alloc_copy(data + sizeof(le16),
 							 len - sizeof(le16));
-		if (!external)
+		if (!external) 
 			sme_send_authentication(wpa_s, wpa_s->current_bss,
 						wpa_s->current_ssid, 2);
 		else
@@ -1352,6 +1375,9 @@ void sme_event_auth(struct wpa_supplicant *wpa_s, union wpa_event_data *data)
 			wpa_s->current_ssid->auth_alg = WPA_AUTH_ALG_SHARED;
 
 			wpa_dbg(wpa_s, MSG_DEBUG, "SME: Trying SHARED auth");
+#if defined(INCLUDE_SCAN_DEBUG)			
+			wpa_printf(MSG_DEBUG, "[%s] auth path a\n", __func__);				   
+#endif			
 			wpa_supplicant_associate(wpa_s, wpa_s->current_bss,
 						 wpa_s->current_ssid);
 			return;
@@ -1360,6 +1386,9 @@ void sme_event_auth(struct wpa_supplicant *wpa_s, union wpa_event_data *data)
 			wpa_s->current_ssid->auth_alg = WPA_AUTH_ALG_LEAP;
 
 			wpa_dbg(wpa_s, MSG_DEBUG, "SME: Trying LEAP auth");
+#if defined(INCLUDE_SCAN_DEBUG)			
+			wpa_printf(MSG_DEBUG, "[%s] auth path b\n", __func__);				   
+#endif			
 			wpa_supplicant_associate(wpa_s, wpa_s->current_bss,
 						 wpa_s->current_ssid);
 			return;
@@ -1835,8 +1864,10 @@ pfs_fail:
 		return;
 	}
 
+#if 1 // for test
 	eloop_register_timeout(SME_ASSOC_TIMEOUT, 0, sme_assoc_timer, wpa_s,
 			       NULL);
+#endif
 
 #ifdef CONFIG_TESTING_OPTIONS
 	wpabuf_free(wpa_s->last_assoc_req_wpa_ie);
@@ -2018,8 +2049,10 @@ void sme_disassoc_while_authenticating(struct wpa_supplicant *wpa_s,
 	 * Re-arm authentication timer in case auth fails for whatever reason.
 	 */
 	eloop_cancel_timeout(sme_auth_timer, wpa_s, NULL);
+#if 1 // for test
 	eloop_register_timeout(SME_AUTH_TIMEOUT, 0, sme_auth_timer, wpa_s,
 			       NULL);
+#endif
 }
 
 

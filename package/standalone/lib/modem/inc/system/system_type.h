@@ -48,14 +48,8 @@ typedef struct _FRAME_HDR {
 } FRAME_HDR;
 
 #include "protocol.h"
-#if defined(STANDARD_11AH)
 #include "protocol_11ah.h"
 #include "lmac_11ah.h"
-#endif /* defined(STANDARD_11AH) */
-
-#if	defined(STANDARD_11N)
-#include "lmac_11n.h"
-#endif /* defined(STANDARD_11N) */
 
 typedef union _UINT64 {
 	struct {
@@ -100,6 +94,7 @@ typedef enum _TQUEUE_EVENT_ID {
 	TASK_QUEUE_EVENT_WDT,
 	TASK_QUEUE_EVENT_MAC_DATA_RX,
 	TASK_QUEUE_EVENT_MAC_MGMT_RX,
+	TASK_QUEUE_EVENT_RF_RECOVERY,
 	TASK_QUEUE_EVENT_MAX,
 } TQUEUE_EVENT_ID;
 

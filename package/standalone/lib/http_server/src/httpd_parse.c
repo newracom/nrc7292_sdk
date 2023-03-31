@@ -299,10 +299,34 @@ static esp_err_t cb_headers_complete(http_parser *parser)
     V(TAG, LOG_FMT("content length = %zu"), r->content_len);
 
     if (parser->upgrade) {
+#ifdef CONFIG_HTTPD_WS_SUPPORT
+        E(TAG, LOG_FMT("Got an upgrade request"));
+
+        /* If there's no "Upgrade" header field, then it's not WebSocket. */
+        char ws_upgrade_hdr_val[] = "websocket";
+        if (httpd_req_get_hdr_value_str(r, "Upgrade", ws_upgrade_hdr_val, sizeof(ws_upgrade_hdr_val)) != ESP_OK) {
+            E(TAG, LOG_FMT("Upgrade header does not match the length of \"websocket\""));
+            parser_data->error = HTTPD_400_BAD_REQUEST;
+            parser_data->status = PARSING_FAILED;
+            return ESP_FAIL;
+        }
+
+        /* If "Upgrade" field's key is not "websocket", then we should also forget about it. */
+        if (strcasecmp("websocket", ws_upgrade_hdr_val) != 0) {
+            E(TAG, LOG_FMT("Upgrade header found but it's %s"), ws_upgrade_hdr_val);
+            parser_data->error = HTTPD_400_BAD_REQUEST;
+            parser_data->status = PARSING_FAILED;
+            return ESP_FAIL;
+        }
+
+        /* Now set handshake flag to true */
+        ra->ws_handshake_detect = true;
+#else
         E(TAG, LOG_FMT("upgrade from HTTP not supported"));
         parser_data->error = HTTPD_XXX_UPGRADE_NOT_SUPPORTED;
         parser_data->status = PARSING_FAILED;
         return ESP_FAIL;
+#endif
     }
 
     parser_data->status = PARSING_BODY;
@@ -499,6 +523,7 @@ static esp_err_t httpd_parse_req(struct httpd_data *hd)
     int blk_len,  offset;
     http_parser   parser;
     parser_data_t parser_data;
+    esp_err_t ret;
 
     /* Initialize parser */
     parse_init(r, &parser, &parser_data);
@@ -524,7 +549,9 @@ static esp_err_t httpd_parse_req(struct httpd_data *hd)
     } while (parser_data.status != PARSING_COMPLETE);
 
     V(TAG, LOG_FMT("parsing complete"));
-    return httpd_uri(hd);
+    ret = httpd_uri(hd);
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    return ret;
 }
 
 static void init_req(httpd_req_t *r, httpd_config_t *config)
@@ -549,6 +576,9 @@ static void init_req_aux(struct httpd_req_aux *ra, httpd_config_t *config)
     ra->first_chunk_sent = 0;
     ra->req_hdrs_count = 0;
     ra->resp_hdrs_count = 0;
+#if CONFIG_HTTPD_WS_SUPPORT
+    ra->ws_handshake_detect = false;
+#endif
     memset(ra->resp_hdrs, 0, config->max_resp_headers * sizeof(struct resp_hdr));
 }
 
@@ -563,6 +593,14 @@ static void httpd_req_cleanup(httpd_req_t *r)
         ra->sd->ctx = r->sess_ctx;
     }
     ra->sd->free_ctx = r->free_ctx;
+
+#if CONFIG_HTTPD_WS_SUPPORT
+    /* Close the socket when a WebSocket Close request is received */
+    if (ra->sd->ws_close) {
+        E(TAG, LOG_FMT("Try closing WS connection at FD: %d"), ra->sd->fd);
+        httpd_sess_trigger_close(r->handle, ra->sd->fd);
+    }
+#endif
 
     /* Clear out the request and request_aux structures */
     ra->sd = NULL;
@@ -590,6 +628,38 @@ esp_err_t httpd_req_new(struct httpd_data *hd, struct sock_db *sd)
     /* Copy session info to the request */
     r->sess_ctx = sd->ctx;
     r->free_ctx = sd->free_ctx;
+#ifdef CONFIG_HTTPD_WS_SUPPORT
+    /* Copy user_ctx to the request */
+    r->user_ctx = sd->ws_user_ctx;
+    /* Handle WebSocket */
+    V(TAG, LOG_FMT("New request, has WS? %s, sd->ws_handler valid? %s, sd->ws_close? %s"),
+             sd->ws_handshake_done ? "Yes" : "No",
+             sd->ws_handler != NULL ? "Yes" : "No",
+             sd->ws_close ? "Yes" : "No");
+    if (sd->ws_handshake_done && sd->ws_handler != NULL) {
+        esp_err_t ret = httpd_ws_get_frame_type(r);
+        V(TAG, LOG_FMT("New WS request from existing socket, ws_type=%d"), ra->ws_type);
+
+        if (ra->ws_type == HTTPD_WS_TYPE_CLOSE) {
+            /*  Only mark ws_close to true if it's a CLOSE frame */
+            sd->ws_close = true;
+        } else if (ra->ws_type == HTTPD_WS_TYPE_PONG) {
+            /* Pass the PONG frames to the handler as well, as user app might send PINGs */
+            V(TAG, LOG_FMT("Received PONG frame"));
+        }
+
+        /* Call handler if it's a non-control frame (or if handler requests control frames, as well) */
+        if (ret == ESP_OK &&
+            (ra->ws_type < HTTPD_WS_TYPE_CLOSE || sd->ws_control_frames)) {
+            ret = sd->ws_handler(r);
+        }
+
+        if (ret != ESP_OK) {
+            httpd_req_cleanup(r);
+        }
+        return ret;
+    }
+#endif
     /* Parse request */
     esp_err_t err = httpd_parse_req(hd);
     if (err != ESP_OK) {

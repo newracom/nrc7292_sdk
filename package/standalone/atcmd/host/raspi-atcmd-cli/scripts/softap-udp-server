@@ -1,0 +1,13 @@
+CALL wifi-softap-wpa2-psk-dhcps-us
+
+AT+SLIST?
+AT+SCLOSE
+
+AT+SOPEN="UDP",50000
+AT+SLIST?
+
+ECHO "Run UDP client on STA"
+HOLD
+
+AT+SCLOSE
+AT+SLIST?

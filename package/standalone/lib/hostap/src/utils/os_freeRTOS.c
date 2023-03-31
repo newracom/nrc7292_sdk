@@ -18,6 +18,8 @@
 #include "system_common.h"
 #include "system_modem_api.h"
 
+extern void *pvPortMalloc2( size_t xWantedSize, uint32_t extra );
+
 void os_sleep(os_time_t sec, os_time_t usec)
 {
 	vTaskDelay(pdMS_TO_TICKS(sec * 1000 + (usec+1) / 1000));
@@ -35,7 +37,13 @@ int os_get_time(struct os_time *t)
 
 void * os_memdup(const void *src, size_t len)
 {
-	void *r = os_malloc(len);
+	void *r = NULL;
+	register size_t result = 0;
+#if (__arm__)
+	__asm volatile ("MOV %0, LR\n" : "=r" (result) );
+#endif
+
+	r= pvPortMalloc2(len, result);
 
 	if (r && src)
 		os_memcpy(r, src, len);
@@ -124,49 +132,60 @@ int os_fdatasync(FILE *stream)
 	return 0;
 }
 
-__attribute__( ( always_inline ) ) static inline uint32_t __get_LR(void)
-{
-	register uint32_t result;
-#if (__arm__)
-	__asm volatile ("MOV %0, LR\n" : "=r" (result) );
-#else
-	// ND 10?
-	return 0;
-#endif
-	return result;
-}
-
 void * __attribute__ ((noinline)) os_zalloc(size_t size)
 {
-	uint32_t lr = __get_LR();
-	void *p = pvPortMalloc2(size, lr);
-	//system_printf("[wpa] alloc ptr=%p size=%d lr=0x%x \n", p, size, lr);
-	if (p)
-		os_memset(p, 0, size);
-	return p;
+	void *ptr = NULL;
+	register size_t result = 0;
+#if (__arm__)
+	__asm volatile ("MOV %0, LR\n" : "=r" (result) );
+#endif
+
+	ptr = pvPortMalloc2(size, result);
+	if (ptr)
+		os_memset(ptr, 0, size);
+	return ptr;
 }
 
 #ifdef OS_NO_C_LIB_DEFINES
 void * __attribute__ ((noinline)) os_malloc(size_t size)
 {
-	uint32_t lr = __get_LR();
-	void* ptr = pvPortMalloc2(size, lr);
-	//system_printf("[wpa] alloc ptr=%p size=%d lr=0x%x \n", ptr, size, lr);
+	void* ptr = NULL;
+	register size_t result = 0;
+#if (__arm__)
+	__asm volatile ("MOV %0, LR\n" : "=r" (result) );
+#endif
+
+	ptr = pvPortMalloc2(size, result);
 
 	return ptr;
 }
 
 void * os_realloc(void *ptr, size_t size)
 {
-	void *ret = os_malloc(size);
-	os_memcpy(ret, ptr, size);
-	os_free(ptr);
-	return ret;
+	void *newPtr = NULL;
+	register size_t result = 0;
+#if (__arm__)
+	__asm volatile ("MOV %0, LR\n" : "=r" (result) );
+#endif
+
+	if (size == 0) {
+		vPortFree(ptr);
+		return NULL;
+	}
+
+	newPtr = pvPortMalloc2(size, result);
+	if (newPtr) {
+		if (ptr != NULL) {
+			os_memcpy(newPtr, ptr, size);
+			vPortFree(ptr);
+		}
+	}
+	return newPtr;
 }
 
 void os_free(void *ptr)
 {
-//	system_printf("[wpa] free ptr=0x%x \n", ptr);
+	//system_printf("[wpa] free ptr=0x%x \n", ptr);
 	vPortFree(ptr);
 }
 
@@ -192,8 +211,14 @@ int os_memcmp(const void *s1, const void *s2, size_t n)
 
 char * os_strdup(const char *s)
 {
+	char *dup = NULL;
+	register size_t result = 0;
 	size_t len = strlen(s) + 1;
-	char *dup = os_malloc(len);
+#if (__arm__)
+	__asm volatile ("MOV %0, LR\n" : "=r" (result) );
+#endif
+
+	dup= pvPortMalloc2(len, result);
 
 	if (!dup)
 		return NULL;

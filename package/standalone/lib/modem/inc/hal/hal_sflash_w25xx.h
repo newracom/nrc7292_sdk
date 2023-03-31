@@ -37,6 +37,7 @@ uint32_t nrc_sf_w25xx_write(uint32_t address, uint8_t *buffer, size_t size);
 bool nrc_sf_w25xx_power_down(bool enable);
 uint32_t nrc_sf_w25xx_read_id(void);
 uint32_t nrc_sf_w25xx_read_jedec(void);
+void w25xx_sw_reset(void);
 
 
 #endif //__NRC_SERIAL_FLASH_W25XX_H__

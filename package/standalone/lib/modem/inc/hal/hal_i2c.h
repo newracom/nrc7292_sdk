@@ -17,7 +17,7 @@ enum {
 };
 
 enum {
-    I2C_CLK_CONTRLLER = 0,
+    I2C_CLK_CONTROLLER = 0,
     I2C_PCLK
 };
 

@@ -210,8 +210,7 @@ uint8_t		umac_s1g_config_get_block_control();
 
 void		umac_s1g_config_set_ess_type_network(bool enable);
 bool		umac_s1g_config_get_ess_type_network();
-
-bool		umac_s1g_config_get_debug_mode();
+uint8_t*	umac_s1g_config_get_vendor_specific_cnt_probe_resp_ptr(void);
 #else /* defined(INCLUDE_S1G_CONFIG) */
 static inline void umac_s1g_config_init() {}
 static inline void umac_s1g_config_load(int8_t vif_id, MAC_STA_TYPE type){}
@@ -284,5 +283,6 @@ static inline uint8_t umac_s1g_config_get_block_control() {return 0;}
 static inline void umac_s1g_config_set_ess_type_network(bool enable){}
 static inline bool umac_s1g_config_get_ess_type_network(){return false;}
 static inline bool umac_s1g_config_get_debug_mode() {return false;}
+static inline uint8_t* umac_s1g_config_get_vendor_specific_cnt_probe_resp_ptr(void){return false;}
 #endif /* defined(INCLUDE_S1G_CONFIG) */
 #endif /* UMAC_S1G_CONFIG_H */

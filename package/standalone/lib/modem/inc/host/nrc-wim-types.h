@@ -136,6 +136,8 @@ enum WIM_EVENT_ID {
 	WIM_EVENT_REQ_DEAUTH,
 	WIM_EVENT_CSA,
 	WIM_EVENT_CH_SWITCH,
+	WIM_EVENT_LBT_ENABLED,
+	WIM_EVENT_LBT_DISABLED,
 	WIM_EVENT_MAX,
 };
 
@@ -213,6 +215,9 @@ enum WIM_TLV_ID {
 	WIM_TLV_FOTA_FINISH,
 	WIM_TLV_FOTA_INFO,  //70
 	WIM_TLV_SOFTAP_BSS_MAX_IDLE,
+	WIM_TLV_SET_TXPOWER,
+	WIM_TLV_LEGACY_ACK,
+	WIM_TLV_BEACON_BYPASS,
 	WIM_TLV_MAX,
 };
 
@@ -224,7 +229,10 @@ enum WIM_STA_TYPE {
 	WIM_STA_TYPE_P2P_GC,
 	WIM_STA_TYPE_P2P_DEVICE,
 	WIM_STA_TYPE_MONITOR,
-	WIM_STA_TYPE_MESH_POINT
+	WIM_STA_TYPE_MESH_POINT,
+#if defined (CONFIG_SUPPORT_IBSS) || defined (INCLUDE_IBSS)
+	WIM_STA_TYPE_IBSS,
+#endif
 };
 
 enum WIM_S1G_STA_TYPE {
@@ -454,6 +462,17 @@ struct nrc_tlv_item {
 	uint8_t value[0];
 };
 
+struct s1g_channel_table {
+	char alpha2[3];				// two-letter country code
+	uint16_t s1g_freq;			// s1g frequency
+	uint8_t s1g_freq_index;			// s1g channel index
+	uint8_t chan_spacing; 		// bandwidth
+	uint8_t cca_level_type;
+	uint8_t global_oper_class;
+	int8_t offset;				// for 1MHz bandwidth alignment
+	int8_t primary_loc;			// for 1MHz bandwidth alignment
+};
+
 struct nrc_tlv {
 	struct nrc_tlv_hdr tlv_hdr;
 	union {
@@ -474,7 +493,9 @@ struct nrc_tlv {
 		struct wim_tim_param *tim_param;
 		struct wim_sleep_duration_param *sleep_duration_param;
 		struct wim_pm_param *pm_param;
-		struct wim_s1g_channel_param *s1g_chan_param;
+#if defined(CONFIG_S1G_CHANNEL)
+		struct s1g_channel_table *s1g_chan_param;
+#endif /* defined(CONFIG_S1G_CHANNEL) */
 		struct wim_bd_param *bd_param;
 		uint8_t *bytes_param;
 		bool *bool_param;
@@ -536,7 +557,7 @@ struct wim_bd_param {
 
 #define WIM_MAX_SCAN_SSID       (2)
 #define WIM_MAX_SCAN_BSSID      (2)
-#define WIM_MAX_SCAN_CHANNEL    (50)
+#define WIM_MAX_SCAN_CHANNEL    (55)
 #ifndef IEEE80211_MAX_SSID_LEN
 #define IEEE80211_MAX_SSID_LEN  (32)
 #endif
@@ -568,6 +589,7 @@ enum wim_system_cap {
 	WIM_SYSTEM_CAP_CHANNEL_2G = BIT(3),
 	WIM_SYSTEM_CAP_CHANNEL_5G = BIT(4),
 	WIM_SYSTEM_CAP_MULTI_VIF = BIT(5),
+	WIM_SYSTEM_CAP_HYBRIDSEC = BIT(6), //PTK:HW, GTK:SW
 };
 
 struct wim_vif_cap_param {
@@ -676,12 +698,16 @@ WIM_DECLARE(wim_sleep_duration);
  *  one bit per byte, in same format as nl80211
  * @pattern: bytes to match where bitmask is 1
  */
+
+/* This must be matched with retention size in nrc_ps_api.h */
+#define WOWLAN_PATTER_SIZE 		48
+
 struct wowlan_pattern {
 	uint16_t offset:6;
 	uint16_t mask_len:4;
 	uint16_t pattern_len:6;
-	uint8_t mask[7];
-	uint8_t pattern[56];
+	uint8_t mask[WOWLAN_PATTER_SIZE/8];
+	uint8_t pattern[WOWLAN_PATTER_SIZE];
 } __packed;
 
 struct wim_pm_param {
@@ -689,6 +715,7 @@ struct wim_pm_param {
 	uint8_t ps_enable;
 	uint16_t ps_wakeup_pin;
 	uint64_t ps_duration;
+	uint32_t ps_timeout;
 	uint8_t wowlan_wakeup_host_pin;
 	uint8_t wowlan_enable_any;
 	uint8_t wowlan_enable_magicpacket;
@@ -699,9 +726,14 @@ struct wim_pm_param {
 WIM_DECLARE(wim_pm);
 
 struct wim_drv_info_param {
-	uint32_t boot_mode		:1;
-	uint32_t cqm_off		:1;
-	uint32_t reserved		:30;
+	uint32_t boot_mode			:1;
+	uint32_t cqm_off			:1;
+	uint32_t sw_enc				:2; //0: HW 1: SW 2:HYBRID
+	uint32_t bitmap_encoding	:1;
+	uint32_t reverse_scrambler	:1;
+	uint32_t kern_ver			:12;
+	uint32_t reserved			:14;
+	uint32_t vendor_oui;
 } __packed;
 WIM_DECLARE(wim_drv_info);
 
@@ -709,6 +741,12 @@ WIM_DECLARE(wim_drv_info);
 #define WIM_SCAN_PARAM_FLAG_HT			(BIT(1))
 #define WIM_SCAN_PARAM_FLAG_WMM			(BIT(2))
 #define WIM_SCAN_PARAM_FLAG_DS			(BIT(3))
+
+enum wim_ENCDEC_type {
+	WIM_ENCDEC_HW = 0,
+	WIM_ENCDEC_SW = 1,
+	WIM_ENCDEC_HYBRID = 2,
+};
 
 struct wim_channel_1m_param {
 	int channel_start;
@@ -722,6 +760,11 @@ struct wim_scan_channel {
 	struct wim_channel_width_param width;
 };
 
+struct wim_scan_preq_ies {
+	uint8_t ies_len;
+	uint8_t *ies;
+} __packed;
+
 struct wim_scan_param {
 	uint8_t mac_addr[6];
 	uint8_t mac_addr_mask[6];
@@ -734,6 +777,7 @@ struct wim_scan_param {
 	struct wim_scan_bssid   bssid[WIM_MAX_SCAN_BSSID];
 	uint16_t                channel[WIM_MAX_SCAN_CHANNEL];
 	struct wim_scan_channel s1g_channel[WIM_MAX_SCAN_CHANNEL];
+	struct wim_scan_preq_ies preq_ies;
 } __packed;
 
 enum wim_cipher_type {
@@ -855,11 +899,10 @@ enum WIM_S1G_CHANNEL_FLAGS {
 	WIM_S1G_CHANNEL_FLAG_MCS10_NOT_RECOMMENDED = BIT(2),
 };
 
-struct wim_s1g_channel_param {
-	uint16_t pr_freq;
-	uint16_t op_freq;
-	uint16_t width;
-	uint16_t flags;
+enum WIM_TXPWR_TYPE {
+	TXPWR_AUTO = 0,
+	TXPWR_LIMIT,
+	TXPWR_FIXED,
 };
 
 #endif /* _NRC_WIM_TYPES_H_ */

@@ -1,0 +1,6 @@
+ECHO "UDP server. (IPv4)"
+ECHO " - Port : 50000"
+HOLD
+
+AT+SOPEN="UDP",50000
+AT+SLIST?

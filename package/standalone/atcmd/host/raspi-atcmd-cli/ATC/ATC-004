@@ -1,0 +1,14 @@
+
+ECHO " ATC-004 : MCS"
+ECHO "========================================="
+HOLD
+
+AT+WRATECTRL=0
+AT+WRATECTRL?
+
+AT+WMCS?
+AT+WMCS=3
+AT+WMCS?
+
+AT+WRATECTRL=1
+AT+WRATECTRL?

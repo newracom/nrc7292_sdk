@@ -55,45 +55,21 @@ static inline unsigned int bswap_32(unsigned int v)
 #ifdef _FREERTOS
 #include <stdint.h>
 #include <sys/types.h>
+#include "lwip/sockets.h"
+
+/* poll and disconnect macro conflicts with hostap package. */
+#ifdef poll
+#undef poll
+#endif
+
+#ifdef disconnect
+#undef disconnect
+#endif
+
 #define __BYTE_ORDER   _BYTE_ORDER
 #define __LITTLE_ENDIAN        _LITTLE_ENDIAN
 #define __BIG_ENDIAN   _BIG_ENDIAN
-#define WPA_TYPES_DEFINED
-typedef uint64_t u64;
-typedef unsigned int u32;
-typedef uint16_t u16;
-typedef uint8_t u8;
-typedef int64_t s64;
-typedef int32_t s32;
-typedef int16_t s16;
-typedef int8_t s8;
-typedef int socklen_t;
-
-#ifndef ECANCELED
-#define ECANCELED (-1)
-#endif
-
-#define AF_UNIX (0)
-#define AF_INET (1)
-
-struct in_addr {
-	uint32_t s_addr;
-};
-
-struct sockaddr_un {
-	void* sun_path;
-};
-
-struct sockaddr_storage {
-	short sin_family;
-	short ss_family;
-};
-
-struct sockaddr {
-  uint8_t     sa_len;
-  uint8_t     sa_family;
-  char        sa_data[14];
-};
+#define os_snprintf		snprintf
 
 static inline unsigned short bswap_16(unsigned short v)
 {
@@ -106,134 +82,15 @@ static inline unsigned int bswap_32(unsigned int v)
 		((v & 0xff0000) >> 8) | (v >> 24);
 }
 
-#ifndef htons
-#define htons		bswap_16
-#endif
-
-#ifndef htonl
-#define htonl		bswap_32
-#endif
-
-#ifndef ntohl
-#define ntohl		bswap_32
-#endif
-
-#define __SOCKADDR_COMMON_SIZE	(sizeof (unsigned short int))
-struct sockaddr_in
-  {
-    in_port_t sin_port;			/* Port number.  */
-    struct in_addr sin_addr;		/* Internet address.  */
-
-    /* Pad to size of `struct sockaddr'.  */
-    unsigned char sin_zero[sizeof (struct sockaddr) -
-			   __SOCKADDR_COMMON_SIZE -
-			   sizeof (in_port_t) -
-			   sizeof (struct in_addr)];
-  };
-
-
-extern int errno;
-
-static inline char* inet_ntoa(struct in_addr in)
-{
-	char* p = (char *)&in.s_addr;
-	return p;
-}
-
-static int inet_aton(const char *cp, struct in_addr *ap)
-{
-	// TODO:
-	return 0;
-}
-
-static inline char *
-inet_ntop(int af, const void *src, char *dst, socklen_t size)
-{
-  char *ret = NULL;
-  int size_int = (int)size;
-  if (size_int < 0) {
-    return NULL;
-  }
-  switch (af) {
-#if LWIP_IPV4
-    case AF_INET:
-      ret = ip4addr_ntoa_r((const ip4_addr_t *)src, dst, size_int);
-      break;
-#endif
-#if LWIP_IPV6
-    case AF_INET6:
-      ret = ip6addr_ntoa_r((const ip6_addr_t *)src, dst, size_int);
-      break;
-#endif
-    default:
-	  return NULL;
-      break;
-  }
-  return ret;
-}
-
-#define os_snprintf		snprintf
-
-#ifdef ARRAY_SIZE
-#undef ARRAY_SIZE
-#endif
-
-#ifdef WLAN_FC_PVER
-#undef WLAN_FC_PVER
-#endif
-
-#ifdef WLAN_FC_PVER
-#undef WLAN_FC_PVER
-#endif
-#ifdef WLAN_FC_TODS
-#undef WLAN_FC_TODS
-#endif
-#ifdef WLAN_FC_FROMDS
-#undef WLAN_FC_FROMDS
-#endif
-#ifdef WLAN_FC_MOREFRAG
-#undef WLAN_FC_MOREFRAG
-#endif
-#ifdef WLAN_FC_RETRY
-#undef WLAN_FC_RETRY
-#endif
-#ifdef WLAN_FC_PWRMGT
-#undef WLAN_FC_PWRMGT
-#endif
-#ifdef WLAN_FC_MOREDATA
-#undef WLAN_FC_MOREDATA
-#endif
-#ifdef WLAN_FC_ISWEP
-#undef WLAN_FC_ISWEP
-#endif
-#ifdef WLAN_FC_ORDER
-#undef WLAN_FC_ORDER
-#endif
-#ifdef WLAN_FC_GET_TYPE
-#undef WLAN_FC_GET_TYPE
-#endif
-#ifdef WLAN_FC_GET_STYPE
-#undef WLAN_FC_GET_STYPE
-#endif
-#ifdef IEEE80211_FC
-#undef IEEE80211_FC
-#endif
-#ifdef CONFIG_WPS_NFC
-#undef CONFIG_WPS_NFC
-#endif
-
-#define IP4ADDR_STRLEN_MAX    16
-#define IP6ADDR_STRLEN_MAX    46
-
-#ifndef INET_ADDRSTRLEN
-#define INET_ADDRSTRLEN     IP4ADDR_STRLEN_MAX
-#endif
-#if LWIP_IPV6
-#ifndef INET6_ADDRSTRLEN
-#define INET6_ADDRSTRLEN    IP6ADDR_STRLEN_MAX
-#endif
-#endif
-
+typedef uint64_t u64;
+typedef unsigned int u32;
+typedef uint16_t u16;
+typedef uint8_t u8;
+typedef int64_t s64;
+typedef int32_t s32;
+typedef int16_t s16;
+typedef int8_t s8;
+#define WPA_TYPES_DEFINED
 #endif /* __FREERTOS__ */
 
 #ifdef __rtems__
@@ -527,8 +384,14 @@ static inline void WPA_PUT_LE64(u8 *a, u64 val)
 #ifndef ETH_P_OUI
 #define ETH_P_OUI 0x88B7
 #endif /* ETH_P_OUI */
+#ifndef MAX_SSID_LEN
+#define MAX_SSID_LEN 32
+#endif
 
-
+#ifdef _FREERTOS
+#define PRINTF_FORMAT(a,b)
+#define STRUCT_PACKED
+#else
 #ifdef __GNUC__
 #define PRINTF_FORMAT(a,b) __attribute__ ((format (printf, (a), (b))))
 #define STRUCT_PACKED __attribute__ ((packed))
@@ -536,6 +399,7 @@ static inline void WPA_PUT_LE64(u8 *a, u64 val)
 #define PRINTF_FORMAT(a,b)
 #define STRUCT_PACKED
 #endif
+#endif /* _FREERTOS */
 
 
 #ifdef CONFIG_ANSI_C_EXTRA

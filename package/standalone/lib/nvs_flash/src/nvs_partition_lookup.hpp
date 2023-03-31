@@ -1,4 +1,3 @@
-#include "esp_err.h"
 #include "nvs_partition.hpp"
 #include "nvs_flash.h"
 

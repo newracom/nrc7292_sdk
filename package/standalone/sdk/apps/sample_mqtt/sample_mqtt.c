@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2020 Newracom, Inc.
+ * Copyright (c) 2022 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,102 +28,228 @@
 #include "MQTTClient.h"
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
+#include "nvs.h"
+#include "nvs_config.h"
 
-#define BROKER_PORT 1883
-#define BROKER_IP   "192.168.10.199"
-
+//#define TEST_MOSQUITTO_ORG_SERVER
 #define USE_MQTTS
-#if defined( USE_MQTTS )
-#undef BROKER_PORT
-#define BROKER_PORT 8883
+
+#ifdef TEST_MOSQUITTO_ORG_SERVER
+#define BROKER_IP   "test.mosquitto.org"
+#else
+#define BROKER_IP   "10.198.1.214"
 #endif
+
+#if defined( USE_MQTTS )
+#define BROKER_PORT 8883
+#else
+#define BROKER_PORT 1883
+#endif
+
+#define GET_IP_RETRY_MAX 10
+#define CONNECTION_RETRY_MAX 3
+#define SET_DEFAULT_SCAN_CHANNEL_THRESHOLD 1
 
 #if defined( SUPPORT_MBEDTLS ) && defined( USE_MQTTS )
 const char ca_cert[] =
-"-----BEGIN CERTIFICATE-----\r\n"
-"MIIDqjCCApKgAwIBAgIJAMS7T21cIG3NMA0GCSqGSIb3DQEBCwUAMGoxFzAVBgNV\r\n"
-"BAMMDkFuIE1RVFQgYnJva2VyMRYwFAYDVQQKDA1Pd25UcmFja3Mub3JnMRQwEgYD\r\n"
-"VQQLDAtnZW5lcmF0ZS1DQTEhMB8GCSqGSIb3DQEJARYSbm9ib2R5QGV4YW1wbGUu\r\n"
-"bmV0MB4XDTE5MTEwMTA0NDA0N1oXDTMyMTAyODA0NDA0N1owajEXMBUGA1UEAwwO\r\n"
-"QW4gTVFUVCBicm9rZXIxFjAUBgNVBAoMDU93blRyYWNrcy5vcmcxFDASBgNVBAsM\r\n"
-"C2dlbmVyYXRlLUNBMSEwHwYJKoZIhvcNAQkBFhJub2JvZHlAZXhhbXBsZS5uZXQw\r\n"
-"ggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDxLadbdZJi635QcgZIzODn\r\n"
-"l2smAm5Yp56++DB7c0RLEYwAtWNffby64duLT1g3B97sDzPZtYmLipKFxgc78NU3\r\n"
-"k9o1atV4F8aRIFrd9EDlQUMtpehG7cE3zemfDyaPlVHgMcY+XhZOamvQrZxikX38\r\n"
-"usNWaPMkhlPLMciKZhCzGcq1JD1Li0FSyZ1uXTNhMulIw0KkQEiex3oV94QU85lV\r\n"
-"hiG/rNT4kB5LVU1Xx3xmmZc2QcglxQ2dGXCvMyrzzqW4bQy2t9ZJYNia15u1ryye\r\n"
-"ldImK1e3LukzEGf55JccC6YLExKzDt18EtB1Hvk8H2gNNmoEDGrhzEQo7bq6Ygap\r\n"
-"AgMBAAGjUzBRMB0GA1UdDgQWBBRBZeQV8SL9moz8ZO9GBQ7K3HpRQDAfBgNVHSME\r\n"
-"GDAWgBRBZeQV8SL9moz8ZO9GBQ7K3HpRQDAPBgNVHRMBAf8EBTADAQH/MA0GCSqG\r\n"
-"SIb3DQEBCwUAA4IBAQBrLpykFoOIcal7UMO8A270d7pdXWtPLbDKEWNHL/zKaaqI\r\n"
-"2HQQaOGMZS231d/Oxfnv6C5u/ESJJIAi7E1XYMwNq1eQkNKVDpP5UFLSFk4sI5D6\r\n"
-"YsOyu85IdodPD+28XnriWvaYUgtnxXsIT4HwIXVzgkNG3/AnWprLp4HIt1ukkxFu\r\n"
-"Em24L3lDlYYMJYTr4Rnu7AiodYkkloJyhzyJ8UBBhCuy0mUO59j6rIXDaZGL71ja\r\n"
-"yKExVSv/h3i7WUiNKnI8sIneh9JvWXHYEA0lUULsQnEGx5N0AC2hmyWdh1xvCMHV\r\n"
-"7EpoLTDRlWv50yFDARsLVMVdnVw5+Ef3G37J3rLj\r\n"
-"-----END CERTIFICATE-----\r\n";
+"-----BEGIN CERTIFICATE-----\n"
+"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\n"
+"usEtW9TFODpeDRmXEJBC2OD6GE3Sd9KCZA==\n"
+"-----END CERTIFICATE-----\n";
 
 const char client_cert[] =
-"-----BEGIN CERTIFICATE-----\r\n"
-"MIIDBjCCAe4CCQDOfHUh/FAWyjANBgkqhkiG9w0BAQsFADBFMQswCQYDVQQGEwJB\r\n"
-"VTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50ZXJuZXQgV2lkZ2l0\r\n"
-"cyBQdHkgTHRkMB4XDTIxMDQxNTAyNDUzNFoXDTIyMDQxNTAyNDUzNFowRTELMAkG\r\n"
-"A1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoMGEludGVybmV0\r\n"
-"IFdpZGdpdHMgUHR5IEx0ZDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB\r\n"
-"AKL71f30DySYtPIFOXQ1Zd29itrZ6VZ5WtLXSANkJq2YxNuMJySMvpi9y540970G\r\n"
-"xP3ING/rhPr+acsmCQ+IBM9xrUSzU0VsrNUTuom8ZdydrsuZf3Zei5jtAJsWzYXD\r\n"
-"P5LKgZbGSTzUmZXmXlX3HGSx0rE0q1Epjh6PGKzpw2rQJzlY3cK7lTHIC8x6YBEV\r\n"
-"Yr9Rw/NwXZEKP6lx6HCpRC8DGck2+8MDCDty40Bl7bMjbY712rt3J/1uHz9c5OmN\r\n"
-"dof8jwFkO/noOB6vsEXCQXlLW9ZXNL3zsA23S2QHrmGukNcLxCpvYtztaHtOuv8y\r\n"
-"OQt8EFHtQyGykTsvP5/0ShkCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAc1Pd/thJ\r\n"
-"4aemeQnQD36ISchvyJs9n8MZW9tMRD2Y0Dq/WpBb4xDOWGQ37Clee2f0k2K3ospJ\r\n"
-"zZ4r9q+f6WRaMDc2ZXk0OJGbgPfvqTbaNo4vP058E87bwLsuUj1JYvI3d+d1hWMC\r\n"
-"a1o8dUOjQyVYf8IfxkL2zAO42/uij2rQw7u3fcC59EbBOAaPk/SO5VGWwBjsDTwQ\r\n"
-"VGQPPoG7iNOU4SvPcLUK6lDWZ68PllFBA+7LIiNHU2xAuHkHc79srySkdbMMJ9pd\r\n"
-"Va6JA2K1JKl+lgIeCK1Z6i11DQyL7HdIAKoK4G5V9pId17Uq8zdnvpQkklg3Udpf\r\n"
-"oQWOaxyon2nU3w==\r\n"
-"-----END CERTIFICATE-----\r\n";
-
+"-----BEGIN CERTIFICATE-----\n"
+"MIIIDzCCBfegAwIBAgIUJyoNipX8W6ybhv8TZ89ilexFiz8wDQYJKoZIhvcNAQEN\n"
+"BQAwajEXMBUGA1UEAwwOQW4gTVFUVCBicm9rZXIxFjAUBgNVBAoMDU93blRyYWNr\n"
+"cy5vcmcxFDASBgNVBAsMC2dlbmVyYXRlLUNBMSEwHwYJKoZIhvcNAQkBFhJub2Jv\n"
+"ZHlAZXhhbXBsZS5uZXQwHhcNMjIxMjIwMTk0OTUyWhcNMjUwMzI0MTk0OTUyWjBn\n"
+"MRQwEgYDVQQDDAtzYW1wbGVfbXF0dDEWMBQGA1UECgwNT3duVHJhY2tzLm9yZzEU\n"
+"MBIGA1UECwwLZ2VuZXJhdGUtQ0ExITAfBgkqhkiG9w0BCQEWEm5vYm9keUBleGFt\n"
+"cGxlLm5ldDCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAKsTEfAU7OF5\n"
+"pqnyrElYHo0rlrYJ+CbKNBdHZK8xCxwcxssWOccr08p492E6pYRQAg7Vd4RcGVLa\n"
+"Jh1zdbTyhg9gDNvRu5FdPbVVNx+a0kk0Ge2gaOxtrjltNDD+SzxxJJmoQwypjL8g\n"
+"WciW2maqS+w4Rsd13KVe2mAUofz9ynPHOdZ/SQHf3Y/HY+f/ZzyJhGeD4aQZlidj\n"
+"0CMSpSNkzTV/5TXHB6idxk6EFYNIuLZYT1M/mGKFSNU+pZcBKUtnFMOLcvDKB4cO\n"
+"VOZTfkLtWhRGkUM1PUEGmEzj5LIK/SojGzZLq3UsBm1GeNsI1AvwIfFZmAGqvd2p\n"
+"OlYkbHnZ3chkx0FQt9jh6IyWOLYGich3iWrfgyRGJ4MUIB4Im7mIV2zxET9xOb7n\n"
+"3QJMwi+RnaxQay0w5qZexgi0jnFoPeXdR9Ko3TKIUxPSZzbbFEEyIq6JM71hizmT\n"
+"1RnTshFFxXzW8iNpOix8fIUkvqLRLxy79Kk5Qtw5tNqV3u/KgcDhBN6aWC/lkdA8\n"
+"8UDSAlNl/IE51/E+91XU7NZmdfo8bIVpwNqLA/0hDw+v9NXWOMlcHWOQHT/8ja+a\n"
+"scb1IXy05J2woTrR/SRGQD6o26v3U9Lz3WMlcaU+8WiGESjI4mABTG4Z8P/PMT8l\n"
+"q2fXpWoV5Js7vGMlzuCogwATm7QpA5i9AgMBAAGjggKuMIICqjAMBgNVHRMBAf8E\n"
+"AjAAMBEGCWCGSAGG+EIBAQQEAwIGQDALBgNVHQ8EBAMCBeAwEwYDVR0lBAwwCgYI\n"
+"KwYBBQUHAwEwIQYJYIZIAYb4QgENBBQWEkJyb2tlciBDZXJ0aWZpY2F0ZTAdBgNV\n"
+"HQ4EFgQUeORJy34xVKv1GbcNMyPzh6bUXj4wgacGA1UdIwSBnzCBnIAUa459h/FA\n"
+"r26TE+ATCjW+tz4/zCOhbqRsMGoxFzAVBgNVBAMMDkFuIE1RVFQgYnJva2VyMRYw\n"
+"FAYDVQQKDA1Pd25UcmFja3Mub3JnMRQwEgYDVQQLDAtnZW5lcmF0ZS1DQTEhMB8G\n"
+"CSqGSIb3DQEJARYSbm9ib2R5QGV4YW1wbGUubmV0ghRYSQQ2ByA0EeL8B1M/H4gb\n"
+"x0FtmjCB7wYDVR0RBIHnMIHkhwQKxgHWhxD9tgWcXFYAAFQUwD/rTTGdhxD9tgWc\n"
+"XFYAAMt35oW+kTDghxD9tgWcXFYAAKLvGmsYtashhxD+gAAAAAAAAAhwsh1rUhDo\n"
+"hxD9tgWcXFYAAEDp2RByc10ThxD9tgWcXFYAADVDzskwAgWRhxD9tgWcXFYAAAAA\n"
+"AAAAAAxFhxD9tgWcXFYAADLJkFTTtMS5hwTAqMj+hxD+gAAAAAAAAOTWMoz/tAIK\n"
+"hwTAqHoBhwR/AAABhxAAAAAAAAAAAAAAAAAAAAABggtzYW1wbGVfbXF0dIIJbG9j\n"
+"YWxob3N0MIGGBgNVHSAEfzB9MHsGAysFCDB0MBwGCCsGAQUFBwIBFhBodHRwOi8v\n"
+"bG9jYWxob3N0MFQGCCsGAQUFBwICMEgwEBYJT3duVHJhY2tzMAMCAQEaNFRoaXMg\n"
+"Q0EgaXMgZm9yIGEgbG9jYWwgTVFUVCBicm9rZXIgaW5zdGFsbGF0aW9uIG9ubHkw\n"
+"DQYJKoZIhvcNAQENBQADggIBAEyhEWnLnDXhYtzHrTkdOyqqb5y6BM7c6PjtTP9b\n"
+"SaYjbPwNAhFeyyZT4gqFt4DoY+KK+JtZK7zg7cgv9KdaCH6fyYXcOaVWetL2sN4W\n"
+"G/wXXs2+rKEb09+8XQBR2uZQ3sRKSztaspEXNEi3mCg+u1ZyS711WBX9kj0RAG0X\n"
+"o/jZWRMXixZrq3mOey9j+VvGEGDg2YELMmoY2ZgBjbJFPkgTD2UT1OdzA//pMN6i\n"
+"I1Q2Kq7k4wDXya5881+z+LwVD5WOFZj1iTTxuLLHTfu0UDVBYh4EcWaySZBd4Vg2\n"
+"PzEmJVPxyT6MMBO2+4IElp1uu1Ibn0otUZ2NYIggkfsUxM2b8UnWYQb3VUhnK22X\n"
+"tp3qJLUdZqlZgVD/4zmtJX8AE2/cUIFtL09wwVbHgJ7othdvdMk3ZJTzSw7+ZMce\n"
+"YVNjp0IEogYQMBQsboK4Uh8ek0su3KRide8dAbFz3PhKFOFswclP0mduLOsf0HNe\n"
+"1XjtaOXz4DVfubtPsluJHIn3BIYBX6N1f72M/Ntd8ic/chO7UipX/kKiCPzZdFwF\n"
+"1tIQU+c2Jac4fXiRHVsRDREhvX1uk90oDrYekK2ctmpJiatOP6Xvenkg+v2vG0wG\n"
+"uI857JJ+0NgeBWgWxSw2oz7VnZ9JwvWugdKeUcXa4TtrRUFvAJbXcnhRq6sJfjB1\n"
+"psaA\n"
+"-----END CERTIFICATE-----\n";
 
 const char client_pk[] =
-"-----BEGIN RSA PRIVATE KEY-----\r\n"
-"MIIEogIBAAKCAQEAovvV/fQPJJi08gU5dDVl3b2K2tnpVnla0tdIA2QmrZjE24wn\r\n"
-"JIy+mL3LnjT3vQbE/cg0b+uE+v5pyyYJD4gEz3GtRLNTRWys1RO6ibxl3J2uy5l/\r\n"
-"dl6LmO0AmxbNhcM/ksqBlsZJPNSZleZeVfccZLHSsTSrUSmOHo8YrOnDatAnOVjd\r\n"
-"wruVMcgLzHpgERViv1HD83BdkQo/qXHocKlELwMZyTb7wwMIO3LjQGXtsyNtjvXa\r\n"
-"u3cn/W4fP1zk6Y12h/yPAWQ7+eg4Hq+wRcJBeUtb1lc0vfOwDbdLZAeuYa6Q1wvE\r\n"
-"Km9i3O1oe066/zI5C3wQUe1DIbKROy8/n/RKGQIDAQABAoIBABzLFOEKjupOOBlR\r\n"
-"pvbKwDZOWAuV1805HzyEX+qJdPPSO2T1+6xPWRSu4xwOC35Phdm31tu25gVZkOMc\r\n"
-"0xj1VLQ5Rv0OGTX4nwf9tkTDDdPN36WEdqo4xby8khDUFHb/KWoLcJ1sZl/ix0de\r\n"
-"LWhOgaugZrJ7tZBfIQZxDVDu82EZIMbqgCQ3NBTIV49wfdj0h/6M/VB1Z9CqNPeq\r\n"
-"Wc3lt1cuZfD+NKVonlmzR6mAfMjtJo6caOggdJ1cnDYu4vQ6gKOpyt3oeAPqTq8Y\r\n"
-"wa7kwUAJbEDB7k5MS8U8ZsnthtP3PSXo6Hv+dZ4nY7Ua4wrocpiHU/JdLG/psNcA\r\n"
-"OVyAzwECgYEAzvcKkJ77vpaohmhfr7xiySb9Y2nJOfwx98/A2EOy1mQ8gM6ugBle\r\n"
-"bBT9FvTssaG91LddvZ03MbrHLCMQdISSTKdDM3GQOJFtqz4jarIW4ymrHxbZLB1r\r\n"
-"4IwHqgcG8x10Fp2MM1F2Iy/4XeV3F6M8OvZtjOGOK7PhJRtdwcitI6kCgYEAyZk3\r\n"
-"uY4//IxuoFOyYqU3mSD/V3CyJOgR3ZaT+hp9DpAOFFOjBiyC9mZeazXvKveSoFIn\r\n"
-"2GK4I/INjbyUDZ9dq6pHCFfQWDeP8L4+gzrRcLCW5mxOmrsYMXfdcY1f4U75DHwj\r\n"
-"qgi2WYgkcz9U06dqIULfRieDbJN+AN8Chola+PECgYAObCrBT0Lt0iPmUemxHmin\r\n"
-"6d6oiduq/cchpMmkiHsy84M/2qdQZ/Qrhf7pFaJU8pd+9lRC/Wy2O3Tbv4nLBN4J\r\n"
-"F3LYZ+aL+p5w24CuU8DCjcnN/dKef2JgIIH8OEcks/2+AbaecOPRqesd5/q3m/l7\r\n"
-"hma19ZXpt7xN0K1k7q4aGQKBgB8zbnNyd6a/mVOJAJ/R0EQL3lkLIRcjL7iq2GYp\r\n"
-"+VbqprMwqpeHBhHakBxpsYVl4bScYnxT8wnlKYHZQNTG6HlsFihNZvpwRv/MgeJP\r\n"
-"lSCqxAAPnS7HbBwj4Ar2BXPahCMRh3eGd6ptrq6Di75iN8PEFMhHz0hbn3HFEh/+\r\n"
-"XC0RAoGARNLIcnU7U25lEyvWbFK+0m1GSmpTUpinI7wC2XawDI/ZlWbCtTAR/7Yi\r\n"
-"RrRaoYGoDTpe4loFecWTHSrc27lxqZHB/WeThz6M9W8BTfyxSJdsgvLDlzRmpJkX\r\n"
-"3k9fMpHX+3Awwa66tcjRccMpBwJt9YJXbeIAGTMH/KDAbFCttqk=\r\n"
-"-----END RSA PRIVATE KEY-----\r\n";
-
-
+"-----BEGIN RSA PRIVATE KEY-----\n"
+"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\n"
+"-----END RSA PRIVATE KEY-----\n";
 
 const char client_pk_pwd[] = "";
 #endif
 
+static nvs_handle_t nvs_handle;
 
 void message_arrived(MessageData* data)
 {
 	nrc_usr_print("Message arrived on topic %.*s: %.*s\n", data->topicName->lenstring.len,
 		data->topicName->lenstring.data, data->message->payloadlen, data->message->payload);
+}
+
+static nrc_err_t connect_to_ap(WIFI_CONFIG *param)
+{
+	int retry_count = 0;
+	int i = 0;
+	uint8_t retry_cnt = 0;
+
+	nrc_usr_print("[%s] Sample App for Wi-Fi  \n",__func__);
+
+	/* set initial wifi configuration */
+	wifi_init(param);
+
+	/* connect to AP */
+	while(1) {
+		if (wifi_connect(param)== WIFI_SUCCESS) {
+			nrc_usr_print ("[%s] connect to %s successfully !! \n", __func__, param->ssid);
+			break;
+		} else {
+			nrc_usr_print ("[%s] Fail for connection %s\n", __func__, param->ssid);
+			if (retry_cnt > CONNECTION_RETRY_MAX) {
+				nrc_usr_print("(connect) Exceeded retry limit (%d). Run sw_reset\n", CONNECTION_RETRY_MAX);
+				nrc_sw_reset();
+				return NRC_FAIL;
+			} else if(retry_cnt == SET_DEFAULT_SCAN_CHANNEL_THRESHOLD){
+				if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
+					nrc_usr_print("[%s] NVS_WIFI_CHANNEL:%d...\n", __func__, 0);
+					nvs_set_u16(nvs_handle, NVS_WIFI_CHANNEL, 0);
+					nrc_set_default_scan_channel(param);
+					nvs_close(nvs_handle);
+				}
+			}
+			_delay_ms(1000);
+			retry_cnt++;
+		}
+	}
+
+	/* check if IP is ready */
+	retry_cnt = 0;
+	while(1){
+		if (nrc_addr_get_state(0) == NET_ADDR_SET) {
+			nrc_usr_print("[%s] IP ...\n",__func__);
+			break;
+		}
+		if (++retry_cnt > GET_IP_RETRY_MAX) {
+			nrc_usr_print("(Get IP) Exceeded retry limit (%d). Run sw_reset\n", GET_IP_RETRY_MAX);
+			nrc_sw_reset();
+		}
+		_delay_ms(1000);
+	}
+
+
+	nrc_usr_print("[%s] Device is online connected to %s\n",__func__, param->ssid);
+	return NRC_SUCCESS;
 }
 
 /******************************************************************************
@@ -136,9 +262,8 @@ nrc_err_t run_sample_mqtt(WIFI_CONFIG *param)
 {
 	int count = 0;
 	int interval = 0;
-	int network_index = 0;
-	tWIFI_STATE_ID wifi_state = WIFI_STATE_INIT;
 	SCAN_RESULTS results;
+	uint32_t channel = 0;
 
 	MQTTClient *mqtt_client = nrc_mem_malloc(sizeof(MQTTClient));
 	memset(mqtt_client, 0x0, sizeof(MQTTClient));
@@ -147,69 +272,34 @@ nrc_err_t run_sample_mqtt(WIFI_CONFIG *param)
 
 	nrc_usr_print("[%s] Sample App for Mqtt \n",__func__);
 
-	count = param->count;
-	interval = param->interval;
+	count = 10;
+	interval = 1000;
 
 	int i = 0;
-	int ssid_found =false;
 
-	/* set initial wifi configuration */
-	while(1){
-		if (wifi_init(param)== WIFI_SUCCESS) {
-			nrc_usr_print ("[%s] wifi_init Success !! \n", __func__);
-			break;
-		} else {
-			nrc_usr_print ("[%s] wifi_init Failed !! \n", __func__);
-			_delay_ms(1000);
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+		nvs_get_u16(nvs_handle, NVS_WIFI_CHANNEL, (uint16_t*)&channel);
+		nrc_usr_print("[%s] channel:%d...\n", __func__, channel);
+		if(channel){
+			param->scan_freq_list[0] = channel;
+			param->scan_freq_num = 1;
 		}
 	}
 
-	/* find AP */
-	while(1){
-		if (nrc_wifi_scan() == WIFI_SUCCESS){
-			if (nrc_wifi_scan_results(&results)== WIFI_SUCCESS) {
-				/* Find the ssid in scan results */
-				for(i=0; i<results.n_result ; i++){
-					if(strcmp((char*)param->ssid, (char*)results.result[i].ssid)== 0 ){
-						ssid_found = true;
-						break;
-					}
-				}
-
-				if(ssid_found){
-					nrc_usr_print ("[%s] %s is found \n", __func__, param->ssid);
-					break;
-				}
+	if (connect_to_ap(param) == NRC_SUCCESS) {
+		nrc_usr_print("[%s] Sending data to server...\n", __func__);
+		AP_INFO ap_info;
+		if (nrc_wifi_get_ap_info(0, &ap_info) == WIFI_SUCCESS) {
+			nrc_usr_print("[%s] AP ("MACSTR" %s (len:%d) %c%c bw:%d ch:%d freq:%d security:%d)\n",
+				__func__, MAC2STR(ap_info.bssid), ap_info.ssid, ap_info.ssid_len,
+				ap_info.cc[0],ap_info.cc[1], ap_info.bw, ap_info.ch, ap_info.freq,
+				ap_info.security);
+			if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
+				nrc_usr_print("[%s] ap_info.freq:%d\n", __func__, ap_info.freq);
+				nvs_set_u16(nvs_handle, NVS_WIFI_CHANNEL, ap_info.freq);
+				nvs_close(nvs_handle);
 			}
-		} else {
-			nrc_usr_print ("[%s] Scan fail !! \n", __func__);
-			_delay_ms(1000);
 		}
-	}
-
-	/* connect to AP */
-	while(1) {
-		if (wifi_connect(param)== WIFI_SUCCESS) {
-			nrc_usr_print ("[%s] connect to %s successfully !! \n", __func__, param->ssid);
-			break;
-		} else{
-			nrc_usr_print ("[%s] Fail for connection %s\n", __func__, param->ssid);
-			_delay_ms(1000);
-		}
-	}
-
-	nrc_wifi_get_network_index(&network_index );
-
-	/* check the IP is ready */
-	while(1){
-		nrc_wifi_get_state(&wifi_state);
-		if (wifi_state == WIFI_STATE_GET_IP) {
-			nrc_usr_print("[%s] IP ...\n",__func__);
-			break;
-		} else{
-			nrc_usr_print("[%s] Current State : %d...\n",__func__, wifi_state);
-		}
-		_delay_ms(1000);
 	}
 
 	unsigned char send_buf[80], read_buf[80];
@@ -258,7 +348,7 @@ nrc_err_t run_sample_mqtt(WIFI_CONFIG *param)
 
 	for(i=0; i<count; i++) {
 		MQTTMessage message;
-		char payload[30];
+		char payload[35];
 
 		message.qos = 1;
 		message.retained = 0;
@@ -293,10 +383,9 @@ nrc_err_t run_sample_mqtt(WIFI_CONFIG *param)
 
 	vTaskDelete((TaskHandle_t)mqtt_client->thread.task);
 
-	nrc_wifi_get_state(&wifi_state);
-	if (wifi_state == WIFI_STATE_GET_IP || wifi_state == WIFI_STATE_CONNECTED) {
+	if (nrc_wifi_get_state(0) == WIFI_STATE_CONNECTED) {
 		nrc_usr_print("[%s] Trying to DISCONNECT... for exit\n",__func__);
-		if (nrc_wifi_disconnect(network_index) != WIFI_SUCCESS) {
+		if (nrc_wifi_disconnect(0, 5000) != WIFI_SUCCESS) {
 			nrc_usr_print ("[%s] Fail for Wi-Fi disconnection (results:%d)\n", __func__);
 			return NRC_FAIL;
 		}
@@ -306,27 +395,30 @@ nrc_err_t run_sample_mqtt(WIFI_CONFIG *param)
 	return NRC_SUCCESS;
 }
 
-
 /******************************************************************************
  * FunctionName : user_init
  * Description  : Start Code for User Application, Initialize User function
  * Parameters   : none
  * Returns      : none
  *******************************************************************************/
+WIFI_CONFIG wifi_config;
+WIFI_CONFIG* param = &wifi_config;
+
 void user_init(void)
 {
 	nrc_err_t ret;
-	WIFI_CONFIG* param;
-
 	nrc_uart_console_enable(true);
+	int count=  10;
 
-	param = nrc_mem_malloc(WIFI_CONFIG_SIZE);
+	if(param == NULL)
+		return;
 	memset(param, 0x0, WIFI_CONFIG_SIZE);
+	nrc_wifi_set_config(param);
 
-	set_wifi_config(param);
-	ret = run_sample_mqtt(param);
-	nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
-	if(param){
-		nrc_mem_free(param);
+	for(int i=0; i<count; i++){
+		ret = run_sample_mqtt(param);
+		nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
+		nrc_sw_reset();
 	}
 }
+

@@ -56,7 +56,7 @@ struct nrc_wpa;
 #define WLAN_BA_NO_AMSDU			0
 #define WLAN_BA_AMSDU				1
 #define WLAN_BA_POLICY_IMM_BA		1
-#define WLAN_BA_MAX_BUF				8
+#define WLAN_BA_MAX_BUF				16
 #define WLAN_REASON_END_BA 			37
 
 #define WLAN_ACTION_S1G_TWT_SETUP			6
@@ -93,6 +93,14 @@ enum block_ack_state {
 	BLOCK_ACK_RX		= BIT(1), //2
 };
 
+enum {
+	VEVENT_VENDOR_IE_CMD_0 = 0x0,
+	VEVENT_VENDOR_IE_CMD_1 = 0x1,
+	VEVENT_VENDOR_IE_CMD_2 = 0x2,
+	VEVENT_VENDOR_IE_CMD_3 = 0x3,
+	VEVENT_VENDOR_IE_CMD_4 = 0x4,
+};
+
 struct nrc_wpa_key {
 	uint64_t tsc;	/* key transmit sequence counter */
 	uint16_t ix;	/* Key Index */
@@ -104,14 +112,93 @@ struct nrc_wpa_key {
 };
 
 #define MAX_TID 8
+
+#if defined (INCLUDE_EARLY_FREE_SYSRXBUF) || defined (INCLUDE_AMPDU_REORDER )
+
+struct tid_ampdu_rx {
+	SemaphoreHandle_t reorder_lock;
+//	u64 reorder_buf_filtered;
+#ifdef INCLUDE_SIMPLE_REORDER_QUEUE
+	struct nrc_wpa_rx_data ** reorder_buf;
+#else
+	struct nrxb_head *reorder_buf;
+#endif
+	unsigned long *reorder_time;
+	void * sta;				  // due to build error of nrc_wpa_sta
+	//struct timer_list reorder_timer;
+	//TimerHandle_t session_timer;
+	TimerHandle_t reorder_timer;
+	unsigned long last_rx;
+	u16 head_seq_num;
+	u16 stored_mpdu_num;
+	u16 ssn;
+	u16 buf_size;
+	u16 timeout;
+	u8 tid;
+	// timer task's priority;
+	u8 tmr_tsk_priority;
+	u8 tmr_tsk_prio_changed; //timer priority changed
+	u8 auto_seq:1,
+	   removed:1,
+	   started:1;
+};
+
+
+struct sta_ampdu_mlme {
+	SemaphoreHandle_t mtx;
+	/* rx */
+#ifdef INCLUDE_STATIC_REORDER_INFO
+	struct tid_ampdu_rx tid_rx[MAX_TID];
+#else
+	struct tid_ampdu_rx *tid_rx[MAX_TID];
+#endif
+	u8 tid_rx_token[MAX_TID];
+	unsigned long tid_rx_timer_expired[MAX_TID];
+	unsigned long tid_rx_stop_requested[MAX_TID];
+	unsigned long tid_rx_manage_offl[MAX_TID];
+	unsigned long agg_session_valid[MAX_TID];
+	unsigned long unexpected_agg[MAX_TID];
+	/* tx */
+#if 0	
+	struct work_struct work;
+	struct tid_ampdu_tx __rcu *tid_tx[MAX_TID];
+	struct tid_ampdu_tx *tid_start_tx[MAX_TID];
+	unsigned long last_addba_req_time[MAX_TID];
+#endif	
+	u8 addba_req_num[MAX_TID];
+	//u8 dialog_token_allocator;
+};
+
+#endif //#if defined (INCLUDE_EARLY_FREE_SYSRXBUF)
+
+#ifdef SUPPORT_USE_4ADDRESS
+struct ieee80211_hdr_4addr {
+	le16 frame_control;
+	le16 duration_id;
+	u8 addr1[ETH_ALEN];
+	u8 addr2[ETH_ALEN];
+	u8 addr3[ETH_ALEN];
+	le16 seq_ctrl;
+	u8 addr4[ETH_ALEN];
+} __packed __aligned(2);
+#define IEEE80211_4ADDR_HDRLEN (sizeof(struct ieee80211_hdr_4addr))
+#endif //SUPPORT_USE_4ADDRESS
 struct nrc_wpa_sta {
 	struct nrc_wpa_key		key;
 	uint8_t 				addr[6];
+#ifdef SUPPORT_USE_4ADDRESS
+	/* only use softAP */
+	uint8_t 				ethaddr[6];
+	bool					use_4addr;
+#endif //SUPPORT_USE_4ADDRESS
 	uint16_t				aid;
 	uint8_t 				state;
 	bool					qos;
 	uint16_t 				last_mgmt_stype;
 	enum block_ack_state 	block_ack[MAX_TID];
+#if defined (INCLUDE_AMPDU_REORDER) || defined (INCLUDE_EARLY_FREE_SYSRXBUF) 
+	struct sta_ampdu_mlme   ampdu_mlme;
+#endif
 };
 
 struct nrc_wpa_bss {
@@ -136,6 +223,7 @@ struct nrc_wpa_if {
 	bool associated;
 	bool is_ap;
 	bool pending_rx_mgmt;
+	bool set_rekey_offload;
 	struct nrc_wpa_sta sta;
 	struct nrc_wpa_bss bss;
 	struct nrc_scan_info* 	scan;
@@ -151,7 +239,24 @@ struct nrc_wpa {
 	struct nrc_wpa_if 	*intf[NRC_WPA_NUM_INTERFACES];
 };
 
+#if defined (INCLUDE_EARLY_FREE_SYSRXBUF) || defined (INCLUDE_AMPDU_REORDER )
+
+/* Control Block for Rx flow */
+struct nrc_rx_data_cb{
+	u8 vif_id;
+	u8 error_mic;           //For michael_mic_verify()
+	u8 center_freq;         //For nrc_wpa_scan_sta_rx(), nrc_wap_mgmt_ap_rx(),nrc_wpa_eapol()
+	u8 rssi;                //For nrc_wpa_scan_sta_rx();
+};
+
+#endif
+
 struct nrc_wpa_rx_data {
+#if defined (INCLUDE_EARLY_FREE_SYSRXBUF) || defined (INCLUDE_AMPDU_REORDER )
+	struct nrc_wpa_rx_data		*next;
+	struct nrc_wpa_rx_data		*prev;
+    struct nrc_rx_data_cb	     cb;
+#endif	
 	struct nrc_wpa_if* intf;
 	struct nrc_wpa_sta* sta;
 	LMAC_RXHDR *rxh;
@@ -160,7 +265,11 @@ struct nrc_wpa_rx_data {
 	union {
 		uint8_t *frame;
 		struct ieee80211_mgmt *mgmt;
+#ifdef SUPPORT_USE_4ADDRESS
+		struct ieee80211_hdr_4addr *hdr;
+#else
 		struct ieee80211_hdr *hdr;
+#endif //SUPPORT_USE_4ADDRESS
 	} u;
 	bool is_8023;
 	uint16_t offset_8023;
@@ -209,7 +318,7 @@ struct nrc_wpa_bdf {
 	uint16_t reserved[4];
 	uint16_t checksum_data;
 
-	uint8_t data[NRC_WPA_BD_MAX_DATA_LENGTH];
+	uint8_t data[];
 };
 #endif /* defined(INCLUDE_BD_SUPPORT) */
 
@@ -223,9 +332,8 @@ struct nrc_wpa_key *nrc_wpa_get_key_by_key_idx(struct nrc_wpa_if *intf,
 struct nrc_wpa_key *nrc_wpa_get_key_by_addr(struct nrc_wpa_if *intf,
 						const uint8_t *addr);
 void wpa_driver_sta_sta_add(struct nrc_wpa_if* intf);
-void wpa_driver_set_associate_status(int status);
-int wpa_driver_get_associate_status(void);
-void wpa_driver_notify_event_to_app(enum wpa_event_type event_id, uint32_t data_len, uint8_t* data);
+bool wpa_driver_get_associate_status(uint8_t vif);
+void wpa_driver_notify_event_to_app(int vif, int event_id, uint32_t data_len, uint8_t* data);
 void wpa_driver_notify_vevent_to_app(int event_id, uint32_t data_len, uint8_t* data);
 
 void wpa_driver_sta_sta_remove(struct nrc_wpa_if* intf);
@@ -239,12 +347,16 @@ int nrc_raw_transmit(struct nrc_wpa_if* intf, uint8_t *frm, const uint16_t len,
 int nrc_get_sec_hdr_len(struct nrc_wpa_key *key);
 void nrc_start_keep_alive(struct nrc_wpa_if* intf);
 #if defined(SOFT_AP_BSS_MAX_IDLE)
-void softap_bss_timer_stop(uint16_t aid);
-void softap_bss_timer_start(uint16_t aid);
+bool softap_bss_max_idle_is_on(void);
 void softap_bss_max_idle_period_update(int period);
-int softap_get_bss_max_idle_period(void);
+uint32_t softap_get_bss_max_idle_period(void);
 void softap_bss_max_idle_retry_update(int retry);
+uint8_t softap_get_bss_max_idle_retry(void);
 void refresh_bss_max_idle_by_maddr(uint8_t vif_id, uint8_t* addr);
+int softap_bss_max_idle_start_timer(void);
+void softap_bss_max_idle_stop_timer(void);
+void softap_bss_max_idle_add_sta(uint16_t aid);
+void softap_bss_max_idle_remove_sta(uint16_t aid);
 #endif /* defined(SOFT_AP_BSS_MAX_IDLE) */
 // Helper functions
 static inline bool is_wep(uint8_t cipher)

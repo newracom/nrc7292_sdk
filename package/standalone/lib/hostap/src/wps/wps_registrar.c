@@ -9,7 +9,7 @@
 #include "utils/includes.h"
 
 #include "utils/common.h"
-#include "utils/base64.h"
+#include "utils/hostap_base64.h"
 #include "utils/eloop.h"
 #include "utils/uuid.h"
 #include "utils/list.h"

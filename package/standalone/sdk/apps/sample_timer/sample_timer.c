@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2020 Newracom, Inc.
+ * Copyright (c) 2022 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -39,12 +39,12 @@ void timer_callback_func0(int ch)
 {
 	nrc_usr_print("[%s] count:%d\n",__func__, count0);
 
-	nrc_hw_timer_clear_irq(TIMER0);
+	nrc_hw_timer_clear_irq(TIMER_0);
 	if(count0++ < TIMER0_COUNT_MAX){
-		nrc_hw_timer_start(TIMER0, TIMER0_INTERVAL);
+		nrc_hw_timer_start(TIMER_0, TIMER0_INTERVAL);
 	} else {
 		nrc_usr_print("[%s] Timer0 is cleared \n",__func__);
-		nrc_hw_timer_deinit(TIMER0);
+		nrc_hw_timer_deinit(TIMER_0);
 		count0 = 0;
 	}
 }
@@ -53,18 +53,18 @@ void timer_callback_func1(int ch)
 {
 	nrc_usr_print("[%s] count:%d\n",__func__, count1);
 
-	nrc_hw_timer_clear_irq(TIMER1);
+	nrc_hw_timer_clear_irq(TIMER_1);
 	if(count1++ < TIMER1_COUNT_MAX){
-		nrc_hw_timer_start(TIMER1, TIMER1_INTERVAL);
+		nrc_hw_timer_start(TIMER_1, TIMER1_INTERVAL);
 	} else {
 		nrc_usr_print("[%s] Timer1 is deinit \n",__func__);
-		nrc_hw_timer_deinit(TIMER1);
+		nrc_hw_timer_deinit(TIMER_1);
 
-		/* Forcely stop and clear timer0 */
+		/* Forcefully stop and clear timer0 */
 		nrc_usr_print("[%s] Timer0 is stopped and deinit\n",__func__);
-		nrc_hw_timer_stop(TIMER0);
-		nrc_hw_timer_clear_irq(TIMER0);
-		nrc_hw_timer_deinit(TIMER0);
+		nrc_hw_timer_stop(TIMER_0);
+		nrc_hw_timer_clear_irq(TIMER_0);
+		nrc_hw_timer_deinit(TIMER_0);
 		count1 = 0;
 	}
 }
@@ -77,8 +77,8 @@ void timer_callback_func1(int ch)
  *******************************************************************************/
 nrc_err_t run_sample_timer(void)
 {
-	nrc_hw_timer_init(TIMER0, timer_callback_func0);
-	nrc_hw_timer_init(TIMER1, timer_callback_func1);
+	nrc_hw_timer_init(TIMER_0, timer_callback_func0);
+	nrc_hw_timer_init(TIMER_1, timer_callback_func1);
 
 	nrc_usr_print("[%s] Sample App for timer test\n", __func__);
 	nrc_usr_print("============================================\n");
@@ -86,19 +86,17 @@ nrc_err_t run_sample_timer(void)
 		(TIMER0_INTERVAL/TIMER_INTERVAL_UNIT), TIMER0_COUNT_MAX);
 	nrc_usr_print("2. The 2nd timer starts with %d second interval, %d times\n",\
 		(TIMER1_INTERVAL/TIMER_INTERVAL_UNIT), TIMER1_COUNT_MAX);
-	nrc_usr_print("3. The 1nd timer forcely stoped and deinit by timer2 callback after %d second\n",\
+	nrc_usr_print("3. The 1nd timer forcefully stopped and deinit by timer2 callback after %d second\n",\
 		(TIMER1_INTERVAL/TIMER_INTERVAL_UNIT), TIMER1_COUNT_MAX);
 
-	nrc_hw_timer_start(TIMER0, TIMER0_INTERVAL);
-	nrc_hw_timer_start(TIMER1, TIMER1_INTERVAL);
+	nrc_hw_timer_start(TIMER_0, TIMER0_INTERVAL);
+	nrc_hw_timer_start(TIMER_1, TIMER1_INTERVAL);
 
 	while(1);
-
 
 	nrc_usr_print("[%s] exit \n",__func__);
 	return NRC_SUCCESS;
 }
-
 
 /******************************************************************************
  * FunctionName : user_init
@@ -108,11 +106,8 @@ nrc_err_t run_sample_timer(void)
  *******************************************************************************/
 void user_init(void)
 {
-	nrc_err_t ret;
-
 	//Enable Console for Debugging
 	nrc_uart_console_enable(true);
 
-	ret = run_sample_timer();
-	nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
+	run_sample_timer();
 }

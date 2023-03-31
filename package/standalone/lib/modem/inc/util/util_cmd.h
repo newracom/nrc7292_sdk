@@ -7,7 +7,7 @@
 #define COPYRIGHT(year) "Copyright (c) "#year \
 	" Newracom Inc. All rights reserved."
 #define NRC_MAX_ARGV	16
-#define NRC_MAX_CMDLINE_SIZE	128
+#define NRC_MAX_CMDLINE_SIZE	200
 #define	CMD_RET_SUCCESS	0
 #define	CMD_RET_FAILURE	1
 #define	CMD_RET_UNHANDLED	2

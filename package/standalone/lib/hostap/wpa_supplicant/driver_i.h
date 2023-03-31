@@ -66,6 +66,33 @@ static inline int wpa_drv_set_bss_max_idle(struct wpa_supplicant *wpa_s,
 	return -1;
 }
 
+static inline int wpa_drv_set_ssid(struct wpa_supplicant *wpa_s,
+							const char *ssid, size_t len)
+{
+	if (wpa_s->driver->set_ssid) {
+		return wpa_s->driver->set_ssid(wpa_s->drv_priv, ssid, len);
+	}
+	return -1;
+}
+
+static inline int wpa_drv_set_bssid(struct wpa_supplicant *wpa_s,
+							const char *bssid)
+{
+	if (wpa_s->driver->set_bssid) {
+		return wpa_s->driver->set_bssid(wpa_s->drv_priv, bssid);
+	}
+	return -1;
+}
+
+static inline int wpa_drv_set_frequency(struct wpa_supplicant *wpa_s,
+							uint16_t freq)
+{
+	if (wpa_s->driver->set_frequency) {
+		return wpa_s->driver->set_frequency(wpa_s->drv_priv, freq);
+	}
+	return -1;
+}
+
 static inline int wpa_drv_authenticate(struct wpa_supplicant *wpa_s,
 				       struct wpa_driver_auth_params *params)
 {

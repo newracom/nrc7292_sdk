@@ -46,7 +46,11 @@ void nrc_adc_sfc_erase_block(uint32_t addr);
 void nrc_adc_sfc_erase_all();
 void nrc_adc_sfc_cs(bool enable);
 void nrc_adc_sfc_enable_quad_mode(void);
+void nrc_adc_sfc_enable_quad_mode_gd25xx(void);
 void nrc_adc_sfc_enable_quad_mode_w25q80ew(void);
+void nrc_adc_sfc_enable_quad_mode_en25s32a(bool enable);
+void nrc_adc_sfc_set_qe_with_performance(bool performance);
+void nrc_adc_sfc_set_performance(bool performance);
 void nrc_adc_sfc_set_burst_len(uint8_t len);
 void nrc_adc_sfc_cache_ctrl(uint32_t ctrl);
 #endif //__HAL_ADC_SFC_NRC7292_H__

@@ -15,9 +15,9 @@
 #include "mbedtls/des.h"
 
 #include "mbedtls/sha1.h"
-#include "mbedtls/mbed_sha256.h"
+#include "mbedtls/sha256.h"
 #if defined(MBEDTLS_SHA512_C)
-#include "mbedtls/mbed_sha512.h"
+#include "mbedtls/sha512.h"
 #endif
 #include "mbedtls/pkcs5.h"
 
@@ -128,13 +128,20 @@ int pbkdf2_sha1(const char *passphrase, const u8 *ssid, size_t ssid_len,
 	mbedtls_md_context_t md;
 	const mbedtls_md_info_t *info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA1);
 	int res = 0;
+	uint32_t B_T, A_T;
 
 	wpa_printf(MSG_ERROR, TAG "%s\n", __func__);
 	mbedtls_md_init(&md);
 	if (mbedtls_md_setup(&md, info, 1) == 0)
+	{
+		A("[pbkdf2_sha1] Enter TSF : %d\n", B_T=TSF);
 		res = mbedtls_pkcs5_pbkdf2_hmac(&md,
 				(const unsigned char *) passphrase, os_strlen(passphrase),
 				ssid, ssid_len, iterations, buflen, buf);
+
+		A("[pbkdf2_sha1] Exit  TSF : %d\n", A_T=TSF);
+		A("[pbkdf2_sha1] op time   : %d, buflen : %d\n", A_T-B_T, buflen);
+	}
 	mbedtls_md_free(&md);
 
 	return res == 0 ? 0 : -1;
@@ -1300,12 +1307,15 @@ void crypto_ecdh_deinit(struct crypto_ecdh *ecdh)
 
 struct wpabuf * crypto_ecdh_get_pubkey(struct crypto_ecdh *ecdh, int inc_y)
 {
-    struct wpabuf *buf = NULL;
-	int len = ecdh->ctx.Q.X.n * 2 + 2;
+	struct wpabuf *buf = NULL;
+	// int len = ecdh->ctx.Q.X.n * 2 + 2;
+	int len = (ecdh->ctx.grp.pbits >> 3) + 2;
 	size_t olen = 0;
 
 	buf = wpabuf_alloc(len);
-	
+
+	wpa_msg(0, MSG_DEBUG, "LEN : %d, T_size : %d pbits : %d, nbits :  %d\n", len, ecdh->ctx.grp.T_size, ecdh->ctx.grp.pbits, ecdh->ctx.grp.nbits);
+
 	if(mbedtls_mpi_write_binary(&ecdh->ctx.Q.X, wpabuf_put(buf, len), len) != 0)
 	{
 		wpa_msg(0, MSG_DEBUG, "OWE : Fail to get public-key\n");

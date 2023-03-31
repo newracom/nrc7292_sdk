@@ -154,7 +154,7 @@ extern "C" {
 #endif
 
 #ifndef INCLUDE_uxTaskGetStackHighWaterMark
-	#define INCLUDE_uxTaskGetStackHighWaterMark 1
+	#define INCLUDE_uxTaskGetStackHighWaterMark 0
 #endif
 
 #ifndef INCLUDE_eTaskGetState
@@ -547,14 +547,11 @@ extern "C" {
 
 #ifndef traceMALLOC
         #define traceMALLOC( pvAddress, uiSize) 
-//        #define traceMALLOC( pvAddress, uiSize) if(uiSize !=288 && uiSize != 2080 && uiSize != 2112) system_printf("heap malloc: %10d , free : %10d, min free : %10d\n" , uiSize , xFreeBytesRemaining , xMinimumEverFreeBytesRemaining );
 #endif
 
 #ifndef traceFREE
         #define traceFREE( pvAddress, uiSize )
-//        #define traceFREE( pvAddress, uiSize )  if(uiSize !=288 && uiSize != 2080 && uiSize != 2112) system_printf("heap free  : %10d , free : %10d, min free : %10d\n" , uiSize , xFreeBytesRemaining , xMinimumEverFreeBytesRemaining );
 #endif
-
 
 #ifndef traceEVENT_GROUP_CREATE
 	#define traceEVENT_GROUP_CREATE( xEventGroup )
@@ -693,16 +690,19 @@ extern "C" {
 #endif
 
 #ifndef configGENERATE_RUN_TIME_STATS
-	#define configGENERATE_RUN_TIME_STATS 1
+	#define configGENERATE_RUN_TIME_STATS 0
 #endif
 
 #if ( configGENERATE_RUN_TIME_STATS == 1 )
+
 	#ifndef portCONFIGURE_TIMER_FOR_RUN_TIME_STATS
-		#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()
+		#error If configGENERATE_RUN_TIME_STATS is defined then portCONFIGURE_TIMER_FOR_RUN_TIME_STATS must also be defined.  portCONFIGURE_TIMER_FOR_RUN_TIME_STATS should call a port layer function to setup a peripheral timer/counter that can then be used as the run time counter time base.
 	#endif /* portCONFIGURE_TIMER_FOR_RUN_TIME_STATS */
 
 	#ifndef portGET_RUN_TIME_COUNTER_VALUE
-		#define portGET_RUN_TIME_COUNTER_VALUE() TSF
+		#ifndef portALT_GET_RUN_TIME_COUNTER_VALUE
+			#error If configGENERATE_RUN_TIME_STATS is defined then either portGET_RUN_TIME_COUNTER_VALUE or portALT_GET_RUN_TIME_COUNTER_VALUE must also be defined.  See the examples provided and the FreeRTOS web site for more information.
+		#endif /* portALT_GET_RUN_TIME_COUNTER_VALUE */
 	#endif /* portGET_RUN_TIME_COUNTER_VALUE */
 
 #endif /* configGENERATE_RUN_TIME_STATS */
@@ -772,7 +772,7 @@ extern "C" {
 #endif
 
 #ifndef configUSE_STATS_FORMATTING_FUNCTIONS
-	#define configUSE_STATS_FORMATTING_FUNCTIONS 1
+	#define configUSE_STATS_FORMATTING_FUNCTIONS 0
 #endif
 
 #ifndef portASSERT_IF_INTERRUPT_PRIORITY_INVALID

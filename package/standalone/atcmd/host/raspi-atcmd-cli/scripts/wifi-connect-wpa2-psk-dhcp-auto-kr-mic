@@ -1,0 +1,18 @@
+
+AT+WCOUNTRY="K2"
+AT+WCOUNTRY?
+AT+WTXPOWER?
+
+AT+WDISCONN
+
+ECHO "Run an AP in WPA2-PSK."
+ECHO " - SSID : halow_atcmd_psk"
+ECHO " - Password : 12345678"
+ECHO " - IP : 192.168.200.1"
+ECHO " - DHCP Server"
+HOLD
+
+AT+WSCAN
+AT+WDHCP=1
+AT+WCONN="halow_atcmd_psk","psk","12345678"
+AT+WCONN?

@@ -13,6 +13,8 @@ extern "C" {
 #define W25XX_JEDEC_ID (0x621614)
 #define IS25WP080D_JEDEC_ID (0x9D7014)
 #define XT25Q08B_JEDEC_ID (0x0B6014)
+#define XT25Q16D_JEDEC_ID (0x0B6015)
+#define XT25W16F_JEDEC_ID (0x0B6515)
 #define IS25LP080D_JEDEC_ID (0x9D6014)
 #define IS25LP128D_JEDEC_ID (0x9D6018)
 #define EN25S16B_JEDEC_ID (0x1C3815)
@@ -21,9 +23,26 @@ extern "C" {
 #define W25Q80EW_JEDEC_ID (0xEF6014)
 #define GD25LQ16C_JEDEC_ID (0xC86015)
 #define GD25LQ40C_JEDEC_ID (0xC86013)
+#define GD25WQ16E_JEDEC_ID (0xC86515)
+#define GD25WQ32E_JEDEC_ID (0xC86516)
+#define GD25Q16CE2GR_JEDEC_ID (0xC84015)
 #define MX25V8035F_JEDEC_ID (0xC22314)
+#define MX25V1635F_JEDEC_ID (0xC22315)
 #define MX25U1633F_JEDEC_ID (0xC22535)
 #define MX25R3235F_JEDEC_ID (0xC22816)
+#define MX25R1635F_JEDEC_ID (0xC22815)
+#define EN25QW32A_JEDEC_ID (0x1C6116)
+#define EN25S32A_JEDEC_ID (0x1C3816)
+#define EN25SE32A_JEDEC_ID (0x1C4816)
+#define XT25Q32F_JEDEC_ID (0x0B6016)
+#define P25Q32U_JEDEC_ID (0x856016)
+#define P25Q16U_JEDEC_ID (0x856015)
+#define UC25WQ08_JEDEC_ID (0xB36014)
+#define UC25WQ16_JEDEC_ID (0xB36015)
+#define UC25WQ32_JEDEC_ID (0xB36016)
+#define GT25Q16A_JEDEC_ID (0xC46015)
+#define GT25Q32A_JEDEC_ID (0xC46016)
+#define FM25W16A_JEDEC_ID (0xA12815)
 
 /* ----------------------------------
  * W26XX JEDEC ID
@@ -38,6 +57,7 @@ enum sf_cmd_e {
 	SF_WRITE_STATUS = 0x01,
 	SF_READ = 0x03,
 	SF_FAST_READ = 0x0B,
+	SF_ENTER_OTP = 0x3A,
 	SF_DUAL_READ = 0x3B,
 	SF_PAGE_PROG = 0x02,
 	SF_ERASE_BLOCK = 0xD8,
@@ -61,45 +81,96 @@ enum sf_burst_len_e {
 
 uint32_t nrc_sf_get_size(void);
 static uint32_t half_addr_sf = 0;
+typedef struct {
+	uint32_t MAP_VERSION;
+	uint32_t FW;
+	uint32_t FW_INFO;
+	uint32_t CORE_DUMP;
+	uint32_t USER_CONFIG_1;
+	uint32_t USER_CONFIG_2;
+	uint32_t USER_CONFIG_3;
+	uint32_t USER_CONFIG_4;
+	uint32_t SYS_CONFIG;
+	uint32_t RF_CAL;
+	uint32_t FOTA;
+	uint32_t RESERVED;
+	uint32_t USER_DATA;
+	uint32_t FOTA_INFO;
+} sf_mem_map_t;
 
 enum sf_store_area_e {
-#if defined(SUPPORT_4MB_FLASH)
-	SF_BOOTLOADER = 0x0,
-	SF_FW = 0x10000,
-	SF_FW_INFO = 0x190000,
-	SF_CORE_DUMP = 0x191000,
-	SF_USER_CONFIG_1 = 0x195000,/*200KB*/
-	SF_USER_CONFIG_2 = 0x1C7000,/*200KB*/
-	SF_USER_CONFIG_3 = 0x1F9000,/*200KB*/
-	SF_USER_CONFIG_4 = 0x22B000,/*200KB*/
-	SF_RESERVED = 0x25D000,/*120KB*/
-	SF_BDF = 0x27B000, /*4KB*/
-	SF_SYSTEM_CONFIG = 0x27C000,
-	SF_MAC_ADDR = 0x27C000, /*not used*/
-	SF_MAC_ADDR_MC = 0x27C008,/*not used*/
-	SF_RF_CAL = 0x27D000,
-	SF_FOTA = 0x27E000,
-	SF_FOTA_INFO = 0x3FE000
+#if defined(SUPPORT_DEVICEWORX)
+	SF_BOOTLOADER_4MB = 0x0,
+	SF_FW_4MB = 0x10000,
+	SF_FW_INFO_4MB = 0x190000,
+	SF_CORE_DUMP_4MB = 0x191000,
+	SF_USER_CONFIG_1_4MB = 0x195000,/*200KB*/
+	SF_USER_CONFIG_2_4MB = 0x1C7000,/*200KB*/
+	SF_USER_CONFIG_3_4MB = 0x1F9000,/*200KB*/
+	SF_USER_CONFIG_4_4MB = 0x22B000,/*200KB*/
+	SF_RESERVED_4MB = 0x25D000,/*4KB*/
+	SF_USER_DATA_4MB = 0x25E000,/*120KB*/
+	SF_SYSTEM_CONFIG_4MB = 0x27C000,
+	SF_MAC_ADDR_4MB = 0x27C000, /*not used*/
+	SF_MAC_ADDR_MC_4MB = 0x27C008,/*not used*/
+	SF_RF_CAL_4MB = 0x27D000,
+	SF_FOTA_4MB = 0x27E000,
+	SF_FOTA_INFO_4MB = 0x3FE000,
 #else
-	SF_BOOTLOADER = 0x0,
-	SF_FW = 0x10000,
-	SF_FW_INFO = 0xF5000,
-	SF_CORE_DUMP = 0xF6000,
-	SF_USER_CONFIG_1 = 0xFA000,
-	SF_USER_CONFIG_2 = 0xFB000,
-	SF_USER_CONFIG_3 = 0xFC000,
-	SF_USER_CONFIG_4 = 0xFD000,
-	SF_SYSTEM_CONFIG = 0xFE000,
-	SF_MAC_ADDR = 0xFE000,
-	SF_MAC_ADDR_MC = 0xFE008,
-	SF_RF_CAL = 0xFF000,
-	SF_FOTA = 0x100000,
-	SF_USER_DATA = 0x1E5000,
-	SF_BDF = 0x1FE000,
-	SF_FOTA_INFO = 0x1FF000
+	SF_BOOTLOADER_4MB = 0x0,
+	SF_FW_4MB = 0x10000,
+	SF_USER_DATA_4MB = 0x3DA000,/*100KB*/
+	SF_FW_INFO_4MB = 0x3FE000,
+	SF_CORE_DUMP_4MB = 0x3F3000,
+	SF_USER_CONFIG_1_4MB = 0x3F7000,/*4KB*/
+	SF_USER_CONFIG_2_4MB = 0x3F8000,/*4KB*/
+	SF_USER_CONFIG_3_4MB = 0x3F9000,/*4KB*/
+	SF_USER_CONFIG_4_4MB = 0x3FA000,/*4KB*/
+	SF_RESERVED_4MB = 0x3FB000,/*4KB*/
+	SF_SYSTEM_CONFIG_4MB = 0x3FC000,
+	SF_RF_CAL_4MB = 0x3FD000,
+	SF_FOTA_4MB = 0x1F5000,
+	SF_FOTA_INFO_4MB = 0x3FF000,
 #endif
+	SF_BOOTLOADER_2MB = 0x0,
+	SF_FW_2MB = 0x10000,
+	SF_FW_INFO_2MB = 0xF5000,
+	SF_CORE_DUMP_2MB = 0xF6000,
+	SF_USER_CONFIG_1_2MB = 0xFA000,
+	SF_USER_CONFIG_2_2MB = 0xFB000,
+	SF_USER_CONFIG_3_2MB = 0xFC000,
+	SF_USER_CONFIG_4_2MB = 0xFD000,
+	SF_SYSTEM_CONFIG_2MB = 0xFE000,
+	SF_MAC_ADDR_2MB = 0xFE000,
+	SF_MAC_ADDR_MC_2MB = 0xFE008,
+	SF_RF_CAL_2MB = 0xFF000,
+	SF_FOTA_2MB = 0x100000,
+	SF_RESERVED_2MB = 0x1E5000,
+	SF_USER_DATA_2MB = 0x1E6000,
+	SF_FOTA_INFO_2MB = 0x1FF000
 };
 
+sf_mem_map_t* nrc_sf_get_mem_map(void);
+static sf_mem_map_t sf_mem_map;
+#define SF_BOOTLOADER 0x0
+#define SF_MEM_MAP 0xF000
+#define SF_FW 0x10000
+#define SF_FW_INFO nrc_sf_get_mem_map()->FW_INFO
+#define SF_CORE_DUMP nrc_sf_get_mem_map()->CORE_DUMP
+#define SF_USER_CONFIG_1 nrc_sf_get_mem_map()->USER_CONFIG_1
+#define SF_USER_CONFIG_2 nrc_sf_get_mem_map()->USER_CONFIG_2
+#define SF_USER_CONFIG_3 nrc_sf_get_mem_map()->USER_CONFIG_3
+#define SF_USER_CONFIG_4 nrc_sf_get_mem_map()->USER_CONFIG_4
+#define SF_SYSTEM_CONFIG nrc_sf_get_mem_map()->SYS_CONFIG
+#define SF_MAC_ADDR half_addr_sf - 0x2000
+#define SF_MAC_ADDR_MC half_addr_sf - 0x1FF8
+#define SF_RF_CAL nrc_sf_get_mem_map()->RF_CAL
+#define SF_FOTA nrc_sf_get_mem_map()->FOTA
+#define SF_RESERVED nrc_sf_get_mem_map()->RESERVED
+#define SF_FOTA_INFO nrc_sf_get_mem_map()->FOTA_INFO
+#define SF_USER_DATA nrc_sf_get_mem_map()->USER_DATA
+
+void nrc_sf_init_memory_map(void);
 enum sf_reg_override_ctrl {
 	SF_REG_OVER_CTRL_ENABLE = 1,
 	SF_REG_OVER_CTRL_DISABLE = 0
@@ -122,16 +193,22 @@ struct sf_reg_override {
 };
 
 typedef struct {
+	uint32_t BI;
+	uint32_t T_SLOT;
+	uint32_t TI_MIN;
+	uint32_t TI_MAX;
+} sf_auth_ctrl_t;
+
+typedef struct {
 	uint32_t version; /* sys_config structure version*/
 	uint8_t mac_addr[6]; /*mac address for interface 0*/
 	uint8_t mac_addr_1[6]; /*mac address for interface 1*/
 	uint32_t cal_use :8; /*enable/disable the usage of calibration data*/
-	uint32_t bdf_use :8; /*enable/disable the usage of bdf data*/
+	uint32_t reserved0 :8;
 	uint32_t hw_version:16; /* HW Version */
 	struct sf_reg_override rf_pllldo12_tr;
-	uint32_t brd_rev_value:7;
-	uint32_t disable_gpio_brd_rev:1;
-	uint32_t reserved:24;
+	uint8_t reserved1[228];
+	char user_factory[512];
 } sf_sys_config_t;
 
 typedef struct {
@@ -166,6 +243,7 @@ bool nrc_sf_erase_entire(void);
 bool nrc_sf_protect(bool enable);
 uint32_t nrc_sf_read(uint32_t address, uint8_t *buffer, size_t size);
 uint32_t nrc_sf_write(uint32_t address, uint8_t *buffer, size_t size);
+uint32_t nrc_sf_erase_and_write(uint32_t address, uint8_t *buffer, size_t size);
 bool nrc_sf_power_down(bool enable);
 uint32_t nrc_sf_read_id(void);
 uint32_t nrc_sf_read_jedec(void);
@@ -184,14 +262,25 @@ uint32_t nrc_sf_get_size(void);
 bool nrc_sf_userconfig_erase(uint32_t address);
 bool nrc_sf_userconfig_read(uint32_t address, uint8_t *data, size_t size);
 bool nrc_sf_userconfig_write(uint32_t address, uint8_t *data, size_t size);
-bool nrc_sf_update_bdf(uint32_t length);
-bool nrc_sf_is_bdf_use(void);
-bool nrc_sf_update_bdf_use(uint8_t bdf_use);
 uint16_t nrc_sf_get_hw_version(void);
-bool nrc_sf_update_disable_gpio_brd_rev(uint8_t value);
-bool nrc_sf_get_disable_gpio_brd_rev(void);
-bool nrc_sf_update_brd_rev(uint8_t version);
-uint8_t nrc_sf_get_brd_rev(void);
+bool nrc_sf_update_hw_version(uint16_t version);
+bool nrc_sf_update_memory_map(sf_mem_map_t *mem_map);
+bool nrc_sf_set_etag_id(uint16_t etag_id);
+uint16_t nrc_sf_get_etag_id(void);
+#if defined(INCLUDE_AUTH_CONTROL)
+bool nrc_sf_set_auth_ctrl(sf_auth_ctrl_t  *auth_ctrl);
+bool nrc_sf_get_auth_ctrl(sf_auth_ctrl_t  *auth_ctrl);
+#endif /* defined(INCLUDE_AUTH_CONTROL) */
+bool nrc_sf_get_user_factory(char* data, uint16_t buf_len);
+bool nrc_sf_update_user_factory(char* data, uint16_t len);
+
+#define NRC_SF_VERIFY_SLOT_OKAY           0
+#define NRC_SF_VERIFY_SLOT_MIN_SIZE_FAIL  1
+#define NRC_SF_VERIFY_SLOT_SIGNATURE_FAIL 2
+#define NRC_SF_VERIFY_SLOT_OVERSIZE_FAIL  3
+#define NRC_SF_VERIFY_SLOT_CHECKSUM_FAIL  4
+
+uint32_t nrc_sf_verify_slot_and_read_data(uint8_t *status, uint32_t address, uint32_t max_length, uint8_t *data_buf);
 
 #ifdef __cplusplus
 } // extern "C"

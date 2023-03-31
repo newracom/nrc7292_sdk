@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 Newracom, Inc.
+ * Copyright (c) 2022 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -31,10 +31,9 @@
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
 
-
 #define TRUE   1
 #define FALSE  0
-#define PORT 8088
+#define PORT 8099
 
 #define MAX_RETRY 5
 #define RECV_BUF_SIZE 1600
@@ -44,30 +43,55 @@ static int error_val = 0;
 static void udp_server_task(void *pvParameters)
 {
 	WIFI_CONFIG *param = pvParameters;
-	tWIFI_STATE_ID wifi_state;
 	char rx_buffer[RECV_BUF_SIZE];
 	int clientlen;
 	int sockfd; /* socket */
+
+#ifdef CONFIG_IPV6
+	struct sockaddr_in6 serveraddr, clientaddr;
+#else
 	struct sockaddr_in serveraddr, clientaddr;
+#endif
+
 	int ret = 0;
 	char *MSGEND = "#*stop_server";
 
-	param->test_running = 1;
+	fd_set read_set;
 
 	//create a socket
-	if( (sockfd = socket(AF_INET , SOCK_DGRAM , 0)) < 0){
+#ifdef CONFIG_IPV6
+	if( (sockfd = socket(AF_INET6 , SOCK_DGRAM , 0)) < 0) {
 		error_val = -1;
 		nrc_usr_print("ERROR opening socket");
 		goto exit;
 	}
 
-	bzero((char *) &serveraddr, sizeof(serveraddr));
+	serveraddr.sin6_len = sizeof(struct sockaddr_in6);
+	serveraddr.sin6_family = AF_INET6;
+	serveraddr.sin6_port = htons(PORT);
+	serveraddr.sin6_flowinfo = 0;
+	serveraddr.sin6_addr = in6addr_any;
+	serveraddr.sin6_scope_id = 1;
+
+	clientlen = sizeof(struct sockaddr_in6);
+#else
+	if( (sockfd = socket(AF_INET , SOCK_DGRAM , 0)) < 0)  {
+		error_val = -1;
+		nrc_usr_print("ERROR opening socket");
+		goto exit;
+	}
+
+	serveraddr.sin_len = sizeof(struct sockaddr_in);
 	serveraddr.sin_family = AF_INET;
-	serveraddr.sin_addr.s_addr =  htonl(INADDR_ANY);
-	serveraddr.sin_port = htons( PORT );
+	serveraddr.sin_port = htons(PORT);
+	serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+	clientlen = sizeof(struct sockaddr_in);
+#endif
+
 
 	//bind the socket to localhost port 8888
-	if (bind(sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr))<0){
+	if (bind(sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) < 0){
 		error_val = -1;
 		nrc_usr_print("ERROR on binding");
 		goto exit;
@@ -77,50 +101,58 @@ static void udp_server_task(void *pvParameters)
 	nrc_usr_print("Receive buffer size :%d \n", RECV_BUF_SIZE);
 	nrc_usr_print("Listener on port %d \n", PORT);
 
-	clientlen = sizeof(clientaddr);
-
 	while (1) {
-		if(nrc_wifi_get_state(&wifi_state) != WIFI_SUCCESS) {
-			nrc_usr_print("[%s] Fail to get state\n", __func__);
-			goto exit;
-		}
-
-		switch (wifi_state){
-			case WIFI_STATE_CONNECTED:
-			case WIFI_STATE_GET_IP:
-				break;
-			default:
+		if (nrc_wifi_get_state(0) != WIFI_STATE_CONNECTED) {
 				nrc_usr_print("[%s] Disconnected from AP!!\n", __func__);
 				goto exit;
 		}
 
-		bzero(rx_buffer, RECV_BUF_SIZE);
-		ret = recvfrom(sockfd, rx_buffer, RECV_BUF_SIZE, MSG_DONTWAIT,
-			 (struct sockaddr *) &clientaddr, (socklen_t *)&clientlen);
-		if (ret < 0){
-			if (errno == EAGAIN)
-				continue;
+		memset(rx_buffer, 0, RECV_BUF_SIZE);
 
-			error_val = -1;
-			nrc_usr_print("ERROR in recvfrom, errno=%d\n", errno);
-			goto exit;
-		}
-		nrc_usr_print("server received datagram from %s, port : %d\n",\
-				inet_ntoa(clientaddr.sin_addr) , ntohs(clientaddr.sin_port));
+		FD_ZERO(&read_set);
+		FD_SET(sockfd, &read_set);
+		if (select(sockfd + 1, &read_set, NULL, NULL, NULL) >= 0) {
+			memset(&clientaddr, 0, sizeof(clientaddr));
+			ret = recvfrom(sockfd, rx_buffer, RECV_BUF_SIZE, MSG_DONTWAIT,
+						   (struct sockaddr *) &clientaddr, (socklen_t *)&clientlen);
+			nrc_usr_print("[%s] received data with size %d...\n", __func__, ret);
+			if (ret < 0){
+				if (errno == EAGAIN)
+					continue;
+
+				error_val = -1;
+				nrc_usr_print("ERROR in recvfrom, errno=%d\n", errno);
+				goto exit;
+			}
+			struct sockaddr_in *client_in = (struct sockaddr_in *) &clientaddr;
+#ifdef CONFIG_IPV6
+			if (client_in->sin_family == AF_INET6) {
+				ip6_addr_t ip6_addr;
+				inet6_addr_to_ip6addr(&ip6_addr, &clientaddr.sin6_addr);
+
+				nrc_usr_print("Server received datagram from %s, port : %d\n",
+							  ip6addr_ntoa(&ip6_addr), ntohs(clientaddr.sin6_port));
+			} else
+#endif
+			{
+				nrc_usr_print("Server received datagram from %s, port : %d\n",
+							  inet_ntoa(client_in->sin_addr), ntohs(client_in->sin_port));
+			}
 //		nrc_usr_print("server received %d bytes: %s\n", ret, rx_buffer);
 #if ECHO_SERVER_ENABLE
-		ret = sendto(sockfd, rx_buffer, strlen(rx_buffer), 0,
-			   (struct sockaddr *) &clientaddr, clientlen);
-		if (ret < 0){
-			error_val = -1;
-			nrc_usr_print("ERROR in sendto");
-			goto exit;
-		}
+			ret = sendto(sockfd, rx_buffer, strlen(rx_buffer), 0,
+						 (struct sockaddr *) &clientaddr, clientlen);
+			if (ret < 0){
+				error_val = -1;
+				nrc_usr_print("ERROR in sendto");
+				goto exit;
+			}
 #endif
-		if (strncmp(rx_buffer, MSGEND, strlen(MSGEND)) == 0)  {
-			break;
-		}
+			if (strncmp(rx_buffer, MSGEND, strlen(MSGEND)) == 0)  {
+				break;
+			}
 
+		}
 	}
 	error_val = 0;
 
@@ -130,7 +162,6 @@ exit:
 		shutdown(sockfd, SHUT_RDWR);
 		close(sockfd);
 	}
-	param->test_running = 0;
 	vTaskDelete(NULL);
 }
 
@@ -148,14 +179,14 @@ nrc_err_t run_sample_udp_server(WIFI_CONFIG *param)
 	nrc_usr_print("[%s] Sample App for run_sample_udp_server \n",__func__);
 
 	/* set initial wifi configuration */
-	if (wifi_init(param)!= WIFI_SUCCESS) {
+	if (wifi_init(param) != WIFI_SUCCESS) {
 		nrc_usr_print ("[%s] ASSERT! Fail for init\n", __func__);
 		return -1;
 	}
 
 	/* connect to AP */
 	for(count = 0 ; count < MAX_RETRY ; ){
-		if (wifi_connect(param)== WIFI_SUCCESS){
+		if (wifi_connect(param) == WIFI_SUCCESS){
 			nrc_usr_print ("[%s] connect to %s successfully !! \n", __func__, param->ssid);
 			break;
 		}
@@ -168,53 +199,26 @@ nrc_err_t run_sample_udp_server(WIFI_CONFIG *param)
 		_delay_ms(1000);
 	}
 
-	/* check the IP is ready */
+	/* check if IP is ready */
 	while(1){
-		if(nrc_wifi_get_state(&wifi_state) != WIFI_SUCCESS) {
-			nrc_usr_print("[%s] Fail to get state\n", __func__);
-			return -1;
-		}
-
-		if (wifi_state == WIFI_STATE_CONNECTED)
-			nrc_usr_print("[%s] IP Address ...\n", __func__);
-		else if (wifi_state == WIFI_STATE_GET_IP){
-			char* ip_addr = NULL;
-
-			if (nrc_wifi_get_ip_address(&ip_addr) != WIFI_SUCCESS){
-				nrc_usr_print("[%s] Fail to get IP address\n", __func__);
-				return -1;
-			}
-
-			nrc_usr_print("[%s] IP Address : %s\n", __func__, ip_addr);
+		if (nrc_addr_get_state(0) == NET_ADDR_SET) {
+			nrc_usr_print("[%s] IP ...\n",__func__);
 			break;
+		} else {
+			nrc_usr_print("[%s] IP Address setting State : %d != NET_ADDR_SET(%d) yet...\n",
+						  __func__, nrc_addr_get_state(0), NET_ADDR_SET);
 		}
-		else {
-			nrc_usr_print("[%s] Disconnected from AP!!\n", __func__);
-			return 0;
-		}
-
 		_delay_ms(1000);
 	}
 
-	if (xTaskCreate(udp_server_task, "udp_server", 1024,
-				(void*)param, uxTaskPriorityGet(NULL), NULL) == pdPASS)
-		param->test_running = 1;
+	xTaskCreate(udp_server_task, "udp_server", 1024,
+					(void*)param, uxTaskPriorityGet(NULL), NULL);
 
-	while(param->test_running){
-		_delay_ms(1);
-	}
+	_delay_ms(500);
 
-	if(nrc_wifi_get_state(&wifi_state) != WIFI_SUCCESS)
-		return -1;
-
-	if (wifi_state == WIFI_STATE_GET_IP || wifi_state == WIFI_STATE_CONNECTED) {
-		int network_index;
+	if(nrc_wifi_get_state(0) == WIFI_STATE_CONNECTED) {
 		nrc_usr_print("[%s] Trying to DISCONNECT... for exit\n",__func__);
-		if (nrc_wifi_get_network_index(&network_index) != WIFI_SUCCESS){
-			nrc_usr_print("[%s] Fail to get network index\n", __func__);
-			return -1;
-		}
-		if (nrc_wifi_disconnect(network_index) != WIFI_SUCCESS) {
+		if (nrc_wifi_disconnect(0, 5000) != WIFI_SUCCESS) {
 			nrc_usr_print ("[%s] Fail for Wi-Fi disconnection\n", __func__);
 			return -1;
 		}
@@ -235,19 +239,14 @@ nrc_err_t run_sample_udp_server(WIFI_CONFIG *param)
  * Parameters   : none
  * Returns      : none
  *******************************************************************************/
+WIFI_CONFIG wifi_config;
+WIFI_CONFIG* param = &wifi_config;
+
 void user_init(void)
 {
-	nrc_err_t ret;
-	WIFI_CONFIG* param;
-
-	param = malloc(WIFI_CONFIG_SIZE);
 	memset(param, 0x0, WIFI_CONFIG_SIZE);
 
-	set_wifi_config(param);
-	ret = run_sample_udp_server(param);
-	nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
-	if(param){
-		free(param);
-	}
+	nrc_wifi_set_config(param);
+	run_sample_udp_server(param);
 }
 

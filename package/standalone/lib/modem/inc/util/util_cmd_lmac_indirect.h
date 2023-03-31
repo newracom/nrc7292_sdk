@@ -4,18 +4,6 @@
 #include "util_byte_stream.h"
 
 #if defined (INCLUDE_LMAC_DEBUG)
-#if defined(STANDARD_11N)
-#define N_CATEGORY     5
-enum {
-    MAX_TX = 112,
-    MAX_RX = 45,
-    MAX_DMA = 26,
-    MAX_SEC = 12,
-    MAX_IRQ = 16,
-    CNT_MAX = 115
-};
-#endif /* #if defined(STANDARD_11N) */
-#if defined(STANDARD_11AH)
 #define N_CATEGORY     5
 enum {
     MAX_TX = 97,
@@ -25,7 +13,6 @@ enum {
     MAX_IRQ = 27,
     CNT_MAX = 100
 };
-#endif /* #if defined(STANDARD_11AH) */
 
 typedef struct {
 	uint16_t    offset;

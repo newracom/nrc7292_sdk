@@ -468,7 +468,11 @@ static void _wpa_supplicant_deauthenticate(void *wpa_s, u16 reason_code)
 {
 	wpa_supplicant_deauthenticate(wpa_s, reason_code);
 	/* Schedule a scan to make sure we continue looking for networks */
+	#ifdef _FREERTOS // For reducing 2nd scanning schedule
+	wpa_supplicant_req_scan(wpa_s, 1, 0);
+	#else
 	wpa_supplicant_req_scan(wpa_s, 5, 0);
+	#endif /* _FREERTOS */
 }
 
 

@@ -14,5 +14,6 @@ void util_sysbuf_queue_push(struct sysbuf_queue *hque, SYS_BUF *sysbuf);
 SYS_BUF *util_sysbuf_queue_pop(struct sysbuf_queue *hque);
 SYS_BUF *util_sysbuf_queue_peek(struct sysbuf_queue *hque);
 uint32_t util_sysbuf_queue_count(struct sysbuf_queue *hque);
+uint8_t util_sysbuf_queue_empty(struct sysbuf_queue *hque);
 
 #endif /* __UTIL_QUEUE_H__ */

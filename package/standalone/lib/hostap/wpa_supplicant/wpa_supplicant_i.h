@@ -809,7 +809,7 @@ struct wpa_supplicant {
 	} sme;
 #endif /* CONFIG_SME */
 
-#ifdef CONFIG_AP
+#if defined(CONFIG_AP) || defined(INCLUDE_SOFT_AP)
 	struct hostapd_iface *ap_iface;
 	void (*ap_configured_cb)(void *ctx, void *data);
 	void *ap_configured_cb_ctx;

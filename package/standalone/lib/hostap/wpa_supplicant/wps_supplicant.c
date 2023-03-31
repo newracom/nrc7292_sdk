@@ -36,8 +36,12 @@
 #include "system_common.h"
 #ifdef WPS_SDK_CB
 #include "api_pbc.h"
+#define NRC_WIFI_SEC_OPEN       0
+#define NRC_WIFI_SEC_WPA2       1
+#define NRC_WIFI_SEC_WPA3_OWE   2
+#define NRC_WIFI_SEC_WPA3_SAE   3
+#define NRC_WIFI_SEC_UNKNOWN    4
 #endif
-
 
 #ifndef WPS_PIN_SCAN_IGNORE_SEL_REG
 #define WPS_PIN_SCAN_IGNORE_SEL_REG 3
@@ -862,6 +866,11 @@ static void wpa_supplicant_wps_event(void *ctx, enum wps_event event,
 				     union wps_event_data *data)
 {
 	struct wpa_supplicant *wpa_s = ctx;
+#ifndef CONFIG_NO_CONFIG_WRITE
+	struct wpa_config *config = wpa_s->conf;
+	struct wpa_ssid *ssid;
+	uint8_t nrc_security_mode;
+#endif /* CONFIG_NO_CONFIG_WRITE */
 	switch (event) {
 	case WPS_EV_M2D:
 		wpa_supplicant_wps_event_m2d(wpa_s, &data->m2d);
@@ -878,7 +887,35 @@ static void wpa_supplicant_wps_event(void *ctx, enum wps_event event,
 		wpa_supplicant_wps_event_success(wpa_s);
 #ifdef WPS_SDK_CB
 		if(wps_pbc_ops->nrc_wifi_wps_pbc_success) {
-			wps_pbc_ops->nrc_wifi_wps_pbc_success();
+#ifndef CONFIG_NO_CONFIG_WRITE
+			for (ssid = config->ssid; ssid; ssid = ssid->next) {
+				if (ssid->key_mgmt == WPA_KEY_MGMT_WPS || ssid->temporary){
+					continue; /* do not save temporary networks */
+				}
+				if (wpa_key_mgmt_wpa_psk(ssid->key_mgmt) && !ssid->psk_set &&
+					!ssid->passphrase){
+					continue; /* do not save invalid network */
+				}
+
+				if (ssid->key_mgmt & WPA_KEY_MGMT_NONE)
+					nrc_security_mode = NRC_WIFI_SEC_OPEN;
+				else if (ssid->key_mgmt & WPA_KEY_MGMT_PSK)
+					nrc_security_mode = NRC_WIFI_SEC_WPA2;
+				else if (ssid->key_mgmt & WPA_KEY_MGMT_OWE)
+					nrc_security_mode = NRC_WIFI_SEC_WPA3_OWE;
+				else if (ssid->key_mgmt & WPA_KEY_MGMT_SAE)
+					nrc_security_mode = NRC_WIFI_SEC_WPA3_SAE;
+				else
+					nrc_security_mode = NRC_WIFI_SEC_UNKNOWN;
+
+				wps_pbc_ops->nrc_wifi_wps_pbc_success(ssid->ssid,
+								      ssid->ssid_len,
+								      nrc_security_mode,
+								      ssid->passphrase);
+			}
+#else
+			wps_pbc_ops->nrc_wifi_wps_pbc_success(NULL, NULL, NULL, NULL);
+#endif /* CONFIG_NO_CONFIG_WRITE */
 		}
 #endif /* WPS_SDK_CB */
 		break;

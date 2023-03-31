@@ -1,133 +1,43 @@
+include $(CONFIG)
 
-DESTDIR=/usr/local
-PREFIX=mbedtls_
+PKG_NAME=mbedtls
 
-.SILENT:
+# mbedtls.make wants CONFIG_LWIP to be set to include
+# TLS support
+CONFIG_LWIP=y
 
-.PHONY: all no_test programs lib tests install uninstall clean test check covtest lcov apidoc apidoc_clean
+include mbedtls.make
 
-all: programs tests
-	$(MAKE) post_build
+MBEDTLS_BASE		= $(CURDIR)
+MBEDTLS_PORT 		= $(MBEDTLS_BASE)/port
+MBEDTLS_PORT_SHA 	= $(MBEDTLS_PORT)/sha
+MBEDTLS_LIB			= $(MBEDTLS_BASE)/mbedtls
+MBEDTLS_LIB_SRC		= $(MBEDTLS_LIB)/library
 
-no_test: programs
+MBEDTLS_PORT_INC	= $(MBEDTLS_PORT)/include
+MBEDTLS_LIB_INC		= $(MBEDTLS_LIB)/include
+MBEDTLS_BASE_INC	= $(MBEDTLS_BASE)/include
 
-programs: lib
-	$(MAKE) -C programs
+INCLUDE	+= -I$(MBEDTLS_PORT_INC)
+INCLUDE	+= -I$(MBEDTLS_LIB_INC)
+INCLUDE	+= -I$(MBEDTLS_BASE_INC)
 
-lib:
-	$(MAKE) -C library
+# LWIP header
+INCLUDE += -I$(TOPDIR)/lib/lwip/port/include
+INCLUDE += -I$(TOPDIR)/lib/lwip/lwip/src/include
 
-tests: lib
-	$(MAKE) -C tests
+INCLUDE += -I$(TOPDIR)/lib/hostap/src/utils
+INCLUDE += -I$(TOPDIR)/lib/hostap/src/crypto
 
-ifndef WINDOWS
-install: no_test
-	mkdir -p $(DESTDIR)/include/mbedtls
-	cp -rp include/mbedtls $(DESTDIR)/include
+VPATH	+= $(MBEDTLS_BASE)
+VPATH	+= $(MBEDTLS_PORT)
+VPATH	+= $(MBEDTLS_PORT_SHA)
+VPATH	+= $(MBEDTLS_LIB_SRC)
 
-	mkdir -p $(DESTDIR)/lib
-	cp -RP library/libmbedtls.*    $(DESTDIR)/lib
-	cp -RP library/libmbedx509.*   $(DESTDIR)/lib
-	cp -RP library/libmbedcrypto.* $(DESTDIR)/lib
+DEFINE += -DMBEDTLS_CONFIG_FILE=\"config-nrc-basic.h\"
+DEFINE += -DNRC_MBEDTLS
 
-	mkdir -p $(DESTDIR)/bin
-	for p in programs/*/* ; do              \
-	    if [ -x $$p ] && [ ! -d $$p ] ;     \
-	    then                                \
-	        f=$(PREFIX)`basename $$p` ;     \
-	        cp $$p $(DESTDIR)/bin/$$f ;     \
-	    fi                                  \
-	done
+# LWIP definition
+DEFINE += -DNRC_LWIP
 
-uninstall:
-	rm -rf $(DESTDIR)/include/mbedtls
-	rm -f $(DESTDIR)/lib/libmbedtls.*
-	rm -f $(DESTDIR)/lib/libmbedx509.*
-	rm -f $(DESTDIR)/lib/libmbedcrypto.*
-
-	for p in programs/*/* ; do              \
-	    if [ -x $$p ] && [ ! -d $$p ] ;     \
-	    then                                \
-	        f=$(PREFIX)`basename $$p` ;     \
-	        rm -f $(DESTDIR)/bin/$$f ;      \
-	    fi                                  \
-	done
-endif
-
-WARNING_BORDER      =*******************************************************\n
-NULL_ENTROPY_WARN_L1=****  WARNING!  MBEDTLS_TEST_NULL_ENTROPY defined! ****\n
-NULL_ENTROPY_WARN_L2=****  THIS BUILD HAS NO DEFINED ENTROPY SOURCES    ****\n
-NULL_ENTROPY_WARN_L3=****  AND IS *NOT* SUITABLE FOR PRODUCTION USE     ****\n
-
-NULL_ENTROPY_WARNING=\n$(WARNING_BORDER)$(NULL_ENTROPY_WARN_L1)$(NULL_ENTROPY_WARN_L2)$(NULL_ENTROPY_WARN_L3)$(WARNING_BORDER)
-
-WARNING_BORDER_LONG      =**********************************************************************************\n
-CTR_DRBG_128_BIT_KEY_WARN_L1=****  WARNING!  MBEDTLS_CTR_DRBG_USE_128_BIT_KEY defined!                      ****\n
-CTR_DRBG_128_BIT_KEY_WARN_L2=****  Using 128-bit keys for CTR_DRBG limits the security of generated         ****\n
-CTR_DRBG_128_BIT_KEY_WARN_L3=****  keys and operations that use random values generated to 128-bit security ****\n
-
-CTR_DRBG_128_BIT_KEY_WARNING=\n$(WARNING_BORDER_LONG)$(CTR_DRBG_128_BIT_KEY_WARN_L1)$(CTR_DRBG_128_BIT_KEY_WARN_L2)$(CTR_DRBG_128_BIT_KEY_WARN_L3)$(WARNING_BORDER_LONG)
-
-# Post build steps
-post_build:
-ifndef WINDOWS
-
-	# If 128-bit keys are configured for CTR_DRBG, display an appropriate warning
-	-scripts/config.pl get MBEDTLS_CTR_DRBG_USE_128_BIT_KEY && ([ $$? -eq 0 ]) && \
-	    echo '$(CTR_DRBG_128_BIT_KEY_WARNING)'
-
-	# If NULL Entropy is configured, display an appropriate warning
-	-scripts/config.pl get MBEDTLS_TEST_NULL_ENTROPY && ([ $$? -eq 0 ]) && \
-	    echo '$(NULL_ENTROPY_WARNING)'
-endif
-
-clean:
-	$(MAKE) -C library clean
-	$(MAKE) -C programs clean
-	$(MAKE) -C tests clean
-ifndef WINDOWS
-	find . \( -name \*.gcno -o -name \*.gcda -o -name \*.info \) -exec rm {} +
-endif
-
-check: lib tests
-	$(MAKE) -C tests check
-
-test: check
-
-ifndef WINDOWS
-# note: for coverage testing, build with:
-# make CFLAGS='--coverage -g3 -O0'
-covtest:
-	$(MAKE) check
-	programs/test/selftest
-	tests/compat.sh
-	tests/ssl-opt.sh
-
-lcov:
-	rm -rf Coverage
-	lcov --capture --initial --directory library -o files.info
-	lcov --capture --directory library -o tests.info
-	lcov --add-tracefile files.info --add-tracefile tests.info -o all.info
-	lcov --remove all.info -o final.info '*.h'
-	gendesc tests/Descriptions.txt -o descriptions
-	genhtml --title "mbed TLS" --description-file descriptions --keep-descriptions --legend --no-branch-coverage -o Coverage final.info
-	rm -f files.info tests.info all.info final.info descriptions
-
-apidoc:
-	mkdir -p apidoc
-	cd doxygen && doxygen mbedtls.doxyfile
-
-apidoc_clean:
-	rm -rf apidoc
-endif
-
-## Editor navigation files
-C_SOURCE_FILES = $(wildcard include/*/*.h library/*.[hc] programs/*/*.[hc] tests/suites/*.function)
-# Exuberant-ctags invocation. Other ctags implementations may require different options.
-CTAGS = ctags --langmap=c:+.h.function -o
-tags: $(C_SOURCE_FILES)
-	$(CTAGS) $@ $(C_SOURCE_FILES)
-TAGS: $(C_SOURCE_FILES)
-	etags -o $@ $(C_SOURCE_FILES)
-GPATH GRTAGS GSYMS GTAGS: $(C_SOURCE_FILES)
-	ls $(C_SOURCE_FILES) | gtags -f - --gtagsconf .globalrc
+include $(TOPDIR)/make/build-lib.mk

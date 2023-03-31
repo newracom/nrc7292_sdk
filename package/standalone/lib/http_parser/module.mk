@@ -1,0 +1,5 @@
+INCLUDE += -I$(HTTP_PARSER_BASE)
+VPATH   += $(HTTP_PARSER_BASE)
+
+CSRCS += \
+	http_parser.c

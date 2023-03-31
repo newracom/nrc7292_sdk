@@ -1,0 +1,7 @@
+BME680 sensor used (https://randomnerdtutorials.com/bme680-sensor-arduino-gas-temperature-humidity-pressure/)
+Use BME680 sensor through I2C
+1. Comment out the line "#define BME680_SPI"
+2. Uncomment "#define BME680_I2C"
+3. Connect CS line on BME680 sensor to VCC
+4. Connect SDO line on BME680 sensor to GND
+5. Ignore VCC & GND on BME680 sensor.

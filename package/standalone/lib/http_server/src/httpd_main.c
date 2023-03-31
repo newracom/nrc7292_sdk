@@ -93,7 +93,7 @@ esp_err_t httpd_queue_work(httpd_handle_t handle, httpd_work_fn_t work, void *ar
 
     int ret = cs_send_to_ctrl_sock(hd->msg_fd, hd->config.ctrl_port, &msg, sizeof(msg));
     if (ret < 0) {
-        E(TAG, LOG_FMT("failed to queue work"));
+        E(TAG, LOG_FMT("failed to queue work %d"), ret);
         return ESP_FAIL;
     }
 

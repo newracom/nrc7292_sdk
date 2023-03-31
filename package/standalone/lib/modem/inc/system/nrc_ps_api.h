@@ -2,52 +2,7 @@
 #define __NRC_PS_API_H__
 
 #include <stdbool.h>
-
-#define PS_SIG_A    0x13579bdf
-#define PS_SIG_B    0x2468ace0
-
-enum ps_event {
-	PS_EVT_COLDBOOT,
-	PS_EVT_BEFORE_DEEPSLEEP,
-	PS_EVT_WAKEUP_DEEPSLEEP,
-	PS_EVT_BEFORE_WAKEUP,       /* UCODE only */
-	PS_EVT_BEFORE_MODEMSLEEP,
-	PS_EVT_WAKEUP_MODEMSLEEP,
-	PS_EVT_MAX
-};
-
-enum ps_ucode_wake_reason {
-	PS_WAKE_NONTIM,
-	PS_WAKE_RX_UNICAST,
-	PS_WAKE_RX_BROADCAST,
-	PS_WAKE_EXT_INT_1,
-	PS_WAKE_EXT_INT_2,
-	PS_WAKE_BEACON_LOSS,		//5 abnormal
-	PS_WAKE_INVALID_RET_INFO,	//6 abnormal
-	PS_WAKE_RTC_TIMEOUT,
-#if defined(NRC7292)
-	PS_WAKE_HSPI,
-#endif
-	PS_WAKE_RSN_MAX,
-};
-
-enum ps_ucode_wake_source {
-	PS_WAKE_SRC_DTIM,
-	PS_WAKE_SRC_TBTT,
-	PS_WAKE_SRC_LI,
-	PS_WAKE_SRC_USER_VAL,
-};
-
-enum sys_operation {
-	SYS_OPER_FW,
-	SYS_OPER_UCODE,
-	SYS_OPER_MAX
-};
-
-#define WKUP_SRC_RTC BIT0
-#define WKUP_SRC_GPIO BIT1
-#define WKUP_SRC_HSPI BIT2
-#define WKUP_SRC_MAX (3)
+#include "nrc_ps_type.h"
 
 //26B
 struct key_info {
@@ -56,12 +11,17 @@ struct key_info {
 	uint8_t		key_id:2;
 	uint32_t	key[4]; //16B (128bit Key)
 	uint64_t	tsc; //8B (64bit)
+#if defined(INCLUDE_7393_7394_WORKAROUND)
+	uint16_t	hw_index;
+#endif
 } __attribute__ ((packed));
 
-//2B
+//3B
 struct ampdu_info {
-	uint8_t		enable;
-	uint8_t		agg_maxnum;
+	uint8_t		enable:1;
+	uint8_t		manual:1;
+	uint8_t		agg_maxnum:6;
+	uint16_t	agg_size_limit;
 } __attribute__ ((packed));
 
 //8B
@@ -94,25 +54,27 @@ struct ret_stainfo {
 } __attribute__ ((packed));
 #define RET_STAINFO_SIZE sizeof(struct ret_stainfo)
 
-//48B(NRC7292), 46B(Others)
+//42B
 struct ucode_stats {
-	uint32_t	deepsleep_cnt;		//#of Entering Deep Sleep in Ucode
-	uint32_t	wake_cnt;		//#of Exiting Wake up in Ucode
-	uint32_t	rx_bcn_cnt;		//#of RX Beacon in Ucode
-	uint32_t	pmc_err_cnt;		//#of PMC Error before WFI
-	uint32_t	rtc_err_cnt;		//#of RTC Error before WFI
-	uint32_t	pmc_int_cnt;		//#of PMC INT before WFI
-	uint32_t	fw_force_rst_cnt;	//#of FW Deep sleep by force (without CB of Null Frame)
-	uint32_t	fw_assert_cnt;	//#of FW ASSERT right before Deep Sleep
-	uint16_t	wake_rsn_cnt[PS_WAKE_RSN_MAX]; //8*2(16B for NRC7292), 7*2(14B for Others) //Wake-up Reason
+	uint32_t	deepsleep_cnt;			//#of Entering Deep Sleep in Ucode
+	uint32_t	wake_cnt;			//#of Exiting Wake up in Ucode
+	uint32_t	rx_bcn_cnt;			//#of RX Beacon in Ucode
+	uint32_t	pmc_err_cnt:6;			//#of PMC Error before WFI
+	uint32_t	rtc_err_cnt:6;			//#of RTC Error before WFI
+	uint32_t	pmc_int_cnt:6;			//#of PMC INT before WFI
+	uint32_t	fw_force_rst_cnt:7;		//#of FW Deep sleep by force (without CB of Null Frame)
+	uint32_t	fw_assert_cnt:7;		//#of FW ASSERT right before Deep Sleep
+	uint16_t	wake_rsn_cnt[PS_WAKE_RSN_MAX];	//Wake-up Reason (2*13(26B))
+	uint32_t	wake_margin_us;			//wakeup margin time in us
 } __attribute__ ((packed));
 
-//46B
+//47B
 struct ret_apinfo {
 	uint8_t		bssid[6];
 	uint8_t		ssid[32];
 	uint8_t		ssid_len;
 	uint8_t		security;
+	uint8_t		akm;
 	uint8_t		dtim_period;
 	uint16_t	bcn_interval;
 	uint16_t	short_bcn_interval;
@@ -122,7 +84,7 @@ struct ret_apinfo {
 } __attribute__ ((packed));
 #define RET_APINFO_SIZE sizeof(struct ret_apinfo)
 
-//12B
+//16B
 struct ret_s1ginfo {
 	uint8_t		s1g_long_support: 1;
 	uint8_t		pv1_frame_support: 1;
@@ -139,28 +101,37 @@ struct ret_s1ginfo {
 	uint8_t		max_ampdu_len_exp: 2;
 	uint8_t		traveling_pilot_support: 2;
 	uint8_t		ndp_preq_support: 1;
-	uint8_t		reserved: 3;
+	uint8_t 	legacy_ack_support: 1;
+	uint8_t 	beacon_bypass_support: 1;
+	uint8_t 	reserved: 1;
 	uint8_t		rx_s1gmcs_map: 8;
 	uint32_t	twt_service_period;
 	uint32_t	twt_wake_interval;
+	int		cca_threshold;
 } __attribute__ ((packed));
 #define RET_S1GINFO_SIZE sizeof(struct ret_s1ginfo)
 
-//105B
+#define	KCK_MAX_LEN	(16)
+#define	KEK_MAX_LEN	(16)
+//137B
 struct ret_keyinfo {
 	uint8_t		security;
-	struct key_info	cipher_info[4];
+	struct		key_info	cipher_info[4];
+	/* for GTK rekey offload */
+	uint8_t		kck[KCK_MAX_LEN];
+	uint8_t		kek[KEK_MAX_LEN];
 } __attribute__ ((packed));
 #define RET_KEYINFO_SIZE sizeof(struct ret_keyinfo)
 
-//6B
+//4B
 struct ret_usrinfo {
-	uint8_t		txpwr;			//tx power (dBm)
-	uint8_t		gi;			//guard interval (0:long, 1:short)
+	uint32_t	txpwr:8;		//tx power (dBm)
 	uint32_t	rxgain:8;		//rx gain (dBm)
+	uint32_t	gi:8;			//guard interval (0:long, 1:short)
 	uint32_t	ucode_wake_src:4;	//ucode wake interval source (0:DTIM/1:TBTT/2:LI/3:USR)
-	uint32_t	ucode_wake_by_group:1; //ucode wake by DTIM BC/MC (0:disable, 1:enable)
-	uint32_t	reserved:19;
+	uint32_t	ucode_wake_by_group:1;	//ucode wake by DTIM BC/MC (0:disable, 1:enable)
+	uint32_t	txpwr_type:2;		//tx power type (0:auto, 1:limit, 2:fixed)
+	uint32_t	reserved:1;
 } __attribute__ ((packed));
 #define RET_USRINFO_SIZE sizeof(struct ret_usrinfo)
 
@@ -169,11 +140,17 @@ struct ret_chinfo {
 	uint16_t	ch_freq;
 	uint8_t		ch_bw;
 	int8_t		ch_offset;
-	uint8_t		primary_loc;
+	uint8_t		primary_loc:7;
+	uint8_t		center_lo:1;
+#if defined(INCLUDE_NEW_CHANNEL_CTX)
+	uint8_t		ch_index;
+	uint8_t		oper;
+	uint8_t		cca;
+#endif
 } __attribute__ ((packed));
 #define RET_CHINFO_SIZE sizeof(struct ret_chinfo)
 
-// 32B + 8B = 40B
+// 32B + 12B = 44B
 struct ret_acinfo {
 	struct edca_info	edca[4];
 	struct ampdu_info	agg_info[4];
@@ -197,10 +174,23 @@ struct ret_ipinfo {
 } __attribute__ ((packed));
 #define RET_IPINFO_SIZE sizeof(struct ret_ipinfo)
 
-//369B
+//10B
+struct ret_lbtinfo {
+	uint16_t	cs_time;
+	uint32_t	pause_time;
+	uint32_t	resume_time;
+} __attribute__ ((packed));
+#define RET_LBTINFO_SIZE sizeof(struct ret_lbtinfo)
+
+//375B
 struct ret_rfinfo {
 	uint8_t 	rf_efuse_revision;
+#if defined(NRC7292)
 	uint32_t	rf_reg_dump[92]; //RF register dump (368B)
+#else
+	uint32_t	rf_reg_dump[127]; //RF register dump (508B)
+#endif
+	int8_t		nrf_poc_param[3][2]; // (6B)
 } __attribute__ ((packed));
 #define RET_RFINFO_SIZE sizeof(struct ret_rfinfo)
 
@@ -240,7 +230,7 @@ struct ret_wakeupinfo {
 } __attribute__ ((packed));
 #define RET_WAKEUPINFO_SIZE sizeof(struct ret_wakeupinfo)
 
-//56B(8+48) for NRC7292, 54B(8+46) for Others
+//58B(16+42)
 struct ret_ucodeinfo {
 	uint32_t	wake_interval;
 	uint32_t	enter_first:1;	//(1: Enter Ucode first)
@@ -251,32 +241,57 @@ struct ret_ucodeinfo {
 	uint32_t	wfi_success:1;	//(1: success 0:fail)
 	uint32_t	wake_reason:4;	//Reason of UCode wake-up
 	uint32_t	pmc_status0:8;	//PMC STATUS0
-	uint32_t	pmc_wake_src:4;	//PMC wakeup source
+	uint32_t	pmc_wake_src:6;	//PMC wakeup source
 	uint32_t	pmc_int:1;	//(1: PMC INT before WFI)
 	uint32_t	send_null:1;	//(1: Sent Null Frame before Deep Sleep)
 	uint32_t	assert:1;	//(1: Assert right before Deep Sleep)
-	uint32_t	reserved:7;
-	struct ucode_stats	 stats;	//Ucode Statistics
+	uint32_t	ucode_test_mode:1;
+	uint32_t	execute_rf_init:1;
+	uint32_t	reserved:3;
+	/* To calculate the deepsleep interval */
+	uint32_t	last_beacon_tsf_lower;	// last received beacon timestamp tsf lower
+	uint32_t	last_beacon_tsf_upper;	// last received beacon timestamp tsf upper
+	uint16_t	ucode_beacon_timer_expire_cont;
+	uint16_t	ucode_beacon_timer_expire_accum;
+	struct 		ucode_stats	 stats;	//Ucode Statistics
 } __attribute__ ((packed));
 #define RET_UCODE_INFO_SIZE sizeof(struct ret_ucodeinfo)
 
-// 1B
+// 7B
 struct ret_drvinfo {
-	uint8_t		fw_boot_mode:2; //FW boot mode (1B) : 0(XIP), 1 or 2(ROM, it must be distinguished in the code based on the core type)
-	uint8_t		do_reset:1;		//FW reboot mode in uCode (1B) : 0(reboot with jump), 1(reboot with reset)
-	uint8_t		cqm_off:1;
-	uint8_t		brd_rev:4;
+	uint16_t fw_boot_mode:2;	//FW boot mode (1B) : 0(XIP), 1 or 2(ROM, it must be distinguished in the code based on the core type)
+	uint16_t do_reset:1;		//FW reboot mode in uCode (1B) : 0(reboot with jump), 1(reboot with reset)
+	uint16_t cqm_off:1;
+	uint16_t kern_ver:12;		// 4bit for major. 8bit for minor. 
+	uint8_t sw_enc:2;
+	uint8_t brd_rev:2;
+	uint8_t bitmap_encoding:1;
+	uint8_t reverse_scrambler:1;
+	uint8_t reserved:2;
+	uint32_t vendor_oui;
 } __attribute__ ((packed));
 #define RET_DRV_INFO_SIZE sizeof(struct ret_drvinfo)
 
+// 12B
+struct ret_dutyinfo {
+	uint32_t duty_window;
+	uint32_t max_token;
+	uint16_t duty_margin;
+	uint16_t duty_beacon_margin;
+} __attribute__ ((packed));
+#define RET_DUTY_INFO_SIZE sizeof(struct ret_dutyinfo)
+
 #if defined (INCLUDE_WOWLAN_PATTERN)
-// 65B
+// 56B
+
+/* This must be matched with wim_pm_param */
+#define WOWLAN_PATTER_SIZE      48
 struct ret_wowlanptns {
 	uint16_t offset:6;
 	uint16_t mask_len:4;
 	uint16_t pattern_len:6;
-	uint8_t mask[7];
-	uint8_t pattern[56];
+	uint8_t mask[WOWLAN_PATTER_SIZE/8];
+	uint8_t pattern[WOWLAN_PATTER_SIZE];	// array size = array size of mask * 8
 } __attribute__ ((packed));
 #define RET_WOWLAN_PATTERNS_SIZE sizeof(struct ret_wowlanptns)
 
@@ -292,73 +307,153 @@ struct ret_wowlaninfo {
 #define RET_WOWLAN_INFO_SIZE sizeof(struct ret_wowlaninfo)
 #endif /* INCLUDE_WOWLAN_PATTERN */
 
-#define RET_USERSPACE_SIZE 64
+#define RET_USERSPACE_SIZE 32
 #define RET_RECOVERED_SIZE 1
-#if defined (INCLUDE_WOWLAN_PATTERN)
-//WoWLAN uses extra 132B for patten match in Ucode
-#if defined(NRC7292)
-#define RET_RESERVED_SIZE 4
-#else
-#define RET_RESERVED_SIZE 6
-#endif
-#else //INCLUDE_WOWLAN_PATTERN
-#if defined(NRC7292)
-#define RET_RESERVED_SIZE 136
-#else
-#define RET_RESERVED_SIZE 138
-#endif
-#endif // //INCLUDE_WOWLAN_PATTERN
-#define RET_UCODE_HDR_SIZE 16
-#define RET_PMK_SIZE 32
-#define WOWLAN_MAX_PATTERNS 2
 
-//Retention Memory (Total_1KB(1024B) - from 0x200B_BC00 to 0x200C_0000)
+//116B
+struct ret_airtimeinfo {
+	/*
+	 * Airtime Measurment
+	 */
+	uint32_t	ps_ucode_first_bootup;
+	uint32_t	ps_ucode_first_idle_rfoff;
+	uint32_t	ps_ucode_first_ds;
+	uint64_t	ps_ucode_tsf_before_first_ds;
+
+	uint32_t	ps_accum_ucode_bootup;
+	uint32_t	ps_accum_ucode_init;
+	uint32_t	ps_accum_ucode_idle;
+	uint32_t	ps_accum_ucode_idle_rfoff;
+	uint32_t	ps_accum_deepsleep;
+	uint32_t	ps_accum_count_deepsleep;
+	uint32_t	ps_accum_expired_deepsleep;
+
+	uint16_t	ps_ucode_max_offset;
+	uint16_t	ps_ucode_max_backoff;
+	uint32_t	max_backoff_tsf_upper;
+	uint32_t	max_backoff_tsf_lower;
+
+	uint32_t 	ps_ucode_last_tsf;
+	uint32_t	ps_ucode_last_fw_tsf;
+
+	uint16_t	airtime_conversion_ucode_to_fw;
+	uint16_t	airtime_conversion_ucode_to_fw_nextcyc;
+	uint16_t	airtime_fw_idle_rfoff;
+	uint16_t	airtime_fw_idle_rfoff_2nd;
+	uint16_t	airtime_fw_idle_rfoff_2nd_nextcyc;
+	uint16_t	esl_tx_sw;
+	uint16_t	esl_tx_hw;
+	uint16_t	esl_total;
+	uint32_t	esl_ps_processing_time;
+	uint32_t	esl_period_buf[3];
+
+	uint16_t	ucode_idle_under_7;
+	uint16_t	ucode_idle_under_30;
+	uint16_t	ucode_idle_under_100;
+	uint16_t	ucode_idle_over_100;
+
+	uint16_t	max_ucode_to_main_ps;
+	uint16_t	max_ucode_to_init_ps;
+	uint32_t	max_ucode_to_bcn_ps;
+} __attribute__ ((packed));
+#define RET_AIRTIME_INFO_SIZE sizeof(struct ret_airtimeinfo)
+#define RET_PMK_SIZE 32
+#if defined(NRC7292)
+#define WOWLAN_MAX_PATTERNS 1
+#elif defined(NRC7393)||defined(NRC7394)
+#define WOWLAN_MAX_PATTERNS 2
+#else
+#error "define wowlan pattern size, if ret size is enough, set 2 or set 1"
+#endif
+
+
+/* Retention Memory Total_1KB(1024B)
+ * from 0x200B_BC00 to 0x200C_0000)
+ * Last 16 Bytes for uCode Header
+ */
+
+#if defined(NRC7393)||defined(NRC7394)
+#if !(defined(BOOT_LOADER) || defined(MASKROM))
+#include "drv_port.h"
+#include "../fdk/lib/hal/hal_modem.h" 
+#endif
+#endif
+
 struct retention_info {
-	struct ret_stainfo		sta_info;			//station info (19B)
-	struct ret_apinfo		ap_info;			//ap info (46B)
-	struct ret_s1ginfo		s1g_info;			//s1g info (12B)
-	struct ret_keyinfo		key_info;			//key info (105B)
-	struct ret_usrinfo		usr_conf_info;		//user config info (6B)
-	struct ret_chinfo		ch_info;			//channel info (5B)
-	struct ret_wakeupinfo	wakeup_info;		//wakeup source (3B)
-	struct ret_acinfo		ac_info;			//info per AC (40B)
-	struct ret_tidinfo		tid_info;			//info per TID ( 68B)
-	struct ret_ipinfo		ip_info;			//ip info (12B)
-	struct ret_rfinfo		rf_info;			//rf info (369B)
-	struct ret_ucodeinfo	ucode_info;			//ucode info (68B)
-	struct ret_drvinfo		drv_info;			//driver info (1B)
+#if defined(NRC7393)||defined(NRC7394)
+#if !(defined(BOOT_LOADER) || defined(MASKROM))
+	hal_modem_ret_info_t hal_modem_ret_info; 
+#endif
+#endif
+	struct ret_stainfo		sta_info;		//station info (20B)
+	struct ret_apinfo		ap_info;		//ap info (47B)
+	struct ret_s1ginfo		s1g_info;		//s1g info (16B)
+	struct ret_keyinfo		key_info;		//key info (105B)
+	struct ret_usrinfo		usr_conf_info;		//user config info (4B)
+	struct ret_chinfo		ch_info;		//channel info (5B)
+	struct ret_wakeupinfo		wakeup_info;		//wakeup source (3B)
+	struct ret_acinfo		ac_info;		//info per AC (40B)
+	struct ret_tidinfo		tid_info;		//info per TID ( 76B)
+	struct ret_ipinfo		ip_info;		//ip info (12B)
+	struct ret_lbtinfo		lbt_info;		//lbt info (10B)
+	struct ret_rfinfo		rf_info;		//rf info (375B)
+	struct ret_ucodeinfo		ucode_info;		//ucode info (58B)
+	struct ret_drvinfo		drv_info;		//driver info (3B)
+	struct ret_dutyinfo		duty_info;		//duty cycle info (12B)
 #if defined (INCLUDE_WOWLAN_PATTERN)
-	struct ret_wowlanptns	wowlan_patterns[WOWLAN_MAX_PATTERNS]; //wowlan patterns (65B * 2)
-	struct ret_wowlaninfo	wowlan_info;		//wowlan info (2B)
+	struct ret_wowlanptns		wowlan_patterns[WOWLAN_MAX_PATTERNS];	//wowlan patterns (65B * 2)
+	struct ret_wowlaninfo		wowlan_info;		//wowlan info (2B)
+#endif
+#if defined(INCLUDE_MEASURE_AIRTIME) || defined(INCLUDE_MEASURE_AIRTIME_NONESL)
+	struct ret_airtimeinfo	airtime_info;			//airtime info (116B)
+#endif
+#if defined (INCLUDE_PS_SCHEDULE)
+	struct ret_schedule_info schedule_info;			//callback info (65B)
+#endif
+	/* GPIO setting while in deep sleep */
+	uint32_t sleep_gpio_dir_mask;
+	uint32_t sleep_gpio_out_mask;
+	uint32_t sleep_gpio_pullup_mask;
+#if defined (INCLUDE_AVOID_FRAG_ATTACK_TEST)
+	uint8_t 			prev_ptk[RET_PMK_SIZE];	//Previous PTK (32B)
 #endif
 #if !defined(INCLUDE_RTC_ALWAYS_ON)
-	uint32_t				sync_time_ms;		//time for recovery (4B)
+	uint32_t			sync_time_ms;		//time for recovery (4B)
 #endif
-	uint8_t					pmk[RET_PMK_SIZE];	//PMK(PSK) (32B)
-	uint32_t				sig_a;				//sig a (4B)
-	uint32_t				sig_b;				//sig b (4B)
-	uint8_t 				userspace_area[RET_USERSPACE_SIZE];	//user space (64B)
-	uint8_t					ps_mode;			//Power saving mode (1B)
-	uint64_t				ps_duration;		//Power save duration (8B) (in ms unit)
-	uint32_t				wdt_cnt;			//WDT Reset Count (4B)
-	bool					recovered;			//recovery status(1B) (true:recovered, false:not recovered)
-	bool					sleep_alone;		//sleep without connection(1B) (true:alone false:with AP)
-	uint8_t					reserved[RET_RESERVED_SIZE];		//avaiable
-	uint8_t     			ucode_hdr[RET_UCODE_HDR_SIZE];		//ucode header (don't touch. should be located at the end)
+#if defined(INCLUDE_NRC7392_UCODE_TEST)
+	uint32_t			ucode_test_deepsleep_interval_ms;
+	uint32_t			ucode_test_idle_interval_ms;
+	uint32_t			ucode_test_count;
+	uint32_t			ucode_count;
+	uint32_t			ucode_interval_ms;
+	uint32_t			ucode_deepsleep_interval_ms;
+#endif
+	uint8_t				pmk[RET_PMK_SIZE];	//PMK(PSK) (32B)
+	uint32_t			sig_a;			//sig a (4B)
+	uint32_t			sig_b;			//sig b (4B)
+	uint8_t 			userspace_area[RET_USERSPACE_SIZE];	//user space (64B)
+	uint8_t				ps_mode;		//Power saving mode (1B) (none/modem/tim/nontim)
+	uint64_t			ps_duration;		//Power save duration (8B) (in ms unit)
+	uint64_t			usr_timeout;		//TIM-mode user timer (8B) (in ms unit)
+	uint32_t			wdt_flag:8;		//WDT Reset Flag (1B)
+	uint32_t			wdt_cnt: 24;		//WDT Reset Count (3B)
+	uint8_t				fota_in_progress:1;	//fota in progress flag(1bit) (1: in progress, 0: not in progress)
+	uint8_t				fota_done:1;		//fota done flag(1bit) (1: done, 0: not compeleted)
+	uint8_t				wake_by_usr:1;		//wakeup in ucode for user timer(1bit) (1: wakeup, 0: none)
+	uint8_t				reserved:5;		//reserved 6bit
+	bool				recovered;		//recovery status(1B) (true:recovered, false:not recovered)
+	bool				sleep_alone;		//sleep without connection(1B) (true:alone false:with AP)
+
 } __attribute__ ((packed));
-#define RET_TOTAL_SIZE sizeof(struct retention_info)
+#define RET_TOTAL_SIZE 				sizeof(struct retention_info)
 
-#define MEM_SIZE_RETENTION_INFO 1024
-
-typedef void (*nrc_ps_cb_t)(enum ps_event event,
-							enum sys_operation operation);
-
+typedef void (*nrc_ps_cb_t)(enum ps_event event,enum sys_operation operation);
 struct nrc_ps_ops {
 	nrc_ps_cb_t cb;
 };
 
 /* ============================================================================== */
-/* =================== Internal INTERFACE =========================================== */
+/* =================== Internal INTERFACE ======================================= */
 /* ============================================================================== */
 struct retention_info* nrc_ps_get_retention_info();
 struct nrc_ps_ops *nrc_ps_get_user(void);
@@ -407,6 +502,107 @@ int nrc_ps_get_power_indication_pin(bool *enable, int *pin_number);
 int nrc_ps_get_wakeup_source(uint8_t *wakeup_source);
 int nrc_ps_get_wakeup_reason(uint8_t *wakeup_reason);
 int nrc_ps_get_wakeup_count(uint32_t *wakeup_count);
-#endif
+int nrc_ps_reset_wakeup_count();
+void nrc_ps_show_ucode_stats();
+void nrc_ps_set_ucode();
+
+#if defined (INCLUDE_PS_SCHEDULE)
+/**********************************************
+ * @fn  int nrc_ps_schedule_add(uint32_t timeout, bool net_init, scheduled_callback func)
+ *
+ * @brief Add schedule information.
+ *        timeout, whether to enable wifi, and callback funtion to execute when
+ *        the scheduled time is reached.
+ *        This information will be added into retention memory and processed in
+ *        main() and standalone_main().
+ *        If net_init is set to true, then wifi and network will be initialized.
+ *        Current implementation can accept up to 4 individual schedules.
+ *        Each individual schedule should have at least one minute apart in timeout.
+ *        When adding schedule the callback should be able to finish in the time window.
+ *
+ * @param timeout: value in msec for this schedule.
+ * @param net_init: whether callback will require wifi connection
+ * @param func: scheduled_callback funtion pointer defined as void func()
+ *
+ * @return 0 for success and -1 for failure.
+ ***********************************************/
+int nrc_ps_schedule_add(uint32_t timeout, bool net_init, scheduled_callback func);
+
+/**********************************************
+ * @fn  int nrc_ps_schedule_gpio_add(bool net_init, scheduled_callback func)
+ *
+ * @brief Add gpio exception callback to handle gpio interrupted wake up.
+ *        This information will be added into retention memory and
+ *        processed if gpio interrupt occurs.
+ *        If net_init is set to true, then wifi and network will be initialized.
+ *
+ * @param net_init: whether callback will require wifi connection
+ * @param func: scheduled_callback funtion pointer defined as void func()
+ *
+ * @return 0 for success and -1 for failure.
+ ***********************************************/
+int nrc_ps_schedule_gpio_add(bool net_init, scheduled_callback func);
+
+/**********************************************
+ * @fn  int nrc_ps_schedule_start()
+ *
+ * @brief Starts scheduled deep sleep configured with nrc_ps_schedule_add.
+ *
+ * @param None
+ *
+ * @return 0 for success and -1 for failure.
+ ***********************************************/
+int nrc_ps_schedule_start();
+
+/**********************************************
+ * @fn  int nrc_ps_schedule_resume(uint64_t timeout)
+ *
+ * @brief Resumes scheduler after wakeup with timeout value given.
+ *        timeout value can be found using "nrc_ps_get_next_sleep_time()"
+ *
+ * @param timeout : timeout for next wakeup
+ *
+ * @return 0 for success and -1 for failure.
+ ***********************************************/
+int nrc_ps_schedule_resume(uint64_t timeout);
+
+/**********************************************
+ * @fn  uint64_t nrc_ps_get_next_sleep_time()
+ *
+ * @brief Used to calculate next timeout based on schedule information
+ *        saved in retention memory (schedule_info)
+ *
+ * @param None
+ *
+ * @return next sleep duration
+ ***********************************************/
+uint64_t nrc_ps_get_next_sleep_time();
+
+/**********************************************
+ * @fn  bool nrc_ps_callback_run(uint32_t index)
+ *
+ * @brief Iterate schedule_info in retention memory to find
+ *        whether the given scheduled entry should be run at
+ *        current RTC time.
+ *
+ * @param index: schedule index in schedule_info
+ *
+ * @return true if the given schedule should run
+ *         false otherwise.
+ ***********************************************/
+bool nrc_ps_callback_run(uint32_t index);
+#endif /* INCLUDE_PS_SCHEDULE */
+
+#endif /* !defined(UCODE) */
+void ps_gpio_config_wakeup_pin();
+void ps_gpio_set_deepsleep(uint32_t pullup_mask, uint32_t gpio_out_mask, uint32_t gpio_dir_mask);
+void ps_set_gpio_direction(uint32_t mask);
+uint32_t ps_get_gpio_direction(void);
+void ps_set_gpio_out(uint32_t mask);
+uint32_t ps_get_gpio_out(void);
+void ps_set_gpio_pullup(uint32_t mask);
+uint32_t ps_get_gpio_pullup(void);
+int nrc_ps_event_user_get(enum ps_event event);
+int nrc_ps_event_user_clear(enum ps_event event);
 
 #endif /*__NRC_PS_API_H__*/

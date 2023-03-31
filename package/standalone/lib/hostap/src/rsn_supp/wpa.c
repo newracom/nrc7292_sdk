@@ -727,11 +727,13 @@ static void wpa_sm_start_preauth(void *eloop_ctx, void *timeout_ctx)
 static void wpa_supplicant_key_neg_complete(struct wpa_sm *sm,
 					    const u8 *addr, int secure)
 {
+#if 0
 	wpa_msg(sm->ctx->msg_ctx, MSG_INFO,
-		"WPA: Key negotiation completed with "
+		"WPA: Key nego done with "
 		MACSTR " [PTK=%s GTK=%s]", MAC2STR(addr),
 		wpa_cipher_txt(sm->pairwise_cipher),
 		wpa_cipher_txt(sm->group_cipher));
+#endif
 	wpa_sm_cancel_auth_timeout(sm);
 	wpa_sm_set_state(sm, WPA_COMPLETED);
 
@@ -1070,10 +1072,11 @@ static int wpa_supplicant_install_igtk(struct wpa_sm *sm,
 			keyidx);
 		return  0;
 	}
-
+#if !defined(INCLUDE_SCAN_DEBUG)
 	wpa_dbg(sm->ctx->msg_ctx, MSG_DEBUG,
-		"WPA: IGTK keyid %d pn " COMPACT_MACSTR,
+		"WPA: IGTK keyid %d pn " MACSTR,
 		keyidx, MAC2STR(igtk->pn));
+#endif
 	wpa_hexdump_key(MSG_DEBUG, "WPA: IGTK", igtk->igtk, len);
 	if (keyidx > 4095) {
 		wpa_msg(sm->ctx->msg_ctx, MSG_WARNING,
@@ -2085,6 +2088,7 @@ static void wpa_eapol_key_dump(struct wpa_sm *sm,
 	u16 key_info = WPA_GET_BE16(key->key_info);
 
 	wpa_dbg(sm->ctx->msg_ctx, MSG_DEBUG, "  EAPOL-Key type=%d", key->type);
+#if !defined(INCLUDE_SCAN_DEBUG)
 	wpa_dbg(sm->ctx->msg_ctx, MSG_DEBUG,
 		"  key_info 0x%x (ver=%d keyidx=%d rsvd=%d %s%s%s%s%s%s%s%s)",
 		key_info, key_info & WPA_KEY_INFO_TYPE_MASK,
@@ -2099,6 +2103,7 @@ static void wpa_eapol_key_dump(struct wpa_sm *sm,
 		key_info & WPA_KEY_INFO_ERROR ? " Error" : "",
 		key_info & WPA_KEY_INFO_REQUEST ? " Request" : "",
 		key_info & WPA_KEY_INFO_ENCR_KEY_DATA ? " Encr" : "");
+#endif
 	wpa_dbg(sm->ctx->msg_ctx, MSG_DEBUG,
 		"  key_length=%u key_data_length=%u",
 		WPA_GET_BE16(key->key_length), key_data_len);
@@ -3512,6 +3517,10 @@ void wpa_sm_set_ptk_kck_kek(struct wpa_sm *sm,
 	sm->ptk_set = 1;
 }
 
+void wpa_sm_set_msg_3_of_4_ok(struct wpa_sm *sm, bool ok)
+{
+	sm->msg_3_of_4_ok = ok;
+}
 
 #ifdef CONFIG_TESTING_OPTIONS
 

@@ -1,0 +1,33 @@
+Tool Usage (Firmware Flash Tool)
+====================================
+
+Overview
+--------
+*Firmware Flash Tool* is a utility for running flash-related operations (reading/writing MAC addresses and uploading XIP standalone bootloader/ XIP standalone firmware) on NRC7292/NRC739X modules.
+    .. image:: images/firmware_flash_tool.png
+
+Tool Version
+------------
+* v6.1
+
+Binary Files
+------------
+
+.. warning::
+   Make sure that the correct 2nd bootloader, XIP bootloader and XIP firmware binaries corresponding to the module types (e.g. NRC7292, NRC7393, NRC7394) are selected!
+
+**2nd Bootloader (written on RAM)**:
+    is the 2nd bootloader binary file to be temporarily written on RAM to replace the mask ROM bootloader to augment the bootloader functionalities.
+
+**XIP Bootloader (written on flash)**:
+    is the XIP bootloader binary file to be stored on the flash memory. The XIP bootloader only needs to be flahsed once.
+
+**XIP Firmware (written on flash)**:
+    is the XIP firmware binary file to be stored on the flash memory.
+
+Basic Functionality
+-------------------
+1. Set the DIP switch (for NRC7292) or jumper configuration (for NRC739X) to **Firmware Download / RAM Operation** mode as described on the instructions panel.
+2. Select the desired procedures by using the corresponding check boxes: MAC adresss write, XIP bootloader write, and XIP firmware write.
+3. Reset the board, and press the **START** button to run the selected procedures.
+

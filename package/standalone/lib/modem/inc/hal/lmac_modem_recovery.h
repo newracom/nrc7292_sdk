@@ -10,6 +10,7 @@ void lmac_run_test_timer_modem_recovery(uint32_t interval, int32_t count);
 void lmac_run_modem_recovery();
 void lmac_show_stats_modem_recovery();
 void lmac_show_keyinfo_modem_recovery();
+void hal_lmac_rf_recovery();
 uint32_t  lmac_get_modem_recovery_count();
 
 void hal_lmac_run_presteps_modem_sleep();

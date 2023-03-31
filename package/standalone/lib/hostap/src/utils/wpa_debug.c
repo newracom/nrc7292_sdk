@@ -28,7 +28,7 @@ static FILE *wpa_debug_tracing_file = NULL;
 #define WPAS_TRACE_PFX "wpas <%d>: "
 #endif /* CONFIG_DEBUG_LINUX_TRACING */
 
-#ifdef INCLUDE_WPA_DEBUG
+#if 0
 int wpa_debug_level = MSG_DEBUG;
 #else
 int wpa_debug_level = MSG_INFO;
@@ -36,6 +36,7 @@ int wpa_debug_level = MSG_INFO;
 int wpa_debug_show_keys = 0;
 int wpa_debug_timestamp = 0;
 
+//#define CONFIG_WPA_HEX_DUMP 1
 
 #ifdef CONFIG_ANDROID_LOG
 
@@ -267,6 +268,7 @@ void wpa_printf(int level, const char *fmt, ...)
 static void _wpa_hexdump(int level, const char *title, const u8 *buf,
 			 size_t len, int show)
 {
+#ifdef CONFIG_WPA_HEX_DUMP
 	size_t i;
 
 #ifdef CONFIG_DEBUG_LINUX_TRACING
@@ -404,6 +406,7 @@ static void _wpa_hexdump(int level, const char *title, const u8 *buf,
 	}
 #endif /* CONFIG_DEBUG_FILE */
 #endif /* CONFIG_ANDROID_LOG */
+#endif /* CONFIG_WPA_HEX_DUMP */
 }
 
 void wpa_hexdump(int level, const char *title, const void *buf, size_t len)
@@ -421,6 +424,7 @@ void wpa_hexdump_key(int level, const char *title, const void *buf, size_t len)
 static void _wpa_hexdump_ascii(int level, const char *title, const void *buf,
 			       size_t len, int show)
 {
+#ifdef CONFIG_WPA_HEX_DUMP
 	size_t i, llen;
 	const u8 *pos = buf;
 	const size_t line_len = 16;
@@ -563,6 +567,7 @@ static void _wpa_hexdump_ascii(int level, const char *title, const void *buf,
 	}
 #endif /* CONFIG_DEBUG_FILE */
 #endif /* CONFIG_ANDROID_LOG */
+#endif /*CONFIG_WPA_HEX_DUMP */
 }
 
 
@@ -697,6 +702,9 @@ void wpa_msg_register_ifname_cb(wpa_msg_get_ifname_func func)
 
 void wpa_msg(void *ctx, int level, const char *fmt, ...)
 {
+#if defined(INCLUDE_MEASURE_AIRTIME)
+	return;
+#endif /* defined(INCLUDE_MEASURE_AIRTIME) */
 #if defined(_FREERTOS) && defined(CONFIG_WPA_MSG)
 
 	va_list ap;

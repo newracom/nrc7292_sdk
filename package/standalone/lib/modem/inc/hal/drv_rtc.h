@@ -147,6 +147,7 @@ void drv_rtc_set_int_en(bool enable);
 void drv_rtc_set_cnt(uint64_t value);
 void drv_rtc_get_cnt(uint64_t *value);
 uint64_t drv_rtc_get_ms(void);
+uint64_t drv_rtc_get_us(void);
 void drv_rtc_set_ofst_comp(uint32_t value);
 void drv_rtc_set_freq_ofst_est_done_clr();
 bool drv_rtc_get_freq_ofst_est_done();

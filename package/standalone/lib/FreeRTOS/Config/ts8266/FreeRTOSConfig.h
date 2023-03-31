@@ -238,6 +238,7 @@ to exclude the API function. */
 #define INCLUDE_xTaskAbortDelay			1
 #define INCLUDE_xTaskGetCurrentTaskHandle		1
 #define INCLUDE_xSemaphoreGetMutexHolder	1
+#define INCLUDE_uxTaskGetStackHighWaterMark 1
 
 /* IPC Semaphore */
 #define configUSE_COUNTING_SEMAPHORES			1
@@ -277,6 +278,8 @@ header file. */
 
 #define configSUPPORT_STATIC_ALLOCATION		1
 #define configSUPPORT_DYNAMIC_ALLOCATION 	1
+
+#define configUSE_STATS_FORMATTING_FUNCTIONS 1
 
 /* Arch Optimization Option */
 //#define configUSE_PORT_OPTIMISED_TASK_SELECTION		1

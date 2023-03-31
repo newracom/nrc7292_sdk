@@ -18,7 +18,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 
-#include "rom/ets_sys.h"
+// #include "rom/ets_sys.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -124,7 +124,7 @@ void esp_early_log_write(esp_log_level_t level, const char* tag, const char* for
 
 /** @cond */
 
-#include "esp_log_internal.h"
+// #include "esp_log_internal.h"
 
 #ifndef LOG_LOCAL_LEVEL
 #ifndef BOOTLOADER_BUILD

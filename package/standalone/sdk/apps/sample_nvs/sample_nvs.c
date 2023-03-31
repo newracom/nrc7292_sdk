@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2020 Newracom, Inc.
+ * Copyright (c) 2022 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -98,11 +98,9 @@ nrc_err_t run_nvs_flash_test()
  *******************************************************************************/
 void user_init(void)
 {
-	nrc_err_t ret = 0;
 	nrc_usr_print("[%s] Starting run_nvs_flash_test...\n",__func__);
 
-	ret = run_nvs_flash_test();
-	nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
+	run_nvs_flash_test();
 
 	/* Will not call nvs_close, so that command line can be used. */
 	/* nvs_close(nvs_handle); */

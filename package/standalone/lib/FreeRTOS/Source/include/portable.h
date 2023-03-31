@@ -128,14 +128,15 @@ void vPortDefineHeapRegions( const HeapRegion_t * const pxHeapRegions ) PRIVILEG
  * Map to the memory management routines required for the port.
  */
 void *pvPortMalloc( size_t xSize ) PRIVILEGED_FUNCTION;
-void *pvPortMalloc2( size_t xSize, uint32_t extra ) PRIVILEGED_FUNCTION;
-void *pvPortCalloc( size_t nmemb, size_t size ) PRIVILEGED_FUNCTION;
-void *pvPortMallocFromISR( size_t xSize ) PRIVILEGED_FUNCTION;
 void vPortFree( void *pv ) PRIVILEGED_FUNCTION;
 void vPortInitialiseBlocks( void ) PRIVILEGED_FUNCTION;
 size_t xPortGetFreeHeapSize( void ) PRIVILEGED_FUNCTION;
 size_t xPortGetMinimumEverFreeHeapSize( void ) PRIVILEGED_FUNCTION;
+#ifdef NRC_FREERTOS
+void *pvPortCalloc( size_t nmemb, size_t size ) PRIVILEGED_FUNCTION;
+void *pvPortRealloc( void *pv, size_t xWantedSize )PRIVILEGED_FUNCTION;
 void vPortGetBlockInfo(void (*cb)(void *addr, size_t size, uint32_t extra)) PRIVILEGED_FUNCTION;
+#endif /* NRC_FREERTOS */
 
 /*
  * Setup the hardware ready for the scheduler to take control.  This generally

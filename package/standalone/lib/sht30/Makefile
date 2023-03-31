@@ -11,6 +11,6 @@ INCLUDE	+= -I$(SHT30_BASE)
 
 VPATH	+= $(SHT30_BASE)
 
-DEFINE += -DSUPPORT_SHT30
+DEFINE += -DSHT30_LOOKUP_TABLE
 
 include $(TOPDIR)/make/build-lib.mk

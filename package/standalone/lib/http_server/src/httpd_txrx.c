@@ -503,7 +503,7 @@ static int httpd_sock_err(const char *ctx, int sockfd)
         E(TAG, LOG_FMT("error calling getsockopt : %d"), errno);
         return HTTPD_SOCK_ERR_FAIL;
     }
-    E(TAG, LOG_FMT("error in %s : %d"), ctx, sock_err);
+    E(TAG, LOG_FMT("error in %s : %d\n"), ctx, sock_err);
 
     switch(sock_err) {
     case EAGAIN:

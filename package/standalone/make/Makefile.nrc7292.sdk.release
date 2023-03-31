@@ -1,4 +1,4 @@
-ALIAS = lib
+LINKOPT = lib
 
 #//--------------------------------------------------
 #// TARGET
@@ -36,7 +36,9 @@ CONFIG_PMF_SWENC=n
 CONFIG_BITMAP_ENCODING=y
 
 # SW-Based NDP ACK Generation (Reversing Scrambler Value)
+ifeq ($(CONFIG_BITMAP_ENCODING),y)
 CONFIG_REVERSE_SCRAMBLER=y
+endif
 
 # Board data
 CONFIG_BD=y
@@ -45,7 +47,7 @@ CONFIG_BD=y
 CONFIG_PS_NONPOLL=y
 
 # SET WIM command via task(Work Queue)
-CONFIG_SET_WIM_BY_WQ=y
+CONFIG_SET_WIM_BY_WQ=n
 
 # TX Frame via task(Work Queue)
 CONFIG_DL_TRANSMIT_BY_WQ=n
@@ -58,24 +60,34 @@ CONFIG_AVOID_FRAG_ATTACK=n
 
 # Fragmentation on target to support low MCS
 # Disable until SAM FW support assemble of fragmented frame
-CONFIG_FRAGMENT_FRAME=n
+CONFIG_DYNAMIC_FRAG=y
+
+# Support defragmentation at lmac for both HM & SAM mode
+CONFIG_DEFRAG=y
 
 # WATCHDOG TIMER
 ifeq ($(CONFIG_NEW_TASK_ARCH),y)
-CONFIG_WDT=n
+CONFIG_WDT=y
 endif
 
-# CLI
+# CLI Support (y: Support n: Not Support)
 CONFIG_CLI=y
+ifeq ($(CONFIG_CLI),y)
+# Support Minimum CLI (y: Support minimum-set of CLIs used by cli_app n: Support all)
+CONFIG_CLI_MINIMUM=y
+endif
 
 # DEBUG (DEBUG, TRACKER, Statistics, etc.)
-CONFIG_DEBUG=y
+CONFIG_DEBUG=n
 
 # PRINT Console LOG
-CONFIG_LOG=y
+CONFIG_LOG=n
 
 # USE CENTER LO for 1M BW
 CONFIG_1MBW_CENTER_LO=y
+
+# Use KR Wireless MIC detection for KR-MIC Band
+CONFIG_KR_MIC_SCAN=y
 
 # (only for CM3) USE PRIMASK-based INT Lock (y:PRIMASK, n:BASEPRI)
 CONFIG_PRIMASK_INT_LOCK=n
@@ -84,7 +96,7 @@ CONFIG_PRIMASK_INT_LOCK=n
 CONFIG_ONLY_STA=n
 
 ifeq ($(CONFIG_ONLY_STA),n)
-# only for AP 
+# only for AP
 # Gather STA's SIGNAL INFO (RSSI,SNR,MCS) on AP
 CONFIG_STA_SIG_INFO=y
 # Probe Response Offloading
@@ -101,42 +113,91 @@ else
 CONFIG_RUNRAM=y
 endif
 
+# Measurement Airtime
+CONFIG_MEASURE_AIRTIME=n
+
+# PowerSave Debug Mode w/always on memory
+CONFIG_PS_DEBUG_ALWAYSONMEM=n
+
+# For use of Authentication control
+CONFIG_AUTH_CONTROL=n
+
+# For use of broadcast fota in STA side
+CONFIG_BCAST_FOTA_STA=n
+
+# Ucode
 CONFIG_UCODE=y
+# Power-Save HOOK for deep sleep //only for Standalone
 CONFIG_WPS_PS_HOOK=y
 
 # GDMA COPY for Data & BSS
 CONFIG_DMA_COPY=y
 
-ifneq ($(findstring usn, $(ALIAS)), )
-# USE KR USN BAND
-CONFIG_KR_USN_CHANNEL=y
-# USE KR MIC BAND should be disabled (mutually exclusive betwen KR MIC and USN band)
-CONFIG_KR_MIC_CHANNEL=n
-endif
+# RF ON/OFF for airplane mode or idle period on STA
+CONFIG_RF_KILL=n
 
-# Use KR Wireless MIC Band
-ifneq ($(findstring mic, $(ALIAS)), )
-# Use KR Wireless MIC Band
-CONFIG_KR_MIC_CHANNEL=y
-# Use 2MBW TX under 4MBW operation
-CONFIG_4M_OP_2M_TX=n
-# USE KR USN BAND should be disabled (mutually exclusive betwen KR MIC and USN band)
-CONFIG_KR_USN_CHANNEL=n
-endif
+# RSN EXT Support
+CONFIG_RSN_EXTENTION=y
 
 # Support Channel Switch Annoucement on STA
 CONFIG_STA_CSA_SUPPORT=y
 
+# Support Scanning mode
+CONFIG_SCAN_MODE=y
+
 # RELEASE FW
 CONFIG_CLI=n
+CONFIG_CLI_MINIMUM=n
 CONFIG_DEBUG=n
 CONFIG_LOG=n
+
+# Duty Cycle
+CONFIG_DUTYCYCLE=y
+
+# AMPDU reordering(draft version : need to tune more)
+CONFIG_AMPDU_REORDER=n
+
+# Use new printf 
+CONFIG_NEW_V_SNPRINTF_SUPPORT=n
+
+# Remote command (via vendor specific IE) feature
+CONFIG_REMOTECMD=n
 
 # RTC Always On
 CONFIG_RTC_ALWAYS_ON=y
 
-# Duty Cycle
-CONFIG_DUTYCYCLE=y
+# Scan Debugging (temporary configuration)
+CONFIG_SCAN_DEBUG=n
+
+# SoftAP OWE support
+CONFIG_SOFTAP_OWE=y
+
+# SDK wifi console command
+CONFIG_CLI_API_WIFI=n
+
+# Schedule Callbacks after deep sleep (nonTIM without connection)
+CONFIG_PS_SCHEDULE=y
+
+# Legacy ACK feature
+CONFIG_LEGACY_ACK=y
+
+# Support for beacon bypass feature
+CONFIG_BEACON_BYPASS=n
+
+# Set # of max MPDU in AMPDU by manual (not reset after reconnect)
+CONFIG_MANUAL_AGG_NUM=y
+
+# TSF Sync by Vendor IE
+CONFIG_TSF_SYNC_VENDOR_IE=y
+
+# TSF Sync by probe req
+CONFIG_TSF_SYNC_PROBE_REQ=y
+
+# Support Modem Sleep (on/off BB during PS)
+CONFIG_MODEM_SLEEP=n
+
+# Serial Flash Deep power down mode
+CONFIG_SFLASH_DP=n
 
 #// --------------------------------------------------
 #// 3rd party library
@@ -152,13 +213,26 @@ CONFIG_SOFT_AP	=	n
 else
 CONFIG_SOFT_AP	=	y
 endif
-CONFIG_HTTP_SERVER =	y
+
+ifneq ($(findstring ipv6, $(ALIAS)), )
+# Support IPV6
+CONFIG_IPV6=y
+endif
+
+ifeq ($(CONFIG_BCAST_FOTA_AP),y)
+CONFIG_MQTT		= y
+endif # CONFIG_BCAST_FOTA_AP
+
+ifeq ($(CONFIG_BCAST_FOTA_STA),y)
+CONFIG_MQTT		= y
+endif # CONFIG_BCAST_FOTA_STA
+
 
 #// --------------------------------------------------
 #// APP Core
 #// --------------------------------------------------
 SDK_DIR 	=  sdk
-SDK_INC	= $(SDK_DIR)/inc
+SDK_INC	= $(SDK_DIR)/include
 SDK_APPS	= $(SDK_DIR)/apps
 SDK_WIFI_COMMON = $(SDK_APPS)/wifi_common
 
@@ -188,12 +262,12 @@ endif
 TOP					=	.
 SYSTEM				=	nrc7292
 STANDARD			=	11ah
-ifneq ($(findstring cm3, $(ALIAS)), )
-CPU				=	ARM_CM3
-DEFINE				+=	-DCPU_CM3
-else
+ifneq ($(findstring cm0, $(ALIAS)), )
 CPU				=	ARM_CM0
 DEFINE				+=	-DCPU_CM0
+else
+CPU				=	ARM_CM3
+DEFINE				+=	-DCPU_CM3
 endif
 
 PREFIX				=	arm-none-eabi-
@@ -232,7 +306,6 @@ else
 DEFINE				+=	-DMAX_STA=1
 endif
 
-
 #//-------------------------------------------------
 #// Rate Control
 #//--------------------------------------------------
@@ -255,8 +328,8 @@ DEFINE				+=	-DINCLUDE_TRACE_ALWAYS
 DEFINE				+=	-DINCLUDE_TRACE_ASSERT
 else
 DEFINE				+=	-DINCLUDE_TRACE_ERROR
-DEFINE				+=	-DINCLUDE_TRACE_ALWAYS
 DEFINE				+=	-DINCLUDE_TRACE_ASSERT
+DEFINE				+=	-DINCLUDE_TRACE_ALWAYS
 endif
 #//-------------------------------------------------
 #// CLI
@@ -269,18 +342,17 @@ endif
 #// Debug (CLI,TRACKER,STATISTICS)
 #//--------------------------------------------------
 ifeq ($(CONFIG_DEBUG),y)
-DEFINE				+=	-DINCLUDE_WPA_DEBUG
 DEFINE				+=	-DINCLUDE_LMAC_DEBUG
 DEFINE				+=	-DINCLUDE_RF_DEBUG
 DEFINE				+=	-DINCLUDE_PHY_DEBUG
 DEFINE				+=	-DINCLUDE_BUF_TRACKER
 DEFINE				+=	-DINCLUDE_EVENT_TRACKER
-DEFINE				+=	-DUTIL_TRACE_STACK
 DEFINE				+=	-DDEBUG_MAC_STATS
 else
 DEFINE				+=	-DINCLUDE_LMAC_DEBUG
 DEFINE				+=	-DDEBUG_MAC_STATS
 endif
+DEFINE				+=	-DUTIL_TRACE_STACK
 
 #//-------------------------------------------------
 #// Configuration
@@ -298,7 +370,11 @@ else
 # 40.5KB Pool
 DEFINE				+=	-DLMAC_CONFIG_DL_DESCRIPTOR=32
 DEFINE 				+=	-DLMAC_CONFIG_POOL_0_RESERVED_NUM=4
+ifeq ($(CONFIG_DEFRAG),y)
+DEFINE 				+=	-DLMAC_CONFIG_POOL_0_NUM=55
+else
 DEFINE 				+=	-DLMAC_CONFIG_POOL_0_NUM=45
+endif
 DEFINE 				+=	-DLMAC_CONFIG_POOL_1_NUM=36
 endif
 
@@ -307,7 +383,9 @@ DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM1=8
 DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM2=8
 DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM3=9
 
-DEFINE                          +=	-DLMAC_MODEM_RECOVERY_TIME_MS=10000
+DEFINE				+=	-DLMAC_MODEM_RECOVERY_TIME_MS=10000
+DEFINE				+=	-DLMAC_WDT_RESET_TIME_MS=20000
+DEFINE				+=	-DLMAC_BMT_LOSS_CNT=30
 
 #// --------------------------------------------------
 #// Common Tool
@@ -339,6 +417,11 @@ HAL_INC_PATH		= $(LIB_MODEM_INC_PATH)/hal
 HOST_INC_PATH		= $(LIB_MODEM_INC_PATH)/host
 UTIL_INC_PATH		= $(LIB_MODEM_INC_PATH)/util
 UMAC_INC_PATH		= $(LIB_MODEM_INC_PATH)/umac
+
+#// BDF_PATH
+BDF_PATH	=	bdf
+INCLUDE += -I$(BDF_PATH)
+VPATH	+= $(BDF_PATH)
 
 #// --------------------------------------------------
 #// Include Path
@@ -377,6 +460,7 @@ LD_FILE			=	$(LIB_MODEM_PATH)/$(LD_FILE_NAME)
 #// --------------------------------------------------
 VPATH	+= $(LIB_MODEM_SRC_PATH)
 CSRCS   += standalone.c
+CSRCS	+= bdf_api.c
 
 #// --------------------------------------------------
 #// System/Target Dependent Define
@@ -384,11 +468,15 @@ CSRCS   += standalone.c
 # PRO_FPGA : 2STA platform and no RF
 DEFINE	+= -DCONFIG_OS_FREERTOS
 DEFINE	+= -DPRO_FPGA
-ifeq ($(CONFIG_RUNRAM), y)
-DEFINE	+= -DconfigTOTAL_HEAP_SIZE=160000
+ifeq ($(CONFIG_USE_SMALL_MEM),y)
+DEFINE	+= -DconfigTOTAL_HEAP_SIZE=60000
 else
-DEFINE	+= -DconfigTOTAL_HEAP_SIZE=404720
-endif
+ifeq ($(CONFIG_IPV6),y)
+DEFINE	+= -DconfigTOTAL_HEAP_SIZE=220000
+else
+DEFINE	+= -DconfigTOTAL_HEAP_SIZE=280000
+endif #ipv6
+endif #small ram
 
 #// --------------------------------------------------
 #// Build Information
@@ -402,17 +490,17 @@ TIMEFMT := --format="- %e Seconds"
 #// --------------------------------------------------
 #// Build Flag
 #// --------------------------------------------------
-ifneq ($(findstring cm3, $(ALIAS)), )
-ARCH_FLAGS      = -mcpu=cortex-m3 -mthumb
+ifneq ($(findstring cm0, $(ALIAS)), )
+ARCH_FLAGS      = -mcpu=cortex-m0 -mthumb
 else
-ARCH_FLAGS	= -mcpu=cortex-m0 -mthumb
+ARCH_FLAGS	= -mcpu=cortex-m3 -mthumb
 endif
 SYS_FLAGS	= --specs=nosys.specs
 
-CPPFLAGS = --std=gun++1y -Wno-literal-suffix -fpermissive -fno-rtti
-CPPFLAGS = $(INCLUDE) $(ARCH_FLAGS) $(DEFINE)
+CPPFLAGS = --std=gnu++1y -Wno-literal-suffix -fpermissive -fno-rtti
 
 CFLAGS 	+= -x none -Werror -Wall -Wno-unused-value -Wno-unused-variable -Wno-unused-but-set-variable -Wno-unused-function
+CFLAGS	+= -Wno-address-of-packed-member
 CFLAGS	+= -fno-common -fno-exceptions -gdwarf-2 -ffunction-sections -fdata-sections
 CFLAGS	+= -Os
 CFLAGS	+= $(INCLUDE) $(ARCH_FLAGS) $(DEFINE)
@@ -429,7 +517,6 @@ ASFLAGS	=
 NMFLAGS	= -S --demangle --size-sort -s -r
 
 #// --------------------------------------------------
-
 include make/Makefile.feature
 include make/Makefile.feature.lib
 include make/Makefile.common

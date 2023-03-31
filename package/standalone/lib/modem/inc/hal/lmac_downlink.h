@@ -51,13 +51,11 @@ typedef struct desc_ring {
 SYS_BUF* rx_read_dl_desc();
 void nrc7291_rxvect_rotate_war(struct lmac_rx_h_data *rx);
 
-#if defined(STANDARD_11AH)
 void hal_dl_recovery_post_process();
 void hal_dl_cleanup_dl_ring();
+void hal_dl_discard_all() ;
 bool is_ndp_preq(struct lmac_rx_h_data *rx);
 #if defined(INCLUDE_STA_SIG_INFO)
 void hal_dl_process_signal_info();
 #endif
-#endif
-
 #endif /* LMAC_DOWNLINK_H */

@@ -131,7 +131,7 @@ static void prvTaskExitError( void );
 
 /* Each task maintains its own interrupt status in the critical nesting
 variable. */
-UBaseType_t uxCriticalNesting = 0xaaaaaaaa;
+static UBaseType_t uxCriticalNesting = 0xaaaaaaaa;
 
 /*
  * The number of SysTick increments that make up one tick period.
@@ -359,81 +359,37 @@ void vPortEndScheduler( void )
 }
 /*-----------------------------------------------------------*/
 
-extern void system_printf(const char *f, ...);
-
 void vPortEnterCritical( void )
 {
-//#ifdef CPU_CM3
-//    asm volatile("cpsid i\n");
-//#else
 	portDISABLE_INTERRUPTS();
-//#endif
 	uxCriticalNesting++;
-    //system_printf("<%d" , uxCriticalNesting);
 
 	/* This is not the interrupt safe version of the enter critical function so
 	assert() if it is being called from an interrupt context.  Only API
 	functions that end in "FromISR" can be used in an interrupt.  Only assert if
 	the critical nesting count is 1 to protect against recursive calls if the
 	assert function also uses a critical section. */
-//#ifndef CPU_CM3
 	if( uxCriticalNesting == 1 )
 	{
 		configASSERT( ( portNVIC_INT_CTRL_REG & portVECTACTIVE_MASK ) == 0 );
 	}
-//#endif
 }
 /*-----------------------------------------------------------*/
 
-void system_printf(const char *f, ...);
-
 void vPortExitCritical( void )
 {
-    //system_printf(">%d\n" , uxCriticalNesting);
 	configASSERT( uxCriticalNesting );
 	uxCriticalNesting--;
 	if( uxCriticalNesting == 0 )
 	{
-//#ifdef CPU_CM3
+#ifdef NRC_FREERTOS
         asm volatile("cpsie i\n");
-//#else
+#endif /* NRC_FREERTOS */
 		portENABLE_INTERRUPTS();
-//#endif
 	}
 }
 /*-----------------------------------------------------------*/
 
-uint32_t ulSetInterruptMaskFromISR( void )
-{
-	__asm volatile(
-					" mrs r0, PRIMASK	\n"
-					" cpsid i			\n"
-					" bx lr				  "
-					::: "memory"
-				  );
-
-	/* To avoid compiler warnings.  The return statement will nevere be reached,
-	but some compilers warn if it is not included, while others won't compile if
-	it is. */
-	return 0;
-}
-/*-----------------------------------------------------------*/
-
-void vClearInterruptMaskFromISR( __attribute__( ( unused ) ) uint32_t ulMask )
-{
-	__asm volatile(
-					" msr PRIMASK, r0	\n"
-					" bx lr				  "
-					::: "memory"
-				  );
-
-#if !defined (__ARMCC_VERSION) && (__ARMCC_VERSION >= 6010050)
-	/* Just to avoid compiler warning.  ulMask is used from the asm code but
-	the compiler can't see that.  Some compilers generate warnings without the
-	following line, while others generate warnings if the line is included. */
-	( void ) ulMask;
-#endif
-}
 void xPortPendSVHandler( void )
 {
 	/* This is a naked function. */
@@ -478,8 +434,6 @@ void xPortSysTickHandler( void )
 	save and then restore the interrupt mask value as its value is already
 	known. */
 	portDISABLE_INTERRUPTS();
-	//UBaseType_t uxSavedInterruptStatus;
-	//uxSavedInterruptStatus = portSET_INTERRUPT_MASK_FROM_ISR();
 	{
 		/* Increment the RTOS tick. */
 		if( xTaskIncrementTick() != pdFALSE )
@@ -490,7 +444,6 @@ void xPortSysTickHandler( void )
 		}
 	}
 	portENABLE_INTERRUPTS();
-	//portCLEAR_INTERRUPT_MASK_FROM_ISR( uxSavedInterruptStatus );
 }
 /*-----------------------------------------------------------*/
 
@@ -746,23 +699,37 @@ __attribute__(( weak )) void vPortSetupTimerInterrupt( void )
 
 #endif /* configASSERT_DEFINED */
 
+#ifdef NRC_FREERTOS
 
+uint32_t ulSetInterruptMaskFromISR( void )
+{
+	__asm volatile(
+					" mrs r0, PRIMASK	\n"
+					" cpsid i			\n"
+					" bx lr				  "
+					::: "memory"
+				  );
 
+	/* To avoid compiler warnings.  The return statement will nevere be reached,
+	but some compilers warn if it is not included, while others won't compile if
+	it is. */
+	return 0;
+}
+/*-----------------------------------------------------------*/
 
+void vClearInterruptMaskFromISR( __attribute__( ( unused ) ) uint32_t ulMask )
+{
+	__asm volatile(
+					" msr PRIMASK, r0	\n"
+					" bx lr				  "
+					::: "memory"
+				  );
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#if !defined (__ARMCC_VERSION) && (__ARMCC_VERSION >= 6010050)
+	/* Just to avoid compiler warning.  ulMask is used from the asm code but
+	the compiler can't see that.  Some compilers generate warnings without the
+	following line, while others generate warnings if the line is included. */
+	( void ) ulMask;
+#endif
+}
+#endif /* NRC_FREERTOS */

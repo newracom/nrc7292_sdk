@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2020 Newracom, Inc.
+ * Copyright (c) 2022 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -124,7 +124,6 @@ nrc_err_t run_sample_xml(void)
 	return NRC_SUCCESS;
 }
 
-
 /******************************************************************************
  * FunctionName : user_init
  * Description  : Start Code for User Application, Initialize User function
@@ -133,11 +132,9 @@ nrc_err_t run_sample_xml(void)
  *******************************************************************************/
 void user_init(void)
 {
-	nrc_err_t ret;
 	WIFI_CONFIG* param;
 
 	nrc_uart_console_enable(true);
 
-	ret = run_sample_xml();
-	nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
+	run_sample_xml();
 }

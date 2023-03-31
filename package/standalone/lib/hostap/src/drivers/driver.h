@@ -4278,6 +4278,12 @@ struct wpa_driver_ops {
 	 */
 	int (*set_ndp_preq)(void *priv, int enabled);
 
+	int (*set_ssid)(void *priv, const char *ssid, size_t len);
+
+	int (*set_bssid)(void *priv, const char *bssid);
+
+	int (*set_frequency)(void *priv, u16 freqeuncy);
+
 	int (*set_bss_max_idle)(void *priv, int period, int retry);
 };
 

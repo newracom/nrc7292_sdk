@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2020 Newracom, Inc.
+ * Copyright (c) 2022 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,6 +28,19 @@
 #define TEST_COUNT 10
 #define TEST_INTERVAL 1000 /* msec */
 
+#if defined(NRC7393) || defined(NRC7394)
+#define PWM_GPIO0 GPIO_06
+#define PWM_GPIO1 GPIO_07
+#define PWM_GPIO2 GPIO_10
+#define PWM_GPIO3 GPIO_11
+#else
+/* For nrc7292 */
+#define PWM_GPIO0 GPIO_08
+#define PWM_GPIO1 GPIO_09
+#define PWM_GPIO2 GPIO_10
+#define PWM_GPIO3 GPIO_11
+#endif
+
 /******************************************************************************
  * FunctionName : run_sample_pwm
  * Description  : sample test for pwm
@@ -40,10 +53,10 @@ nrc_err_t run_sample_pwm(int count, int interval)
 
 	nrc_usr_print("[%s] Sample App for PWM API \n",__func__);
 
-	nrc_pwm_hw_init(PWM_CH0, GPIO_08, 0);
-	nrc_pwm_hw_init(PWM_CH1, GPIO_09, 0);
-	nrc_pwm_hw_init(PWM_CH2, GPIO_10, 0);
-	nrc_pwm_hw_init(PWM_CH3, GPIO_11, 0);
+	nrc_pwm_hw_init(PWM_CH0, PWM_GPIO0, 0);
+	nrc_pwm_hw_init(PWM_CH1, PWM_GPIO1, 0);
+	nrc_pwm_hw_init(PWM_CH2, PWM_GPIO2, 0);
+	nrc_pwm_hw_init(PWM_CH3, PWM_GPIO3, 0);
 
 	nrc_pwm_set_config(PWM_CH0, 0xF0000000, 0x0, 0x0, 0x0);
 	nrc_pwm_set_config(PWM_CH1, 0xFFFF0000, 0x0, 0x0, 0x0);
@@ -76,7 +89,7 @@ nrc_err_t run_sample_pwm(int count, int interval)
 
 	for(i=0;i<count; i++)
 	{
-		nrc_usr_print("[%s] Print GPIO_08\n",__func__);
+		nrc_usr_print("[%s] Print GPIO_%02d\n",__func__, PWM_GPIO0);
 		nrc_pwm_set_config(PWM_CH0, 0, 0, 0, 0);
 		nrc_pwm_set_config(PWM_CH1, 0, 0, 0, 0);
 		nrc_pwm_set_config(PWM_CH2, 0, 0, 0, 0);
@@ -87,7 +100,7 @@ nrc_err_t run_sample_pwm(int count, int interval)
 		b = c = d = 0;
 		while (a != 0xFFFFFFFF)
 		{
-			nrc_usr_print("[%s] Print GPIO_08\n",__func__);
+			nrc_usr_print("[%s] Print GPIO_%02d\n",__func__, PWM_GPIO0);
 			nrc_pwm_set_config(PWM_CH0, a, 0, 0, 0);
 			a = (a << 1) | 0x1;
 			_delay_ms(50);
@@ -95,7 +108,7 @@ nrc_err_t run_sample_pwm(int count, int interval)
 		b = 1;
 		while (b != 0xFFFFFFFF)
 		{
-			nrc_usr_print("[%s] Print GPIO_09\n",__func__);
+			nrc_usr_print("[%s] Print GPIO_%02d\n",__func__, PWM_GPIO1);
 			nrc_pwm_set_config(PWM_CH1, 0, b, 0, 0);
 			b = (b << 1) | 0x1;
 			_delay_ms(50);
@@ -103,7 +116,7 @@ nrc_err_t run_sample_pwm(int count, int interval)
 		c = 1;
 		while (c != 0xFFFFFFFF)
 		{
-			nrc_usr_print("[%s] Print GPIO_10\n",__func__);
+			nrc_usr_print("[%s] Print GPIO_%02d\n",__func__, PWM_GPIO2);
 			nrc_pwm_set_config(PWM_CH2, 0, 0, c, 0);
 			c = (c << 1) | 0x1;
 			_delay_ms(50);
@@ -111,7 +124,7 @@ nrc_err_t run_sample_pwm(int count, int interval)
 		d = 1;
 		while (d != 0xFFFFFFFF)
 		{
-			nrc_usr_print("[%s] Print GPIO_11\n",__func__);
+			nrc_usr_print("[%s] Print GPIO_%02d\n",__func__, PWM_GPIO3);
 			nrc_pwm_set_config(PWM_CH3, 0, 0, 0, d);
 			d = (d << 1) | 0x1;
 			_delay_ms(50);
@@ -131,28 +144,28 @@ nrc_err_t run_sample_pwm(int count, int interval)
 
 		while (a != 0x0)
 		{
-			nrc_usr_print("[%s] Print GPIO_08\n",__func__);
+			nrc_usr_print("[%s] Print GPIO_%02d\n",__func__, PWM_GPIO0);
 			nrc_pwm_set_config(PWM_CH0, a, 0, 0, 0);
 			a = a >> 1;
 			_delay_ms(50);
 		}
 		while (b != 0x0)
 		{
-			nrc_usr_print("[%s] Print GPIO_09\n",__func__);
+			nrc_usr_print("[%s] Print GPIO_%02d\n",__func__, PWM_GPIO1);
 			nrc_pwm_set_config(PWM_CH1, 0, b, 0, 0);
 			b = b >> 1;
 			_delay_ms(50);
 		}
 		while (c != 0x0)
 		{
-			nrc_usr_print("[%s] Print GPIO_10\n",__func__);
+			nrc_usr_print("[%s] Print GPIO_%02d\n",__func__, PWM_GPIO2);
 			nrc_pwm_set_config(PWM_CH2, 0, 0, c, 0);
 			c = c >> 1;
 			_delay_ms(50);
 		}
 		while (d != 0x0)
 		{
-			nrc_usr_print("[%s] Print GPIO_11\n",__func__);
+			nrc_usr_print("[%s] Print GPIO_%02d\n",__func__, PWM_GPIO3);
 			nrc_pwm_set_config(PWM_CH3, 0, 0, 0, d);
 			d = d >> 1;
 			_delay_ms(50);
@@ -164,7 +177,6 @@ nrc_err_t run_sample_pwm(int count, int interval)
 	return NRC_SUCCESS;
 }
 
-
 /******************************************************************************
  * FunctionName : user_init
  * Description  : Start Code for User Application, Initialize User function
@@ -173,11 +185,8 @@ nrc_err_t run_sample_pwm(int count, int interval)
  *******************************************************************************/
 void user_init(void)
 {
-	nrc_err_t ret;
-
 	//Enable Console for Debugging
 	nrc_uart_console_enable(true);
 
-	ret = run_sample_pwm(TEST_COUNT, TEST_INTERVAL);
-	nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
+	run_sample_pwm(TEST_COUNT, TEST_INTERVAL);
 }

@@ -17,25 +17,28 @@
 #ifndef _NRC_VENDOR_H_
 #define _NRC_VENDOR_H_
 
-#define OUI_NRC								0xFCFFAA
-#define NRC_SUBCMD_WOWLAN_PATTERN			0xB0
-#define NRC_OUI_SUBCMD_ANNOUNCE1			0xF0
-#define NRC_OUI_SUBCMD_ANNOUNCE2			0xF1
-#define NRC_OUI_SUBCMD_ANNOUNCE3			0xF2
-#define NRC_OUI_SUBCMD_ANNOUNCE4			0xF3
-#define NRC_OUI_SUBCMD_ANNOUNCE5			0xF4
-#define NRC_OUI_SUBCMD_RM_ANNOUNCE1			0xE0 // remove the vendor specific IE which was injected by 0xF0
-#define NRC_OUI_SUBCMD_RM_ANNOUNCE2			0xE1 // remove the vendor specific IE which was injected by 0xF1
-#define NRC_OUI_SUBCMD_RM_ANNOUNCE3			0xE2 // remove the vendor specific IE which was injected by 0xF2
-#define NRC_OUI_SUBCMD_RM_ANNOUNCE4			0xE3 // remove the vendor specific IE which was injected by 0xF3
-#define NRC_OUI_SUBCMD_RM_ANNOUNCE5			0xE4 // remove the vendor specific IE which was injected by 0xF4
+#define OUI_IEEE_REGISTRATION_AUTHORITY		0xFCFFAA
+
+/**
+ * iw vendor command can be worked and accepted which includes the same
+ * OUI with this 'VENDOR_OUI'
+ */
+#define VENDOR_OUI							(OUI_IEEE_REGISTRATION_AUTHORITY)
+
+/**
+ * A subcmd to remove the vendor specific IE which was injected before.
+ * ex>$sudo iw dev wlan0 vendor send 0xfcffaa 0xde 0x2
+ *   => this cmd will remove the injected vendor specific IE
+ *      of which the subcmd was 0x2.
+ */
+#define NRC_SUBCMD_RM_VENDOR_IE				0xDE
 
 /*
  * GPIO pin number on Raspberry Pi.
  * This is used to wake up the target in deep-sleep.
  * [direction]: OUTPUT
  */
-#define RPI_GPIO_FOR_PS						(20)
+#define RPI_GPIO_FOR_PS						(20) //NRC7292 EVB
 
 /*
  * GPIO pin number on the target device.
@@ -43,7 +46,7 @@
  * which will read signal from RPI_GPIO_FOR_RS for waking up target.
  * [direction]: INPUT
  */
-#define TARGET_GPIO_FOR_WAKEUP				(11)
+#define TARGET_GPIO_FOR_WAKEUP				(11) //NRC7292 EVB
 
 /*
  * GPIO pin number on the target device.
@@ -56,8 +59,13 @@
 #define RPI_GPIO_FOR_RST					(4)
 
 enum nrc_vendor_event {
-	NRC_VENDOR_EVENT_ANNOUNCE = 0,
-	NRC_VENDOR_EVENT_WOWLAN,
+	NRC_SUBCMD_ANNOUNCE1 = 0,
+	NRC_SUBCMD_ANNOUNCE2,
+	NRC_SUBCMD_ANNOUNCE3,
+	NRC_SUBCMD_ANNOUNCE4,
+	NRC_SUBCMD_ANNOUNCE5,
+	NRC_SUBCMD_REMOTECMD,
+	NRC_SUBCMD_WOWLAN_PATTERN,
 	NUM_VENDOR_EVENT,
 	MAX_VENDOR_EVENT = NUM_VENDOR_EVENT - 1
 };
@@ -66,6 +74,12 @@ enum nrc_vendor_attributes {
 	NRC_VENDOR_ATTR_DATA = 0,
 	NUM_VENDOR_ATTR,
 	MAX_VENDOR_ATTR = NUM_VENDOR_ATTR - 1
+};
+
+struct remotecmd_params {
+	struct wiphy *wiphy;
+	struct wireless_dev *wdev;
+	u8 subcmd;
 };
 
 #endif /* _NRC_VENDOR_H_ */

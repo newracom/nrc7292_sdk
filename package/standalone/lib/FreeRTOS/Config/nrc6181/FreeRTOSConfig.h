@@ -133,6 +133,7 @@ to exclude the API function. */
 #define	INCLUDE_xTaskGetHandle			1
 #define INCLUDE_xTaskAbortDelay			1
 #define INCLUDE_xSemaphoreGetMutexHolder	1
+#define INCLUDE_uxTaskGetStackHighWaterMark 1
 
 /* Normal assert() semantics without relying on the provision of an assert.h
 header file. */
@@ -148,6 +149,8 @@ standard names - or at least those used in the unmodified vector table. */
 #define configSUPPORT_STATIC_ALLOCATION		1
 #define configSUPPORT_DYNAMIC_ALLOCATION 	1
 #define configAPPLICATION_ALLOCATED_HEAP    0
+
+#define configUSE_STATS_FORMATTING_FUNCTIONS 1
 
 /* The priority for the task that unblocked by the MAC interrupt to process
 received packets. */

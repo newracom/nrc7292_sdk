@@ -140,7 +140,7 @@ struct ieee80211_beacon {
 	uint16_t	type           : 2;
 	uint16_t 	subtype        : 4;
 	uint16_t 	to_ds          : 1;
-	uint16_t 	from_ds        : 1;	
+	uint16_t 	from_ds        : 1;
 	uint16_t 	more_frag      : 1;
 	uint16_t 	retry          : 1;
 	uint16_t 	pwr_mgt        : 1;
@@ -164,6 +164,52 @@ struct ieee80211_beacon {
 	/* SSID IE Word 9 */
 	uint8_t 	element[0];
 };
+
+#if defined(TEST_SBR)
+#define SBR_TYPE_BEACON 0
+#define SBR_TYPE_WAKEUP 1
+#define SBR_TYPE_SHORT_WAKEUP 2
+#define SBR_TYPE_DATA_WAKEUP 3
+
+#define SBR_SUBTYPE_CONTROL_DUTY 0
+#define SBR_SUBTYPE_CONTROL_TBTT 1
+#define SBR_SUBTYPE_CONTROL_THRESHOLD 2
+#define SBR_SUBTYPE_GENERAL 7
+
+typedef struct _SBR_Beacon{
+	uint32_t	id 			: 18;
+	uint32_t	type		: 2;
+	uint32_t	cont		: 1;
+	uint32_t	tsf			: 11;
+} SBR_Beacon;
+
+typedef struct _SBR_Wakeup {
+	uint32_t	id 			: 18;
+	uint32_t	type		: 2;
+	uint32_t	cont		: 1;
+	uint32_t	body_present: 1;
+	uint32_t	length      : 7;
+	uint32_t	reserved    : 3;
+} SBR_Wakeup;
+
+typedef struct _SBR_Short_Wakeup {
+	uint32_t	id 			: 18;
+	uint32_t	type		: 2;
+	uint32_t	cont		: 1;
+	uint32_t	reserved    : 3;
+} SBR_Short_Wakeup;
+
+typedef struct _SBR_Data_Wakeup {
+	uint32_t	id 			: 18;
+	uint32_t	type		: 2;
+	uint32_t	cont		: 1;
+	uint32_t	body_present: 1;
+	uint32_t	length      : 7;
+	uint32_t	subtype     : 3;
+    uint8_t     body [127];
+} SBR_Data_Wakeup;
+#endif
+
 
 typedef struct _ActionFrame {
 	uint8_t category				: 8;
@@ -371,13 +417,18 @@ bool lmac_check_action_frame(GenericMacHeader* gmh);
 bool ieee80211_is_protected(GenericMacHeader* gmh);
 bool ieee80211_is_s1g_beacon(GenericMacHeader *gmh);
 bool ieee80211_is_frag(GenericMacHeader* gmh);
+bool ieee80211_is_last_frag(GenericMacHeader* gmh);
+bool ieee80211_has_morefrags(GenericMacHeader* gmh);
 bool ieee80211_is_amsdu(GenericMacHeader* gmh);
 bool ieee80211_is_eapol(GenericMacHeader *gmh, int len);
 bool ieee80211_has_htc(GenericMacHeader* gmh);
 uint8_t* ieee80211_get_bssid(GenericMacHeader *gmh);
 bool ieee80211_is_arp(GenericMacHeader* gmh);
 bool ieee80211_is_dhcp(GenericMacHeader* gmh);
-bool ieee80211_is_robust(GenericMacHeader* gmh);
+#if defined (INCLUDE_AVOID_FRAG_ATTACK_TEST)
+bool ieee80211_is_icmp(GenericMacHeader *gmh);
+#endif
+bool ieee80211_is_robust(GenericMacHeader* gmh,uint32_t mpdu_len);
 bool ieee80211_is_ip(GenericMacHeader* gmh);
 
 bool ieee80211_has_fromds(GenericMacHeader* gmh);
@@ -390,4 +441,8 @@ bool is_broadcast_addr(const uint8_t* addr);
 
 uint8_t get_mesh_control_length(GenericMacHeader* gmh);
 uint8_t ieee80211_mhd_length(GenericMacHeader* gmh);
+uint8_t ieee80211_get_tid(GenericMacHeader* gmh);
+void ieee80211_set_qos_ack_policy (GenericMacHeader* gmh, int ack);
+uint8_t ieee80211_get_qos_ack_policy (GenericMacHeader* gmh);
+bool ieee80211_has_a4(GenericMacHeader * gmh);
 #endif /* __PROTOCOL_H__ */

@@ -4,10 +4,10 @@
 #include "system.h"
 
 enum {
-    ADC_CH_0 = 0,
-    ADC_CH_1,
-    ADC_CH_2,
-    ADC_CH_3,
+	ADC_CH_0 = 0,
+	ADC_CH_1,
+	ADC_CH_2,
+	ADC_CH_3,
 };
 
 typedef union {

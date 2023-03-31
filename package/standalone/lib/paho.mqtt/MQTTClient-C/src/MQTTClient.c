@@ -31,27 +31,33 @@ static int getNextPacketId(MQTTClient *c) {
     return c->next_packetid = (c->next_packetid == MAX_PACKET_ID) ? 1 : c->next_packetid + 1;
 }
 
-
 static int sendPacket(MQTTClient* c, int length, Timer* timer)
 {
-    int rc = FAILURE, sent = 0;
+	int rc = FAILURE, sent = 0;
+#if defined(INCLUDE_MQTT_FAST_CONN)
+	while (sent < length)
+	{
+		rc = c->ipstack->mqttwrite(c->ipstack, &c->buf[sent], length, 0);
+#else
+	while (sent < length && !TimerIsExpired(timer))
+	{
+		rc = c->ipstack->mqttwrite(c->ipstack, &c->buf[sent], length, TimerLeftMS(timer));
+#endif /* defined(INCLUDE_MQTT_FAST_CONN) */
+		if (rc < 0){  // there was an error writing the data
+			system_printf("%s sendPacket loop error %d %d %d\n", __func__, rc, sent, length);
+			break;
+		}
+		sent += rc;
+	}
+	if (sent == length)
+	{
+		TimerCountdown(&c->last_sent, c->keepAliveInterval); // record the fact that we have successfully sent the packet
+		rc = SUCCESS;
+	}
+	else
+		rc = FAILURE;
 
-    while (sent < length && !TimerIsExpired(timer))
-    {
-        rc = c->ipstack->mqttwrite(c->ipstack, &c->buf[sent], length, TimerLeftMS(timer));
-        if (rc < 0)  // there was an error writing the data
-            break;
-        sent += rc;
-    }
-    if (sent == length)
-    {
-        TimerCountdown(&c->last_sent, c->keepAliveInterval); // record the fact that we have successfully sent the packet
-        rc = SUCCESS;
-    }
-    else
-        rc = FAILURE;
-
-    return rc;
+	return rc;
 }
 
 
@@ -277,8 +283,8 @@ int cycle(MQTTClient* c, Timer* timer)
             break;
         case PUBLISH:
         {
-            MQTTString topicName;
             MQTTMessage msg;
+            MQTTString topicName;
             int intQoS;
             msg.payloadlen = 0; /* this is a size_t, but deserialize publish sets this as int */
             if (MQTTDeserialize_publish(&msg.dup, &intQoS, &msg.retained, &msg.id, &topicName,
@@ -366,8 +372,15 @@ int MQTTIsConnected(MQTTClient* client)
     return client->isconnected;
 }
 
+#if defined(INCLUDE_MQTT_FAST_CONN)
+extern bool isMQTTRun_flag;
+#endif /* defined(INCLUDE_MQTT_FAST_CONN) */
+
 void MQTTRun(void* parm)
 {
+#if defined(INCLUDE_MQTT_FAST_CONN)
+	isMQTTRun_flag = true;
+#endif /* defined(INCLUDE_MQTT_FAST_CONN) */
 	Timer timer;
 	MQTTClient* c = (MQTTClient*)parm;
 
@@ -378,7 +391,10 @@ void MQTTRun(void* parm)
 #if defined(MQTT_TASK)
 		MutexLock(&c->mutex);
 #endif
+
+#if !defined(INCLUDE_MEASURE_AIRTIME)
 		TimerCountdownMS(&timer, 300); /* Don't wait too long if no traffic is incoming */
+#endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
 		cycle(c, &timer);
 #if defined(MQTT_TASK)
 		MutexUnlock(&c->mutex);
@@ -411,25 +427,25 @@ int waitfor(MQTTClient* c, int packet_type, Timer* timer)
     return rc;
 }
 
-
-
-
 int MQTTConnectWithResults(MQTTClient* c, MQTTPacket_connectData* options, MQTTConnackData* data)
 {
+    
+
     Timer connect_timer;
     int rc = FAILURE;
     MQTTPacket_connectData default_options = MQTTPacket_connectData_initializer;
     int len = 0;
-
 #if defined(MQTT_TASK)
     MutexLock(&c->mutex);
 #endif
 
 	if (c->isconnected) /* don't send connect packet again if we are already connected */
-        goto exit;
+        goto exit;    
 
-    TimerInit(&connect_timer);
+    TimerInit(&connect_timer);    
+#if !defined(INCLUDE_MQTT_FAST_CONN)
     TimerCountdownMS(&connect_timer, c->command_timeout_ms);
+#endif /* !defined(INCLUDE_MQTT_FAST_CONN) */        
 
     if (options == 0)
         options = &default_options; /* set default options if none were supplied */
@@ -437,33 +453,43 @@ int MQTTConnectWithResults(MQTTClient* c, MQTTPacket_connectData* options, MQTTC
     c->keepAliveInterval = options->keepAliveInterval;
     c->cleansession = options->cleansession;
     TimerCountdown(&c->last_received, c->keepAliveInterval);
-    if ((len = MQTTSerialize_connect(c->buf, c->buf_size, options)) <= 0)
+    if ((len = MQTTSerialize_connect(c->buf, c->buf_size, options)) <= 0) {
+        system_printf("[%s] MQTTSerialize_connect error %d\n", __func__, len);
         goto exit;
+    }
 
-    if ((rc = sendPacket(c, len, &connect_timer)) != SUCCESS)  // send the connect packet
+    if ((rc = sendPacket(c, len, &connect_timer)) != SUCCESS) {  // send the connect packet
+        system_printf("[%s] SendPacket error %d\n", __func__, rc);
         goto exit; // there was a problem
-    
+    }
+#if defined(INCLUDE_MQTT_FAST_CONN)
+    TimerCountdownMS(&connect_timer, c->command_timeout_ms);
+#endif /* defined(INCLUDE_MQTT_FAST_CONN) */
     // this will be a blocking call, wait for the connack
     if (waitfor(c, CONNACK, &connect_timer) == CONNACK)
     {
+#if !defined(INCLUDE_MEASURE_AIRTIME)        
         system_printf("[%s] CONNACK received\n", __func__);
+#endif /* !defined(INCLUDE_MEASURE_AIRTIME) */        
         data->rc = 0;
-        data->sessionPresent = 0;
+        data->sessionPresent = 0;                
         if (MQTTDeserialize_connack(&data->sessionPresent, &data->rc, c->readbuf, c->readbuf_size) == 1)
             rc = data->rc;
         else
             rc = FAILURE;
     }
     else
-        rc = FAILURE;
+        rc = FAILURE;    
 
 exit:
+
     if (rc == SUCCESS)
     {
         c->isconnected = 1;
         c->ping_outstanding = 0;
-    }
-
+    } else {
+		c->isconnected = 0;
+	}
 #if defined(MQTT_TASK)
     MutexUnlock(&c->mutex);
 #endif
@@ -524,7 +550,8 @@ int MQTTSetMessageHandler(MQTTClient* c, const char* topicFilter, messageHandler
 int MQTTSubscribeWithResults(MQTTClient* c, const char* topicFilter, int qos,
        messageHandler messageHandler, MQTTSubackData* data)
 {
-    int rc = FAILURE;
+    //int rc = FAILURE;
+    int rc = 1;
     Timer timer;
     int len = 0;
     MQTTString topic = MQTTString_initializer;
@@ -538,18 +565,31 @@ int MQTTSubscribeWithResults(MQTTClient* c, const char* topicFilter, int qos,
 	    goto exit;
 
     TimerInit(&timer);
+#if !defined(INCLUDE_MQTT_FAST_CONN)
     TimerCountdownMS(&timer, c->command_timeout_ms);
+#endif /* !defined(INCLUDE_MQTT_FAST_CONN) */
 
     len = MQTTSerialize_subscribe(c->buf, c->buf_size, 0, getNextPacketId(c), 1, &topic, &qos);
     if (len <= 0)
+	{
+		rc = 2;
         goto exit;
+	}
 
     if ((rc = sendPacket(c, len, &timer)) != SUCCESS) // send the subscribe packet
+	{
+		rc = 3;
         goto exit;             // there was a problem
+	}
 
+#if defined(INCLUDE_MQTT_FAST_CONN)
+    TimerCountdownMS(&timer, c->command_timeout_ms);
+#endif /* defined(INCLUDE_MQTT_FAST_CONN) */
     if (waitfor(c, SUBACK, &timer) == SUBACK)      // wait for suback
     {
+#if !defined(INCLUDE_MEASURE_AIRTIME)        
         system_printf("[%s] SUBACK received\n", __func__);
+#endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
         int count = 0;
         unsigned short mypacketid;
         data->grantedQoS = QOS0;
@@ -560,11 +600,12 @@ int MQTTSubscribeWithResults(MQTTClient* c, const char* topicFilter, int qos,
         }
     }
     else
-        rc = FAILURE;
+        rc = 4;
+        //rc = FAILURE;
 
 exit:
-    if (rc == FAILURE)
-        MQTTCloseSession(c);
+    //if (rc != SUCCESS)
+        //MQTTCloseSession(c);
 
 #if defined(MQTT_TASK)
 	MutexUnlock(&c->mutex);
@@ -645,7 +686,9 @@ int MQTTPublish(MQTTClient* c, const char* topicName, MQTTMessage* message)
 		goto exit;
 
     TimerInit(&timer);
+#if !defined(INCLUDE_MQTT_FAST_CONN)
     TimerCountdownMS(&timer, c->command_timeout_ms);
+#endif /* !defined(INCLUDE_MQTT_FAST_CONN) */
 
     if (message->qos == QOS1 || message->qos == QOS2)
         message->id = getNextPacketId(c);
@@ -654,14 +697,20 @@ int MQTTPublish(MQTTClient* c, const char* topicName, MQTTMessage* message)
               topic, (unsigned char*)message->payload, message->payloadlen);
     if (len <= 0)
         goto exit;
+
     if ((rc = sendPacket(c, len, &timer)) != SUCCESS) // send the subscribe packet
         goto exit; // there was a problem
 
+#if defined(INCLUDE_MQTT_FAST_CONN)
+    TimerCountdownMS(&timer, c->command_timeout_ms);
+#endif /* defined(INCLUDE_MQTT_FAST_CONN) */
     if (message->qos == QOS1)
     {
         if (waitfor(c, PUBACK, &timer) == PUBACK)
         {
+#if !defined(INCLUDE_MEASURE_AIRTIME)					            
             system_printf("[%s] PUBACK received\n", __func__);
+#endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
             unsigned short mypacketid;
             unsigned char dup, type;
             if (MQTTDeserialize_ack(&type, &dup, &mypacketid, c->readbuf, c->readbuf_size) != 1)
@@ -674,7 +723,9 @@ int MQTTPublish(MQTTClient* c, const char* topicName, MQTTMessage* message)
     {
         if (waitfor(c, PUBCOMP, &timer) == PUBCOMP)
         {
+#if !defined(INCLUDE_MEASURE_AIRTIME)		            
             system_printf("[%s] PUBCOMP received\n", __func__);
+#endif /* !defined(INCLUDE_MEASURE_AIRTIME) */            
             unsigned short mypacketid;
             unsigned char dup, type;
             if (MQTTDeserialize_ack(&type, &dup, &mypacketid, c->readbuf, c->readbuf_size) != 1)
@@ -685,8 +736,8 @@ int MQTTPublish(MQTTClient* c, const char* topicName, MQTTMessage* message)
     }
 
 exit:
-    if (rc == FAILURE)
-        MQTTCloseSession(c);
+    //if (rc == FAILURE)
+        //MQTTCloseSession(c);
 
 #if defined(MQTT_TASK)
 	MutexUnlock(&c->mutex);

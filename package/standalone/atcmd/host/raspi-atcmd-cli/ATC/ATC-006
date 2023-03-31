@@ -1,0 +1,10 @@
+
+ECHO " ATC-006 : Tx Time"
+ECHO "========================================="
+HOLD
+
+AT+WTXTIME?
+
+AT+WTXTIME=1200,100
+AT+WTXTIME?
+

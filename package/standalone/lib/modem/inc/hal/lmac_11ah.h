@@ -27,12 +27,17 @@
 #define BUFFER_ADDRESS(base, offset)    ((base) + ((offset) << 2))
 #define OFFSET_ADDRESS(base, addr)      ((((addr) - (base)) >> 2) & MAC_REG_RX_REG_DL_DESC0_DATA_ADDRESS_OFFSET_MASK)
 
+#if defined(NRC7292) || defined(TS8266) || defined(TR6260)
+#define MAC_REG_STA_FILTER_MODE_RX_GROUP_ADDRESSED       MAC_REG_STA_FILTER_MODE_RECEIVE_GROUP_ADDRESSED
+#define MAC_REG_STA_FILTER_MODE_RX_GROUP_ADDRESSED_MASK  MAC_REG_STA_FILTER_MODE_RECEIVE_GROUP_ADDRESSED_MASK
+#define MAC_REG_STA_FILTER_MODE_RX_GROUP_ADDRESSED_SHIFT MAC_REG_STA_FILTER_MODE_RECEIVE_GROUP_ADDRESSED_SHIFT
+#endif
 
 // 802.11ah specific enumeration
 enum {
 	MAX_SEQUENCE_NUMBER = 1 << 12,
 };
-enum ch_width {
+typedef enum ch_width {
 	BW_1M = 0,
 	BW_2M,
 	BW_4M,
@@ -40,7 +45,11 @@ enum ch_width {
 
 	BW_8M = 3,
 	BW_16M,
-};
+    BW_UNDEFINED,
+} bw_t;
+
+#define BW_TO_BW_ENUM(x) x == BANDWIDTH_1M ? BW_1M : x == BANDWIDTH_2M ? BW_2M : BW_4M
+#define BW_ENUM_TO_BW(x) x == BW_1M ? 1 : x == BW_2M ? 2 : 4
 
 enum {
 	PR_CH_WIDTH_2M = 0,
@@ -53,6 +62,12 @@ enum {
 	OP_CH_WIDTH_4M  = 3,
 	OP_CH_WIDTH_8M  = 7,
 	OP_CH_WIDTH_16M = 15,
+};
+
+enum {
+	FREQ_BAND_GLOBAL = 0,
+	FREQ_BAND_K1_USN = 1,
+	FREQ_BAND_K2_MIC = 2,
 };
 
 enum {
@@ -178,56 +193,55 @@ enum {
 };
 
 
+/* These values are just priority value of S/W perspective */
 #define MAX_TID		8
+#define MAX_VIF		2
+
 typedef enum {
 	ACI_BK = 0,
 	ACI_BE,
 	ACI_VI,
 	ACI_VO,
 	ACI_BEACON,
-	ACI_GP,
 	ACI_MAX
 } ACI;
 
+#if defined(NRC7292) || defined(NRC7391)
 typedef enum {
 	VIF0_BK = 0,
 	VIF0_BE,
 	VIF0_VI,
 	VIF0_VO,
 	VIF0_BEACON,
-#if defined(NRC7292) || defined(NRC7391)
 	VIF0_GP,
-#else
+	MAX_AC /* 6 */
+} VIFAC;
+
+
+#elif defined(NRC7393) || defined(NRC7394)
+typedef enum {
+	VIF0_BK = 0,
+	VIF0_BE,
+	VIF0_VI,
+	VIF0_VO,
+	VIF0_BEACON,
 	VIF_CONC,
-	VIF1_BK,
+	VIF1_BK, /* 6 */
 	VIF1_BE,
 	VIF1_VI,
 	VIF1_VO,
 	VIF1_BEACON,
-#endif /* defined(NRC7292) */
-	MAX_AC
+	MAX_AC /* 11 */
 } VIFAC;
 
-static const uint8_t AIFSN[MAX_AC] = { 7,  3,  2,  2,  1,  3};
-static const uint8_t CWMIN[MAX_AC] = { 4,  4,  3,  2,  0,  4};
-static const uint8_t CWMAX[MAX_AC] = {10, 10,  4,  3,  0,  10};
+#else
+#error "Please, implement this"
+#endif /* defined(NRC7292) || defined(NRC7391) */
 
-// [TODO] confirm the value of AC_GP and BEACON
-// the unit of this value is microsecond.
-// TXOP Limit complies with 802.11ah D10.0 Specifiacation
-
-/**
-
-* README: TXOP limit default value in standalone mode - jmjang - 2019-0524 - CB#NONE
-* Time period needed for transmitting frame is not enough in CM0(Standalone mode case).
-* So, Set the default value to zero about TXOP limit value
-
-* 2019-0621 CB#8410 jayden.yoo: applied txop_limit in accordance with draft 11-18-1177-02-000m
-**/
-static const uint16_t TXOPLIMIT[MAX_AC] = { 15008, 15008, 15008, 15008, 0, 0 };
-//static const uint16_t TXOPLIMIT[MAX_AC] = { 2528, 2528, 4096, 2080, 2528, 2528};
-//static const uint16_t TXOPLIMIT[MAX_AC] = { 32736, 0, 32736, 32736, 0, 0};
-//static const uint16_t TXOPLIMIT[MAX_AC] = { 0, 0, 3008, 1504, 2528, 2528};
+extern const uint8_t AIFSN[MAX_AC];
+extern const uint8_t CWMIN[MAX_AC];
+extern const uint8_t CWMAX[MAX_AC];
+extern const uint16_t TXOPLIMIT[MAX_AC];
 
 
 typedef struct _TXVECTOR{
@@ -240,7 +254,7 @@ typedef struct _TXVECTOR{
 	uint32_t scrambler_exist: 1;
 	uint32_t tx_pwr_level   : 8;
 	uint32_t service_rsvd	: 1;
-#if defined (NRC5291)
+#if defined(NRC7393) || defined(NRC4792) || defined(NRC7394)
 	uint32_t sbr_mode		: 1; // 0: 11ah Legacy PPDU , 1: SBR PPDU
 	uint32_t sbr_rate		: 1; // 0 :LDR , 1 : HDR
 	uint32_t sbr_byte_length : 7; // Number of data byte exepct SYNC bits
@@ -272,7 +286,7 @@ typedef struct _LMAC_TXHDR {
 	union {
 		struct {
 			// Word 4 : BD info 0 (Valid only at first Buffer)
-#if defined(NRC5291)
+#if defined(NRC7393) || defined(NRC4792) || defined(NRC7394)
 			uint32_t    legacy_tsf_sym_ptr           : 6; 		 //number of data symbol right before the symbol containing first bit of TSF subfield
 #else
 			uint32_t    reserved0                    : 6;
@@ -287,9 +301,9 @@ typedef struct _LMAC_TXHDR {
 			uint32_t    timestamp_position           : 6;        // in byte, timestamp position in frame , in bit (when used in SBR TSF Update)
 			uint32_t	bssid_idx                    : 2;
 			uint32_t	mac_idx                      : 2;
-#if defined(NRC5291)
+#if defined(NRC7393) || defined(NRC4792) || defined(NRC7394)
 			uint32_t	sbr_tsf_update				 : 1;
-			uint32_t 	reserved2					 : 2;
+			uint32_t	sbr_segment					 : 2;
 #else
 			uint32_t    reserved2                    : 3;
 #endif
@@ -301,7 +315,7 @@ typedef struct _LMAC_TXHDR {
 #else
 			uint32_t	key_location				 : 10;
 			uint32_t	key_search_en				 : 1;
-#if defined(NRC5291)
+#if defined(NRC7393) || defined(NRC4792) || defined(NRC7394)
 			uint32_t	sbr_tsf_bit_ptr				 : 5;
 #else
 			uint32_t	reserved3					 : 5;
@@ -313,7 +327,7 @@ typedef struct _LMAC_TXHDR {
 			uint32_t    bcn_compatible_update        : 1;
 			uint32_t    tetra_partial_tsf_update     : 1;
 			uint32_t    penta_partial_tsf_update     : 1;
-#if defined(NRC5291)
+#if defined(NRC7393) || defined(NRC4792)|| defined(NRC7394)
 			uint32_t	sbr_start					 : 1; //
 			uint32_t	sbr_embedded_bssid_en		 : 1; //
 			uint32_t	reserved4					 : 1;
@@ -343,7 +357,7 @@ typedef struct _LMAC_TXBD {
 	union {
 		struct {
 			// Word 0 : BD info 0 (Valid only at first Buffer)
-#if defined(NRC5291)
+#if defined(NRC7393) || defined(NRC4792)|| defined(NRC7394)
 			uint32_t    legacy_tsf_sym_ptr           : 6; 		 //number of data symbol right before the symbol containing first bit of TSF subfield
 #else
 			uint32_t    reserved0                    : 6;
@@ -358,9 +372,9 @@ typedef struct _LMAC_TXBD {
 			uint32_t    timestamp_position           : 6;        // in byte, timestamp position in frame , in bit (when used in SBR TSF Update)
 			uint32_t	bssid_idx                    : 2;
 			uint32_t	mac_idx                      : 2;
-#if defined(NRC5291)
+#if defined(NRC7393) || defined(NRC4792)|| defined(NRC7394)
 			uint32_t	sbr_tsf_update				 : 1;
-			uint32_t 	reserved2					 : 2;
+			uint32_t 	sbr_segment					 : 2;
 #else
 			uint32_t    reserved2                    : 3;
 #endif
@@ -372,7 +386,7 @@ typedef struct _LMAC_TXBD {
 #else
 			uint32_t	key_location				 : 10;
 			uint32_t	key_search_en				 : 1;
-#if defined(NRC5291)
+#if defined(NRC7393) || defined(NRC4792)|| defined(NRC7394)
 			uint32_t	sbr_tsf_bit_ptr				 : 5;
 #else
 			uint32_t	reserved3					 : 5;
@@ -384,7 +398,7 @@ typedef struct _LMAC_TXBD {
 			uint32_t    bcn_compatible_update        : 1;
 			uint32_t    tetra_partial_tsf_update     : 1;
 			uint32_t    penta_partial_tsf_update     : 1;
-#if defined(NRC5291)
+#if defined(NRC7393) || defined(NRC4792)|| defined(NRC7394)
 			uint32_t	sbr_start					 : 1; //
 			uint32_t	sbr_embedded_bssid_en		 : 1; //
 			uint32_t	reserved4					 : 1;
@@ -421,7 +435,7 @@ typedef struct _LMAC_TXBD {
 			uint32_t scrambler_exist: 1;
 			uint32_t tx_pwr_level   : 8;
 			uint32_t service_rsvd	: 1;
-#if defined (NRC5291)
+#if defined (NRC7393) || defined(NRC4792)|| defined(NRC7394)
 			uint32_t sbr_mode		: 1; // 0: 11ah Legacy PPDU , 1: SBR PPDU
 			uint32_t sbr_rate		: 1; // 0 :LDR , 1 : HDR
 			uint32_t sbr_byte_length : 7; // Number of data byte exepct SYNC bits
@@ -459,7 +473,7 @@ typedef struct _LMAC_TXBUF {
 	union {
 		struct {
 			// Word 4 : BD info 0 (Valid only at first Buffer)
-#if defined(NRC5291)
+#if defined(NRC7393) || defined(NRC4792)|| defined(NRC7394)
 			uint32_t    legacy_tsf_sym_ptr           : 6; 		 //number of data symbol right before the symbol containing first bit of TSF subfield
 #else
 			uint32_t    reserved0                    : 6;
@@ -474,9 +488,9 @@ typedef struct _LMAC_TXBUF {
 			uint32_t    timestamp_position           : 6;        // in byte, timestamp position in frame , in bit (when used in SBR TSF Update)
 			uint32_t	bssid_idx                    : 2;
 			uint32_t	mac_idx                      : 2;
-#if defined(NRC5291)
+#if defined(NRC7393) || defined(NRC4792)|| defined(NRC7394)
 			uint32_t	sbr_tsf_update				 : 1;
-			uint32_t 	reserved2					 : 2;
+			uint32_t 	sbr_segment					 : 2;
 #else
 			uint32_t    reserved2                    : 3;
 #endif
@@ -488,7 +502,7 @@ typedef struct _LMAC_TXBUF {
 #else
 			uint32_t	key_location				 : 10;
 			uint32_t	key_search_en				 : 1;
-#if defined(NRC5291)
+#if defined(NRC7393) || defined(NRC4792)|| defined(NRC7394)
 			uint32_t	sbr_tsf_bit_ptr				 : 5;
 #else
 			uint32_t	reserved3					 : 5;
@@ -500,7 +514,7 @@ typedef struct _LMAC_TXBUF {
 			uint32_t    bcn_compatible_update        : 1;
 			uint32_t    tetra_partial_tsf_update     : 1;
 			uint32_t    penta_partial_tsf_update     : 1;
-#if defined(NRC5291)
+#if defined(NRC7393) || defined(NRC4792)|| defined(NRC7394)
 			uint32_t	sbr_start					 : 1; //
 			uint32_t	sbr_embedded_bssid_en		 : 1; //
 			uint32_t	reserved4					 : 1;
@@ -535,7 +549,7 @@ typedef struct _LMAC_TXBUF {
 			uint32_t scrambler_exist: 1;
 			uint32_t tx_pwr_level   : 8;
 			uint32_t service_rsvd	: 1;
-#if defined (NRC5291)
+#if defined (NRC7393) || defined(NRC4792)|| defined(NRC7394)
 			uint32_t sbr_mode		: 1; // 0: 11ah Legacy PPDU , 1: SBR PPDU
 			uint32_t sbr_rate		: 1; // 0 :LDR , 1 : HDR
 			uint32_t sbr_byte_length : 7; // Number of data byte exepct SYNC bits

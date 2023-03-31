@@ -1,13 +1,8 @@
 #ifndef LMAC_TYPE_H
 #define LMAC_TYPE_H
 #include "system_type.h"
-#if	defined(STANDARD_11N)
-#include "lmac_11n.h"
-#endif /* defined(STANDARD_11N) */
-#if defined(STANDARD_11AH)
 #include "protocol_11ah.h"
 #include "lmac_11ah.h"
-#endif /* defined(STANDARD_11AH) */
 
 
 #define VIF_MAX     (2)
@@ -27,7 +22,18 @@ enum key_cmd {
 	KEY_ADD = 0,
 	KEY_DEL = 1,
 	KEY_DELALL = 2,
+#if defined(NRC7292)
 	KEY_UNKNOWN = 8,
+#elif (defined(NRC7393) || defined(NRC7394))
+	KEY_MOREDATA = 4,
+	KEY_TWT = 5,
+	KEY_BOTH = 6,
+	KEY_FLAG_WR = 7,
+	KEY_FLAG_RD = 8,
+	KEY_UNKNOWN = 15,
+#else
+	KEY_UNKNOWN = 15,
+#endif
 };
 
 enum {
@@ -37,9 +43,9 @@ enum {
 
 enum {
 	LOG_NONE 	= 0,
-	LOG_DATA 	= 1 << 0, // 1
-	LOG_MGMT 	= 1 << 1, // 2
-	LOG_BEACON	= 1 << 2, // 4
+	LOG_DATA	= BIT(0), // 1
+	LOG_MGMT	= BIT(1), // 2
+	LOG_BEACON	= BIT(2), // 4
 	LOG_ALL		= LOG_DATA | LOG_MGMT | LOG_BEACON, //7
 };
 
@@ -70,15 +76,19 @@ typedef	enum mac_stats_type {
 	STATS_TYPES_MAX
 } MAC_STATS_TYPE;
 
-typedef struct mac_stats_info {
+typedef struct mac_stats_flag {
 	uint8_t print_flag;
 	uint8_t last_mcs;
+} MAC_STATS_FLAG;
+
+typedef struct mac_stats_info {
 	uint32_t n_mpdu[STATS_TYPES_MAX][MAX_STATS_STATUS];
 	uint32_t b_mpdu[STATS_TYPES_MAX][MAX_STATS_STATUS];
 	uint32_t n_ac[MAX_AC][MAX_STATS_STATUS];
 	uint32_t b_ac[MAX_AC][MAX_STATS_STATUS];
 	uint32_t n_mcs[STATS_MCS_MAX][MAX_STATS_STATUS];
 	uint32_t b_mcs[STATS_MCS_MAX][MAX_STATS_STATUS];
+	uint32_t n_frag[STATS_MCS_MAX];
 } MAC_STATS_INFO;
 
 typedef enum  _LMacEvent {
@@ -131,6 +141,9 @@ enum {
 	MODE_STA = 0,
 	MODE_AP  = 1,
 	MODE_MESH = 2,
+#ifdef INCLUDE_IBSS
+	MODE_IBSS = 3,
+#endif
 	MODE_MAX,
 };
 
@@ -166,6 +179,12 @@ enum CipherType {
 	CIP_WAPI = 4,
 	CIP_MAX = 5,
 	CIP_NONE = CIP_MAX,
+};
+
+enum {
+	GI_LONG = 0,
+	GI_SHORT = 1,
+	GI_CAPA = 2,
 };
 
 #define TID_TO_AC(_tid) (      \

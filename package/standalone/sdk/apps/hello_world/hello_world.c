@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2020 Newracom, Inc.
+ * Copyright (c) 2022 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -46,7 +46,6 @@ nrc_err_t run_sample_hello_world(int count, int interval)
 	return NRC_SUCCESS;
 }
 
-
 /******************************************************************************
  * FunctionName : user_init
  * Description  : Start Code for User Application, Initialize User function
@@ -55,8 +54,5 @@ nrc_err_t run_sample_hello_world(int count, int interval)
  *******************************************************************************/
 void user_init(void)
 {
-	nrc_err_t ret;
-	ret = run_sample_hello_world(TEST_COUNT, TEST_INTERVAL);
-	nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
-
+	run_sample_hello_world(TEST_COUNT, TEST_INTERVAL);
 }

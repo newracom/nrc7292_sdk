@@ -58,8 +58,8 @@
 	#error FreeRTOS.h must be included before list.h
 #endif
 
-#ifndef INC_LIST_H
-#define INC_LIST_H
+#ifndef LIST_H
+#define LIST_H
 
 /*
  * The list structure members are modified from within interrupts, and therefore

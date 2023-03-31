@@ -3,9 +3,11 @@
 
 typedef enum {
 	WPA_PS_HOOK_TYPE_SCAN = 0,
+	WPA_PS_HOOK_TYPE_FAST_SCAN,
 	WPA_PS_HOOK_TYPE_INIT,
 	WPA_PS_HOOK_TYPE_PMK,
 	WPA_PS_HOOK_TYPE_SET_KEY,
+	WPA_PS_HOOK_TYPE_SET_REKEY_INFO,
 	WPA_PS_HOOK_TYPE_AUTH,
 	WPA_PS_HOOK_TYPE_ASSOC,	
 	WPA_PS_HOOK_TYPE_PORT,
@@ -25,9 +27,8 @@ typedef enum {
 	WPA_PS_HOOK_RET_FAIL_NO_HANDLER = -7,
 } DRV_PS_HOOK_RET_TYPE;
 
+#if defined (INCLUDE_WPS_PS_HOOK) && (defined (INCLUDE_UCODE) || defined(INCLUDE_UCODE7393))
 int wpa_driver_ps_hook_handle(DRV_PS_HOOK_TYPE type, void *param1, void *param2);
-
-#if defined (INCLUDE_WPS_PS_HOOK) && defined (INCLUDE_UCODE)
 #define WPA_DRIVER_PS_HOOK(type, param1, param2, ret)										\
 	do {																				\
 		if(wpa_driver_ps_hook_handle(type, param1, param2) == WPA_PS_HOOK_RET_SUCCESS)	 \
@@ -35,6 +36,7 @@ int wpa_driver_ps_hook_handle(DRV_PS_HOOK_TYPE type, void *param1, void *param2)
 	} while(0)
 int8_t wpa_driver_ps_get_recovered();
 #else
+inline int wpa_driver_ps_hook_handle(DRV_PS_HOOK_TYPE type, void *param1, void *param2){return -1;};
 #define WPA_DRIVER_PS_HOOK(type, param1, param2, ret)
 static inline int8_t wpa_driver_ps_get_recovered(){return -1;};
 #endif

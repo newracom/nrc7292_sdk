@@ -128,7 +128,11 @@
 #define configUSE_TIMERS				0
 #else
 #define configUSE_TIMERS				1
+#if defined (INCLUDE_NEW_TASK_ARCH) && defined (INCLUDE_STANDALONE)
+#define configTIMER_TASK_PRIORITY		( configMAX_PRIORITIES - 3 )
+#else
 #define configTIMER_TASK_PRIORITY		( 3 )
+#endif
 #define configTIMER_QUEUE_LENGTH		5
 #define configTIMER_TASK_STACK_DEPTH	( 1024 )
 #endif
@@ -146,6 +150,7 @@ to exclude the API function. */
 #define INCLUDE_xTaskAbortDelay			1
 #define INCLUDE_xTaskGetCurrentTaskHandle 1
 #define INCLUDE_xSemaphoreGetMutexHolder	1
+#define INCLUDE_uxTaskGetStackHighWaterMark 1
 
 /* Normal assert() semantics without relying on the provision of an assert.h
 header file. */
@@ -161,6 +166,8 @@ standard names - or at least those used in the unmodified vector table. */
 #define configSUPPORT_STATIC_ALLOCATION		1
 #define configSUPPORT_DYNAMIC_ALLOCATION 	1
 #define configAPPLICATION_ALLOCATED_HEAP    0
+
+#define configUSE_STATS_FORMATTING_FUNCTIONS 1
 
 /* The priority for the task that unblocked by the MAC interrupt to process
 received packets. */
@@ -180,7 +187,7 @@ received packets. */
 #else
 #define LWIP_IPERF_TASK_PRIORITY	( configMAX_PRIORITIES - 5 ) //27
 #endif //#if defined (INCLUDE_NEW_TASK_ARCH)
-#define LWIP_IPERF_TASK_STACK_SIZE	( 512 )
+#define LWIP_IPERF_TASK_STACK_SIZE	( 2048 )
 
 #define LWIP_PING_TASK_PRIORITY	( 3 )
 #define LWIP_PING_TASK_STACK_SIZE	( 1024 )

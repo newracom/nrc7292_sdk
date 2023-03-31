@@ -1,0 +1,13 @@
+CALL wifi-connect-wpa2-psk-dhcp
+
+AT+SLIST?
+AT+SCLOSE
+
+AT+SOPEN="UDP",50000
+AT+SLIST?
+
+ECHO "Run UDP client on SoftAP"
+HOLD
+
+AT+SCLOSE
+AT+SLIST?

@@ -17,13 +17,13 @@
 #define SYS_TASK_STACK_SIZE         (2048 / sizeof(StackType_t))
 #define SYSTEM_LMAC_TASK_STACK_SIZE (2048 / sizeof(StackType_t))
 #define SYSTEM_LMAC_TASK_PRIORITY   (31)
-#elif defined(NRC7292_STANDALONE_XIP)
+#elif defined(INCLUDE_STANDALONE)
 #define SYS_TASK_STACK_SIZE         ((2 * 4096) / sizeof(StackType_t))
 #else
 #define SYS_TASK_STACK_SIZE         (4096 / sizeof(StackType_t))
 #endif /* defined(LMAC_TEST) */
 
-#if defined(NRC7292) 
+#if defined(NRC7292) || defined(NRC7393)|| defined(NRC7394)
 #define BACKGROUND_TASK_STACK_SIZE		(2048 / sizeof(StackType_t))
 #else
 #define BACKGROUND_TASK_STACK_SIZE		(1024 / sizeof(StackType_t))
@@ -34,16 +34,13 @@
 #if !defined(SYSTEM_LMAC_TASK_STACK_SIZE)
 
 #if defined(INCLUDE_STANDALONE)
-#if defined (INCLUDE_NEW_TASK_ARCH)
-#define LMAC_TASK_STACK_SIZE	    (4096 / sizeof(StackType_t))
-#else
 #define LMAC_TASK_STACK_SIZE	    ((2 * 4096) / sizeof(StackType_t))
-#endif //#if defined (INCLUDE_NEW_TASK_ARCH)
 #else //#if defined(INCLUDE_STANDALONE)
 #define LMAC_TASK_STACK_SIZE	    (4096 / sizeof(StackType_t))
 #endif //#if defined(INCLUDE_STANDALONE)
 
 #if defined (INCLUDE_NEW_TASK_ARCH)
+//#define LMAC_TASK_PRIORITY		    (30)
 #define LMAC_TASK_PRIORITY		    (configMAX_PRIORITIES - 3) // PRI_29
 #else // #if defined (INCLUDE_NEW_TASK_ARCH)
 #define LMAC_TASK_PRIORITY		    (31) //PRI_31

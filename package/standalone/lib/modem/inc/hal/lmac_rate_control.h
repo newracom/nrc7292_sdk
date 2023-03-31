@@ -31,20 +31,6 @@ enum {
 };
 
 enum {
-#if defined(STANDARD_11N)
-	RC_11B_ENTRY_NUM = 4,
-	RC_11AG_ENTRY_NUM = 8,
-	RC_HT_LGI_ENTRY_NUM = 8,
-	RC_HT_SGI_ENTRY_NUM = 8,
-	RC_MAX_ENTRY_SIZE	= RC_11B_ENTRY_NUM + RC_11AG_ENTRY_NUM + RC_HT_LGI_ENTRY_NUM + RC_HT_SGI_ENTRY_NUM,
-
-	RC_11B_BASE = 0,
-	RC_11AG_BASE = 4,
-	RC_HT_LGI_BASE = 12,
-	RC_HT_SGI_BASE = 20,
-
-#endif
-#if defined(STANDARD_11AH)
 	RC_1M_ENTRY_NUM = 9,
 	RC_2M_ENTRY_NUM = 8,
 	RC_4M_ENTRY_NUM = 8,
@@ -53,7 +39,6 @@ enum {
 	RC_1M_BASE = 0,
 	RC_2M_BASE = 9,
 	RC_4M_BASE = 17,
-#endif /* defined(STANDARD_11AH) */
 };
 
 typedef struct _PER_RATE {
@@ -82,23 +67,12 @@ typedef struct _PER_NODE {
     PER_RATE rate[30];
 } PER_NODE;
 
-#if defined(STANDARD_11N)
-    #define RC_BW_20        0
-    #define RC_BW_40        1
+#define RC_BW_1         0
+#define RC_BW_2         1
+#define RC_BW_4         2
 
-    #define RC_FORMAT_11A   0
-    #define RC_FORMAT_11B   1
-    #define RC_FORMAT_11N   3
-	#define NUM_RATES 		16
-#endif
-#if defined(STANDARD_11AH)
-    #define RC_BW_1         0
-    #define RC_BW_2         1
-    #define RC_BW_4         2
-
-    #define RC_FORMAT_S1G   0
-	#define NUM_RATES 		25
-#endif
+#define RC_FORMAT_S1G   0
+#define NUM_RATES 		27
 
 #define RC_MODE_NEW		(0)
 #define RC_MODE			(1)
@@ -173,8 +147,6 @@ void lmac_rc_set_last_tsf(uint32_t state);
 void lmac_rc_show();
 void lmac_rc_show_all(int vif_id);
 void lmac_rc_show_current_entry(int vif_id);
-void lmac_set_rate_control(int vif_id, bool en);
-bool lmac_get_rate_control(int vif_id);
 uint8_t lmac_get_max_rc_bandwidth(int vif_id);
 void lmac_config_rate_control(uint8_t format, uint8_t attr, uint32_t mcs_bitmap, int vif_id);
 void lmac_reconfig_rc_entry(uint8_t cur_width, uint8_t new_width, int vif_id);

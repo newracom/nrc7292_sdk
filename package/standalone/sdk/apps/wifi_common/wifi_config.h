@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 Newracom, Inc.
+ * Copyright (c) 2022 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,118 +26,398 @@
 #ifndef __WIFI_CONFIG_H__
 #define __WIFI_CONFIG_H__
 
-/* SSID (Service Set Identifier) */
+/*
+ * Include user defined options first. Anything not defined in these files
+ * will be set to standard values.
+ */
+#include "wifi_user_config.h"
+
+
+/**
+ * SSID (Service Set Identifier)
+ * To set the AP SSID to connect to when the device is in STA mode and
+ * to run the AP with that SSID, you will need to configure the wireless
+ * network settings of the device.
+ */
 #ifndef STR_SSID
 #define STR_SSID "halow_demo"
 #endif /* STR_SSID */
 
-/* KR:Korea, JP: Japan, US:United States, TW: Taiwan, EU: EURO */
+
+/**
+ * Country code
+ * The ISO/IEC alpha2 country code for the country in which this device is
+ * currently operating.
+ * K1:Korea-USN, K2: Korea-MIC, JP: Japan, US:United States, TW: Taiwan
+ * AU:Australia, NZ: New Zealand, CN: China , EU: EURO
+ */
 #ifndef COUNTRY_CODE
 #define COUNTRY_CODE "US"
 #endif /* COUNTRY_CODE */
 
-/* WIFI_SEC_OPEN, WIFI_SEC_WPA2, WIFI_SEC_WPA3_SAE, WIFI_SEC_WPA3_SAE */
+
+/**
+ * Security settings for Wi-Fi networks can be specified for both the Access Point (AP) and Station (STA) modes.
+ * The available security options are:
+ *     WIFI_SEC_OPEN: No security
+ *     WIFI_SEC_WPA2: Wi-Fi Protected Access II (WPA2)
+ *     WIFI_SEC_WPA3_SAE: Wi-Fi Protected Access III (WPA3) Simultaneous Authentication of Equals (SAE)
+ *     WIFI_SEC_WPA3_OWE: Wi-Fi Protected Access III (WPA3) Opportunistic Wireless Encryption (OWE)
+ *     Note that SoftAP mode may not support WIFI_SEC_WPA3_SAE and WIFI_SEC_WPA3_OWE security options.
+ */
 #ifndef NRC_WIFI_SECURE
 #define NRC_WIFI_SECURE  WIFI_SEC_OPEN
 #endif /* NRC_WIFI_SECURE */
 
-/* WIFI_STATIC_IP, WIFI_DYNAMIC_IP*/
+
+/**
+ * IP Address settings for Wi-Fi connections can be specified as either static or dynamic (DHCP).
+ * The available options are:
+ *     WIFI_STATIC_IP: the device will use a manually specified IP address, subnet mask,
+ *                     and default gateway for the Wi-Fi connection.
+ *     WIFI_DYNAMIC_IP: the device will obtain the IP address, subnet mask, and default gateway
+ *                      automatically from the Wi-Fi network's DHCP server.
+ */
 #ifndef NRC_WIFI_IP_MODE
 #define NRC_WIFI_IP_MODE	WIFI_DYNAMIC_IP
 #endif /* NRC_WIFI_IP_MODE */
 
-/* Remote IP address to connect */
+
+/**
+ * When establishing a network connection, a remote IP address needs to be specified.
+ * This is the IP address of the remote device or server that the local device will
+ * be connecting to.
+ */
 #ifndef NRC_REMOTE_ADDRESS
 #define NRC_REMOTE_ADDRESS "192.168.200.1"
 #endif /* NRC_REMOTE_ADDRESS */
 
-/* Remote Port number to connect */
+
+/**
+ * When establishing a network connection, a remote port number needs to be specified.
+ * This is the port number on the remote device or server that the local device will
+ * be connecting to.
+ */
 #ifndef NRC_REMOTE_PORT
 #define NRC_REMOTE_PORT		8099
 #endif /* NRC_REMOTE_PORT */
 
-/* Scan APs on specfied frequencies */
+
+/**
+ * When scanning for available Wi-Fi Access Points (APs), it's possible to specify
+ * the frequency channels to scan on. This can be useful in situations where only certain
+ * frequency bands are supported or where interference from other devices is present.
+ * By specifying the frequency channels to scan on, the scanning process can be optimized
+ * to reduce the amount of time and power required to complete the scan.
+ */
 #ifndef NRC_WIFI_SCAN_LIST
 #define NRC_WIFI_SCAN_LIST 0
 #endif /* NRC_WIFI_SCAN_LIST */
 
+
+/**
+ * The SCAN_CHANNEL_LIST is a configuration setting that specifies the list of
+ * frequencies to scan on when searching for available Wi-Fi Access Points (APs).
+ *
+ *  It's used to optimize the scanning process for specific frequency bands or
+ *  to avoid interference from other devices operating on nearby frequencies.
+ *
+ * The SCAN_CHANNEL_LIST can be set to a comma-separated list of frequency values
+ * (in MHz) that are supported by the device's Wi-Fi chipset. For example, setting
+ * this value to "9255,9275,9270" would cause the scan to only search for APs on
+ * the 900MHz frequency band.
+ *
+ * Note that the specific values that can be used for this setting will depend on
+ * the capabilities of the device's Wi-Fi chipset and the regulatory domain in
+ * which it is operating.
+ */
+#ifndef SCAN_CHANNEL_LIST
+#define SCAN_CHANNEL_LIST "9025,9035,9045,9055,9065,9075,9085,9095,9105,9115,\
+		9125,9135,9145,9155,9165,9175,9185,9195,9205,9215,\
+		9225,9235,9245,9255,9265,9275,9030,9050,9070,9090,\
+		9110,9130,9150,9170,9190,9210,9230,9250,9270,9060,\
+		9100,9140,9180,9220,9260"
+#endif /* SCAN_CHANNEL_LIST */
+
+
 /* Tx power value (dBm) */
 #ifndef TX_POWER
-#define TX_POWER 17
+#define TX_POWER 24
 #endif /* TX_POWER */
 
-/* Test number */
-#ifndef NRC_WIFI_TEST_COUNT
-#define NRC_WIFI_TEST_COUNT 20
-#endif /* NRC_WIFI_TEST_COUNT */
 
-/* Test interval (ms)*/
-#ifndef NRC_WIFI_TEST_INTERVAL
-#define NRC_WIFI_TEST_INTERVAL 1000
-#endif /* NRC_WIFI_TEST_INTERVAL */
+/**
+ * The Tx power type can be configured for the Wi-Fi radio.
+ *
+ * There are three possible settings for the Tx power type:
+ *     Auto(0): The device will automatically adjust its Tx power based on the
+ *              current network conditions and signal strength.
+ *     Limit(1): The device will use a specified maximum Tx power limit.
+ *
+ *     Fixed(2): The device will use a fixed Tx power level, which can be useful
+ *               for testing or for applications where a consistent power level is required.
+ */
+#ifndef TX_POWER_TYPE
+#define TX_POWER_TYPE 1
+#endif /* TX_POWER_TYPE */
 
-/* Test duration (ms)*/
-#ifndef NRC_WIFI_TEST_DURATION
-#define NRC_WIFI_TEST_DURATION 10000 /* ms */
-#endif /* NRC_WIFI_TEST_DURATION */
 
-#if defined(NRC_WIFI_SECURE) && (NRC_WIFI_SECURE == WIFI_SEC_WPA2)
-/* password */
+/**
+ * The NRC_WIFI_PASSWORD configuration setting specifies the Wi-Fi password to use
+ * when connecting to a secure network.
+ * This setting is used when the NRC_WIFI_SECURE configuration setting is set
+ * to WIFI_SEC_WPA2 or WIFI_SEC_WPA3_SAE. If this setting is not overridden,
+ * the default password of "12345678" will be used.
+ */
 #ifndef NRC_WIFI_PASSWORD
 #define NRC_WIFI_PASSWORD  "12345678"
 #endif /* NRC_WIFI_PASSWORD */
-#endif /* defined(NRC_WIFI_SECURE) && (NRC_WIFI_SECURE == WIFI_SEC_WPA2) */
 
-#if (NRC_WIFI_IP_MODE == WIFI_STATIC_IP)
-/* Static IP address */
+
+/**
+ * The NRC_STATIC_IP, NRC_NETMASK, and NRC_GATEWAY configuration settings are used
+ * to specify the static IP address, netmask, and gateway to use when connecting
+ * to a network in static IP mode.
+ *
+ * These settings are used when the NRC_WIFI_IP_MODE configuration setting is
+ * set to WIFI_STATIC_IP. If these settings are not overridden, the default
+ * IP address of "192.168.200.13", netmask of "255.255.255.0", and gateway
+ * of "192.168.200.1" will be used.
+ */
 #ifndef NRC_STATIC_IP
 #define NRC_STATIC_IP "192.168.200.13"
 #endif /* NRC_STATIC_IP */
-#endif /* (NRC_WIFI_IP_MODE == WIFI_STATIC_IP) */
 
-#ifdef CONFIG_IPV6
-/* Static IPv6 address to use. */
-/* In order to override this configure it using NVS key "wlan0_ip6" */
+#ifndef NRC_NETMASK
+#define NRC_NETMASK "255.255.255.0"
+#endif /* NRC_NETMASK */
+
+#ifndef NRC_GATEWAY
+#define NRC_GATEWAY "192.168.200.1"
+#endif /* NRC_GATEWAY */
+
+
+/**
+ * The NRC_STATIC_IP6 setting is a configuration option that specifies a static IPv6
+ * address to use for the Wi-Fi connection. If this setting is not defined, the default
+ * value will be used.
+ *
+ * If a static IPv6 address is specified, it will be used instead of obtaining an
+ * address automatically from the Wi-Fi network's DHCPv6 server.
+ *
+ * This setting can be overridden by configuring the "wlan0_ip6" NVS key for the device.
+ * See wifi_common/nvs_config.h for more information on how to configure NVS settings
+ * for the device's Wi-Fi connection.
+ */
 #ifndef NRC_STATIC_IP6
 #define NRC_STATIC_IP6 "fc00::c0a8:c80d"
 #endif /* NRC_STATIC_IP6 */
-#endif /* CONFIG_IPV6 */
 
-#if NRC_WIFI_SCAN_LIST
-/* Scan channels and lists */
-#if defined(INCLUDE_KR_MIC_CHANNEL)
-#ifndef NRC_WIFI_SCAN_FREQ_NUM
-#define NRC_WIFI_SCAN_FREQ_NUM 3
-uint16_t nrc_scan_freq_list[NRC_WIFI_SCAN_FREQ_NUM]={9255,9275,9270};
-#endif /* NRC_WIFI_SCAN_FREQ_NUM */
-#else
-#ifndef NRC_WIFI_SCAN_FREQ_NUM
-#define NRC_WIFI_SCAN_FREQ_NUM 5
-uint16_t nrc_scan_freq_list[NRC_WIFI_SCAN_FREQ_NUM]={9055,9175,9090,9250,9220};
-#endif /* NRC_WIFI_SCAN_FREQ_NUM */
-#endif /* !INCLUDE_KR_MIC_CHANNEL */
-#endif /* NRC_WIFI_SCAN_LIST */
 
-/* DHCP server is enable or disable in softAP */
+/**
+ * The DHCP server can be enabled or disabled for the SoftAP Wi-Fi network.
+ * Enabling the DHCP server allows devices that connect to the SoftAP network to obtain
+ * IP addresses automatically from the device acting as the SoftAP.
+ *
+ * This can be useful for creating ad-hoc networks or for providing temporary network
+ * access to other devices.Disabling the DHCP server will require devices that connect to
+ * the SoftAP network to use a static IP address that is manually configured.
+ * By default, the DHCP server is enabled for SoftAP networks.
+ */
 #ifndef NRC_WIFI_SOFTAP_DHCP_SERVER
 #define NRC_WIFI_SOFTAP_DHCP_SERVER 1
 #endif /* NRC_WIFI_SOFTAP_DHCP_SERVER */
 
-/* IP address for softAP */
-#ifndef NRC_AP_IP
-#define NRC_AP_IP "192.168.200.1"
-#endif /* NRC_AP_IP */
 
-/* Default CH(MHz) : KR:920.0(KR MIC:927.5) JP:918.0 US:925.0 TW:839.5 EU:864.0 */
-#ifndef NRC_AP_SET_CHANNEL
-#define NRC_AP_SET_CHANNEL 9225
-#endif /* NRC_AP_SET_CHANNEL */
+/**
+ * The NRC_WIFI_CHANNEL setting is used to specify the default operating channel
+ * The value "0" indicates that no dedicated channel has been assigned.
+ * This configuration setting is optional and if it is not defined,
+ * the default value of 0 will be used.
+ */
+#ifndef NRC_WIFI_CHANNEL
+#define NRC_WIFI_CHANNEL 0
+#endif /* NRC_WIFI_CHANNEL */
 
-#if defined(INCLUDE_SCAN_MODE)
-/* Scan method */
+
+/**
+ * This code sets the default channel bandwidth for an access point (AP).
+ * The channel bandwidth determines the amount of frequency spectrum that will be
+ * used to transmit data over the wireless network.
+ * The available options for bandwidth are 0(Auto), 1(WIFI_1M), 2(WIFI_2M), and 4(WIFI_4M).
+ * This parameter applies only to Japan, and bandwidth must be set at 924.5MHz and 925.5MHz.
+ */
+#ifndef NRC_AP_SET_CHANNEL_BW
+#define NRC_AP_SET_CHANNEL_BW 0
+#endif /* NRC_AP_SET_CHANNEL_BW */
+
+
+/**
+ * This code snippet defines the default scan mode used for WiFi scanning.
+ * WiFi scanning allows a device to discover nearby WiFi access points (APs) and
+ * retrieve their information such as SSID, signal strength, security protocols, and more.
+ * The scan method is set to WIFI_SCAN_NORMAL by default, which performs a standard WiFi scan.
+ * Other available options include WIFI_SCAN_PASSIVE, which performs a passive scan with lower
+ * power consumption, and WIFI_SCAN_FAST, which performs a faster scan with less accuracy.
+ * By setting a default scan mode, the device can perform WiFi scans automatically
+ * without requiring the user to specify the scan mode each time.
+ */
 #ifndef WIFI_SCAN_MODE
 #define WIFI_SCAN_MODE	WIFI_SCAN_NORMAL
 #endif /* WIFI_SCAN_MODE */
-#endif /* INCLUDE_SCAN_MODE */
+
+
+/**
+ * This code block defines the timeout period for WiFi connection attempts. The value of
+ * WIFI_CONN_TIMEOUT is set to 0, which means that the connection attempts will continue
+ * indefinitely until a successful connection is made or an error occurs.
+ * WIFI_CONN_TIMEOUT to the desired value (in milliseconds) in your code.
+ */
+#ifndef WIFI_CONN_TIMEOUT
+#define WIFI_CONN_TIMEOUT	0 /* infinite */
+#endif /* WIFI_CONN_TIMEOUT */
+
+
+/**
+ * This code block defines the timeout period for WiFi disconnection attempts. The value of
+ * WIFI_DISCONN_TIMEOUT is set to 0, which means that the disconnection attempts will continue
+ * indefinitely until a successful disconnection is made or an error occurs.
+ * WIFI_DISCONN_TIMEOUT to the desired value (in milliseconds) in your code.
+ */
+#ifndef WIFI_DISCONN_TIMEOUT
+#define WIFI_DISCONN_TIMEOUT	0 /* infinite */
+#endif /* WIFI_DISCONN_TIMEOUT */
+
+/**
+ * In wireless networking, an AP is considered idle if there are no active connections to it.
+ * The WIFI_BSS_MAX_IDLE directive sets the time duration in seconds that an AP will remain active
+ * after the last connection has been disconnected.
+ * Once the idle time exceeds the maximum value set in this directive, the AP will be automatically
+ * disconnected to free up network resources.
+ */
+#ifndef WIFI_BSS_MAX_IDLE
+#define WIFI_BSS_MAX_IDLE	60 /* bss_max_idle unit(second) */
+#endif /* WIFI_BSS_MAX_IDLE */
+
+/**
+ * This code sets the maximum number of retries for checking the keep alive packet.
+ * The default value is 3, which means that if the access point does not receive the keep alive packet
+ * after 3 times the maximum idle time, the system will retry up to three times before giving up.
+ */
+#ifndef WIFI_BSS_RETRY_CNT
+#define WIFI_BSS_RETRY_CNT	3 /* retry count */
+#endif /* WIFI_BSS_RETRY_CNT */
+
+
+/**
+ * The minimum interval time for sending data over Wi-Fi. The default value is 100ms.
+ */
+#ifndef WIFI_MIN_INTERVAL
+#define WIFI_MIN_INTERVAL 100
+#endif /* WIFI_MIN_INTERVAL */
+
+
+/**
+ * The maximum beacon interval time for Wi-Fi. The default value is 300ms.
+ */
+#ifndef WIFI_MAX_INTERVAL
+#define WIFI_MAX_INTERVAL 10000
+#endif /* WIFI_MAX_INTERVAL */
+
+
+/**
+ * The minimum beacon interval time for Wi-Fi. The default value is 1ms.
+ */
+#ifndef WIFI_MIN_BCN_INTERVAL
+#define WIFI_MIN_BCN_INTERVAL 1
+#endif /* WIFI_MIN_BCN_INTERVAL */
+
+
+/**
+ * The minimum transmit power for Wi-Fi. The default value is 1.
+ */
+#ifndef WIFI_MAX_BCN_INTERVAL
+#define WIFI_MAX_BCN_INTERVAL 300
+#endif /* WIFI_MAX_BCN_INTERVAL */
+
+
+/**
+ * The minimum transmit power for Wi-Fi. The default value is 1.
+ */
+#ifndef WIFI_MIN_TXPOWER
+#define WIFI_MIN_TXPOWER 1
+#endif /* WIFI_MIN_TXPOWER */
+
+
+/**
+ * The maximum transmit power for Wi-Fi. The default value is 20.
+ */
+#ifndef WIFI_MAX_TXPOWER
+#define WIFI_MAX_TXPOWER 20
+#endif /* WIFI_MAX_TXPOWER */
+
+
+/**
+ * The default device mode STA(0) or AP(1) for Wi-Fi. The default value is STA(0).
+ */
+#ifndef WIFI_DEVICE_MODE
+#define WIFI_DEVICE_MODE 0
+#endif /* WIFI_DEVICE_MODE */
+
+
+/**
+ * The default network mode Bridge(0) or NAP(1) for Wi-Fi. The default value is NAT(1).
+ */
+#ifndef WIFI_NETWORK_MODE
+#define WIFI_NETWORK_MODE 1
+#endif /* WIFI_NETWORK_MODE */
+
+
+/**
+ * The maximum number of attempts to connect to Wi-Fi. The default value is 3.
+ */
+#ifndef MAX_WIFI_CONNECT_TRIES
+#define MAX_WIFI_CONNECT_TRIES 3
+#endif /* MAX_WIFI_CONNECT_TRIES */
+
+
+/**
+ * The maximum number of attempts to initialize Wi-Fi
+ */
+#ifndef MAX_WIFI_INIT_TRIES
+#define MAX_WIFI_INIT_TRIES 64
+#endif /* MAX_WIFI_INIT_TRIES */
+
+
+/**
+ * Beacon interval time for Wi-Fi. The default value is 1000ms.
+ */
+#ifndef NRC_WIFI_BCN_INTERVAL
+#define NRC_WIFI_BCN_INTERVAL 1000
+#endif /* NRC_WIFI_BCN_INTERVAL */
+
+
+/**
+ * Short beacon interval time for Wi-Fi. The default value is 100ms.
+ */
+#ifndef NRC_WIFI_SHORT_BCN_INTERVAL
+#define NRC_WIFI_SHORT_BCN_INTERVAL 100
+#endif /* NRC_WIFI_SHORT_BCN_INTERVAL */
+
+
+/**
+ * The default mode for Wi-Fi. The default value is WIFI_MODE_AP.
+ */
+#ifndef NRC_WIFI_MODE_DEFAULT
+#define NRC_WIFI_MODE_DEFAULT WIFI_MODE_AP
+#endif /* NRC_WIFI_MODE_DEFAULT */
+
+
+/**
+ * The default network mode for Wi-Fi. The default value is WIFI_NETWORK_MODE_NAT.
+ */
+#ifndef NRC_WIFI_NETWORK_MODE_DEFAULT
+#define NRC_WIFI_NETWORK_MODE_DEFAULT WIFI_NETWORK_MODE_NAT
+#endif /* NRC_WIFI_NETWORK_MODE_DEFAULT */
 
 #endif /* __WIFI_CONFIG_H__ */

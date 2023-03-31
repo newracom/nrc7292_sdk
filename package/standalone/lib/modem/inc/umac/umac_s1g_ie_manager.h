@@ -85,10 +85,14 @@ bool insert_ie_mesh_ch_switch_param(struct byte_stream *bs, bool is_tx, int8_t v
 bool insert_ie_mesh_awake_window(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 bool insert_ie_vendor_specific_wmm(struct byte_stream *bs, bool is_tx, int8_t vif_id, OUI_SUBTYPE oui_stype);
 bool insert_ie_vendor_specific_all_others(struct byte_stream *bs, bool is_tx, int8_t vif_id);
+bool insert_ie_vendor_specific_probe_resp(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 bool insert_ie_extension_all(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 #if defined(INCLUDE_H2E_SUPPORT)
 bool insert_ie_rsn_extension(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 #endif /* defined(INCLUDE_H2E_SUPPORT) */
+#if defined(INCLUDE_TSF_SYNC_VENDOR_IE)
+bool insert_ie_vendor_specific_tsf_sync(struct byte_stream *bs, bool is_tx, int8_t vif_id);
+#endif /* defined(INCLUDE_TSF_SYNC_VENDOR_IE) */
 bool umac_s1g_beacon_is_short(SYS_BUF* buf, bool is_tx);
 uint8_t* umac_s1g_beacon_find_ie(SYS_BUF *buf, int eid, bool is_tx);
 uint8_t* umac_s1g_short_beacon_find_ie(SYS_BUF *buf, int eid, bool is_tx);
@@ -105,6 +109,11 @@ bool parse_ie_s1g_header_compression(struct _SYS_BUF *buf, int8_t vif_id, ie_gen
 bool parse_ie_s1g_shortbeaconinterval(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 bool parse_ie_edca_parameter_set(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 bool parse_ie_vendor_specific(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
+#if defined(INCLUDE_VENDOR_REMOTECMD)
+void parse_ie_vendor_remotecmd(int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
+static void remotecmd_callback_enqueue(int v);
+static int32_t remotecmd_callback(void *param);
+#endif // INCLUDE_VENDOR_REMOTECMD
 bool parse_ie_extension(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 bool parse_ie_mesh_config(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 bool parse_ie_mesh_id(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
@@ -120,7 +129,20 @@ bool parse_ie_s1g_twt(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool 
 bool parse_ie_rsn_extension(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 #endif /* defined(INCLUDE_H2E_SUPPORT) */
 // Functions for parsed information
+
+#if defined (INCLUDE_IBSS)
+compatibility_info* get_g_cap_info(void);
+ie_ibss_param_set* get_g_ie_ibss_param_set(void);
+ie_multiple_bssid* get_g_ie_mbssid(void);
+bool parse_ie_ibss_param_set(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
+bool insert_ie_ibss_param_set(struct byte_stream *bs, bool is_tx, int8_t vif_id);
+bool parse_ie_informal_mbssid(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
+bool insert_multiple_bssid_ie(struct byte_stream *bs, bool is_tx, int8_t vif_id);
+bool build_informal_mbssid_ie(uint8_t * bssid);
+#endif
+
 bool umac_s1g_is_valid_ie_associated_beaconframe(SYS_BUF *buf, int8_t vif_id);
+bool umac_s1g_is_valid_ie_associated_proberesp(SYS_BUF *buf, int8_t vif_id);
 
 bool		umac_s1g_has_rsn_ie_existence();
 
@@ -135,10 +157,12 @@ void 		umac_s1g_set_ie_ssid(int8_t vif_id, uint8_t *ssid, uint8_t ssid_len);
 
 bool	 	umac_s1g_get_ie_vendor_specific_wmm_existence();
 uint16_t	umac_s1g_get_frame_beacon_interval();
+uint16_t	umac_s1g_get_frame_short_beacon_interval();
 
 void		umac_s1g_update_short_bi(SYS_BUF *buf, int8_t vif_id, bool is_tx, bool short_beacon);
 
 uint32_t	get_assoc_resp_status_code(uint8_t*);
+
 
 #if defined(SOFT_AP_BSS_MAX_IDLE)
 bool umac_s1g_set_softap_ie_bss_max_idle(int period);
@@ -151,8 +175,8 @@ void update_s1gbuffer_diff(struct _SYS_BUF *new_buf, struct _SYS_BUF *ori_buf);
 
 #if defined (INCLUDE_STA_CSA_SUPPORT)
 struct external_csa_info* get_ext_csa_info(void);
- void init_ext_csa_info(void);
- #endif
+void init_ext_csa_info(void);
+#endif
 
 #else
 static inline uint8_t* umac_s1g_beacon_find_ie(SYS_BUF *b, int e, bool i)

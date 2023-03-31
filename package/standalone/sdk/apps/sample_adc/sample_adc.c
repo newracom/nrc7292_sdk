@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2020 Newracom, Inc.
+ * Copyright (c) 2022 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -49,7 +49,7 @@ nrc_err_t run_sample_adc(int count, int interval)
 		nrc_usr_print("[%s] ", __func__);
 
 		for (id = ADC1; id <= ADC3 ; id++) {
-			nrc_adc_get_data(id, &data);
+			data = nrc_adc_get_data(id);
 			nrc_usr_print("CH%d=%03d  ", id, data);
 		}
 		nrc_usr_print("\n");
@@ -60,7 +60,6 @@ nrc_err_t run_sample_adc(int count, int interval)
 	return NRC_SUCCESS;
 }
 
-
 /******************************************************************************
  * FunctionName : user_init
  * Description  : Start Code for User Application, Initialize User function
@@ -69,11 +68,8 @@ nrc_err_t run_sample_adc(int count, int interval)
  *******************************************************************************/
 void user_init(void)
 {
-	nrc_err_t ret;
-
 	//Enable Console for Debugging
 	nrc_uart_console_enable(true);
 
-	ret = run_sample_adc(TEST_COUNT, TEST_INTERVAL);
-	nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
+	run_sample_adc(TEST_COUNT, TEST_INTERVAL);
 }

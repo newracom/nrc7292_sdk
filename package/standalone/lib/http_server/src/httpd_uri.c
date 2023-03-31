@@ -76,6 +76,15 @@ esp_err_t httpd_register_uri_handler(httpd_handle_t handle,
             hd->hd_calls[i]->method   = uri_handler->method;
             hd->hd_calls[i]->handler  = uri_handler->handler;
             hd->hd_calls[i]->user_ctx = uri_handler->user_ctx;
+#ifdef CONFIG_HTTPD_WS_SUPPORT
+            hd->hd_calls[i]->is_websocket = uri_handler->is_websocket;
+            hd->hd_calls[i]->handle_ws_control_frames = uri_handler->handle_ws_control_frames;
+            if (uri_handler->supported_subprotocol) {
+                hd->hd_calls[i]->supported_subprotocol = strdup(uri_handler->supported_subprotocol);
+            } else {
+                hd->hd_calls[i]->supported_subprotocol = NULL;
+            }
+#endif
             V(TAG, LOG_FMT("[%d] installed %s"), i, uri_handler->uri);
             return ESP_OK;
         }
@@ -186,7 +195,7 @@ esp_err_t httpd_uri(struct httpd_data *hd)
     /* For conveying URI not found/method not allowed */
     httpd_err_resp_t err = 0;
 
-    V(TAG, LOG_FMT("request for %s with type %d"), req->uri, req->method);
+    V(TAG, LOG_FMT("request for %s with type %d\n"), req->uri, req->method);
     /* URL parser result contains offset and length of path string */
     if (res->field_set & (1 << UF_PATH)) {
         uri = httpd_find_uri_handler2(&err, hd,
@@ -199,10 +208,10 @@ esp_err_t httpd_uri(struct httpd_data *hd)
     if (uri == NULL) {
         switch (err) {
             case HTTPD_404_NOT_FOUND:
-                E(TAG, LOG_FMT("URI '%s' not found"), req->uri);
+                E(TAG, LOG_FMT("URI '%s' not found\n"), req->uri);
                 return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND);
             case HTTPD_405_METHOD_NOT_ALLOWED:
-                E(TAG, LOG_FMT("Method '%d' not allowed for URI '%s'"), req->method, req->uri);
+                E(TAG, LOG_FMT("Method '%d' not allowed for URI '%s'\n"), req->method, req->uri);
                 return httpd_resp_send_err(req, HTTPD_405_METHOD_NOT_ALLOWED);
             default:
                 return ESP_FAIL;
@@ -212,10 +221,26 @@ esp_err_t httpd_uri(struct httpd_data *hd)
     /* Attach user context data (passed during URI registration) into request */
     req->user_ctx = uri->user_ctx;
 
+#ifdef CONFIG_HTTPD_WS_SUPPORT
+    struct httpd_req_aux   *aux = req->aux;
+    if (uri->is_websocket && aux->ws_handshake_detect && uri->method == HTTP_GET) {
+        V(TAG, LOG_FMT("Responding WS handshake to sock %d"), aux->sd->fd);
+        esp_err_t ret = httpd_ws_respond_server_handshake(&hd->hd_req, uri->supported_subprotocol);
+        if (ret != ESP_OK) {
+            return ret;
+        }
+
+        aux->sd->ws_handshake_done = true;
+        aux->sd->ws_handler = uri->handler;
+        aux->sd->ws_control_frames = uri->handle_ws_control_frames;
+        aux->sd->ws_user_ctx = uri->user_ctx;
+    }
+#endif
+
     /* Invoke handler */
     if (uri->handler(req) != ESP_OK) {
         /* Handler returns error, this socket should be closed */
-        E(TAG, LOG_FMT("uri handler execution failed"));
+        E(TAG, LOG_FMT("uri handler execution failed\n"));
         return ESP_FAIL;
     }
     return ESP_OK;

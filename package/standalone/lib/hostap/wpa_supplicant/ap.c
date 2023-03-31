@@ -454,6 +454,17 @@ static int wpa_supplicant_conf_ap(struct wpa_supplicant *wpa_s,
 	}
 #endif /* CONFIG_P2P */
 
+#ifdef INCLUDE_SOFTAP_OWE
+	if (wpa_key_mgmt_owe(ssid->key_mgmt)) {
+		bss->wpa = ssid->proto;
+		// conf->wpa = 2;
+		/*
+		* SAE has psk but owe not.
+		* wpa = 2  in host mode hostapd conf.
+		*/
+	}
+#endif /* INCLUDE_SOFTAP_OWE */
+
 	if ((bss->wpa & 2) && bss->rsn_pairwise == 0)
 		bss->rsn_pairwise = bss->wpa_pairwise;
 	bss->wpa_group = wpa_select_ap_group_cipher(bss->wpa, bss->wpa_pairwise,

@@ -6,8 +6,8 @@
  * See README for more details.
  */
 
-#ifndef LIST_H
-#define LIST_H
+#ifndef UTIL_LIST_H
+#define UTIL_LIST_H
 
 /**
  * struct dl_list - Doubly-linked list
@@ -94,4 +94,4 @@ static inline unsigned int dl_list_len(struct dl_list *list)
 #define DEFINE_DL_LIST(name) \
 	struct dl_list name = { &(name), &(name) }
 
-#endif /* LIST_H */
+#endif /* UTIL_LIST_H */

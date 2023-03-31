@@ -842,10 +842,8 @@ StreamBufferHandle_t xStreamBufferGenericCreateStatic( size_t xBufferSizeBytes,
 	uint8_t ucStreamBufferGetStreamBufferType( StreamBufferHandle_t xStreamBuffer ) PRIVILEGED_FUNCTION;
 #endif
 
-/*
 #if defined( __cplusplus )
 extern "C" {
 #endif
-*/
 
 #endif	/* !defined( STREAM_BUFFER_H ) */

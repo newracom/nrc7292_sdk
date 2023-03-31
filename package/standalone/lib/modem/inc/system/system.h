@@ -1,6 +1,6 @@
 #ifndef _SYSTEM_H_
 #define _SYSTEM_H_
-
+#include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
@@ -1061,6 +1061,8 @@ typedef struct {
 #endif
 #define REMAP_SRAM_0	(3)
 #define REMAP_SRAM_2	(4)
+
+#define SYS_MAX_TX_GAIN_VALUE	30
 
 //===================================================================================================================
 // RF SPI  Defines

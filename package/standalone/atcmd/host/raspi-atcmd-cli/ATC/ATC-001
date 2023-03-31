@@ -1,0 +1,16 @@
+
+ECHO " ATC-001 : Version / Echo / Reset"
+ECHO "========================================="
+HOLD
+
+AT+VER?
+
+ATE
+AT
+
+ATE
+AT
+
+ATZ
+AT
+

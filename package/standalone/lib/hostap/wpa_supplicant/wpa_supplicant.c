@@ -2068,7 +2068,10 @@ void wpa_supplicant_associate(struct wpa_supplicant *wpa_s,
 #endif /* CONFIG_TDLS */
 
 	if ((wpa_s->drv_flags & WPA_DRIVER_FLAGS_SME) &&
-	    ssid->mode == WPAS_MODE_INFRA) {
+	    ssid->mode == WPAS_MODE_INFRA) {		
+#if defined(INCLUDE_SCAN_DEBUG)			
+		wpa_printf(MSG_DEBUG, "[%s] auth path\n", __func__);
+#endif		
 		sme_authenticate(wpa_s, bss, ssid);
 		return;
 	}
@@ -5419,8 +5422,8 @@ void radio_work_check_next(struct wpa_supplicant *wpa_s)
 {
 	struct wpa_radio *radio = wpa_s->radio;
 
-	if (dl_list_empty(&radio->work))
-		return;
+	if (dl_list_empty(&radio->work)) 		
+		return;	
 	if (wpa_s->ext_work_in_progress) {
 		wpa_printf(MSG_DEBUG,
 			   "External radio work in progress - delay start of pending item");
@@ -5428,6 +5431,10 @@ void radio_work_check_next(struct wpa_supplicant *wpa_s)
 	}
 	eloop_cancel_timeout(radio_start_next_work, radio, NULL);
 	eloop_register_timeout(0, 0, radio_start_next_work, radio, NULL);
+
+#if defined(INCLUDE_SCAN_DEBUG)
+	wpa_printf(MSG_DEBUG, "[%s] start next work\n", __func__);
+#endif	
 }
 
 
@@ -5658,6 +5665,9 @@ static int wpa_supplicant_init_iface(struct wpa_supplicant *wpa_s,
 		wpa_s->confname = os_strdup(iface->confname);
 #endif /* CONFIG_BACKEND_FILE */
 		wpa_s->conf = wpa_config_read(wpa_s->confname, NULL);
+#ifndef CONFIG_NO_CONFIG_WRITE
+		wpa_s->conf->update_config = 1;
+#endif /* CONFIG_NO_CONFIG_WRITE */
 		if (wpa_s->conf == NULL) {
 			wpa_printf(MSG_ERROR, "Failed to read or parse "
 				   "configuration '%s'.", wpa_s->confname);
@@ -6799,6 +6809,7 @@ void wpas_connection_failed(struct wpa_supplicant *wpa_s, const u8 *bssid)
 	}
 
 	switch (count) {
+#if !defined(INCLUDE_WLAN_STABLE_CONN)		
 	case 1:
 		timeout = 100;
 		break;
@@ -6814,6 +6825,10 @@ void wpas_connection_failed(struct wpa_supplicant *wpa_s, const u8 *bssid)
 	default:
 		timeout = 10000;
 		break;
+#else
+	default:
+		timeout = 100;
+#endif /* defined(INCLUDE_WLAN_STABLE_CONN) */
 	}
 
 	wpa_dbg(wpa_s, MSG_DEBUG, "Blacklist count %d --> request scan in %d "
@@ -7082,6 +7097,7 @@ void wpas_auth_failed(struct wpa_supplicant *wpa_s, char *reason)
 	}
 #endif /* CONFIG_P2P */
 
+#if !defined(INCLUDE_WLAN_STABLE_CONN)
 	if (ssid->auth_failures > 50)
 		dur = 300;
 	else if (ssid->auth_failures > 10)
@@ -7096,6 +7112,9 @@ void wpas_auth_failed(struct wpa_supplicant *wpa_s, char *reason)
 		dur = 20;
 	else
 		dur = 10;
+#else
+	dur = 0;
+#endif /* defined(INCLUDE_WLAN_STABLE_CONN) */
 
 	if (ssid->auth_failures > 1 &&
 	    wpa_key_mgmt_wpa_ieee8021x(ssid->key_mgmt))

@@ -1,0 +1,28 @@
+1. Prepare firmware to be used for Firmware Over The Air (FOTA).
+Build any sample application that will be used for firmware upgrade.
+
+2. Once the firmware is built, use crc.py provided in sdk/apps/sample_fota/python-http-server/python/crc.py
+i.e.
+./crc.py <firmware file name>.bin
+
+3. An example "version" file that is used in sample_fota is provided in sdk/apps/sample_fota/example_server_contents.
+
+4. Python web server script is provided in sdk/apps/sample_fota/python-http-server.
+To start the web server, copy python-http-server directory to a Linux computer with python3 installed.
+Once copied,
+cd python-http-server
+./Run-server.sh {http|https}
+
+If http is used, server will run on port 8080.
+If https is used, server will run on port 4443.
+
+5. SSL supporting example server certificate and server private key is provided in python-http-server/ssl-cert, and Run-server.sh script and corresponding python script will use the certificate exists for HTTPS communication.
+
+6. Copy the firmware to be upgrade to the directory where the "Run-server.sh" is starting.
+   Create "version" (Example version file is provided in sdk/apps/sample_fota/example_server_contents) and place it in the same directory where "Run-server.sh" was executed.
+
+7. Once the preparation is completed, then install sample_fota firmware on target device and restart.
+
+Note :
+1. You don't need to use python web server. If you prefer, you can use readily available web server on a server.
+2. sample_fota uses certificates and key in directory sdk/apps/sample_fota/certs. The certificates and key are converted as a C header file fota_certs.h.

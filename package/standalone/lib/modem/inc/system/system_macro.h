@@ -96,8 +96,6 @@
 
 #define MIN(x, y)               (((x) < (y))? (x) : (y))
 #define MAX(x, y)               (((x) > (y))? (x) : (y))
-#define min(x, y)               (((x) < (y))? (x) : (y))
-#define max(x, y)               (((x) > (y))? (x) : (y))
 
 #define BITAND(A, B)            (((uint32_t)A)&((uint32_t)B))
 #define BITOR(A, B)             (((uint32_t)A)|((uint32_t)B))
@@ -198,7 +196,7 @@
 #define HIF_HDR_SIZE    sizeof(HIF_HDR)
 
 #define FRAME_HDR(buf)  (buf)->frame_hdr
-#define FRAME_HDR_SIZE  sizeof(FRAME_HDR_SIZE)
+#define FRAME_HDR_SIZE  sizeof(FRAME_HDR)
 
 #define TX_MAC_HDR(buf) (buf)->tx_mac_header
 #define RX_MAC_HDR(buf) (buf)->rx_mac_header
@@ -210,6 +208,9 @@
 #define LMAC_BUF_TO_FRAME_HDR(buf) FRAME_HDR(LMAC_BUF_TO_SYS_BUF(buf))
 #define SYS_BUF_TO_LMAC_TXBUF(buf) ((LMAC_TXBUF*)(&(buf)->lmac_txhdr))
 #define SYS_BUF_TO_LMAC_RXBUF(buf) ((LMAC_RXBUF*)(&(buf)->lmac_rxhdr))
+
+#define MACHDR_TO_LMAC_TXBUF(gmh) ((LMAC_TXBUF*)(((uint32_t)(gmh)) - sizeof(LMAC_TXBUF)))
+#define MACHDR_TO_LMAC_RXBUF(gmh) ((LMAC_RXBUF*)(((uint32_t)(gmh)) - sizeof(LMAC_RXBUF)))
 
 #define SYS_BUF_NEXT(buf)           (buf)->sys_hdr.m_next
 #define SYS_BUF_LINK(buf)           (buf)->sys_hdr.m_link

@@ -1,0 +1,20 @@
+
+ECHO " ATC-008 : BSS max idle"
+ECHO "========================================="
+HOLD
+
+ATZ
+
+AT+WCOUNTRY="US"
+
+AT+WSOFTAP?
+AT+WSOFTAP=925,"halow_softap","wpa2-psk","12345678"
+AT+WSOFTAP?
+
+AT+WBSSMAXIDLE?
+
+AT+WBSSMAXIDLE=30,5
+AT+WBSSMAXIDLE?
+
+AT+WBSSMAXIDLE=0
+AT+WBSSMAXIDLE?

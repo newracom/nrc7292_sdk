@@ -1585,7 +1585,7 @@ int wpa_supplicant_connect(struct wpa_supplicant *wpa_s,
 			return 0;
 		}
 		wpa_msg(wpa_s, MSG_DEBUG, "Request association with " MACSTR,
-			MAC2STR(selected->bssid));
+			MAC2STR(selected->bssid));		
 		wpa_supplicant_associate(wpa_s, selected, ssid);
 	} else {
 		wpa_dbg(wpa_s, MSG_DEBUG, "Already associated or trying to "
@@ -1939,7 +1939,9 @@ static int _wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 		wpa_s->scan_work = NULL;
 		radio_work_done(work);
 	}
-
+#if defined(INCLUDE_SCAN_DEBUG)	
+	wpa_printf(MSG_DEBUG, "[%s] connect call\n", __func__);
+#endif	
 	return wpas_select_network_from_last_scan(wpa_s, 1, own_request);
 
 scan_work_done:
@@ -1984,10 +1986,16 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 	}
 #endif /* CONFIG_MESH */
 
+#if defined(INCLUDE_SCAN_DEBUG)
+	wpa_printf(MSG_DEBUG, "[%s] selected: %p\n", __func__, selected);
+#endif	
 	if (selected) {
 		int skip;
 		skip = !wpa_supplicant_need_to_roam(wpa_s, selected, ssid);
 		if (skip) {
+#if defined(INCLUDE_SCAN_DEBUG)
+			wpa_printf(MSG_DEBUG, "[%s] skip -> new_scan %d\n", __func__, new_scan);
+#endif
 			if (new_scan)
 				wpa_supplicant_rsn_preauth_scan_results(wpa_s);
 			return 0;
@@ -1999,7 +2007,9 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 			wpa_supplicant_deauthenticate(
 				wpa_s, WLAN_REASON_DEAUTH_LEAVING);
 		}
-
+#if defined(INCLUDE_SCAN_DEBUG)
+		wpa_printf(MSG_DEBUG, "[%s] connect call\n", __func__);
+#endif
 		if (wpa_supplicant_connect(wpa_s, selected, ssid) < 0) {
 			wpa_dbg(wpa_s, MSG_DEBUG, "Connect failed");
 			return -1;
@@ -2015,12 +2025,21 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 	} else {
 		wpa_dbg(wpa_s, MSG_DEBUG, "No suitable network found");
 		ssid = wpa_supplicant_pick_new_network(wpa_s);
+#if defined(INCLUDE_SCAN_DEBUG)		
+		wpa_printf(MSG_DEBUG, "[%s] ssid: %p\n", __func__, ssid);	
+#endif		
 		if (ssid) {
 			wpa_dbg(wpa_s, MSG_DEBUG, "Setup a new network");
+#if defined(INCLUDE_SCAN_DEBUG)			
+			wpa_printf(MSG_DEBUG, "[%s] auth path\n", __func__);	
+#endif			
 			wpa_supplicant_associate(wpa_s, NULL, ssid);
 			if (new_scan)
 				wpa_supplicant_rsn_preauth_scan_results(wpa_s);
 		} else if (own_request) {
+#if defined(INCLUDE_SCAN_DEBUG)			
+			wpa_printf(MSG_DEBUG, "[%s] own_request\n", __func__);	
+#endif			
 			/*
 			 * No SSID found. If SCAN results are as a result of
 			 * own scan request and not due to a scan request on
@@ -2104,6 +2123,10 @@ static int wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 	struct wpa_supplicant *ifs;
 	int res;
 
+#if defined(INCLUDE_SCAN_DEBUG)
+	wpa_printf(MSG_DEBUG, "[%s] connect call\n", __func__);
+#endif
+
 	res = _wpa_supplicant_event_scan_results(wpa_s, data, 1, 0);
 	if (res == 2) {
 		/*
@@ -2167,7 +2190,9 @@ int wpa_supplicant_fast_associate(struct wpa_supplicant *wpa_s)
 		wpa_printf(MSG_DEBUG, "Fast associate: Old scan results");
 		return -1;
 	}
-
+#if defined(INCLUDE_SCAN_DEBUG)	
+	wpa_printf(MSG_DEBUG, "[%s] connect call\n", __func__);
+#endif	
 	return wpas_select_network_from_last_scan(wpa_s, 0, 1);
 #endif /* CONFIG_NO_SCAN_PROCESSING */
 }
@@ -4054,6 +4079,7 @@ static void wpa_supplicant_event_assoc_auth(struct wpa_supplicant *wpa_s,
 			       data->assoc_info.ptk_kck_len,
 			       data->assoc_info.ptk_kek,
 			       data->assoc_info.ptk_kek_len);
+	wpa_sm_set_msg_3_of_4_ok(wpa_s->wpa, true);
 #ifdef CONFIG_FILS
 	if (wpa_s->auth_alg == WPA_AUTH_ALG_FILS) {
 		struct wpa_bss *bss = wpa_bss_get_bssid(wpa_s, wpa_s->bssid);
@@ -4353,6 +4379,9 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 			wpa_dbg(wpa_s, MSG_DEBUG, "Scan completed in %ld.%06ld seconds",
 				diff.sec, diff.usec);
 		}
+#if defined(INCLUDE_SCAN_DEBUG)		
+		wpa_printf(MSG_DEBUG, "[%s] wpa_supplicant_event_scan_results call\n", __func__);
+#endif		
 		if (wpa_supplicant_event_scan_results(wpa_s, data))
 			break; /* interface may have been removed */
 		if (!(data && data->scan_info.external_scan))

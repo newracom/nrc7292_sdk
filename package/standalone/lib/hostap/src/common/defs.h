@@ -114,6 +114,11 @@ static inline int wpa_key_mgmt_sae(int akm)
 			 WPA_KEY_MGMT_FT_SAE));
 }
 
+static inline int wpa_key_mgmt_owe(int akm)
+{
+	return !!(akm & WPA_KEY_MGMT_OWE);
+}
+
 static inline int wpa_key_mgmt_fils(int akm)
 {
 	return !!(akm & (WPA_KEY_MGMT_FILS_SHA256 |

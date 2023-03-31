@@ -34,8 +34,8 @@
 
 #include "bme680.h"
 
-#define BME680_SPI
-//#define BME680_I2C
+//#define BME680_SPI
+#define BME680_I2C
 
 struct bme680_dev sensor;
 
@@ -103,9 +103,13 @@ static int spi_init(spi_device_t* spi)
 	return BME680_OK;
 }
 #elif defined(BME680_I2C)
-
+#ifdef NRC7292
 #define BME680_I2C_SCL    16
 #define BME680_I2C_SDA    17
+#else
+#define BME680_I2C_SCL    7
+#define BME680_I2C_SDA    6
+#endif
 #define BME680_I2C_CLOCK  100000
 #define BME680_I2C_CLOCK_SOURCE 0 /* 0:clock controller, 1:PCLK */
 #define I2C_XACT_DELAY_MS 1
@@ -222,12 +226,15 @@ static int sensor_init()
 	bme680_spi.pin_miso = 12;
 	bme680_spi.pin_mosi = 13;
 	bme680_spi.pin_cs =14;
+#ifdef NRC7292
 	bme680_spi.pin_sclk = 15;
+#else
+	bme680_spi.pin_sclk = 17;
+#endif
 	bme680_spi.frame_bits = SPI_BIT8;
 	bme680_spi.clock = 1000000;
 	bme680_spi.mode = SPI_MODE3;
 	bme680_spi.controller = SPI_CONTROLLER_SPI0;
-	bme680_spi.bit_order = SPI_MSB_ORDER;
 	bme680_spi.irq_save_flag = 0;
 	bme680_spi.isr_handler = NULL;
 
@@ -288,7 +295,7 @@ void user_init(void)
 	nrc_uart_console_enable(true);
 
 	if(sensor_init() == NRC_FAIL)   {
-		nrc_usr_print("[%s] sensor init failed!!!\n");
+		nrc_usr_print("[%s] sensor init failed!!!\n", __func__);
 		return;
 	}
 

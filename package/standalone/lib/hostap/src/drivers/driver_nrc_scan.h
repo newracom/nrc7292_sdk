@@ -27,6 +27,11 @@
 #define DRIVER_SCAN_DEBUG_TEST_SUITE
 #define MAX_SCAN_SSID_LIST			(16)
 #define MAX_SCAN_HISTORY			(8)
+#define PROBE_RESPONSE_BSSID_OFFSET	10
+#define PROBE_RESPONSE_SSID_LEN_OFFSET	37
+#define PROBE_RESPONSE_SSID_BASE_LEN	9
+#define LENGTH_OF_DSPARAM	3
+#define LENGTH_OF_SUPP_RATES	10
 
 struct nrc_wpa_scan_res {
 	struct dl_list list;
@@ -62,5 +67,4 @@ void scan_flush(struct nrc_scan_info *scan);
 void scan_deinit(struct nrc_scan_info *scan);
 
 void nrc_scan_test();
-
 #endif // DRIVER_FREERTOS_SCAN_H

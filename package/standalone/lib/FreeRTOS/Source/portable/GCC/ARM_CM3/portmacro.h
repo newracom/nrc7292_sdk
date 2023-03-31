@@ -113,6 +113,14 @@ not necessary for to use this port.  They are defined so the common demo files
 #define portTASK_FUNCTION( vFunction, pvParameters ) void vFunction( void *pvParameters )
 /*-----------------------------------------------------------*/
 
+/*--------------------	Run Time Stats -----------------------*/
+#ifdef NRC_FREERTOS
+extern uint32_t drv_lmac_get_tsf_lo(int vif_id);
+#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()
+#define portGET_RUN_TIME_COUNTER_VALUE() drv_lmac_get_tsf_lo(0)
+#define portALT_GET_RUN_TIME_COUNTER_VALUE(x) do {x = (uint32_t)drv_lmac_get_tsf_lo(0);} while(0)
+#endif /* NRC_FREERTOS */
+
 /* Tickless idle/low power functionality. */
 #ifndef portSUPPRESS_TICKS_AND_SLEEP
 	extern void vPortSuppressTicksAndSleep( TickType_t xExpectedIdleTime );
@@ -195,7 +203,6 @@ uint32_t ulNewBASEPRI;
 
 	__asm volatile
 	(
-
 		"	mov %0, %1												\n" \
 		"	msr basepri, %0											\n" \
 		"	isb														\n" \
@@ -212,14 +219,12 @@ uint32_t ulOriginalBASEPRI, ulNewBASEPRI;
 
 	__asm volatile
 	(
-
 		"	mrs %0, basepri											\n" \
 		"	mov %1, %2												\n" \
 		"	msr basepri, %1											\n" \
 		"	isb														\n" \
 		"	dsb														\n" \
 		:"=r" (ulOriginalBASEPRI), "=r" (ulNewBASEPRI) : "i" ( configMAX_SYSCALL_INTERRUPT_PRIORITY ) : "memory"
-
 	);
 
 	/* This return will not be reached but is necessary to prevent compiler

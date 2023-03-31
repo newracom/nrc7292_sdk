@@ -1,6 +1,6 @@
 #include "system_common.h"
 #include "nrc_ps_api.h"
-#include "nrc_wifi.h"
+#include "nrc_lwip.h"
 
 #include "driver_nrc.h"
 #include "driver_nrc_scan.h"
@@ -29,7 +29,7 @@ static int wpa_ps_check_hook(DRV_PS_HOOK_TYPE type, struct retention_info *ret_i
 	uint8_t empty_bssid[6] = {0,};
 
 	/* No need to check HOOK_TYPE_PORT. Always hooked */
-	if (type == WPA_PS_HOOK_TYPE_PORT) {
+	if ((type == WPA_PS_HOOK_TYPE_PORT) || (type == WPA_PS_HOOK_TYPE_FAST_SCAN)) {
 		return WPA_PS_HOOK_RET_SUCCESS;
 	}
 
@@ -43,6 +43,10 @@ static int wpa_ps_check_hook(DRV_PS_HOOK_TYPE type, struct retention_info *ret_i
 		return WPA_PS_HOOK_RET_FAIL_NO_RETENT;
 	}
 
+	if (type == WPA_PS_HOOK_TYPE_SET_REKEY_INFO) {
+		return WPA_PS_HOOK_RET_SUCCESS;
+	}
+
 	if (!ret_info->recovered) {
 		I(TT_WPAS, TAG "no hook. recovery is not started yet \n");
 		return WPA_PS_HOOK_RET_FAIL_NOT_RECOVERED;
@@ -53,7 +57,7 @@ static int wpa_ps_check_hook(DRV_PS_HOOK_TYPE type, struct retention_info *ret_i
 		return WPA_PS_HOOK_RET_FAIL_NO_AP_INFO;
 	}
 
-#if 0 
+#if 0
 	// scan and dhcp can be hooked even if wpa2/wpa3
 	if (type == WPA_PS_HOOK_TYPE_SCAN || type == WPA_PS_HOOK_TYPE_DHCP) {
 		return WPA_PS_HOOK_RET_SUCCESS;
@@ -105,7 +109,7 @@ static int _build_internal_element(struct retention_info *ret_info , uint8_t *ie
 	// [0x30] RSN info ie (for PSK/SAE security)
 	if (ret_info->ap_info.security == WPA_KEY_MGMT_PSK || ret_info->ap_info.security == 8 ||
 		ret_info->ap_info.security == 16) {
-		uint8_t rsn_ie[22] = {0x30, 0x14, 0x01, 0x00, 0x00, 0x0f, 0xac, 0x04, 0x01, 0x00, 0x00, 0x0f, 0xac, 0x04, 0x01, 
+		uint8_t rsn_ie[22] = {0x30, 0x14, 0x01, 0x00, 0x00, 0x0f, 0xac, 0x04, 0x01, 0x00, 0x00, 0x0f, 0xac, 0x04, 0x01,
 		0x00, 0x00, 0x0f, 0xac, 0x00, 0x00, 0x00};
 		os_memcpy (ie_chain+pos, rsn_ie, 22);
 		pos += 19;
@@ -186,6 +190,24 @@ static int wpa_ps_hook_handle_set_key(struct retention_info *ret_info, void *par
 	return WPA_PS_HOOK_RET_SUCCESS;
 }
 
+static int wpa_ps_hook_handle_set_rekey_info(struct retention_info *ret_info, void *param1, void *param2)
+{
+	ASSERT(param1);
+
+	union wpa_event_data *event = (union wpa_event_data *)(param1);
+
+	V(TT_WPAS, TAG "%s: KCK length:%d KEK length:%d\n", __func__,
+			event->assoc_info.ptk_kck_len, event->assoc_info.ptk_kek_len);
+
+	if (event->assoc_info.ptk_kck_len > KCK_MAX_LEN || event->assoc_info.ptk_kek_len > KEK_MAX_LEN) {
+		return WPA_PS_HOOK_RET_FAIL;
+	}
+	memcpy(ret_info->key_info.kck, event->assoc_info.ptk_kck, KCK_MAX_LEN);
+	memcpy(ret_info->key_info.kek, event->assoc_info.ptk_kek, KEK_MAX_LEN);
+
+	return WPA_PS_HOOK_RET_SUCCESS;
+}
+
 static int wpa_ps_hook_handle_scan(struct retention_info *ret_info, void *param1, void *param2)
 {
 	ASSERT(param1);
@@ -197,7 +219,9 @@ static int wpa_ps_hook_handle_scan(struct retention_info *ret_info, void *param1
 	uint16_t ie_copy_len = 0;
 	u64 tsf = NOW;
 
+#if !defined(INCLUDE_MEASURE_AIRTIME)
 	E(TT_WPAS, TAG "%d scan start\n", vif_id);
+#endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
 
 	scan_flush(intf->scan);
 
@@ -220,7 +244,9 @@ static int wpa_ps_hook_handle_scan(struct retention_info *ret_info, void *param1
 		return WPA_PS_HOOK_RET_FAIL_MEM_ALLOC;
 	}
 	os_memcpy(scan_res->res->bssid, ret_info->ap_info.bssid, ETH_ALEN);
-	scan_res->res->freq = STAGetNoneS1GFreq(ret_info->ch_info.ch_freq);
+	scan_res->res->freq = STAGetNonS1GFreqWithBw(ret_info->ch_info.ch_freq,
+					BW_TO_BW_ENUM(ret_info->ch_info.ch_bw));
+
 	scan_res->res->beacon_int = ret_info->ap_info.bcn_interval;
 	scan_res->res->caps = 0x1;
 	if (ret_info->ap_info.security == WPA_KEY_MGMT_PSK || ret_info->ap_info.security == 8 ||
@@ -237,7 +263,9 @@ static int wpa_ps_hook_handle_scan(struct retention_info *ret_info, void *param1
 	ASSERT(ie_copy_len <= ie_chain_len);
 	dl_list_add(&intf->scan->scan_list, &scan_res->list);
 
+#if !defined(INCLUDE_MEASURE_AIRTIME)
 	E(TT_WPAS, TAG "%d scan done\n",vif_id);
+#endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
 
 #if 0
 	I(TT_WPAS, TAG "%d scan entry bssid(" MACSTR "), freq(%d), bi(%d), "
@@ -252,12 +280,16 @@ static int wpa_ps_hook_handle_scan(struct retention_info *ret_info, void *param1
 		scan_res->res->level,
 		scan_res->res->ie_len);
 #else
+
+#if !defined(INCLUDE_MEASURE_AIRTIME)
 	E(TT_WPAS, TAG "%d bssid(" MACSTR "), freq(%d), bi(%d), caps(%d), level(%d)\n",
 		vif_id, MAC2STR(scan_res->res->bssid),
 		scan_res->res->freq,
 		scan_res->res->beacon_int,
 		scan_res->res->caps,
 		scan_res->res->level);
+#endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
+
 #endif
 	//print_hex(scan_res->res+1, ie_chain_len);
 
@@ -276,7 +308,9 @@ static int wpa_ps_hook_handle_auth(struct retention_info *ret_info, void *param1
 		//return WPA_PS_HOOK_RET_SUCCESS;
 	}
 
+#if !defined(INCLUDE_MEASURE_AIRTIME)
 	E(TT_WPAS, TAG "%d auth\n", 0);
+#endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
 
 	struct nrc_wpa_if *intf = (struct nrc_wpa_if *)(param1);
 	union wpa_event_data event;
@@ -304,10 +338,16 @@ static int wpa_ps_hook_handle_assoc(struct retention_info *ret_info, void *param
 	struct nrc_wpa_if *intf = (struct nrc_wpa_if *)(param1);
 	struct wpa_driver_associate_params *assoc_param= (struct wpa_driver_associate_params *)(param2);
 	union wpa_event_data event;
+	uint8_t* assoc_addr;
+	struct nrc_wpa_key *key = NULL;
+
 	os_memset(&event, 0, sizeof(event));
 
+#if !defined(INCLUDE_MEASURE_AIRTIME)
 	E(TT_WPAS, TAG "%d assoc (kms:%d)\n",
 		intf->vif_id, assoc_param->key_mgmt_suite);
+#endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
+
 	intf->key_mgmt = assoc_param->key_mgmt_suite;
 	intf->associated = true;
 	intf->sta.aid = ret_info->sta_info.aid;
@@ -331,21 +371,31 @@ static int wpa_ps_hook_handle_assoc(struct retention_info *ret_info, void *param
 		}
 #endif
 	event.assoc_info.reassoc = false;
-	event.assoc_info.freq = STAGetNoneS1GFreq(ret_info->ch_info.ch_freq);
+	event.assoc_info.freq = STAGetNonS1GFreqWithBw(ret_info->ch_info.ch_freq,
+					BW_TO_BW_ENUM(ret_info->ch_info.ch_bw));
 	if (intf->key_mgmt == WPA_KEY_MGMT_NONE)
 		event.assoc_info.authorized = 0;
 	else
 		event.assoc_info.authorized = 1;
 	event.assoc_info.resp_ies_len = 0;
 	event.assoc_info.resp_ies = NULL;
+#if !defined(INCLUDE_MEASURE_AIRTIME)
 	E(TT_WPAS, TAG "%d bss max idle (%d)\n", intf->vif_id, intf->bss.max_idle);
+#endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
 	if (intf->bss.max_idle) {
 		nrc_start_keep_alive(intf);
 	}
+
+	/* restore GTK rekey offload */
+	event.assoc_info.ptk_kck_len = KCK_MAX_LEN;
+	event.assoc_info.ptk_kek_len = KEK_MAX_LEN;
+	event.assoc_info.ptk_kck = ret_info->key_info.kck;
+	event.assoc_info.ptk_kek = ret_info->key_info.kek;
+
 	wpa_supplicant_event(intf->wpa_supp_ctx, EVENT_ASSOC, &event);
+	lmac_set_bypass_beacon_mode(intf->vif_id, false);
 	if (event.assoc_info.authorized) {
 #if 1
-		struct nrc_wpa_key *key = NULL;
 		uint8_t br_addr[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 		for (int i = 0; i < 4; i++) {
 			if (!ret_info->key_info.cipher_info[i].key_enable) continue;
@@ -367,8 +417,14 @@ static int wpa_ps_hook_handle_assoc(struct retention_info *ret_info, void *param
 #endif
 		wpa_supplicant_event(intf->wpa_supp_ctx, EVENT_PORT_AUTHORIZED, NULL);
 	}
-	wpa_driver_set_associate_status(true);
-	wpa_driver_notify_event_to_app(EVENT_ASSOC, 0, NULL);
+
+	assoc_addr = os_malloc(ETH_ALEN*sizeof(uint8_t));
+	os_memcpy(assoc_addr, key->addr, ETH_ALEN);
+
+	wpa_driver_notify_event_to_app(intf->vif_id, WIFI_EVT_CONNECT_SUCCESS, ETH_ALEN, assoc_addr);
+
+	/* currently, it's verified for the static ip assignment case on the ESL Project. */
+	lmac_send_qos_null_frame(false);
 
 	return WPA_PS_HOOK_RET_SUCCESS;
 }
@@ -381,7 +437,9 @@ static int wpa_ps_hook_handle_port(struct retention_info *ret_info, void *param1
 	struct nrc_wpa_if *intf = (struct nrc_wpa_if *)(param1);
 	int authorized = *((int*)(param2));
 
+#if !defined(INCLUDE_MEASURE_AIRTIME)
 	E(TT_WPAS, TAG "%d set key (mgmt:%d, authorized:%d)\n", intf->vif_id, intf->key_mgmt, authorized);
+#endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
 
 	if (!intf->key_mgmt || intf->key_mgmt == WPA_KEY_MGMT_NONE ||authorized)
 		return WPA_PS_HOOK_RET_FAIL;
@@ -400,7 +458,6 @@ static int wpa_ps_hook_handle_dhcp(struct retention_info *ret_info, void *param1
 
 	int vif_id = *(int *)param1;
 	s8_t err;
-	ip4_addr_t adrs;
 	struct eth_addr bssid;
 
 	E(TT_WPAS, TAG "%d dhcp\n",  vif_id);
@@ -412,18 +469,28 @@ static int wpa_ps_hook_handle_dhcp(struct retention_info *ret_info, void *param1
 		return WPA_PS_HOOK_RET_FAIL_NO_IP;
 	}
 
+#if LWIP_IPV4
 	/* Set IP and DNS */
 	struct ip_info ip_info;
+#if LWIP_IPV6
+	ip_info.ip.u_addr.ip4.addr = ret_info->ip_info.ip_addr;
+	ip_info.netmask.u_addr.ip4.addr = ret_info->ip_info.net_mask;
+	ip_info.gw.u_addr.ip4.addr = ret_info->ip_info.gw_addr;
+#else
 	ip_info.ip.addr = ret_info->ip_info.ip_addr;
 	ip_info.netmask.addr = ret_info->ip_info.net_mask;
 	ip_info.gw.addr = ret_info->ip_info.gw_addr;
+#endif
 	wifi_set_ip_info(vif_id, &ip_info);
-	wifi_set_dns_server();
+	wifi_set_dns_server(NULL, NULL);
+#endif
 
 	/* Set state of WLAN Manager as "GET_IP" */
-	nrc_wifi_set_state(WIFI_STATE_GET_IP);
+	//nrc_wifi_set_state(WIFI_STATE_GET_IP);
 
+#if LWIP_IPV4
 	/* Add AP's MAC into ARP Entery */
+	ip4_addr_t adrs;
 	adrs.addr = ret_info->ip_info.gw_addr;
 	memcpy(bssid.addr, ret_info->ap_info.bssid, 6);
 	err = etharp_add_static_entry(&adrs, &bssid);
@@ -431,6 +498,7 @@ static int wpa_ps_hook_handle_dhcp(struct retention_info *ret_info, void *param1
 		E(TT_WPAS, TAG "%s Fail to add ethar (err:%d)\n", __func__, err);
 	else
 		E(TT_WPAS, TAG "%d add arp\n", vif_id);
+#endif
 
 	/* Send Null for informing AP of Awake */
 	lmac_send_qos_null_frame(false);
@@ -452,7 +520,9 @@ static const wpa_ps_hook_handler handlers[WPA_PS_HOOK_TYPE_MAX] = {
 	[WPA_PS_HOOK_TYPE_INIT]	= wpa_ps_hook_handle_init,
 	[WPA_PS_HOOK_TYPE_PMK]		= wpa_ps_hook_handle_pmk,
 	[WPA_PS_HOOK_TYPE_SET_KEY]	= wpa_ps_hook_handle_set_key,
+	[WPA_PS_HOOK_TYPE_SET_REKEY_INFO] = wpa_ps_hook_handle_set_rekey_info,
 	[WPA_PS_HOOK_TYPE_SCAN]		= wpa_ps_hook_handle_scan,
+	[WPA_PS_HOOK_TYPE_FAST_SCAN]= wpa_ps_hook_handle_scan,
 	[WPA_PS_HOOK_TYPE_AUTH] 	= wpa_ps_hook_handle_auth,
 	[WPA_PS_HOOK_TYPE_ASSOC]	= wpa_ps_hook_handle_assoc,
 	[WPA_PS_HOOK_TYPE_PORT]	= wpa_ps_hook_handle_port,

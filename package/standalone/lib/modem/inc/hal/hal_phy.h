@@ -1,6 +1,15 @@
 #ifndef __NRC_PHY_H__
 #define __NRC_PHY_H__
 
+/* CCA Threshold init : -75 dBm */
+#define CCA_THRESHOLD_REG2_INIT_VALUE	0x0000b5b8
+#define CCA_THRESHOLD_REG3_INIT_VALUE	0xb5b5b8b8
+
+/* 10212021 CCA-ED Threshold : - 85dBm regardless of BW */
+/* CCA-ED: -85dBm */
+#define CCA_THRESHOLD_REG2_KR_VALUE	0x0000abab
+#define CCA_THRESHOLD_REG3_KR_VALUE	0xabababab
+
 ////////////////////
 void init_constructor();
 void print_cli_title();
@@ -26,7 +35,7 @@ void phy_dfe_status_counter_rst();
 void phy_gain_adap_on();
 void phy_gain_adap_off();
 
-void phy_op_bw(uint32_t bw);
+void phy_op_bw(uint8_t vif_id,uint32_t bw);
 void phy_field_test();
 void phy_loopback_enable();
 void phy_loopback_disable();

@@ -1,0 +1,13 @@
+
+ECHO " ATC-005 : CCA Threshold"
+ECHO "========================================="
+HOLD
+
+AT+WCCATHRESHOLD?
+
+AT+WCCATHRESHOLD=-85
+AT+WCCATHRESHOLD?
+
+AT+WCCATHRESHOLD=-75
+AT+WCCATHRESHOLD?
+

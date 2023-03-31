@@ -5,3 +5,8 @@ v1.3.0
 => Refactoring.
 => Passthrough mode support added.
 => Asynchronous continuous transmission mode support removed.
+
+v1.4.0
+=> NRC module type-agnostic version identifier.
+=> AT-commands update.
+=> Experimental echo integrity test removed.

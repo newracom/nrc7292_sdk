@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2020 Newracom, Inc.
+ * Copyright (c) 2022 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,13 +28,30 @@
 #include "wifi_connect_common.h"
 
 #define MAX_RETRY 10
-#define SLEEP_MODE 1 /* 0: POWER_SAVE_MODEM_SLEEP_MODE | 1 : POWER_SAVE_DEEP_SLEEP_MODE */
-#define INTERVAL 0 /* 0: Tim | non-zero : Non - Tim (ms) */
 
-#ifndef WAKEUP_GPIO_PIN
-#define WAKEUP_GPIO_PIN 15
-#endif /* WAKEUP_GPIO_PIN */
+/* TIM or NonTIM deep sleep (select one depending on services)*/
+#define TIM_DEEPSLEEP 0 //TIM (1) NonTIM(0)
+/* in ms. STA can enter deep sleep if there is no traffic during timeout */
+#define IDLE_TIMEOUT 100 // ms
+/* in ms. STA wakes up if sleep time is expired during deep sleep*/
+#define SLEEP_TIME_MS 5000 // ms
 
+//#define WAKEUP_GPIO_PIN 15
+
+static void user_operation(uint32_t delay_ms)
+{
+	_delay_ms(delay_ms);
+}
+
+static bool _ready_ip_address(void)
+{
+	if (nrc_addr_get_state(0) == NET_ADDR_SET &&
+		nrc_wifi_get_state(0) == WIFI_STATE_CONNECTED) {
+		return true;
+	} else {
+		return false;
+	}
+}
 
 /******************************************************************************
  * FunctionName : run_sample_wifi_power_save
@@ -44,17 +61,16 @@
  *******************************************************************************/
 nrc_err_t run_sample_wifi_power_save(WIFI_CONFIG *param)
 {
-	int network_index = 0;
-	tWIFI_STATE_ID wifi_state = WIFI_STATE_INIT;
 	int retry_count = 0;
-	int current_wifi_state = WIFI_STATE_INIT;
 	SCAN_RESULTS results;
 	char* ip_addr = NULL;
+	uint32_t wakeup_source = 0;
 
 	nrc_usr_print("[%s] Sample App for Wi-Fi  \n",__func__);
 
 	int i = 0;
 	int ssid_found =false;
+	uint8_t retry_cnt = 0;
 
 	/* set initial wifi configuration */
 	while(1){
@@ -67,94 +83,86 @@ nrc_err_t run_sample_wifi_power_save(WIFI_CONFIG *param)
 		}
 	}
 
-	/* find AP */
-	while(1){
-		if (nrc_wifi_scan() == WIFI_SUCCESS){
-			if (nrc_wifi_scan_results(&results)== WIFI_SUCCESS) {
-				/* Find the ssid in scan results */
-				for(i=0; i<results.n_result ; i++){
-					if(strcmp((char*)param->ssid, (char*)results.result[i].ssid)== 0 ){
-						ssid_found = true;
-						break;
-					}
-				}
-
-				if(ssid_found){
-					nrc_usr_print ("[%s] %s is found \n", __func__, param->ssid);
-					break;
-				}
-			}
-		} else {
-			nrc_usr_print ("[%s] Scan fail !! \n", __func__);
-			_delay_ms(1000);
-		}
-	}
-
 	/* connect to AP */
 	while(1) {
 		if (wifi_connect(param)== WIFI_SUCCESS) {
 			nrc_usr_print ("[%s] connect to %s successfully !! \n", __func__, param->ssid);
 			break;
-		}else{
+		} else {
 			nrc_usr_print ("[%s] Fail for connection %s\n", __func__, param->ssid);
 			_delay_ms(1000);
-		}
-	}
-
-	nrc_wifi_get_network_index(&network_index );
-
-	/* check the IP is ready */
-	while(1){
-		nrc_wifi_get_state(&wifi_state);
-		if (wifi_state == WIFI_STATE_GET_IP) {
-			if (nrc_wifi_get_ip_address(&ip_addr) != WIFI_SUCCESS){
-				nrc_usr_print("[%s] IP Address : %s\n", __func__, ip_addr);
+			if (++retry_cnt > 2) {
+				nrc_usr_print("(connect) Exceeded retry limit (2), going into RTC deep sleep for 5000ms.");
+				nrc_ps_deep_sleep(5000);
 			}
-			break;
-		} else{
-			if (wifi_state == WIFI_STATE_CONNECTED) nrc_wifi_set_ip_address();
-			nrc_usr_print("[%s] Current State : %d...\n",__func__, wifi_state);
 		}
-		_delay_ms(1000);
 	}
 
-	uint32_t delay_ms = 3000;
-	nrc_usr_print("[%s] waiting for %u ms before entering sleep... \n",__func__, delay_ms);
-	_delay_ms(delay_ms);
+check_again:
+	retry_cnt = 0;
+	/* check if wifi-connected and IP is ready */
+	while (1) {
+		if (_ready_ip_address()) {
+			nrc_usr_print("[%s] IP is ready\n",__func__);
+			break;
+		}
+		nrc_usr_print("[%s] not ready (wifi_state:%d, ip_state:%d)\n",
+			__func__, nrc_wifi_get_state(0), nrc_addr_get_state(0));
+		_delay_ms(200);
+		if (++retry_cnt > 200) {
+			//waiting for connection for (total 200ms * 200 try = 40000 ms)
+			nrc_usr_print("Exceeded retry limit (200), going into RTC deep sleep for 5000ms.");
+			nrc_ps_deep_sleep(5000);
+		}
+	}
 
-sleep:
 #if defined(WAKEUP_GPIO_PIN)
 	nrc_ps_set_gpio_wakeup_pin(false, WAKEUP_GPIO_PIN);
-	nrc_ps_set_wakeup_source(WAKEUP_SOURCE_RTC|WAKEUP_SOURCE_GPIO);
+	wakeup_source |= WAKEUP_SOURCE_GPIO;
 #endif /* defined(WAKEUP_GPIO_PIN) */
 
-	if (nrc_ps_set_sleep(SLEEP_MODE, INTERVAL, 0) < 0) {
-		/* Something is wrong. maybe disconnected. wait for reconnection */
-		while(1){
-			nrc_wifi_get_state(&wifi_state);
-			if (wifi_state == WIFI_STATE_CONNECTED) {
-				if (nrc_wifi_set_ip_address() != WIFI_SUCCESS) {
-					nrc_usr_print("[%s] Fail to Get IP Address\n", __func__);
-				}
-				nrc_wifi_get_state(&wifi_state);
-				if (wifi_state == WIFI_STATE_GET_IP) {
-					goto sleep;
-				}
+	wakeup_source |= WAKEUP_SOURCE_RTC;
+	nrc_ps_set_wakeup_source(wakeup_source);
+
+	/* To detect disconnections, the operation time must exceed 3 seconds. */
+	user_operation(3000);
+
+	while (1) {
+		/* Try to enter deepsleep */
+#if TIM_DEEPSLEEP
+		/* STA can wake up if buffered unit is indicated by AP or timeout is expired.
+			(if gpio is set for wakeup source, STA also can wake up by gpio input) */
+		if (nrc_ps_wifi_tim_deep_sleep(IDLE_TIMEOUT, SLEEP_TIME_MS) == NRC_SUCCESS) {
+#else
+		/* STA can wake up if timeout is expired.
+			(if gpio is set for wakeup source, STA also can wake up by gpio input) */
+		if (nrc_ps_deep_sleep(SLEEP_TIME_MS) == NRC_SUCCESS) {
+#endif
+			if (_ready_ip_address()) {
+				nrc_usr_print("[%s] IP is ready\n",__func__);
+				break;
 			}
-			nrc_usr_print("[%s] Current State : %d...\n",__func__, wifi_state);
-			_delay_ms(1000);
+		} else {
+			nrc_usr_print("[%s] fail to set sleep (wifi_state:%d, ip_state:%d)\n",
+				__func__, nrc_wifi_get_state(0), nrc_addr_get_state(0));
+			goto check_again;
 		}
 	}
 
-	nrc_usr_print("[%s] End of run_sample_wifi_power_save!! \n",__func__);
-
 	while(1) {
+		if (_ready_ip_address()) {
+			nrc_usr_print("Done.\n");
+		} else {
+			nrc_usr_print("[%s] disconnected (wifi_state:%d, ip_state:%d)\n",
+				__func__, nrc_wifi_get_state(0), nrc_addr_get_state(0));
+			goto check_again;
+		}
+		/* just wait for entering deep sleep via dynamic PS */
 		_delay_ms(1000);
 	}
 
 	return NRC_SUCCESS;
 }
-
 
 /******************************************************************************
  * FunctionName : user_init
@@ -162,20 +170,15 @@ sleep:
  * Parameters   : none
  * Returns      : none
  *******************************************************************************/
+WIFI_CONFIG wifi_config;
+WIFI_CONFIG* param = &wifi_config;
+
 void user_init(void)
 {
-	nrc_err_t ret;
-	WIFI_CONFIG* param;
-
 	nrc_uart_console_enable(true);
 
-	param = nrc_mem_malloc(WIFI_CONFIG_SIZE);
 	memset(param, 0x0, WIFI_CONFIG_SIZE);
 
-	set_wifi_config(param);
-	ret = run_sample_wifi_power_save(param);
-	nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
-	if(param){
-		nrc_mem_free(param);
-	}
+	nrc_wifi_set_config(param);
+	run_sample_wifi_power_save(param);
 }

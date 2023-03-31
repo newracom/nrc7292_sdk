@@ -342,6 +342,24 @@ typedef struct httpd_uri {
      * Pointer to user context data which will be available to handler
      */
     void *user_ctx;
+#ifdef CONFIG_HTTPD_WS_SUPPORT
+    /**
+     * Flag for indicating a WebSocket endpoint.
+     * If this flag is true, then method must be HTTP_GET. Otherwise the handshake will not be handled.
+     */
+    bool is_websocket;
+
+    /**
+     * Flag indicating that control frames (PING, PONG, CLOSE) are also passed to the handler
+     * This is used if a custom processing of the control frames is needed
+     */
+    bool handle_ws_control_frames;
+
+    /**
+     * Pointer to subprotocol supported by URI
+     */
+    const char *supported_subprotocol;
+#endif
 } httpd_uri_t;
 
 /**
@@ -1180,6 +1198,150 @@ esp_err_t httpd_queue_work(httpd_handle_t handle, httpd_work_fn_t work, void *ar
  * @}
  */
 
+/* ************** Group: WebSocket ************** */
+/** @name WebSocket
+ * Functions and structs for WebSocket server
+ * @{
+ */
+#ifdef CONFIG_HTTPD_WS_SUPPORT
+/**
+ * @brief Enum for WebSocket packet types (Opcode in the header)
+ * @note Please refer to RFC6455 Section 5.4 for more details
+ */
+typedef enum {
+    HTTPD_WS_TYPE_CONTINUE   = 0x0,
+    HTTPD_WS_TYPE_TEXT       = 0x1,
+    HTTPD_WS_TYPE_BINARY     = 0x2,
+    HTTPD_WS_TYPE_CLOSE      = 0x8,
+    HTTPD_WS_TYPE_PING       = 0x9,
+    HTTPD_WS_TYPE_PONG       = 0xA
+} httpd_ws_type_t;
+
+/**
+ * @brief Enum for client info description
+ */
+typedef enum {
+    HTTPD_WS_CLIENT_INVALID        = 0x0,
+    HTTPD_WS_CLIENT_HTTP           = 0x1,
+    HTTPD_WS_CLIENT_WEBSOCKET      = 0x2,
+} httpd_ws_client_info_t;
+
+/**
+ * @brief WebSocket frame format
+ */
+typedef struct httpd_ws_frame {
+    bool final;                 /*!< Final frame:
+                                     For received frames this field indicates whether the `FIN` flag was set.
+                                     For frames to be transmitted, this field is only used if the `fragmented`
+                                         option is set as well. If `fragmented` is false, the `FIN` flag is set
+                                         by default, marking the ws_frame as a complete/unfragmented message
+                                         (esp_http_server doesn't automatically fragment messages) */
+    bool fragmented;            /*!< Indication that the frame allocated for transmission is a message fragment,
+                                     so the `FIN` flag is set manually according to the `final` option.
+                                     This flag is never set for received messages */
+    httpd_ws_type_t type;       /*!< WebSocket frame type */
+    uint8_t *payload;           /*!< Pre-allocated data buffer */
+    size_t len;                 /*!< Length of the WebSocket data */
+} httpd_ws_frame_t;
+
+/**
+ * @brief Transfer complete callback
+ */
+typedef void (*transfer_complete_cb)(esp_err_t err, int socket, void *arg);
+
+/**
+ * @brief Receive and parse a WebSocket frame
+ *
+ * @note    Calling httpd_ws_recv_frame() with max_len as 0 will give actual frame size in pkt->len.
+ *          The user can dynamically allocate space for pkt->payload as per this length and call httpd_ws_recv_frame() again to get the actual data.
+ *          Please refer to the corresponding example for usage.
+ *
+ * @param[in]   req         Current request
+ * @param[out]  pkt         WebSocket packet
+ * @param[in]   max_len     Maximum length for receive
+ * @return
+ *  - ESP_OK                    : On successful
+ *  - ESP_FAIL                  : Socket errors occurs
+ *  - ESP_ERR_INVALID_STATE     : Handshake was already done beforehand
+ *  - ESP_ERR_INVALID_ARG       : Argument is invalid (null or non-WebSocket)
+ */
+esp_err_t httpd_ws_recv_frame(httpd_req_t *req, httpd_ws_frame_t *pkt, size_t max_len);
+
+/**
+ * @brief Construct and send a WebSocket frame
+ * @param[in]   req     Current request
+ * @param[in]   pkt     WebSocket frame
+ * @return
+ *  - ESP_OK                    : On successful
+ *  - ESP_FAIL                  : When socket errors occurs
+ *  - ESP_ERR_INVALID_STATE     : Handshake was already done beforehand
+ *  - ESP_ERR_INVALID_ARG       : Argument is invalid (null or non-WebSocket)
+ */
+esp_err_t httpd_ws_send_frame(httpd_req_t *req, httpd_ws_frame_t *pkt);
+
+/**
+ * @brief Low level send of a WebSocket frame out of the scope of current request
+ * using internally configured httpd send function
+ *
+ * This API should rarely be called directly, with an exception of asynchronous send using httpd_queue_work.
+ *
+ * @param[in] hd      Server instance data
+ * @param[in] fd      Socket descriptor for sending data
+ * @param[in] frame     WebSocket frame
+ * @return
+ *  - ESP_OK                    : On successful
+ *  - ESP_FAIL                  : When socket errors occurs
+ *  - ESP_ERR_INVALID_STATE     : Handshake was already done beforehand
+ *  - ESP_ERR_INVALID_ARG       : Argument is invalid (null or non-WebSocket)
+ */
+esp_err_t httpd_ws_send_frame_async(httpd_handle_t hd, int fd, httpd_ws_frame_t *frame);
+
+/**
+ * @brief Checks the supplied socket descriptor if it belongs to any active client
+ * of this server instance and if the websoket protocol is active
+ *
+ * @param[in] hd      Server instance data
+ * @param[in] fd      Socket descriptor
+ * @return
+ *  - HTTPD_WS_CLIENT_INVALID   : This fd is not a client of this httpd
+ *  - HTTPD_WS_CLIENT_HTTP      : This fd is an active client, protocol is not WS
+ *  - HTTPD_WS_CLIENT_WEBSOCKET : This fd is an active client, protocol is WS
+ */
+httpd_ws_client_info_t httpd_ws_get_fd_info(httpd_handle_t hd, int fd);
+
+/**
+ * @brief Sends data to to specified websocket synchronously
+ *
+ * @param[in] handle  Server instance data
+ * @param[in] socket  Socket descriptor
+ * @param[in] frame   Websocket frame
+ * @return
+ *  - ESP_OK                    : On successful
+ *  - ESP_FAIL                  : When socket errors occurs
+ *  - ESP_ERR_NO_MEM            : Unable to allocate memory
+ */
+esp_err_t httpd_ws_send_data(httpd_handle_t handle, int socket, httpd_ws_frame_t *frame);
+
+/**
+ * @brief Sends data to to specified websocket asynchronously
+ *
+ * @param[in] handle    Server instance data
+ * @param[in] socket    Socket descriptor
+ * @param[in] frame     Websocket frame
+ * @param[in] callback  Callback invoked after sending data
+ * @param[in] arg       User data passed to provided callback
+ * @return
+ *  - ESP_OK                    : On successful
+ *  - ESP_FAIL                  : When socket errors occurs
+ *  - ESP_ERR_NO_MEM            : Unable to allocate memory
+ */
+esp_err_t httpd_ws_send_data_async(httpd_handle_t handle, int socket, httpd_ws_frame_t *frame,
+                                   transfer_complete_cb callback, void *arg);
+
+#endif /* CONFIG_HTTPD_WS_SUPPORT */
+/** End of WebSocket related stuff
+ * @}
+ */
 #ifdef __cplusplus
 }
 #endif

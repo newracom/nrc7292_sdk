@@ -86,8 +86,8 @@ static void prvTaskExitError( void );
 
 /* Each task maintains its own interrupt status in the critical nesting
 variable. */
-
 static UBaseType_t uxCriticalNesting = 0xaaaaaaaa;
+
 /*-----------------------------------------------------------*/
 
 /*

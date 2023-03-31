@@ -3503,6 +3503,12 @@ static int wpa_supplicant_ctrl_iface_update_network(
 		wpa_config_update_psk(ssid);
 	else if (os_strcmp(name, "priority") == 0)
 		wpa_config_update_prio_list(wpa_s->conf);
+	else if (os_strcmp(name, "ssid") == 0)
+		wpa_drv_set_ssid(wpa_s, (const char*)ssid->ssid, ssid->ssid_len);
+	else if (os_strcmp(name, "bssid") == 0)
+		wpa_drv_set_bssid(wpa_s, (const char*)ssid->bssid);
+	else if (os_strcmp(name, "frequency") == 0)
+		wpa_drv_set_frequency(wpa_s, (uint16_t)ssid->frequency);
 	return 0;
 }
 

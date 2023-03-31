@@ -3,9 +3,9 @@
 
 #include "system.h"
 
-#define GPIO_27 27
-#define GPIO_28 28
-#define GPIO_29 29
+#define HW_VERSION_GPIO_HIGH 27
+#define HW_VERSION_GPIO_MID 28
+#define HW_VERSION_GPIO_LOW 29
 
 // GPIO[27:29]
 #define NRC7292_A_VALUE 7 /* 0b111 */

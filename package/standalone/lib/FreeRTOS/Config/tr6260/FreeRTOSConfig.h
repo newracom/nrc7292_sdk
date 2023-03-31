@@ -123,7 +123,7 @@ to exclude the API function. */
 #define INCLUDE_vTaskSuspend				1
 #define INCLUDE_vTaskDelayUntil				1
 #define INCLUDE_vTaskDelay				1
-
+#define INCLUDE_uxTaskGetStackHighWaterMark 1
 
 #define	INCLUDE_xTaskGetHandle			1
 #define configUSE_MUTEXES				1
@@ -162,6 +162,8 @@ header file. */
 #define configSUPPORT_STATIC_ALLOCATION		1
 #define configSUPPORT_DYNAMIC_ALLOCATION 	1
 
+#define configUSE_STATS_FORMATTING_FUNCTIONS 1
+
 /* Arch Optimization Option */
 //#define configUSE_PORT_OPTIMISED_TASK_SELECTION		1
 
@@ -181,10 +183,9 @@ received packets. */
 #define LWIP_IPERF_TASK_STACK_SIZE	( 512 )
 #endif
 
-#ifdef LWIP_PING
 #define LWIP_PING_TASK_PRIORITY	( configMAX_PRIORITIES - 6 )
 #define LWIP_PING_TASK_STACK_SIZE	( 512 )
-#endif
+
 /* The priority of the task that runs the test task */
 #define TEST_TASK_PRIORITY	( 2 )
 #define TEST_TASK_STACK_SIZE 	(1024 / sizeof(StackType_t))

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<title>Newracom Wireleass Bridge</title>
+<style type="text/css">
+html {
+color: #000;
+background: #FFF;
+}
+body {
+font: 13px/1.231 arial, helvetica, clean, sans-serif;
+*font-size: small;
+*font: x-small;
+}
+body {
+text-align: center;
+}
+.yui-t1,
+.yui-t2,
+.yui-t3,
+.yui-t4,
+.yui-t5,
+.yui-t6,
+.yui-t7 {
+margin: auto;
+text-align: left;
+width: 57.69em;
+*width: 56.25em;
+min-width: 750px;
+}
+</style>
+</head>
+<body onload="initPage()">
+<script type="text/javascript">
+var channels = {
+US: [
+[9025, 1],[9035, 1],[9045, 1],[9055, 1],[9065, 1],
+[9075, 1],[9085, 1],[9095, 1],[9105, 1],[9115, 1],
+[9125, 1],[9135, 1],[9145, 1],[9155, 1],[9165, 1],
+[9175, 1],[9185, 1],[9195, 1],[9205, 1],[9215, 1],
+[9225, 1],[9235, 1],[9245, 1],[9255, 1],[9265, 1],
+[9275, 1],[9030, 2],[9050, 2],[9070, 2],[9090, 2],
+[9110, 2],[9130, 2],[9150, 2],[9170, 2],[9190, 2],
+[9210, 2],[9230, 2],[9250, 2],[9270, 2],[9060, 4],
+[9100, 4],[9140, 4],[9180, 4],[9220, 4],[9260, 4]],
+EU: [
+[8635, 1],[8645, 1],[8655, 1],[8665, 1],[8675, 1]],
+CN: [
+[7495, 1],[7505, 1],[7515, 1],[7525, 1],[7535, 1],
+[7545, 1],[7555, 1],[7565, 1],[7500, 2],[7520, 2],
+[7540, 2],[7560, 2],[7510, 4],[7550, 4]],
+NZ: [
+[9155, 1],[9165, 1],[9175, 1],[9185, 1],[9195, 1],
+[9205, 1],[9215, 1],[9225, 1],[9235, 1],[9245, 1],
+[9255, 1],[9265, 1],[9275, 1],[9170, 2],[9190, 2],
+[9210, 2],[9230, 2],[9250, 2],[9270, 2],[9180, 4],
+[9220, 4],[9260, 4]],
+AU: [
+[9155, 1],[9165, 1],[9175, 1],[9185, 1],[9195, 1],
+[9205, 1],[9215, 1],[9225, 1],[9235, 1],[9245, 1],
+[9255, 1],[9265, 1],[9275, 1],[9170, 2],[9190, 2],
+[9210, 2],[9230, 2],[9250, 2],[9270, 2],[9180, 4],
+[9220, 4],[9260, 4]],
+JP: [
+[9210, 1],[9230, 1],[9240, 1],[9250, 1],[9260, 1],
+[9270, 1],[9235, 2],[9245, 2],[9255, 2],[9265, 2],
+[9245, 4],[9255, 4]],
+K1: [
+[9215, 1],[9225, 1]],
+TW: [
+[8390, 1],[8400, 1],[8410, 1],[8420, 1],[8430, 1],
+[8440, 1],[8450, 1],[8460, 1],[8470, 1],[8480, 1],
+[8490, 1],[8500, 1],[8510, 1],[8395, 2],[8415, 2],
+[8435, 2],[8455, 2],[8475, 2],[8495, 2],[8405, 4],
+[8445, 4],[8485, 4]],
+K2: [
+[9255, 1],[9265, 1],[9275, 1],[9285, 1],[9295, 1],
+[9305, 1],[9270, 2],[9290, 2]]
+};
+var security = [["none", "None"], ["wpa2", "WPA2"], ["wpa3_owe", "WPA3-OWE"], ["wpa3_sae", "WPA3-SAE"]];
+var websocket;
+function initPage() {
+var mode = %%WIFI_MODE%%
+var ssid = %%WIFI_SSID%%
+var security = %%WIFI_SECURITY%%
+var password = %%WIFI_PASSWORD%%
+var country = %%WIFI_COUNTRY%%
+var channel = %%WIFI_CHANNEL%%
+var ip_mode = %%WIFI_IP_MODE%%
+var static_ip = %%WIFI_STATIC_IP%%
+var dhcp_server = %%WIFI_DHCP_SERVER%%
+var bcn_interval = %%WIFI_SHORT_BCN%%
+var txpower = %%WIFI_TXPOWER%%
+var bss_max_idle = %%WIFI_BSS_MAX_IDLE%%
+var bss_retry_cnt = %%WIFI_BSS_RETRY_CNT%%
+var conn_timeout = %%WIFI_CONN_TIMEOUT%%
+var disconn_timeout = %%WIFI_DISCONN_TIMEOUT%%
+var txpower_type = %%WIFI_TXPOWER_TYPE%%
+var netmask = %%WIFI_NETMASK%%
+var gateway = %%WIFI_GATEWAY%%
+var ipv4 = static_ip.split('.')
+var nm = netmask.split('.')
+var gw = gateway.split('.')
+document.getElementById('mode').value = mode
+document.getElementById('ssid').value = ssid
+document.getElementById('password').value = password
+document.getElementById('country').value = country
+setChannels(country)
+document.getElementById('channel').value = channel
+document.getElementById('ip_mode').value = ip_mode
+document.getElementById('static_ip1').value = ipv4[0]
+document.getElementById('static_ip2').value = ipv4[1]
+document.getElementById('static_ip3').value = ipv4[2]
+document.getElementById('static_ip4').value = ipv4[3]
+document.getElementById('netmask1').value = nm[0]
+document.getElementById('netmask2').value = nm[1]
+document.getElementById('netmask3').value = nm[2]
+document.getElementById('netmask4').value = nm[3]
+document.getElementById('gateway1').value = gw[0]
+document.getElementById('gateway2').value = gw[1]
+document.getElementById('gateway3').value = gw[2]
+document.getElementById('gateway4').value = gw[3]
+if (dhcp_server == 1) {
+document.getElementById('dhcp_server').checked = true
+}
+else {
+document.getElementById('dhcp_server').checked = false
+}
+document.getElementById('bcn_interval').value = bcn_interval
+document.getElementById('txpower').value = txpower
+document.getElementById('bss_max_idle').value = bss_max_idle
+document.getElementById('bss_retry_cnt').value = bss_retry_cnt
+document.getElementById('conn_timeout').value = conn_timeout
+document.getElementById('disconn_timeout').value = disconn_timeout
+document.getElementById('txpower_type').value = txpower_type
+changeMode(mode)
+hideShowPasswd(security)
+hideShowStaticIPv4(ip_mode)
+updateBCNInterval(bcn_interval)
+updateTxpower(txpower)
+updateBssMaxIdle(bss_max_idle)
+updateBssRetryCnt(bss_retry_cnt)
+updateConnTimeout(conn_timeout)
+updateDisconnTimeout(disconn_timeout)
+updateTxPowerType(txpower_type)
+document.getElementById('security').value = security
+}
+function removeOptions(dropdown) {
+while (dropdown.options.length > 0) {
+dropdown.remove(0);
+}
+}
+function changeMode(curMode) {
+hideShowChannel(curMode)
+setSecurity(curMode)
+hideShowDHCPServer(curMode)
+}
+function setChannels(country_val) {
+var chan_select = document.getElementById('channel')
+removeOptions(chan_select)
+for (const chan of channels[country_val]) {
+var option = document.createElement("option");
+option.value = chan[0];
+var chan_string = (chan[0].toFixed(1) / 10.0).toFixed(1);
+if (chan[1] == 1)
+option.text = chan_string + ' - 1 MHZ'
+else if (chan[1] == 2)
+option.text = chan_string + ' - 2 MHZ'
+else if (chan[1] == 4)
+option.text = chan_string + ' - 4 MHZ'
+else
+option.text = 'error'
+chan_select.appendChild(option);
+}
+}
+function setSecurity(mode_val) {
+var security_select = document.getElementById('security')
+removeOptions(security_select)
+for (const secval of security) {
+var option = document.createElement("option");
+option.value = secval[0]
+option.text = secval[1]
+security_select.appendChild(option);
+if (mode_val == 'ap' && secval[0] == 'wpa2')
+break;
+}
+}
+function hideShowPasswd(curSecurity) {
+var pwd_div = document.getElementById("password_div");
+if (curSecurity == 'none')
+pwd_div.style = "display:none;"
+else
+pwd_div.style = ""
+}
+function hideShowStaticIPv4(curStaticIPv4) {
+var ip_div = document.getElementById("static_ip_div");
+var netmask_div = document.getElementById("netmask_div");
+var gateway_div = document.getElementById("gateway_div");
+if (curStaticIPv4 != 'static_ip') {
+ip_div.style = "display:none;"
+netmask_div.style = "display:none;"
+gateway_div.style = "display:none;"
+}
+else {
+ip_div.style = ""
+netmask_div.style = ""
+gateway_div.style = ""
+}
+}
+function hideShowDHCPServer(curMode) {
+var dhcp_div = document.getElementById("dhcp_div");
+var dhcp = document.getElementById("dhcp_server");
+
+if (curMode == 'ap') {
+dhcp_div.style = ""
+}
+else {
+dhcp_div.style = "display:none;"
+}
+}
+function hideShowChannel(curMode) {
+var channel_div = document.getElementById("channel_div");
+if (curMode == 'sta')
+channel_div.style = "display:none;"
+else
+channel_div.style = ""
+}
+function hideShowAdvanced(isChecked) {
+var advanced_div = document.getElementById("advanced_div");
+if (isChecked == false)
+advanced_div.style = "display:none;"
+else
+advanced_div.style = ""
+}
+function updateBCNInterval(bcn_interval) {
+document.getElementById('bcn_interval_output').value = bcn_interval + " ms";
+}
+function updateTxpower(txpower) {
+document.getElementById('txpower_output').value = txpower + " dBm";
+}
+function updateBssMaxIdle(bss_max_idle) {
+document.getElementById('bss_max_idle').value = bss_max_idle;
+}
+function updateBssRetryCnt(bss_retry_cnt) {
+document.getElementById('bss_retry_cnt').value = bss_retry_cnt;
+}
+function updateConnTimeout(conn_timeout) {
+document.getElementById('conn_timeout').value = conn_timeout;
+}
+function updateDisconnTimeout(disconn_timeout) {
+document.getElementById('disconn_timeout').value = disconn_timeout;
+}
+function updateTxPowerType(txpower_type) {
+document.getElementById('txpower_type').value = txpower_type;
+}
+</script>
+<div id="doc2" class="yui-t2">
+<div id="hd">
+<h1><span style="font-family: Michroma;">Newracom Wireless Bridge</span></h1>
+</div>
+<div><span style="font-family: Michroma;"></span><br>
+</div>
+<div id="bd">
+<div id="yui-main">
+<div class="yui-b">
+<div class="yui-g">
+<form action="/update_settings" method="get">
+<p style="text-align: left;">Wi-Fi Mode&nbsp;&nbsp;
+<select name="mode" id="mode" onclick="changeMode(this.value)">
+<option value="ap">AP</option>
+<option value="sta">STA</option>
+</select>
+</p>
+<p></p>
+<p style="text-align: left;">SSID&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp; <input name="ssid" id="ssid" value="halow_demo"
+maxlength="32" type="text">
+</p>
+<p style="text-align: left;">Security&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;
+<select name="security" id="security" onclick="hideShowPasswd(this.value)">
+<option value="none">None</option>
+<option value="wpa2">WPA2</option>
+<option value="wpa3_owe">WPA3-OWE</option>
+<option value="wpa3_sae">WPA3-SAE</option>
+</select>
+</p>
+<div id="password_div" class="password_div" style="display:none;">
+<p style="text-align: left;">Password&nbsp;&nbsp; &nbsp; <input name="password" id="password"
+minlength="8" maxlength="32" type="password">
+</p>
+</div>
+<p style="text-align: left;">Country&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp; &nbsp;
+<select name="country" id="country" onclick="setChannels(this.value)">
+<option value="US">US</option>
+<option value="JP">JP</option>
+<option value="K1">K1</option>
+<option value="K2">K2</option>
+<option value="TW">TW</option>
+<option value="EU">EU</option>
+<option value="CN">CN</option>
+<option value="NZ">NZ</option>
+<option value="AU">AU</option>
+</select>
+</p>
+<div id="channel_div" class="channel_div" style="">
+<p style="text-align: left;">Channel&nbsp;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;
+<select name="channel" id="channel">
+</select>
+</p>
+</div>
+<p style="text-align: left;">IP Address &nbsp;&nbsp;
+<select name="ip_mode" id="ip_mode" onclick="hideShowStaticIPv4(this.value)">
+<option value="static_ip">Static</option>
+<option value="dynamic_ip">DHCP</option>
+</select>
+</p>
+<div id="static_ip_div" class="static_ip_div">
+<p style="text-align: left;">Static IP&nbsp;&nbsp;&nbsp;
+&nbsp; &nbsp; <input name="static_ip1" id="static_ip1" value="192" maxlength="3" size="3"
+type="text">. <input name="static_ip2" id="static_ip2" value="168" maxlength="3" size="3"
+type="text">.
+<input name="static_ip3" id="static_ip3" value="200" maxlength="3" size="3" type="text">.
+<input name="static_ip4" id="static_ip4" value="1" maxlength="3" size="3" type="text">
+</p>
+</div>
+<div id="netmask_div" class="netmask_div">
+<p style="text-align: left;">Netmask&nbsp;&nbsp;&nbsp;
+&nbsp; &nbsp; <input name="netmask1" id="netmask1" value="255" maxlength="3" size="3"
+type="text">. <input name="netmask2" id="netmask2" value="255" maxlength="3" size="3"
+type="text">.
+<input name="netmask3" id="netmask3" value="255" maxlength="3" size="3" type="text">.
+<input name="netmask4" id="netmask4" value="1" maxlength="3" size="3" type="text">
+</p>
+</div>
+<div id="gateway_div" class="gateway_div">
+<p style="text-align: left;">Gateway&nbsp;&nbsp;&nbsp;
+&nbsp; &nbsp; <input name="gateway1" id="gateway1" value="192" maxlength="3" size="3"
+type="text">. <input name="gateway2" id="gateway2" value="168" maxlength="3" size="3"
+type="text">.
+<input name="gateway3" id="gateway3" value="200" maxlength="3" size="3" type="text">.
+<input name="gateway4" id="gateway4" value="1" maxlength="3" size="3" type="text">
+</p>
+</div>
+<div id="dhcp_div" class="dhcp_div" style="">
+<p style="text-align: left;">DHCP Server&nbsp;&nbsp; <input name="dhcp_server"
+id="dhcp_server" type="checkbox"> </p>
+</div>
+<p> Advanced <input name="advanced" id="advanced" onclick="hideShowAdvanced(this.checked)"
+type="checkbox"> </p>
+<p> </p>
+<div id="advanced_div" class="advanced_div" style="display:none;">
+<p> <label for="bcn_interval">BCN Interval</label> <input min="0" max="300" step="10"
+name="bcn_interval" id="bcn_interval" oninput="updateBCNInterval(this.value)" type="text">
+<output for="bcn_interval" id="bcn_interval_output">ms</output>
+</p>
+<p> <label for="txpower">TX Power</label> <input min="0" max="20" name="txpower"
+id="txpower" oninput="updateTxpower(this.value)" type="text"> <output for="txpower"
+id="txpower_output">dBm</output> </p>
+<p style="text-align: left;">TX POWER Type&nbsp;&nbsp;
+<select name="txpower_type" id="txpower_type">
+<option value="auto">Auto</option>
+<option value="limit">Limit</option>
+<option value="fixed">Fixed</option>
+</select>
+</p>
+<p> <label for="bss_max_idle">BSS Max Idle</label> <input min="0" max="2147483648"
+name="bss_max_idle" id="bss_max_idle" oninput="updateBssMaxIdle(this.value)" type="text">
+<output for="bss_max_idle" id="bss_max_idle_output"></output>
+</p>
+<p> <label for="bss_retry_cnt">BSS Retry Count</label> <input min="0" max="10" step="1"
+name="bss_retry_cnt" id="bss_retry_cnt" oninput="updateBssRetryCnt(value)" type="text">
+<output for="bss_retry_cnt" id="bss_retry_cnt_output"></output>
+</p>
+<p> <label for="conn_timeout">Connection Timeout</label> <input min="0" max="100000" step="1"
+name="conn_timeout" id="conn_timeout" oninput="updateConnTimeout(this.value)" type="text">
+<output for="conn_timeout" id="conn_timeout_output">ms</output>
+</p>
+<p> <label for="disconn_timeout">Disconnection Timeout</label> <input min="0" max="100000" step="1"
+name="disconn_timeout" id="disconn_timeout" oninput="updateDisconnTimeout(this.value)"
+type="text">
+<output for="disconn_timeout" id="disconn_timeout_output">ms</output>
+</p>
+</div>
+<br>
+<p> <button value="submit" type="submit">Update</button> </p>
+</form>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>

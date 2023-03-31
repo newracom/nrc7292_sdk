@@ -1,8 +1,11 @@
 # NRC7292 Standalone SDK Package
 
 ## Notice
-- Please do not use package/standalone/tools/external_tools/FirmwareFlashTool.exe of v1.3.4 rev08. Use other revision's one instead.
+- Starting from version 1.4, kindly utilize the FirmwareFlashTool.exe located in the package/standalone/tools/external directory.
+- Please do not use package/standalone/tools/external_tools/FirmwareFlashTool.exe of v1.3.4 rev08. Use other v1.3.4 revision's one instead.
+
 ### Release roadmap
+- v1.4         (2023.03.31)
 - v1.3.4_rev09 (2022.10.24)
 - v1.3.4_rev08 (2022.08.09)
 - v1.3.4_rev07 (2022.07.19)
@@ -19,12 +22,10 @@
 - v1.3.0 (2020.07.19)
 
 ### Latest release
-- [NRC7292_Standalone_SDK_v1.3.4_rev09](https://github.com/newracom/nrc7292_sdk/releases/tag/v1.3.4_rev09)
+- [NRC7292_Standalone_SDK_v1.4](https://github.com/newracom/nrc7292_sdk/releases/tag/v1.4)
 
 ### Release package contents
 - standalone: NRC7292 standalone SDK package for global regulatory domains
-- standalone_kr_mic: NRC7292 standalone SDK package for South Korea MIC frequency regulation
-- standalone_kr_usn: NRC7292 standalone SDK package for South Korea USN frequency regulation
 
 ### Apply a specific package
 If you want to apply a specific package to your exiting package directory, you can choose one of following methods.

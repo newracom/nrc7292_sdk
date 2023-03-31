@@ -41,6 +41,9 @@ bool handle_ap_tx_pv1proberes(SYS_BUF **buf, int8_t vif_id, bool is_tx);
 
 void umac_s1g_scan_handler_init();
 bool umac_s1g_scan_handler_activate(MAC_STA_TYPE type);
+bool umac_s1g_scan_bcn_handler_activate(MAC_STA_TYPE type);
 bool umac_s1g_scan_handler_deactivate(MAC_STA_TYPE type);
+bool umac_s1g_scan_bcn_handler_deactivate(MAC_STA_TYPE type);
+bool umac_configure_ndpprobereq_rx_handler(bool support);
 
 #endif /* UMAC_S1G_SCAN_HANDLER_H */

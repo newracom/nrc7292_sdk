@@ -15,7 +15,7 @@
 
 #include "common.h"
 #include "config.h"
-#include "base64.h"
+
 
 #define USE_WLAN0_AUTO_CONFIG 0 //0: use (WPA)CLI, 1:use config
 
@@ -75,7 +75,7 @@ const char* __attribute__((weak)) wlan1_conf = NULL;
 #if USE_WLAN0_AUTO_CONFIG
 const char* __attribute__((weak)) global_conf = "\n\
 COUNTRY=US\n \
-NDP_PREQ=1";
+NDP_PREQ=0";
 #else
 const char* __attribute__((weak)) global_conf = NULL;
 #endif
@@ -301,11 +301,9 @@ struct wpa_config * wpa_config_read(const char *name, struct wpa_config *config)
 	if (!config)
 		config = wpa_config_alloc_empty(NULL, NULL);
 
-	#if defined(STANDARD_11AH)
 	/* IEEE 802.11 draft; 11-18-1177-02-000m */
 	for (i = 0; i < 4; i++)
 		config->wmm_ac_params[i].txop_limit = 469;
-	#endif
 
 	wpa_config_read_global(config, global_conf);
 
@@ -333,6 +331,13 @@ int wpa_config_write(const char *name, struct wpa_config *config)
 
 	for (ssid = config->ssid; ssid; ssid = ssid->next) {
 		/* TODO: write networks */
+		if (ssid->key_mgmt == WPA_KEY_MGMT_WPS || ssid->temporary){
+			continue; /* do not save temporary networks */
+		}
+		if (wpa_key_mgmt_wpa_psk(ssid->key_mgmt) && !ssid->psk_set &&
+			!ssid->passphrase){
+			continue; /* do not save invalid network */
+		}
 	}
 
 	for (blob = config->blobs; blob; blob = blob->next) {

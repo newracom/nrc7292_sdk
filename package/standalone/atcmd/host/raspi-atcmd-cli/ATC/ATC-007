@@ -1,0 +1,13 @@
+
+ECHO " ATC-007 : Duty Cycle"
+ECHO "========================================="
+HOLD
+
+AT+WDUTYCYCLE?
+
+AT+WDUTYCYCLE=1000000,2000000,10
+AT+WDUTYCYCLE?
+
+AT+WDUTYCYCLE=0
+AT+WDUTYCYCLE?
+

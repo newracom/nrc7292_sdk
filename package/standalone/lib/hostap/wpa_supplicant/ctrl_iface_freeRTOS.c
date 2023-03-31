@@ -3,10 +3,10 @@
 #include "config.h"
 #include "wpa_supplicant_i.h"
 #include "ctrl_iface.h"
+#include "ctrl_iface_freeRTOS.h"
 #include "system_common.h"
 #include "driver_nrc.h"
 
-#define PRINT_BUFFER_SIZE 1024
 
 #ifdef CONFIG_NO_STDOUT_DEBUG
 #ifdef wpa_printf
@@ -23,7 +23,7 @@ static void wpa_printf(int level, const char *fmt, ...)
 #endif
 #endif
 
-int ctrl_iface_receive(int vif_id, char *cmd);
+/***********************************************************************************************************/
 
 struct ctrl_iface_priv {
 	struct wpa_supplicant *wpa_s;
@@ -33,10 +33,8 @@ struct ctrl_iface_global_priv {
 	struct ctrl_iface_priv 	*ctrl_if[NRC_WPA_NUM_INTERFACES];
 };
 
-
 static struct ctrl_iface_global_priv* global_ctrl_if = NULL;
 
-//struct wpa_supplicant *ctrl_if_wpa_s = NULL;
 
 static struct wpa_supplicant *wpa_get_wpa_from_vif(int vif_id)
 {
@@ -48,59 +46,64 @@ static struct wpa_supplicant *wpa_get_wpa_from_vif(int vif_id)
 	return global_ctrl_if->ctrl_if[vif_id]->wpa_s;
 }
 
-int wpa_cmd_receive(int vif_id, int argc, char *argv[]) {
-	int i = 0;
-	char buf[512] = {0,};
+/***********************************************************************************************************/
 
-	if (argc <= 1)
-		return -1;
+static SemaphoreHandle_t g_ctrl_if_lock = NULL;
 
-	sprintf(buf, "%s", argv[1]);
-	for (i = 2; i < argc; i++) {
-		sprintf(buf, "%s %s", buf, argv[i]);
-	}
-
-	return ctrl_iface_receive(vif_id, buf);
-}
-
-size_t ctrl_iface_receive_response(int vif_id, char *cmd, char *ret)
+static int _ctrl_iface_lock_init (void)
 {
-	char *reply = NULL, *p = cmd;
-	size_t reply_len = 0;
-	struct wpa_supplicant *wpa_s;
-
-	wpa_printf(MSG_INFO, "[%s] cmd: %s", __func__, cmd);
-
-	wpa_s = wpa_get_wpa_from_vif(vif_id);
-	if (!wpa_s)
-		return 0;
-
-	while(*p != ' ' && *p != 0) {
-		*p = (char) toupper((int) *p);
-		p++;
+	if (!g_ctrl_if_lock) {
+		g_ctrl_if_lock = xSemaphoreCreateMutex();
+		if (!g_ctrl_if_lock) {
+			wpa_printf(MSG_ERROR, "WPA: %s() failed\n", __func__);
+			return -1;
+		}
 	}
 
-	reply = wpa_supplicant_ctrl_iface_process(
-		wpa_s, cmd, &reply_len);
-	if (reply_len <= 0) {
-		os_free(reply);
-		return 0;
-	}
-
-	if (reply[reply_len - 1] == '\n')
-		reply[--reply_len] = '\0'; /* remove new line */
-	else
-		reply[reply_len] = '\0';
-
-	wpa_printf(MSG_INFO, "reply_len: %d\nreply: %s\n", reply_len, reply);
-
-	memcpy(ret, reply, reply_len);
-	ret[reply_len] = '\0';
-
-	os_free(reply);
-
-	return reply_len;
+	return 0;
 }
+
+static void _ctrl_iface_lock_deinit (void)
+{
+	if (g_ctrl_if_lock) {
+		vSemaphoreDelete(g_ctrl_if_lock);
+		g_ctrl_if_lock = NULL;
+	}
+}
+
+static bool _ctrl_iface_lock (void)
+{
+	const int timeout_msec = 60 * 1000;
+
+	if (!g_ctrl_if_lock) {
+		wpa_printf(MSG_ERROR, "WPA: %s(), null\n", __func__);
+		return false;
+	}
+
+	if (!xSemaphoreTake(g_ctrl_if_lock, pdMS_TO_TICKS(timeout_msec)))	{
+		wpa_printf(MSG_ERROR, "WPA: %s(), timeout, %d-msec\n", __func__, timeout_msec);
+		return false;
+	}
+
+	return true;
+}
+
+static bool _ctrl_iface_unlock (void)
+{
+	if (!g_ctrl_if_lock) {
+		wpa_printf(MSG_ERROR, "WPA: %s(), null\n", __func__);
+		return false;
+	}
+
+	if (!xSemaphoreGive(g_ctrl_if_lock)) {
+		wpa_printf(MSG_ERROR, "WPA: %s(), no space\n", __func__);
+		return false;
+	}
+
+	return true;
+}
+
+/***********************************************************************************************************/
 
 int ctrl_iface_receive(int vif_id, char *cmd)
 {
@@ -133,18 +136,16 @@ int ctrl_iface_receive(int vif_id, char *cmd)
 			else {
 				wpa_printf(MSG_DEBUG, "WPA: Control interface response (%d)", reply_len);
 
-				if (wpa_debug_level <= MSG_DEBUG) {
-					char temp;
+				char temp;
 
-					for (i = 0 ; i < reply_len ; i += PRINT_BUFFER_SIZE) {
-						if ((reply_len - i) < PRINT_BUFFER_SIZE)
-							wpa_printf(MSG_DEBUG, "%s\n", reply + i);
-						else {
-							temp = reply[i + PRINT_BUFFER_SIZE];
-							reply[i + PRINT_BUFFER_SIZE] = '\0';
-							wpa_printf(MSG_DEBUG, "%s", reply + i);
-							reply[i + PRINT_BUFFER_SIZE] = temp;
-						}
+				for (i = 0 ; i < reply_len ; i += PRINT_BUFFER_SIZE) {
+					if ((reply_len - i) < PRINT_BUFFER_SIZE)
+						wpa_printf(MSG_DEBUG, "%s\n", reply + i);
+					else {
+						temp = reply[i + PRINT_BUFFER_SIZE];
+						reply[i + PRINT_BUFFER_SIZE] = '\0';
+						wpa_printf(MSG_DEBUG, "%s", reply + i);
+						reply[i + PRINT_BUFFER_SIZE] = temp;
 					}
 				}
 			}
@@ -157,6 +158,150 @@ int ctrl_iface_receive(int vif_id, char *cmd)
 	return ret;
 }
 
+int wpa_cmd_receive(int vif_id, int argc, char *argv[])
+{
+	int i = 0;
+	char buf[512] = {0,};
+
+	if (argc <= 1)
+		return -1;
+
+	sprintf(buf, "%s", argv[1]);
+	for (i = 2; i < argc; i++) {
+		sprintf(buf + strlen(buf), " %s", argv[i]);
+	}
+
+	return ctrl_iface_receive(vif_id, buf);
+}
+
+/***********************************************************************************************************/
+
+ctrl_iface_resp_t *ctrl_iface_receive_response(int vif_id, const char *fmt, ...)
+{
+	struct wpa_supplicant *wpa_s = wpa_get_wpa_from_vif(vif_id);
+
+	if (wpa_s)
+	{
+		va_list ap;
+		char cmd[256];
+
+		ASSERT(_ctrl_iface_lock());
+
+		va_start(ap, fmt);
+
+		if (vsnprintf(cmd, sizeof(cmd), fmt, ap) > 0)
+		{
+			size_t reply_len;
+			char *reply;
+			int i;
+
+#if !defined(INCLUDE_MEASURE_AIRTIME)
+			wpa_printf(MSG_EXCESSIVE, "[%s] cmd: %s", __func__, cmd);
+#endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
+
+			for (i = 0 ; cmd[i] != ' ' && cmd[i] != '\0' ; i++)
+				cmd[i] = toupper(cmd[i]);
+
+			reply = wpa_supplicant_ctrl_iface_process(wpa_s, cmd, &reply_len);
+			if (reply && reply_len > 0)
+			{
+				if (reply[reply_len - 1] == '\n')
+					reply[--reply_len] = '\0'; /* remove new line */
+				else
+					reply[reply_len] = '\0';
+
+#if !defined(INCLUDE_MEASURE_AIRTIME)
+				wpa_printf(MSG_EXCESSIVE, "reply_len: %d\n", reply_len);
+
+				if (reply_len <= PRINT_BUFFER_SIZE){
+					wpa_printf(MSG_EXCESSIVE, "reply: %s\n", reply);
+				} else {
+					char temp;
+
+					wpa_printf(MSG_EXCESSIVE, "reply: ");
+
+					for (i = 0 ; i < reply_len ; i += PRINT_BUFFER_SIZE) {
+						if ((reply_len - i) < PRINT_BUFFER_SIZE)
+							wpa_printf(MSG_INFO, "%s\n", reply + i);
+						else {
+							temp = reply[i + PRINT_BUFFER_SIZE];
+							reply[i + PRINT_BUFFER_SIZE] = '\0';
+							wpa_printf(MSG_INFO, "%s", reply + i);
+							reply[i + PRINT_BUFFER_SIZE] = temp;
+						}
+					}
+				}
+#endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
+
+				if (memcmp(reply, "FAIL", 4) != 0 && strcmp(reply, "UNKNOWN COMMAND") != 0)
+				{
+					static ctrl_iface_resp_t resp;
+
+					if (strcmp(reply, "OK") == 0) {
+						os_free(reply);
+
+						reply_len = 0;
+						reply = NULL;
+					}
+
+					resp.len = reply_len;
+					resp.msg = reply;
+
+	    			va_end(ap);
+					ASSERT(_ctrl_iface_unlock());
+
+					return &resp;
+				}
+			}
+
+			if (reply)
+				os_free(reply);
+		}
+
+	    va_end(ap);
+		ASSERT(_ctrl_iface_unlock());
+	}
+
+	return NULL;
+}
+
+bool CTRL_IFACE_RESP_OK (ctrl_iface_resp_t *resp)
+{
+	if (resp && resp->len == 0)
+		return true;
+
+	return false;
+}
+
+bool CTRL_IFACE_RESP_MSG (ctrl_iface_resp_t *resp)
+{
+	if (resp && resp->len > 0 && resp->msg)
+		return true;
+
+	return false;
+}
+
+bool CTRL_IFACE_RESP_ERR (ctrl_iface_resp_t *resp)
+{
+	if (!resp || resp->len < 0)
+		return true;
+
+	return false;
+}
+
+void CTRL_IFACE_RESP_FREE (ctrl_iface_resp_t *resp)
+{
+	if (resp) {
+		if (resp->msg)
+			os_free(resp->msg);
+
+		resp->msg = NULL;
+		resp->len = 0;
+	}
+}
+
+/***********************************************************************************************************/
+
 struct ctrl_iface_priv* wpa_supplicant_ctrl_iface_init(struct wpa_supplicant *wpa_s)
 {
 	struct ctrl_iface_priv* priv = NULL;
@@ -166,6 +311,9 @@ struct ctrl_iface_priv* wpa_supplicant_ctrl_iface_init(struct wpa_supplicant *wp
 		wpa_printf(MSG_ERROR, "Failed to init ctrl_iface.");
 		return NULL;
 	}
+
+	if (_ctrl_iface_lock_init() != 0)
+		return NULL;
 
 	if (os_strcmp(NRC_WPA_INTERFACE_NAME_0, wpa_s->ifname) == 0)
 		vif_id = 0;
@@ -197,6 +345,8 @@ struct ctrl_iface_priv* wpa_supplicant_ctrl_iface_init(struct wpa_supplicant *wp
 void wpa_supplicant_ctrl_iface_deinit(struct ctrl_iface_priv *priv)
 {
 	os_free(priv);
+
+	_ctrl_iface_lock_deinit();
 }
 
 void wpa_supplicant_ctrl_iface_wait(struct ctrl_iface_priv *priv)

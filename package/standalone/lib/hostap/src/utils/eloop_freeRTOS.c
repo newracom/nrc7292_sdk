@@ -257,8 +257,10 @@ int eloop_register_timeout(unsigned int secs, unsigned int usecs,
 	timeout->user_data	= user_data;
 	timeout->handler	= handler;
 
-	if (!lock_timeout_list())
+	if (!lock_timeout_list()){
+		os_free(timeout);
 		return -1;
+	}
 
 	if (secs == 0 && usecs == 0) {
 		dl_list_add_tail(&eloop.execute, &timeout->list);
@@ -383,7 +385,9 @@ int eloop_deplete_timeout(unsigned int req_secs, unsigned int req_usecs,
 	if (!lock_timeout_list())
 		return -1;
 
-	//wpa_printf(MSG_INFO, "eloop: %s", __func__);
+#if !defined(INCLUDE_MEASURE_AIRTIME)
+	wpa_printf(MSG_INFO, "eloop: %s", __func__);
+#endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
 
 	dl_list_for_each(tmp, &eloop.timeout, struct eloop_timeout, list) {
 		if (tmp->handler == handler &&
@@ -394,12 +398,32 @@ int eloop_deplete_timeout(unsigned int req_secs, unsigned int req_usecs,
 			os_get_reltime(&now);
 			os_reltime_sub(&tmp->time, &now, &remaining);
 			if (os_reltime_before(&requested, &remaining)) {
+#ifdef true
+				if (os_get_reltime(&tmp->time) < 0) {
+					os_free(tmp);
+					unlock_timeout_list();
+					return -1;
+				}
+				tmp->time.sec += requested.sec;
+				tmp->time.usec += requested.usec;
+				if (requested.sec == 0 && requested.usec == 0) {
+					dl_list_del(&tmp->list);
+					dl_list_add_tail(&eloop.execute, &tmp->list);
+				} else {
+					while (tmp->time.usec >= SEC_TO_US(1)) {
+						tmp->time.sec++;
+						tmp->time.usec -= US_TIME_UNIT;
+					}
+				}
+				eloop_run_signal();
+#else // mutex overlapped
 				eloop_cancel_timeout(handler, eloop_data,
 						     user_data);
 				eloop_register_timeout(requested.sec,
 						       requested.usec,
 						       handler, eloop_data,
 						       user_data);
+#endif
 				unlock_timeout_list();
 				return 1;
 			}
@@ -431,12 +455,32 @@ int eloop_replenish_timeout(unsigned int req_secs, unsigned int req_usecs,
 			os_get_reltime(&now);
 			os_reltime_sub(&tmp->time, &now, &remaining);
 			if (os_reltime_before(&remaining, &requested)) {
+#ifdef true
+				if (os_get_reltime(&tmp->time) < 0) {
+					os_free(tmp);
+					unlock_timeout_list();
+					return -1;
+				}
+				tmp->time.sec += requested.sec;
+				tmp->time.usec += requested.usec;
+				if (requested.sec == 0 && requested.usec == 0) {
+					dl_list_del(&tmp->list);
+					dl_list_add_tail(&eloop.execute, &tmp->list);
+				} else {
+					while (tmp->time.usec >= SEC_TO_US(1)) {
+						tmp->time.sec++;
+						tmp->time.usec -= US_TIME_UNIT;
+					}
+				}
+				eloop_run_signal();
+#else // mutex overlapped
 				eloop_cancel_timeout(handler, eloop_data,
 						     user_data);
 				eloop_register_timeout(requested.sec,
 						       requested.usec,
 						       handler, eloop_data,
 						       user_data);
+#endif
 				unlock_timeout_list();
 				return 1;
 			}
@@ -458,14 +502,18 @@ int eloop_register_signal(int sig, eloop_signal_handler handler,
 int eloop_register_signal_terminate(eloop_signal_handler handler,
 		void *user_data)
 {
+#if !defined(INCLUDE_MEASURE_AIRTIME)	
 	wpa_printf(MSG_INFO, "eloop: %s", __func__);
+#endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
 	return 0;
 }
 
 int eloop_register_signal_reconfig(eloop_signal_handler handler,
 		void *user_data)
 {
+#if !defined(INCLUDE_MEASURE_AIRTIME)	
 	wpa_printf(MSG_INFO, "eloop: %s", __func__);
+#endif /* !defined(INCLUDE_MEASURE_AIRTIME)	*/	
 	return 0;
 }
 

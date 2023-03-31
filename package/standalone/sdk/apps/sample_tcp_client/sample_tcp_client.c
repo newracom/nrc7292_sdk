@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 Newracom, Inc.
+ * Copyright (c) 2022 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,7 +29,6 @@
 #include "lwip/errno.h"
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
-#include "wlan_manager.h"
 
 
 static const uint8_t payload[3200] = {
@@ -116,14 +115,10 @@ static const uint8_t payload[3200] = {
 
 };
 
-const int payload_size = sizeof(payload);
-
-struct sockaddr_in dest_addr;
-struct timeval select_timeout;
-int sockfd;
+static int sockfd = -1;
 
 #define SOCK_TIMEOUT_SECONDS 1
-#define MAX_RECV_LEN (2*1024)
+#define MAX_RECV_LEN (4*1024)
 #define MAX_RETRY 5
 #define MAX_SEND_RERTY 2
 
@@ -133,17 +128,57 @@ int sockfd;
  * Parameters   : void
  * Returns	    : true or false
  *****************************************************************************/
-static bool open_connection(void)
+static bool open_connection(char *remote_address, uint16_t port)
 {
-	int ret =0;
+#ifdef CONFIG_IPV6
+	struct sockaddr_in6 dest_addr;
+#else
+	struct sockaddr_in dest_addr;
+#endif
+	struct sockaddr_in *addr_in = (struct sockaddr_in *) &dest_addr;
+	ip_addr_t remote_addr;
+	int ret = 0;
 
-	sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (ipaddr_aton((char *) remote_address, &remote_addr)) {
+		if (IP_IS_V4(&remote_addr)) {
+			nrc_usr_print("[%s] IPv4...\n", __func__);
+			struct sockaddr_in *d_addr = (struct sockaddr_in *) &dest_addr;
+			addr_in->sin_family = AF_INET;
+			addr_in->sin_len = sizeof(struct sockaddr_in);
+			addr_in->sin_port = htons(port);
+			addr_in->sin_addr.s_addr = inet_addr(remote_address);
+		} else {
+#ifdef CONFIG_IPV6
+			nrc_usr_print("[%s] IPv6...\n", __func__);
+			struct sockaddr_in6 *d_addr = (struct sockaddr_in6 *) &dest_addr;
+			dest_addr.sin6_family = AF_INET6;
+			dest_addr.sin6_len = sizeof(struct sockaddr_in6);
+			dest_addr.sin6_port = htons(port);
+			dest_addr.sin6_flowinfo = 0;
+			dest_addr.sin6_scope_id = ip6_addr_zone(ip_2_ip6(&remote_addr));
+			inet6_addr_from_ip6addr(&dest_addr.sin6_addr, ip_2_ip6(&remote_addr));
+#else
+		nrc_usr_print("[%s] Unknown address type %s\n", __func__, remote_address);
+		nrc_usr_print("[%s] Enable IPv6 to handle IPv6 remote address...\n", __func__);
+		return false;
+#endif
+		}
+	} else {
+		nrc_usr_print("[%s] Address %s not valid or enable IPv6 support.\n", __func__, remote_address);
+		nrc_usr_print("[%s] use nvs set remote_address <ip address>\n", __func__);
+		return false;
+	}
+
+	nrc_usr_print("[%s] Connecting to %s port %d...\n", __func__,
+					remote_address, port);
+
+	sockfd = socket(addr_in->sin_family, SOCK_STREAM, IPPROTO_TCP);
 	if (sockfd < 0) {
 		nrc_usr_print("Create socket failed\n");
 		return false;
 	}
 
-	ret =connect(sockfd, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+	ret = connect(sockfd, (struct sockaddr *) &dest_addr, sizeof(dest_addr));
 	if (ret < 0) {
 		nrc_usr_print("open_connection failed\n");
 		close(sockfd);
@@ -173,11 +208,11 @@ static bool close_connection(void)
 
 /****************************************************************************
  * FunctionName : retry_tcp_connection
- * Description  : close connection and open connection again
- * Parameters   : void
+ * Description  : retry tcp connection for given address and port
+ * Parameters   : remote address, port
  * Returns	    : true or false
  *****************************************************************************/
-static bool retry_tcp_connection(void)
+static bool retry_tcp_connection(char *remote_address, uint16_t port)
 {
 	int bSuccess = true;
 
@@ -186,7 +221,7 @@ static bool retry_tcp_connection(void)
 		return false;
 	}
 
-	bSuccess = open_connection();
+	bSuccess = open_connection(remote_address, port);
 	if (bSuccess == false) {
 		return false;
 	}
@@ -197,7 +232,7 @@ static bool retry_tcp_connection(void)
 
 /****************************************************************************
  * FunctionName : send_socket_data
- * Description  : close connection and open connection again
+ * Description  : send data to remote target
  * Parameters   : char* data      - data pointer
  *                int data_length - data length
  * Returns	    : true or false
@@ -207,15 +242,18 @@ static bool send_socket_data(char* data, int data_length)
 	int send_retry_count = 0;
 	int send_len = 0;
 	int remain_len = data_length;
+	static uint64_t sent_count = 0;
 
 	while (remain_len > 0) {
 		send_len = send(sockfd, data, remain_len, 0);
 		if (send_len < 0) {
-			if(send_retry_count <  MAX_SEND_RERTY){
+			if(send_retry_count <  MAX_SEND_RERTY) {
 				send_retry_count++;
 				_delay_ms(1000);
 				continue;
-			}else{
+			} else {
+				nrc_usr_print("[%s] MAX retry (%d) reached, returning false\n",
+								__func__, send_retry_count);
 				return false;
 			}
 		}
@@ -223,13 +261,15 @@ static bool send_socket_data(char* data, int data_length)
 		data		+= send_len;
 		remain_len	-= send_len;
 	}
+
+	sent_count++;
+	nrc_usr_print("[%s] %llu, %d bytes sent...\n", __func__, sent_count, send_len);
 	return true;
 }
 
-#ifdef VERIFY_RESPONSE_PACKET
 /****************************************************************************
  * FunctionName : receive_socket_data
- * Description  : close connection and open connection again
+ * Description  : receive data from the target
  * Parameters   : char* recv_buffer  - buffer pointer
  *                int buffer_len     - buffer length
  * Returns	    : true or false
@@ -238,30 +278,36 @@ static bool receive_socket_data(char* recv_buffer, int buffer_len)
 {
 	int ret = 0;
 	int recv_len = 0;
+	struct timeval select_timeout;
+	fd_set fdRead;
 
-	while ((buffer_len-1) > 0) {
-		fd_set fdRead;
-		FD_ZERO(&fdRead);
-		FD_SET(sockfd, &fdRead);
-		ret = select(0, &fdRead, NULL, NULL, &select_timeout);
+	/* setting select_timeout */
+	select_timeout.tv_sec = 2;
+	select_timeout.tv_usec = 0;
 
-		if ((ret > 0) && (FD_ISSET(sockfd, &fdRead))) {
+	FD_ZERO(&fdRead);
+	FD_SET(sockfd, &fdRead);
+	ret = select(sockfd + 1, &fdRead, NULL, NULL, &select_timeout);
+
+	if (ret > 0) {
+		if (FD_ISSET(sockfd, &fdRead)) {
+			FD_CLR(sockfd, &fdRead);
 			recv_len = recv(sockfd, recv_buffer, buffer_len-1, 0);
-
 			if (recv_len <= 0) {
 				nrc_usr_print("recv failed\n");
 				return false;
 			}
-			recv_buffer	+= recv_len;
-			buffer_len	-= recv_len;
-		} else {
-			nrc_usr_print("'select' failed inside recv method\n");
-			return false;
 		}
+	} else if (ret == 0) {
+		nrc_usr_print("nothing to receive, continue...\n");
+	} else {
+		nrc_usr_print("'select' failed inside recv method\n");
+		return false;
 	}
 	return true;
 }
 
+#ifdef VERIFY_RESPONSE_PACKET
 /****************************************************************************
  * FunctionName : validate_ack
  * Description  : validate ack from received packet
@@ -282,7 +328,7 @@ static bool validate_ack(char* data)
  *                int data_length - data length
  * Returns	    : true or false
  *****************************************************************************/
-static bool upload_data_packet(char* data, int data_length)
+static bool upload_data_packet(char *remote_address, uint16_t port, char* data, int data_length)
 {
 	bool bSuccess = false;
 	int retryCount = 0;
@@ -291,21 +337,21 @@ static bool upload_data_packet(char* data, int data_length)
 		bSuccess = send_socket_data(data, data_length);
 
 		if (bSuccess == true) {
-#ifdef VERIFY_RESPONSE_PACKET
 			char recvBuff[MAX_RECV_LEN+1] = {0};
 			bSuccess = receive_socket_data(recvBuff, MAX_RECV_LEN+1);
+#ifdef VERIFY_RESPONSE_PACKET
 			if (bSuccess == true) {
 				bSuccess = validate_ack(recvBuff);
-				if (bSuccess == true) 	{
-					return true;
+				if (bSuccess == false) 	{
+					nrc_usr_print("[%s] Received data validate failed.\n", __func__);
+					return false;
 				}
 			}
-#else
-			return true;
 #endif
-		}else {
+			return true;
+		} else {
 			nrc_usr_print("upload_data_packet attempting retry %d\n", retryCount);
-			if(retry_tcp_connection()){
+			if(retry_tcp_connection(remote_address, port)){
 				nrc_usr_print("Restart upload_data_packet!!!\n");
 				retryCount = 0;
 			}else{
@@ -326,54 +372,56 @@ static bool upload_data_packet(char* data, int data_length)
  *****************************************************************************/
 nrc_err_t run_sample_tcp_client(WIFI_CONFIG *param)
 {
-	tWIFI_STATE_ID wifi_state = WIFI_STATE_INIT;
 	int count;
-
-	/* Filling server information */
-	dest_addr.sin_family = AF_INET;
-	dest_addr.sin_port = htons(param->remote_port);
-	dest_addr.sin_addr.s_addr = inet_addr((const char *)param->remote_addr);
-
-	/* setting select_timeout */
-	select_timeout.tv_sec = 1;
-	select_timeout.tv_usec = 0;
 
 	nrc_usr_print("==========================\n");
 	nrc_usr_print("TCP Aging Test - Client\n");
 	nrc_usr_print("==========================\n");
-	nrc_usr_print("* total length of the sample data: %d\n", sizeof(payload));
+	nrc_usr_print("* sample data length : %d\n", sizeof(payload));
 
 	/* set initial wifi configuration */
 	if (wifi_init(param)!= WIFI_SUCCESS) {
-		nrc_usr_print ("[%s] ASSERT! Fail for init\n", __func__);
+		nrc_usr_print ("[%s] Error Wifi initialzation failed.\n", __func__);
 		return -1;
 	}
 
 	/* connect to AP */
 	for(count = 0 ; count < MAX_RETRY ; ){
 		if (wifi_connect(param)== WIFI_SUCCESS){
-			nrc_usr_print ("[%s] connect to %s successfully !! \n", __func__, param->ssid);
+			nrc_usr_print ("[%s] Successfully connected to '%s' !! \n", __func__, param->ssid);
 			break;
 		}
 
 		if (++count == MAX_RETRY){
-			nrc_usr_print ("[%s] Fail for connection %s\n", __func__, param->ssid);
+			nrc_usr_print ("[%s] Failed to connect to '%s'\n", __func__, param->ssid);
 			return -1;
 		}
 
 		_delay_ms(1000);
 	}
 
+	/* check if IP is ready */
+	while(1){
+		if (nrc_addr_get_state(0) == NET_ADDR_SET) {
+			nrc_usr_print("[%s] IP ...\n",__func__);
+			break;
+		} else {
+			nrc_usr_print("[%s] IP Address setting State : %d != NET_ADDR_SET(%d) yet...\n",
+						  __func__, nrc_addr_get_state(0), NET_ADDR_SET);
+		}
+		_delay_ms(1000);
+	}
+
 	/* Connect to tcp server */
 	for(count = 0 ; count < MAX_RETRY ; count++){
-		if (open_connection()){
-			nrc_usr_print("[%s] open_connection success\n", __func__);
-			nrc_usr_print("[%s] Start upload_data_packet!!!\n", __func__);
+		if (open_connection((char *) param->remote_addr, param->remote_port)){
+			nrc_usr_print("[%s] Connection successful.\n", __func__);
+			nrc_usr_print("[%s] Starting upload_data_packet...\n", __func__);
 			break;
 		}
 
 		if (++count == MAX_RETRY){
-			nrc_usr_print("[%s] open_connection failed\n", __func__);
+			nrc_usr_print("[%s] Connection failed for remote %s.\n", __func__, param->remote_addr);
 			return -1;
 		}
 
@@ -383,26 +431,22 @@ nrc_err_t run_sample_tcp_client(WIFI_CONFIG *param)
 
 	/* Upload data to tcp server */
 	while(1){
-		if(nrc_wifi_get_state(&wifi_state) != WIFI_SUCCESS) {
-			nrc_usr_print("[%s] Fail to get state\n", __func__);
-			return -1;
-		}
-
-		if (wifi_state == WIFI_STATE_CONNECTED) {
+		if (nrc_wifi_get_state(0) == WIFI_STATE_CONNECTED) {
 			char* ip_addr = NULL;
 
-			if (nrc_wifi_get_ip_address(&ip_addr) == WIFI_SUCCESS)
+			if (nrc_wifi_get_ip_address(0, &ip_addr) == WIFI_SUCCESS)
 				nrc_usr_print("[%s] IP Address : %s\n", __func__, ip_addr);
 			else
-				nrc_usr_print("[%s] IP Address ...\n", __func__);
+				nrc_usr_print("[%s] IP Address...\n", __func__);
 		}
-		else if (wifi_state != WIFI_STATE_GET_IP) {
+		else {
 			nrc_usr_print("[%s] Disconnected from AP!!\n", __func__);
 			return 0;
 		}
 
-		if (!upload_data_packet((char *)payload,  payload_size)){
-			nrc_usr_print("[%s] Fail to upload data\n", __func__);
+		if (!upload_data_packet((char *) param->remote_addr, param->remote_port,
+								(char *)payload,  sizeof(payload))){
+			nrc_usr_print("[%s] Failed to send data to %s\n", __func__, param->remote_addr);
 			return -1;
 		}
 
@@ -417,18 +461,14 @@ nrc_err_t run_sample_tcp_client(WIFI_CONFIG *param)
  * Parameters   : none
  * Returns      : none
  *****************************************************************************/
+WIFI_CONFIG wifi_config;
+WIFI_CONFIG* param = &wifi_config;
+
 void user_init(void)
 {
-	nrc_err_t ret;
-	WIFI_CONFIG* param;
-
-	param = malloc(WIFI_CONFIG_SIZE);
 	memset(param, 0x0, WIFI_CONFIG_SIZE);
 
-	set_wifi_config(param);
-	ret = run_sample_tcp_client(param);
-	nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
-	if(param)
-		free(param);
+	nrc_wifi_set_config(param);
+	run_sample_tcp_client(param);
 }
 

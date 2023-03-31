@@ -161,3 +161,4 @@ void user_init(void)
 	ret = run_sample_i2c();
 	nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
 }
+

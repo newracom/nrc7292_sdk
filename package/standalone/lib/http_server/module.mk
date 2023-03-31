@@ -1,0 +1,24 @@
+DEFINE	+= -DCONFIG_HTTPD_WS_SUPPORT
+DEFINE	+= -DCONFIG_LOG_DEFAULT_LEVEL=0
+DEFINE	+= -DCONFIG_HTTPD_VALIDATE_REQ
+
+HTTP_SERVER_SRC     = $(HTTP_SERVER_BASE)/src
+HTTP_SERVER_PORT    = $(HTTP_SERVER_SRC)/port
+HTTP_SERVER_UTIL    = $(HTTP_SERVER_SRC)/util
+
+INCLUDE += -I$(HTTP_SERVER_BASE)/include
+INCLUDE += -I$(HTTP_SERVER_SRC)/port/nrc7292
+INCLUDE += -I$(HTTP_SERVER_UTIL)
+
+VPATH   += $(HTTP_SERVER_SRC)
+VPATH   += $(HTTP_SERVER_PORT)
+VPATH   += $(HTTP_SERVER_UTIL)
+
+CSRCS += \
+	httpd_ws.c \
+	httpd_sess.c \
+	httpd_parse.c \
+	httpd_uri.c \
+	httpd_txrx.c \
+	httpd_main.c \
+	ctrl_sock.c

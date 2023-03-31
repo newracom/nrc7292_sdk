@@ -16,6 +16,8 @@ struct lmac_stats {
 	uint32_t	m_total_rx_byte;
 	int32_t		m_total_beacon_rssi;
 	int32_t		m_total_beacon_cnt;
+	uint32_t	m_beacon_success_cnt;
+	uint32_t	m_beacon_fail_cnt;
 	uint32_t	m_total_length;
 	uint16_t	m_total_bw;
 	int16_t		m_total_mcs;
@@ -35,5 +37,34 @@ struct lmac_stats {
 
 void lmac_stats_init();
 struct lmac_stats * stats();
+
+#if defined(INCLUDE_MEASURE_AIRTIME) || defined(INCLUDE_MEASURE_AIRTIME_NONESL)
+void clear_airtime_deepsleep_statistics();
+#endif
+
+#if defined(INCLUDE_MEASURE_AIRTIME)
+typedef enum {
+	AIRTIME_UPDATE_TX_SW,
+	AIRTIME_UPDATE_TX_HW
+} ESL_AIRTIME_EVENT;
+
+typedef enum {
+	PROGRESS_INIT,
+	PROGRESS_ELAPSED,
+	PROGRESS_ADJUST
+} ESL_PROGRESS_CMD;
+
+typedef enum {
+	AIRTIME_ADV_FW_RFOFF
+} ESL_AIRTIME_ADV_EVENT;
+
+void show_airtime_progress();
+void update_airtime_tx_duration_push(uint32_t duration);
+void update_airtime_total_progress(ESL_PROGRESS_CMD cmd);
+void update_airtime_tx_duration(ESL_AIRTIME_EVENT event, uint32_t duration);
+void update_airtime_advanced_measurement(ESL_AIRTIME_ADV_EVENT event);
+void print_airtime_statistics();
+void clear_airtime_fw_statistics();
+#endif /* defined(INCLUDE_MEASURE_AIRTIME) */
 
 #endif /* HAL_LMAC_STATS_H */

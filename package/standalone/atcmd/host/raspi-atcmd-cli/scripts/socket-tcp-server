@@ -1,0 +1,7 @@
+ECHO "TCP server. (IPv4)"
+ECHO " - Port : 50000"
+HOLD
+
+AT+SOPEN="TCP",50000
+AT+SLIST?
+

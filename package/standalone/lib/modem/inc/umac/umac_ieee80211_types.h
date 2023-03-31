@@ -180,7 +180,11 @@
 typedef enum {
     MAC_STA_TYPE_STA = 0,
     MAC_STA_TYPE_AP,
-	MAC_STA_TYPE_MESH_POINT
+    MAC_STA_TYPE_MESH_POINT,
+#if defined(INCLUDE_IBSS)
+    MAC_STA_TYPE_IBSS,
+#endif
+    MAC_STA_TYPE_MAX
 } MAC_STA_TYPE;
 
 typedef enum  {
@@ -346,8 +350,6 @@ struct s1g_ieee80211_mgmt {
 ///	unsigned short  seq_ctrl;
 ///};
 
-
-#if defined(STANDARD_11AH)
 struct ndp_probereq_1m {
 	uint32_t		frame_type						: 3;
 	uint32_t		cssid_ano_present				: 1;
@@ -489,8 +491,6 @@ typedef struct {
 	uint8_t			maxs1g_mcs_for_4ss		: 2;
 } basic_s1g_mcs_and_nss_set;
 
-#endif /* defined(STANDARD_11AH) **/
-
 /////////////////////////
 // Information Elements
 
@@ -550,6 +550,50 @@ typedef struct {
 	uint8_t 	bitmapcontrol;
 	uint8_t 	partialvirtualbitmap[DOT11_VBM_SIZE];
 } ie_tim;
+
+#if defined(INCLUDE_IBSS)
+// EID 6 : IBSS Parameter set
+#define IE_LEN_IBSS_PARAM_SET  2
+
+typedef struct {
+	uint8_t	eid;
+	uint8_t	length;
+	uint16_t	atim_window;
+} ie_ibss_param_set;
+
+// 222 Resered Sub element ID of MBSSID IE
+
+#if 0
+#define MBSSID_SE_ID         222
+#define MBSSID_SE_LEN_BSSID  6
+
+typedef struct {
+	uint8_t	eid; // 222
+	uint8_t	length;
+	uint8_t	bssiid[6];
+} mbssid_sub_e_bssid_;
+
+//EID 71: Multiple BSSID IE
+typedef struct {
+	uint8_t	eid;
+	uint8_t	length;
+	uint8_t	MaxBSSID_indicator;
+	uint8_t	variables[0];
+} ie_multiple_bssid_set;
+#else
+#define IE_LEN_MBSSID_SET  9
+
+typedef struct {
+	uint8_t	eid;
+	uint8_t	length;
+	uint8_t	MaxBSSID_indicator;
+	uint8_t	sub_eid; // 222  // variable start, 222 means revered #. temp code.
+	uint8_t	sub_elength;
+	uint8_t	bssid[6];
+} ie_multiple_bssid;
+
+#endif//#if 0
+#endif//#if defined(INCLUDE_IBSS)
 
 // EID 12 : EDCA Parameter Set
 #define IE_LENGTH_EDCA_PARAMETER_SET	18
@@ -738,9 +782,6 @@ typedef  struct {
 
 } ie_aid_response;
 
-
-#if defined(STANDARD_11AH)
-
 // EID 213 : S1G Beacon Compatibility
 #define IE_LENGTH_S1G_BEACON_COMPATIBILITY  		8
 typedef struct {
@@ -856,8 +897,6 @@ typedef struct {
 	basic_s1g_mcs_and_nss_set	mcsnssset;
 } ie_s1g_operation;
 
-
-
 //EID 233 : Header Compression
 typedef struct __attribute__((packed)){
 	uint8_t request_response: 1;
@@ -883,7 +922,6 @@ typedef struct __attribute__((packed)) {
 	uint8_t				a4[6];
 	///ccmp_update			ccmpupdate;
 } ie_header_compression;
-#endif
 
 // EID 221 : Vendor Specific
 typedef enum {
@@ -904,6 +942,35 @@ typedef struct {
 	uint8_t		reserve;
 	uint8_t		param[16];
 } ie_vendor_specific;
+
+/* This vendor IE is used for AP's fast sleep with dtim_period, sbi, tsf */
+#define IE_LENGTH_VENDOR_SPECIFIC_TSF_SYNC					17
+typedef struct {
+	uint8_t	eid;
+	uint8_t	length;
+	uint8_t	oui[3];
+	uint8_t	cmd;
+	uint8_t	dtim_period;
+	uint16_t	bi;
+	uint16_t	sbi;
+	uint32_t	tsf_sync_low;
+	uint32_t	tsf_sync_high;
+} ie_vendor_tsf_sync;
+
+
+#if defined(INCLUDE_VENDOR_REMOTECMD)
+#define REMOTECMD_COMMAND_MAX_LENGTH			(INFO_ELEMENT_MAX_LENGTH - 12)
+typedef struct {
+	uint8_t		eid;
+	uint8_t		length;
+	uint8_t		oui[3];
+	uint8_t		oui_type;
+	uint8_t		cntdwn;
+	uint8_t		addr[6];
+	uint8_t		distributed;
+	uint8_t		command[REMOTECMD_COMMAND_MAX_LENGTH];
+} ie_vendor_remotecmd;
+#endif // INCLUDE_VENDOR_REMOTECMD
 
 // EID 244: RSN Extension
 typedef struct {

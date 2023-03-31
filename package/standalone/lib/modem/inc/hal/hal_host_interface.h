@@ -17,6 +17,9 @@ struct host_interface_ops {
 #if !defined(NRC_ROMLIB)
 	void (*reset)(int que);
 #else
+#if defined(NRC5291)
+	void (*reset)(void *arg, int que);
+#endif
 	void (*start_fw)();
 #endif /* !defined(NRC_ROMLIB) */
 	void (*stop)(void *priv);

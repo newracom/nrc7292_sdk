@@ -178,6 +178,7 @@ void wpa_sm_set_rx_replay_ctr(struct wpa_sm *sm, const u8 *rx_replay_counter);
 void wpa_sm_set_ptk_kck_kek(struct wpa_sm *sm,
 			    const u8 *ptk_kck, size_t ptk_kck_len,
 			    const u8 *ptk_kek, size_t ptk_kek_len);
+void wpa_sm_set_msg_3_of_4_ok(struct wpa_sm *sm, bool ok);
 int wpa_fils_is_completed(struct wpa_sm *sm);
 
 #else /* CONFIG_NO_WPA */

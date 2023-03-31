@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 Newracom, Inc.
+ * Copyright (c) 2022 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -31,13 +31,12 @@
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
 
-
 #define TRUE   1
 #define FALSE  0
 #define LOCAL_PORT 8099
 #define MAX_RETRY 5
 #define MAX_CLIENTS 128
-#define BUFFER_SIZE (1024*12)
+#define BUFFER_SIZE (1024*4)
 
 #define ECHO_SERVER_ENABLE 1
 #define SERVER_DATA_DEBUG 1
@@ -48,17 +47,21 @@ static int error_val = 0;
 static void tcp_server_task(void *pvParameters)
 {
 	WIFI_CONFIG *param = pvParameters;
-	tWIFI_STATE_ID wifi_state;
-	int listen_socket , addrlen , new_socket , conn_socket[MAX_CLIENTS];
+	int listen_socket = -1, addrlen , new_socket , conn_socket[MAX_CLIENTS];
 	int activity, i , sd;
 	int max_sd;
 	int PORT = LOCAL_PORT;
-	struct sockaddr_in address;
+
+#ifdef CONFIG_IPV6
+	struct sockaddr_in6 addr;
+	struct sockaddr_in6 peer;
+#else
+	struct sockaddr_in addr;
+	struct sockaddr_in peer;
+#endif
 	char *MSGEND = "#*stop_server";
 	char buffer[BUFFER_SIZE];
 	int len,ret = 0;
-
-	param->test_running = 1;
 
 	fd_set rfds, wfds;
 
@@ -66,19 +69,35 @@ static void tcp_server_task(void *pvParameters)
 		conn_socket[i] = -1;
 	}
 
+#ifdef CONFIG_IPV6
+	if( (listen_socket = socket(AF_INET6 , SOCK_STREAM , 0)) < 0)  {
+		nrc_usr_print("socket failed\n");
+		goto exit;
+	}
+	addrlen = sizeof(struct sockaddr_in6);
+	addr.sin6_len = addrlen;
+	addr.sin6_family = AF_INET6;
+	addr.sin6_port = htons(PORT);
+	addr.sin6_flowinfo = 0;
+	addr.sin6_addr = in6addr_any;
+	addr.sin6_scope_id = 1;
+#else
 	if( (listen_socket = socket(AF_INET , SOCK_STREAM , 0)) < 0)  {
 		nrc_usr_print("socket failed\n");
 		goto exit;
 	}
+	addrlen = sizeof(struct sockaddr_in);
+	addr.sin_len = addrlen;
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(PORT);
+	addr.sin_addr.s_addr = htonl(INADDR_ANY);
+#endif
 
-	address.sin_family = AF_INET;
-	address.sin_addr.s_addr = INADDR_ANY;
-	address.sin_port = htons( PORT );
-
-	if (bind(listen_socket, (struct sockaddr *)&address, sizeof(address))<0) {
+	if (bind(listen_socket, (struct sockaddr *)&addr, addrlen) < 0) {
 		nrc_usr_print("bind failed\n");
 		goto exit;
 	}
+
 	nrc_usr_print("[TCP Server]\n");
 	nrc_usr_print("Echo : %s\n", ECHO_SERVER_ENABLE ? "Enable" : "Disable");
 	nrc_usr_print("Receive buffer size :%d \n", BUFFER_SIZE);
@@ -89,40 +108,28 @@ static void tcp_server_task(void *pvParameters)
 		goto exit;
 	}
 
-	addrlen = sizeof(address);
 	nrc_usr_print("Waiting for connections ...\n");
 
 	while(TRUE)
 	{
-		if(nrc_wifi_get_state(&wifi_state) != WIFI_SUCCESS) {
-			nrc_usr_print("[%s] Fail to get state\n", __func__);
+		if (nrc_wifi_get_state(0) != WIFI_STATE_CONNECTED) {
+			nrc_usr_print("[%s] Disconnected from AP!!\n", __func__);
 			goto exit;
-		}
-
-		switch (wifi_state){
-			case WIFI_STATE_CONNECTED:
-			case WIFI_STATE_GET_IP:
-				break;
-			default:
-				nrc_usr_print("[%s] Disconnected from AP!!\n", __func__);
-				goto exit;
 		}
 
 		FD_ZERO(&rfds);
 		FD_SET(listen_socket, &rfds);
 		max_sd = listen_socket;
 
-		for ( i = 0 ; i < MAX_CLIENTS ; i++)
-		{
+		for ( i = 0 ; i < MAX_CLIENTS ; i++) {
 			sd = conn_socket[i];
 			if(sd >= 0)
-				FD_SET( sd , &rfds);
+				FD_SET(sd , &rfds);
 
-			if(sd > max_sd)
-				max_sd = sd;
+			max_sd = MAX(max_sd, sd);
 		}
 
-		activity = select( max_sd + 1 , &rfds , NULL , NULL , NULL);
+		activity = select(max_sd + 1 , &rfds , NULL , NULL , NULL);
 		if ((activity < 0) && (errno!=EINTR))
 			nrc_usr_print("select error\n");
 
@@ -131,80 +138,107 @@ static void tcp_server_task(void *pvParameters)
 
 		if (FD_ISSET(listen_socket, &rfds)) {
 			FD_CLR(listen_socket, &rfds);
-			if ((new_socket = accept(listen_socket, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0){
+			if ((new_socket = accept(listen_socket, (struct sockaddr *)&addr, (socklen_t*)&addrlen)) < 0){
 				nrc_usr_print("accept failed\n");
 				goto exit;
 			}
-			fcntl(new_socket, F_SETFL, O_NONBLOCK);
-			nrc_usr_print("New connection , socket fd is %d , ip is : %s , port : %d \n" ,\
-				 new_socket , inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
 
-			for (i = 0; i < MAX_CLIENTS; i++)
+#ifdef CONFIG_IPV6
+			struct sockaddr_in *addr_in = (struct sockaddr_in *) &addr;
+			if (addr_in->sin_family == AF_INET6) {
+				ip6_addr_t ip6_addr;
+				inet6_addr_to_ip6addr(&ip6_addr, &addr.sin6_addr);
+				nrc_usr_print("New connection , socket fd is %d , ip is : %s , port : %d \n",
+							  new_socket , ip6addr_ntoa(&ip6_addr) , ntohs(addr.sin6_port));
+			} else
+#endif
 			{
-				if( conn_socket[i] < 0 ){
+				nrc_usr_print("New connection , socket fd is %d , ip is : %s , port : %d \n",
+							  new_socket , inet_ntoa(addr.sin_addr) , ntohs(addr.sin_port));
+			}
+
+			fcntl(new_socket, F_SETFL, O_NONBLOCK);
+
+			for (i = 0; i < MAX_CLIENTS; i++) {
+				if( conn_socket[i] < 0 ) {
 					conn_socket[i] = new_socket;
-					nrc_usr_print("Adding to list of sockets as %d\n" , i);
+					nrc_usr_print("Adding socket %d to list of sockets as %d\n" , new_socket, i);
 					break;
 				}
 			}
+			continue;
 		}
 
-		for (i = 0; i < MAX_CLIENTS; i++)
-		{
+		for (i = 0; i < MAX_CLIENTS; i++) {
 			sd = conn_socket[i];
 			if (sd < 0)
 				continue;
 
-			if (FD_ISSET( sd , &rfds)) 	{
-				len = recv( sd , buffer, sizeof(buffer), 0);
-				if(len < 0){
+			if (FD_ISSET(sd , &rfds)) {
+				FD_CLR(sd, &rfds);
+				len = recv(sd , buffer, sizeof(buffer), 0);
+				if(len < 0) {
 					nrc_usr_print("recv failed: errno %d\n", errno);
 					shutdown(sd, 0);
 					close(sd);
 					conn_socket[i] = -1;
-				} else if(len == 0) {
-					getpeername(sd , (struct sockaddr*)&address , (socklen_t*)&addrlen);
-					nrc_usr_print("Host disconnected , ip %s , port %d \n" ,\
-						 inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
+				} else if (len == 0) {
+					struct sockaddr_in *peer_in = (struct sockaddr_in *) &peer;
+					getpeername(sd , (struct sockaddr*) &peer , (socklen_t*)&addrlen);
+#ifdef CONFIG_IPV6
+					if (peer_in->sin_family == AF_INET6) {
+						ip6_addr_t ip6_addr;
+						inet6_addr_to_ip6addr(&ip6_addr, &peer.sin6_addr);
+						nrc_usr_print("Host disconnected , ip %s , port %d \n" ,
+									  ip6addr_ntoa(&ip6_addr) , ntohs(peer.sin6_port));
+					} else
+#endif
+					{
+						nrc_usr_print("Host disconnected , ip %s , port %d \n" ,
+									  inet_ntoa(peer_in->sin_addr) , ntohs(peer_in->sin_port));
+					}
 
 					close( sd );
 					conn_socket[i] = -1;
 				} else {
-					#if SERVER_DATA_DEBUG
-					nrc_usr_print("[%d] Recv(%d)\n", sd, len);
-					#if SERVER_DATA_HEX_PRINT
+#if SERVER_DATA_DEBUG
+					nrc_usr_print("socket %d, %d bytes received...\n", sd, len);
+#if SERVER_DATA_HEX_PRINT
 					print_hex((uint8_t*)buffer, len);
-					#endif /* SERVER_DATA_HEX_PRINT */
-					#endif /* SERVER_DATA_DEBUG */
+#endif /* SERVER_DATA_HEX_PRINT */
+#endif /* SERVER_DATA_DEBUG */
 
 					if (strncmp(buffer, MSGEND, strlen(MSGEND)) == 0)
 						goto exit;
 
-					#if ECHO_SERVER_ENABLE
-					ret = send(sd, buffer, len, 0);
-					if (ret == -1) {
-						if (errno == EWOULDBLOCK) 	{
-							FD_ZERO(&wfds);
-							FD_SET(sd, &wfds);
+#if ECHO_SERVER_ENABLE
+					FD_ZERO(&wfds);
+					FD_SET(sd, &wfds);
 
-							struct timeval timeout;
-							timeout.tv_sec = 2;
-							timeout.tv_usec = 0;
+					struct timeval timeout;
+					timeout.tv_sec = 2;
+					timeout.tv_usec = 0;
 
-							ret = select(max_sd + 1, NULL, &wfds, NULL, &timeout);
+					ret = select(sd + 1, NULL, &wfds, NULL, &timeout);
 
-							if (ret > 0)
-								continue;
-
-							if (ret == 0) 	{
-								nrc_usr_print("Send Timeout\n");
+					if (ret > 0) {
+						if (FD_ISSET(sd, &wfds)) {
+							FD_CLR(sd, &wfds);
+							ret = send(sd, buffer, len, 0);
+							if (ret == -1) {
+								if (errno == EWOULDBLOCK) {
+									nrc_usr_print("error send, EWOULDBLOCK\n");
+								}
+								nrc_usr_print("send failed: errno %d\n", errno);
+							} else {
+								nrc_usr_print("socket %d, %d bytes sent...\n", sd, ret);
 							}
 						}
-						nrc_usr_print("send failed: errno %d\n", errno);
-					} else {
-						nrc_usr_print("[%d] Send(%d)\n", sd, ret);
 					}
-					#endif /* ECHO_SERVER_ENABLE */
+					else {
+						nrc_usr_print("Send Timeout\n");
+					}
+#endif /* ECHO_SERVER_ENABLE */
 				}
 			}
 		}
@@ -228,7 +262,6 @@ exit:
 		shutdown(listen_socket, 0);
 		close(listen_socket);
 	}
-	param->test_running = 0;
 	vTaskDelete(NULL);
 }
 
@@ -240,7 +273,6 @@ exit:
  *******************************************************************************/
 nrc_err_t run_sample_tcp_server(WIFI_CONFIG* param)
 {
-	tWIFI_STATE_ID wifi_state = WIFI_STATE_INIT;
 	int count;
 
 	/* set initial wifi configuration */
@@ -250,69 +282,36 @@ nrc_err_t run_sample_tcp_server(WIFI_CONFIG* param)
 	}
 
 	/* connect to AP */
-	for(count = 0 ; count < MAX_RETRY ; ){
-		if (wifi_connect(param)== WIFI_SUCCESS){
+	while(1) {
+		if (wifi_connect(param)== WIFI_SUCCESS) {
 			nrc_usr_print ("[%s] connect to %s successfully !! \n", __func__, param->ssid);
 			break;
-		}
-
-		if (++count == MAX_RETRY){
+		} else{
 			nrc_usr_print ("[%s] Fail for connection %s\n", __func__, param->ssid);
-			return -1;
+			_delay_ms(1000);
 		}
-
-		_delay_ms(1000);
 	}
 
-	/* check the IP is ready */
+	/* check if IP is ready */
 	while(1){
-		if(nrc_wifi_get_state(&wifi_state) != WIFI_SUCCESS) {
-			nrc_usr_print("[%s] Fail to get state\n", __func__);
-			return -1;
-		}
-
-		if (wifi_state == WIFI_STATE_CONNECTED)
-			nrc_usr_print("[%s] IP Address ...\n", __func__);
-		else if (wifi_state == WIFI_STATE_GET_IP){
-			char* ip_addr = NULL;
-
-			if (nrc_wifi_get_ip_address(&ip_addr) != WIFI_SUCCESS){
-				nrc_usr_print("[%s] Fail to get IP address\n", __func__);
-				return -1;
-			}
-
-			nrc_usr_print("[%s] IP Address : %s\n", __func__, ip_addr);
+		if (nrc_addr_get_state(0) == NET_ADDR_SET) {
+			nrc_usr_print("[%s] IP ...\n",__func__);
 			break;
+		} else {
+			nrc_usr_print("[%s] IP Address setting State : %d != NET_ADDR_SET(%d) yet...\n",
+						  __func__, nrc_addr_get_state(0), NET_ADDR_SET);
 		}
-		else {
-			nrc_usr_print("[%s] Disconnected from AP!!\n", __func__);
-			return 0;
-		}
-
 		_delay_ms(1000);
 	}
 
-	if (xTaskCreate(tcp_server_task, "tcp_server_task", 1024,
-				(void*)param, uxTaskPriorityGet(NULL), NULL) == pdPASS)
-		param->test_running = 1;
+	xTaskCreate(tcp_server_task, "tcp_server_task", 2048,
+					(void*)param, uxTaskPriorityGet(NULL), NULL);
 
-	while(param->test_running){
-		_delay_ms(1);
-	}
+	_delay_ms(500);
 
-	if(nrc_wifi_get_state(&wifi_state) != WIFI_SUCCESS){
-		nrc_usr_print("[%s] Fail to get state\n", __func__);
-		return -1;
-	}
-
-	if (wifi_state == WIFI_STATE_GET_IP || wifi_state == WIFI_STATE_CONNECTED) {
-		int network_index;
+	if (nrc_wifi_get_state(0) == WIFI_STATE_CONNECTED) {
 		nrc_usr_print("[%s] Trying to DISCONNECT... for exit\n",__func__);
-		if (nrc_wifi_get_network_index(&network_index) != WIFI_SUCCESS){
-			nrc_usr_print("[%s] Fail to get network index\n", __func__);
-			return -1;
-		}
-		if (nrc_wifi_disconnect(network_index) != WIFI_SUCCESS) {
+		if (nrc_wifi_disconnect(0, 5000) != WIFI_SUCCESS) {
 			nrc_usr_print ("[%s] Fail for Wi-Fi disconnection\n", __func__);
 			return -1;
 		}
@@ -320,7 +319,6 @@ nrc_err_t run_sample_tcp_server(WIFI_CONFIG* param)
 
 	if (error_val < 0)
 		return -1;
-
 	return 0;
 }
 
@@ -331,19 +329,14 @@ nrc_err_t run_sample_tcp_server(WIFI_CONFIG* param)
  * Parameters   : none
  * Returns      : none
  *******************************************************************************/
+WIFI_CONFIG wifi_config;
+WIFI_CONFIG* param = &wifi_config;
+
 void user_init(void)
 {
-	nrc_err_t ret;
-	WIFI_CONFIG* param;
-
-	param = malloc(WIFI_CONFIG_SIZE);
 	memset(param, 0x0, WIFI_CONFIG_SIZE);
 
-	set_wifi_config(param);
-	ret = run_sample_tcp_server(param);
-	nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
-	if(param){
-		free(param);
-	}
+	nrc_wifi_set_config(param);
+	run_sample_tcp_server(param);
 }
 

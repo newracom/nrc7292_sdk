@@ -18,6 +18,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#include <hal_sflash.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -37,8 +39,12 @@ void hal_uart_printf(const char *f, ...);
 #endif
 
 /* Use User_Config_1, User_Config_2, and User_config_3 */
-#define SPI_SECTORS_USED                    3
-#define SPI_FLASH_SEC_SIZE                  (1024 * 4)
+#define SPI_SECTORS_USED                    4
+#if defined(SUPPORT_DEVICEWORX)
+#define SPI_FLASH_SEC_SIZE                  0x32000//200KB
+#else
+#define SPI_FLASH_SEC_SIZE                  0x1000//4KB
+#endif
 #define MIN_PARTITION_SIZE                  (SPI_FLASH_SEC_SIZE * SPI_SECTORS_USED)
 
 #define NVS_OK                              0

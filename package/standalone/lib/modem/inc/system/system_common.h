@@ -16,6 +16,9 @@
 #include "system_freertos.h"
 #include "util_trace.h"
 
+#if defined(NEW_V_SNPRINTF_SUPPORT)
+#include "system_new_printf.h"
+#endif /* defined(NEW_V_SNPRINTF_SUPPORT) */
 
 void system_task_init();
 void background_task_init();
@@ -33,7 +36,24 @@ int32_t     swap_int32(int32_t val);
 uint16_t    swap_uint16(uint16_t val);
 int16_t     swap_int16(int16_t val);
 
-#if defined (NRC7291) || (NRC7292) || (NRC7391) || (NRC7392) || (NRC4791) || (NRC5291)
+extern const char* string_bw_to_str[BW_MAX];
+#define bw_to_str(A) string_bw_to_str[A]
+bw_t str_to_bw(const char *str);
+
+
+#if defined (NRC7292)
+#define BUILD_CHIP_ID   0x7292
+#elif defined (NRC7392)
+#define BUILD_CHIP_ID   0x7392
+#elif defined (NRC7393)
+#define BUILD_CHIP_ID   0x7393
+#elif defined (NRC7394)
+#define BUILD_CHIP_ID   0x7394
+#else
+#error "Please add new chip id"
+#endif
+
+#if defined (NRC7291) || (NRC7292) || (NRC7391) || (NRC7392) || (NRC4791) || (NRC5291) || (NRC7393) || (NRC4792) || (NRC7394)
 // -- General Include --
 // -- Hal Include --
 #if defined(NRC7291)
@@ -57,6 +77,7 @@ int16_t     swap_int16(int16_t val);
 #include "hal_uart.h"
 #include "hal_clock.h"
 #include "hal_gpio.h"
+#include "hal_led.h"
 #include "hal_i2c.h"
 #include "drv_timer.h"
 #include "hal_pwm.h"
@@ -72,7 +93,7 @@ int16_t     swap_int16(int16_t val);
     #include "hal_phy.h"
     #include "hal_rf.h"
 #endif /* defined(NRC7292_LMACTEST_FPGA_AVIA) */
-/* TODO: This has to be accessed through HAL and driver. */ 
+/* TODO: This has to be accessed through HAL and driver. */
 #include "reg_gdma.h"
 #endif /* defined(NRC7292) */
 
@@ -98,23 +119,20 @@ int16_t     swap_int16(int16_t val);
 #include     "hal_phy.h"
 #endif /* defined(NRC7391) */
 
-#if defined(NRC7392) || defined(NRC4791) || defined(NRC5291)
+#if defined(NRC7392) || defined(NRC4791) || defined(NRC5291) || defined(NRC7393) || defined(NRC4792)|| defined(NRC7394)
 #include    "hal_uart.h"
 #include    "hal_gpio.h"
 #include   "hal_clock.h"
 #include   "drv_timer.h"
 #include     "hal_i2c.h"
 
-#if defined(INCLUDE_RF_AVIA)
-#include      "hal_rf_avia.h"
-#include      "hal_phy_avia.h"
-#elif defined(INCLUDE_RF_NRC7292RFE)
+#if defined(INCLUDE_RF_NRC7292RFE)
 #include      "hal_rf_nrc7292rfe.h"
 #include      "hal_phy.h"
 #else
 #include      "hal_rf.h"
 #include      "hal_phy.h"
-#endif /* defined(INCLUDE_RF_AVIA) */
+#endif /* defined(INCLUDE_RF_NRC7292RFE) */
 
 //#include    "lmac.h"
 #include    "hal_phy_register.h"
@@ -125,7 +143,7 @@ int16_t     swap_int16(int16_t val);
 #include     "hal_wdt.h"
 #include    "hal_nadc.h"
 #include    "hal_cspi.h"
-#if defined(NRC_ROMLIB)
+#if defined(NRC_ROMLIB) && !defined(NRC7393)
 #include "hal_adc_sfc.h"
 #include  "hal_sflash_lib.h"
 #else
@@ -138,19 +156,20 @@ int16_t     swap_int16(int16_t val);
 #include "util_trace.h"
 #include "util_cmd.h"
 
-#if defined(NRC7292)
+#if defined (NRC7292) || defined (NRC7393)|| defined(NRC7394)
 #include "util_core_dump.h"
 #endif /* defined(NRC7292) */
 
 typedef enum _COUNTRY_CODE_INDEX {
 	COUNTRY_CODE_JP = 0,
-	COUNTRY_CODE_KR,
+	COUNTRY_CODE_K1,
 	COUNTRY_CODE_TW,
 	COUNTRY_CODE_US,
 	COUNTRY_CODE_EU,
 	COUNTRY_CODE_CN, //5
 	COUNTRY_CODE_NZ, //6
 	COUNTRY_CODE_AU, //7
+	COUNTRY_CODE_K2, //8
 	COUNTRY_CODE_MAX,
 } CONTRY_CODE_INDEX;
 
@@ -253,6 +272,13 @@ void msdelay(unsigned int delay);
 // ------------------------------------------------------------------------
 //
 
+#define NOTIFY_DRIVER_WDT_EXPIRED			(0x7D000000)
+#define NOTIFY_DRIVER_FW_READY_FROM_WDT		(0x9D000000)
+#define NOTIFY_DRIVER_W_DISABLE_ASSERTED	(0xAB000000)
+#define NOTIFY_DRIVER_REQUEST_FW_DOWNLOAD	(0xDC000000)
+#define NOTIFY_DRIVER_FW_READY_FROM_PS		(0xEC000000)
+#define MAX_SHOWN_RSSI				(-10)
+
 sys_info *get_sys_info();
 
 bool system_schedule_work_queue_from_isr( sys_task_func func , void* param , sys_task_func_cb cb );
@@ -264,15 +290,24 @@ bool system_schedule_work_queue         ( sys_task_func func , void* param , sys
 //define
 #define WDT_DEBUG			0
 #define WDT_TIMEOUT_RST			1	//System Reset by WDT timeout (1:Reset, 0:Print Log)
-#define WDT_TIMEOUT_MS		 	10000	// 10000ms (10 sec)
-#define WDT_RST_TRIGGER_CNT		3	//WDT RESET Threshold (waiting count)
+#if defined (LMAC_WDT_RESET_TIME_MS)
+#define WDT_TIMEOUT_MS		 	LMAC_WDT_RESET_TIME_MS // in makefile
+#else
+#define WDT_TIMEOUT_MS		 	10000		 // 10000ms (10 sec)
+#endif
+#define WDT_RST_TRIGGER_CNT		5		// WDT RESET Threshold (waiting count)
+
+#if !defined (INCLUDE_WDT_INT)
+#define WDT_RST_MON_TIMER_CH		SYS_TIMER_0	// WDT Monitor Timer
+#define WDT_RST_MON_TIMER_INTERVAL	2000000		// Monitor every 2 seccods
+#endif
 
 //Common Task
-#define WDT_ALIVE_LMAC_TASK	 BIT(0)		//LMAC Task
-#define WDT_ALIVE_SYSTEM_TASK	 BIT(1)		//SYS Task
-#define WDT_ALIVE_BG_TASK	 BIT (2)	//BG Task
+#define WDT_ALIVE_LMAC_TASK	 BIT(0)			//LMAC Task
+#define WDT_ALIVE_SYSTEM_TASK	 BIT(1)			//SYS Task
+#define WDT_ALIVE_BG_TASK	 BIT (2)		//BG Task
 
-#if defined(NRC7292_CSPI) || defined(NRC7392_CSPI)
+#if defined(CSPI)
 #define WDT_ALIVE_MASK		(BIT(1)|BIT(0))
 #endif
 
@@ -287,7 +322,10 @@ bool system_schedule_work_queue         ( sys_task_func func , void* param , sys
 //external functions
 void system_wdt_set_alive(uint16_t alive_flag);
 uint16_t system_wdt_get_alive();
-void system_wdt_isr();
+void system_wdt_init();
+void system_wdt_deinit();
+void system_wdt_reset_show();
+void system_wdt_log_enable(bool enable);
 #endif //#if defined (INCLUDE_WDT)
 
 /* Fast Work Task */
@@ -312,7 +350,6 @@ struct fast_task_stats* fast_task_get_stats_handle();
 		tq_message.q_event_id = e;
 
 #define TQM	&tq_message
-
 
 #endif //#if defined (INCLUDE_NEW_TASK_ARCH)
 

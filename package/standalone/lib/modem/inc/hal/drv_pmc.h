@@ -5,6 +5,18 @@
 #define MS_TO_HZ(m) (m * 32768) / 1000
 
 enum {
+    PMC_REG_PWR_SW_MASK             = PMC_BASE_ADDR + 0x20,
+    PMC_REG_PWR_SW_MASK_CORE        = PMC_REG_PWR_SW_MASK,
+    PMC_REG_PWR_SW_MASK_CORE_SHIFT  = 8,
+    PMC_REG_PWR_SW_MASK_CORE_MASK   = 0x00000100,
+
+    PMC_REG_ETC_CTRL                = PMC_BASE_ADDR + 0x30,
+    PMC_REG_ETC_CTRL_RF_OFF         = PMC_REG_ETC_CTRL,
+    PMC_REG_ETC_CTRL_RF_OFF_SHIFT   = 0,
+    PMC_REG_ETC_CTRL_RF_OFF_MASK    = 0x00000001
+};
+
+enum {
     PMC_X32K = 0,
     PMC_X32M,
     PMC_PWR,
@@ -18,11 +30,11 @@ enum {
 enum {
     PMC_PMU_CTRL = BIT0,
     PMC_LDO_CTRL = BIT1,
-    PMC_CORE	 = BIT8,
+    PMC_CORE     = BIT8,
     PMC_MODEM    = BIT9,
-    PMC_MEM		 = BIT10,
-    PMC_RF		 = BIT11,
-    PMC_MEMPD	 = BIT16,
+    PMC_MEM      = BIT10,
+    PMC_RF       = BIT11,
+    PMC_MEMPD    = BIT16,
 };
 
 enum {
@@ -36,10 +48,17 @@ enum {
 
 
 enum {
-    PMC_EXTINT0 = BIT0,
-    PMC_EXTINT1 = BIT1,
-    PMC_RTCINT 	= BIT2,
-    PMC_CSPIINT = BIT3,
+	PMC_EXTINT0 = BIT0,
+	PMC_EXTINT1 = BIT1,
+#if defined(NRC7394)
+	PMC_EXTINT2 = BIT2,
+	PMC_EXTINT3 = BIT3,
+	PMC_RTCINT  = BIT4,
+	PMC_CSPIINT = BIT5,
+#else
+	PMC_RTCINT  = BIT2,
+	PMC_CSPIINT = BIT3,
+#endif
 };
 
 bool drv_pmc_init();
@@ -50,6 +69,10 @@ void drv_pmc_irq(bool enable);
 void drv_pmc_enable(bool enable);
 void drv_pmc_int0_level(uint32_t level);
 void drv_pmc_int1_level(uint32_t level);
+#if defined(NRC7394)
+void drv_pmc_int2_level(uint32_t level);
+void drv_pmc_int3_level(uint32_t level);
+#endif
 void drv_pmc_wakeup_source_mask(uint32_t source);
 void drv_pmc_opcode(uint32_t code);
 void drv_pmc_wait(uint32_t id, uint32_t value);
@@ -85,10 +108,14 @@ void drv_scfg_clr_boot_reason();
 void drv_pmc_sleep(int mode, uint64_t sleep_duration_ms);
 //void drv_pmc_enter_sleep0(uint32_t after_ms);
 void drv_pmc_execute_deepsleep(uint64_t after_ms);
-//void drv_pmc_execute_modemsleep(uint64_t after_ms);
+void drv_pmc_execute_modemsleep(uint64_t after_ms);
 void remap_and_reset(int remap, int others);
-
 //void drv_pmc_test(int mode, uint64_t duration_sec);
+
+void drv_pmc_rf_power(bool power_on);
+void drv_pmc_core_power(bool power_on);
+void drv_pmc_wakeup_modemsleep();
+
 void drv_pmc_show();
 
 #endif //__DRV_PMC_H__

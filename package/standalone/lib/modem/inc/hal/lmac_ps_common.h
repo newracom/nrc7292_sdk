@@ -1,8 +1,6 @@
 #ifndef __HAL_LMAC_PS_COMMON_H__
 #define __HAL_LMAC_PS_COMMON_H__
 
-#include "nrc_ps_api.h"
-
 #define SET_PS_SLEEP_MODE(variable, value)	\
 	do {									\
 		variable &= ~(0x03); 				\
@@ -43,7 +41,7 @@ typedef enum _ps_state {
     PS_STATE_IDLE,
     PS_STATE_ACTIVE,
     PS_STATE_ACTIVE_TO_DOZE,
-    PS_STATE_DOZE,
+	PS_STATE_DOZE,
     PS_STATE_DOZE_TO_ACTIVE
 } ps_state;
 
@@ -64,6 +62,16 @@ typedef void (*ps_doze_cb)(void);
 typedef void (*ps_wake_cb)(void);
 
 #define MAX_CB 5
+
+typedef struct _lmac_dynamic_ps {
+	uint32_t	dyn_ps_timeout_us; //timeout for dynamic ps in us unit
+	uint32_t	last_check_tsf; //tsf when dynamic ps is expired
+	uint32_t	last_tx_us; //lower tsf for last tx frame
+	uint32_t	last_rx_us; //lower tsf for last rx frame
+	uint32_t	last_bcmc_rx_us; //lower tsf for last rx bc/mc frame
+
+	bool	expired; //whether dynamic ps is expired
+} lmac_dynamic_ps;
 
 typedef struct _lmac_ps_info {
 	ps_mode     	mode;
@@ -86,23 +94,19 @@ typedef struct _lmac_ps_info {
 	uint8_t 	    wake_cb_num;
 
 	uint64_t		target_interval_ms;
-	uint32_t	    wait_tx_before_deepsleep_us;
 	uint32_t	    wait_rx_before_deepsleep_us;
 	uint64_t	    wakeup_after_deepsleep_us;
-	uint32_t	    last_tx_us;
-	uint32_t	    last_rx_us;
-	uint32_t	    last_bcmc_rx_us;
 	uint32_t		minimum_sleep_interval_us;
 	uint32_t	    deepsleep_start_us;
 	uint32_t		beacon_rx_us;
-	uint32_t		beacon_interval_us;
+	//uint32_t		beacon_interval_us;
 	uint32_t		ready_for_wakeup_us;
 	bool    	    non_tim;
 	bool    	    keep_alive;
 	int8_t			vif_id;
 	uint8_t 		dtim_count;
 	uint32_t	    next_dtim_us;
-
+	bool			sent_pm0;
 	bool			activate;
 	bool			associated;
 	uint32_t		last_ps_tsf;
@@ -115,34 +119,99 @@ typedef struct _lmac_ps_info {
 	uint32_t 		wakeup_margin;
 
 	uint32_t		total_count_qosdata_fail;
+	bool			first_ps;
 
-#if defined(NRC7292_STANDALONE_XIP)
-	bool 			ms_mode;
-	uint32_t 		timeout_ms;	//standalone only
-#endif /* NRC7292_STANDALONE_XIP */
 } lmac_ps_info;
 
-void lmac_process_ps();
-
+#if defined(INCLUDE_MODEM_SLEEP)
+void lmac_ps_init_base();
+void lmac_ps_init(uint32_t wait_tx , uint32_t wait_rx , uint64_t wakeup_after_deepsleep_us );
+bool lmac_ps_get_modem_sleep_support();
+void lmac_ps_set_pm0_sent(bool sent);
+bool lmac_ps_get_pm0_sent();
 bool hal_lmac_ps_doze();
 bool hal_lmac_ps_wake();
+bool lmac_can_start_ps();
+void lmac_process_ps();
+bool lmac_ps_add_doze_cb( ps_doze_cb cb );
+bool lmac_ps_add_wake_cb( ps_wake_cb cb );
+void lmac_ps_set_wakeup();
+bool lmac_ps_is_wakeup();
+int lmac_ps_stop();
+void lmac_ps_modemsleep_stop();
+ps_state lmac_ps_get_tx_state();
+ps_state lmac_ps_get_tx_state_pm();
+ps_state lmac_ps_get_beacon_tim();
+int8_t lmac_ps_get_vifid();
+bool lmac_ps_is_modem_sleep_mode();
+bool lmac_ps_is_modem_sleep(int8_t vif_id);
+bool lmac_ps_set_halt_modem_sleep(int8_t vif_id, bool stop);
+void lmac_ps_set_beacon_tim(ps_state state);
+void lmac_ps_set_rx_state(ps_state state);
+ps_state lmac_ps_get_rx_state();
+void lmac_ps_set_tx_state_pm(ps_state state);
+void lmac_ps_set_bcmc_rx_state(ps_state tsf);
+ps_state lmac_ps_get_bcmc_rx_state();
 
+/* in lmac_ps_psnonpoll.c */
+void lmac_ps_active();
+void lmac_ps_doze();
+void lmac_ps_active_to_doze();
+void lmac_ps_doze_to_active();
+void lmac_ps_check_qm();
 
-void lmac_ps_init(uint32_t wait_tx , uint32_t wait_rx , uint64_t wakeup_after_deepsleep_us );
+#else /* INCLUDE_MODEM_SLEEP */
 
-bool lmac_ps_add_doze_cb( ps_doze_cb );
-bool lmac_ps_add_wake_cb( ps_wake_cb );
+static inline void lmac_ps_init_base() {}
+static inline void lmac_ps_init(uint32_t wait_tx , uint32_t wait_rx , uint64_t wakeup_after_deepsleep_us ) {}
+static inline bool lmac_ps_get_modem_sleep_support() {return false;}
+static inline void lmac_ps_set_pm0_sent(bool sent) {}
+static inline bool lmac_ps_get_pm0_sent() {return false;}
+static inline bool hal_lmac_ps_doze() {return false;}
+static inline bool hal_lmac_ps_wake() {return false;}
+static inline bool lmac_can_start_ps() {return false;};
+static inline void lmac_process_ps() {}
+static inline bool lmac_ps_add_doze_cb( ps_doze_cb cb ) {return false;}
+static inline bool lmac_ps_add_wake_cb( ps_wake_cb cb ) {return false;}
+static inline void lmac_ps_set_wakeup() {}
+static inline bool lmac_ps_is_wakeup() {return false;}
+static inline int lmac_ps_stop() {return -1;}
+static inline void lmac_ps_modemsleep_stop() {}
+static inline ps_state lmac_ps_get_tx_state() {return 0;}
+static inline ps_state lmac_ps_get_tx_state_pm() {return 0;}
+static inline ps_state lmac_ps_get_beacon_tim() {return 0;}
+static inline ps_state lmac_ps_get_rx_state() {return 0;}
+static inline ps_state lmac_ps_get_bcmc_rx_state() {return 0;}
+static inline int8_t lmac_ps_get_vifid() {return 0;}
+static inline bool lmac_ps_is_modem_sleep_mode() {return false;}
+static inline bool lmac_ps_is_modem_sleep(int8_t vif_id) {return false;}
+static inline bool lmac_ps_set_halt_modem_sleep(int8_t vif_id, bool stop) {return false;}
+static inline void lmac_ps_set_beacon_tim(ps_state state) {}
+static inline void lmac_ps_set_rx_state(ps_state state) {}
+static inline void lmac_ps_set_tx_state_pm(ps_state state) {}
+static inline void lmac_ps_set_bcmc_rx_state(ps_state tsf) {}
+#endif /* INCLUDE_MODEM_SLEEP */
 
-//Set PS params including retention info
-void lmac_ps_set_listen_interval(uint8_t vif_id, uint32_t listen_interval_us );
-void lmac_ps_set_short_beacon_interval(uint32_t sbi);
-void lmac_ps_set_dtim_period(uint8_t period);
-void lmac_ps_set_long_beacon_interval(uint16_t bi);
-void lmac_ps_set_statype(uint8_t sta_type);
-void lmac_ps_set_ps_mode(uint8_t mode, uint64_t duration);
-void lmac_ps_set_target_wake(uint8_t wake);
-void lmac_ps_set_channel(uint16_t freq);
-void lmac_ps_set_aid(uint16_t aid);
+ps_mode lmac_ps_get_psmode();
+void lmac_ps_go_doze();
+void lmac_ps_execute_sleepmode(uint64_t after_ms);
+ps_mode lmac_ps_get_mode();
+ps_state lmac_ps_get_state();
+
+/* API for SDK */
+void lmac_ps_go_sleep_alone(uint8_t mode, uint64_t duration);
+int lmac_ps_set_sleep(uint8_t sleep_mode, uint64_t interval_ms);
+
+/* Retention APIs */
+bool lmac_ps_get_target_wake();
+void lmac_ps_detect_qosdata_fail();
+static void lmac_ps_go_deepsleep();
+bool lmac_ps_get_ret_recovered();
+bool lmac_ps_get_ret_validity();
+void lmac_ps_set_first_ps(bool first);
+void lmac_ps_set_cca_threshold(int cca_threshold);
+void lmac_ps_set_sync_time_ms(uint32_t time);
+uint32_t lmac_ps_get_sync_time_ms(void);
 void lmac_ps_set_addr(uint8_t *addr, bool ap);
 void lmac_ps_set_country(uint8_t *cc);
 void lmac_ps_set_ssid(uint8_t *ssid, uint8_t  len);
@@ -153,78 +222,64 @@ void lmac_ps_set_key(uint8_t key_id, uint8_t key_type, uint32_t *key);
 void lmac_ps_set_key_tsc(uint8_t key_id, uint64_t tsc);
 void lmac_ps_set_edca(uint8_t ac, uint8_t aifsn, uint16_t cwmin, uint16_t cwmax,  uint16_t txop);
 void lmac_ps_set_ampdu(uint8_t ac, uint8_t max_agg);
-void lmac_ps_set_ampdu_enable(uint8_t ac, uint8_t enable);
+void lmac_ps_set_ampdu_enable(uint8_t ac, bool enable);
+void lmac_ps_set_ampdu_size(uint8_t ac, uint16_t limit_size);
+void lmac_ps_set_ampdu_manual(uint8_t ac, uint8_t manual);
 void lmac_ps_set_tx_seqnum(uint8_t tid, uint16_t sn);
 void lmac_ps_set_rx_seqnum(uint8_t tid, uint16_t sn, uint16_t bitmap);
 void lmac_ps_set_ba_state(uint8_t tid, bool add, uint8_t ba_state);
-void lmac_ps_set_txpwr(uint8_t tx_pwr);
+void lmac_ps_set_txpwr(uint8_t tx_pwr, uint8_t type);
 void lmac_ps_set_rxgain(uint8_t rx_gain);
 void lmac_ps_set_sgi(uint8_t sgi);
 void lmac_ps_set_bss_maxidle(uint8_t option, uint16_t period);
 void lmac_ps_set_security(uint8_t security);
+void lmac_ps_set_akm(uint8_t akm);
 void lmac_ps_set_pmk(uint8_t *pmk, uint32_t pmk_len);
 void lmac_ps_set_ip_addr(uint32_t ipaddr, uint32_t netmask, uint32_t gwaddr);
 void lmac_ps_set_ucode_wake_src(uint8_t source);
 void lmac_ps_set_init_retention();
+void lmac_ps_set_rf_reg_dump(uint32_t *dump_val);
+void lmac_ps_set_lbt_cs(uint16_t cs_time);
+void lmac_ps_set_lbt_pause(uint32_t pause_time);
+void lmac_ps_set_lbt_resume(uint32_t resume_time);
+void lmac_ps_set_listen_interval(uint8_t vif_id,  uint32_t listen_interval);
+void lmac_ps_set_long_beacon_interval(uint16_t bi);
+void lmac_ps_set_short_beacon_interval(uint32_t sbi);
+void lmac_ps_set_dtim_period(uint8_t period);
 void lmac_ps_set_1m_ctrl_resp_preamble(uint8_t support);
+void lmac_ps_set_ps_mode(uint8_t mode, uint64_t duration);
+void lmac_ps_set_usr_timer_tsf(uint8_t vif_id, uint32_t timeout_ms);
+void lmac_ps_set_target_wake(uint8_t wake);
+void lmac_ps_set_statype(uint8_t sta_type);
+void lmac_ps_set_aid(uint16_t aid);
+void lmac_ps_set_channel(uint16_t freq);
+#if defined(INCLUDE_LEGACY_ACK)
+void lmac_ps_set_legacy_ack(uint8_t enable);
+#endif /* INCLUDE_LEGACY_ACK */
+#if defined(INCLUDE_BEACON_BYPASS)
+void lmac_ps_set_beacon_bypass(uint8_t enable);
+#endif /* INCLUDE_BEACON_BYPASS */
+#if defined (INCLUDE_AVOID_FRAG_ATTACK_TEST)
+void lmac_ps_set_prev_ptk(uint8_t *ptk, uint32_t ptk_len);
+#endif /* INCLUDE_AVOID_FRAG_ATTACK_TEST */
+#if defined(INCLUDE_DUTYCYCLE)
+void lmac_ps_set_duty_info(uint32_t window, uint32_t token, uint16_t margin, uint16_t beacon_margin);
+#endif /* defined(INCLUDE_DUTYCYCLE) */
+void lmac_ps_set_short_bcn_interval(uint16_t short_bcn_interval);
+void lmac_ps_set_bcn_interval(uint16_t bcn_interval);
 
-// ps_xxx common function
-void lmac_ps_active();
-void lmac_ps_doze();
-void lmac_ps_active_to_doze();
-void lmac_ps_doze_to_active();
-void lmac_ps_check_qm();
-void lmac_ps_set_wakeup();
-bool lmac_ps_is_wakeup();
-void lmac_ps_execute_sleepmode(uint64_t after_ms);
-uint32_t lmac_ps_get_last_sleep_time();
-void lmac_ps_go_doze();
-
-ps_mode lmac_ps_get_mode();
-ps_state lmac_ps_get_state();
-ps_state lmac_ps_get_tx_state();
-ps_state lmac_ps_get_rx_state();
-ps_state lmac_ps_get_tx_state_pm();
-ps_state lmac_ps_get_beacon_tim();
-uint32_t lmac_ps_get_beacon_interval();
-void lmac_ps_set_bcmc_rx_state(ps_state tsf);
-ps_state lmac_ps_get_bcmc_rx_state();
-int8_t lmac_ps_get_vifid();
-bool lmac_ps_get_ret_recovered();
-bool lmac_ps_get_ret_validity();
-bool lmac_ps_get_target_wake();
-bool lmac_ps_is_modem_sleep_mode();
-bool lmac_ps_set_halt_modem_sleep(int8_t vif_id, bool stop);
-
-void lmac_ps_set_beacon_tim(ps_state state);
-void lmac_ps_set_rx_state(ps_state state);
-void lmac_ps_set_tx_state_pm(ps_state state);
-void lmac_ps_set_last_rx_tsf(uint32_t tsf);
-uint32_t lmac_ps_get_last_rx_tsf();
-void lmac_ps_set_last_bcmc_rx_tsf(uint32_t tsf);
-uint32_t lmac_ps_get_last_bcmc_rx_tsf();
-void lmac_ps_set_last_tx_tsf(uint32_t tsf);
-uint32_t lmac_ps_get_last_tx_tsf();
-void lmac_ps_detect_qosdata_fail();
-
-// ps api function
-int lmac_ps_set_sleep(uint8_t mode, uint64_t interval_ms);
-#if defined(NRC7292_STANDALONE_XIP) || defined(NRC7392_STANDALONE_XIP)
-void lmac_ps_modemsleep_stop();
-int lmac_ps_set_iw_power_timeout(uint32_t timeout_ms);
-uint32_t lmac_ps_get_iw_power_timeout(void);
-#endif
-int lmac_ps_stop();
-void lmac_ps_register_callback();
-ps_mode lmac_ps_get_psmode();
-void lmac_ps_go_sleep_alone(uint8_t mode, uint64_t duration);
-void lmac_ps_set_sync_time_ms(uint32_t time);
-uint32_t lmac_ps_get_sync_time_ms(void);
-
-bool lmac_ps_can_be_doze();
+/* Dynamic PS API */
+void lmac_dyn_ps_init();
+uint32_t lmac_dyn_ps_get_timeout(uint8_t vif_id);
+int lmac_dyn_ps_set_timeout(uint8_t vif_id, uint32_t dps_timeout_ms);
+void lmac_dyn_ps_check_timeout(uint8_t vif_id);
+void lmac_dyn_ps_set_last_rx_tsf(uint32_t tsf);
+uint32_t lmac_dyn_ps_get_last_rx_tsf();
+void lmac_dyn_ps_set_last_bcmc_rx_tsf(uint32_t tsf);
+uint32_t lmac_dyn_ps_get_last_bcmc_rx_tsf();
+void lmac_dyn_ps_set_last_tx_tsf(uint32_t tsf);
+uint32_t lmac_dyn_ps_get_last_tx_tsf();
 
 extern lmac_ps_info g_lmac_ps_info;
-
-
 
 #endif // __HAL_LMAC_PS_COMMON_H__

@@ -7,8 +7,6 @@
 #include "umac_s1g_channel.h"
 #include "umac_scan.h"
 
-#define BW_TO_NUMBER(bw)    bw == BW_1M ? 1 : bw == BW_2M ? 2 : 4
-
 struct cca_info_node
 {
     uint16_t s1g_freq;

@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2020 Newracom, Inc.
+ * Copyright (c) 2022 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -43,7 +43,7 @@
 #define RECV_BUF_SIZE (1024 * 2)
 #define RECVFROM_WAITING_TIME 0 /* seconds */
 
-static int s_uart_ch = NRC_UART_CH2;	// USE UART2
+NRC_UART_CONFIG uart_config;
 char buffer[MAX_BUFFER_BYTE];
 int buffer_len = 0;
 int count_buf = 0;
@@ -56,10 +56,10 @@ static void uart_intr_handler(int vector)
 	char ch;
 
 	while (1) {
-		if (nrc_uart_get(s_uart_ch, &ch) < 0) {
+		if (nrc_uart_get(uart_config.ch, &ch) != NRC_SUCCESS) {
 			break;
 		}
-		nrc_uart_put(s_uart_ch, ch);	 //Echo for test
+		nrc_uart_put(uart_config.ch, ch);	 //Echo for test
 	}
 }
 #endif
@@ -107,11 +107,13 @@ void SendtoDevice(NRC_UART_CONFIG* conf, int packetLen)
  *******************************************************************************/
 void user_init(void)
 {
-	NRC_UART_CONFIG uart_config;
-
 	nrc_uart_console_enable(true);
 
-	uart_config.ch = NRC_UART_CH2;
+#ifdef NRC7292
+	uart_config.ch = NRC_UART_CH2;	// USE UART2
+#else
+	uart_config.ch = NRC_UART_CH1;	// USE UART1
+#endif
 	uart_config.db = NRC_UART_DB8;
 	uart_config.br = 115200;
 	uart_config.stop_bit = NRC_UART_SB1;

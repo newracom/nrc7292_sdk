@@ -165,6 +165,14 @@ extern void vPortClearInterruptMask( unsigned long ulNewMaskValue );
 #define portTASK_FUNCTION_PROTO( vFunction, pvParameters ) void vFunction( void *pvParameters )
 #define portTASK_FUNCTION( vFunction, pvParameters ) void vFunction( void *pvParameters )
 
+/*--------------------	Run Time Stats -----------------------*/
+#ifdef NRC_FREERTOS
+extern uint32_t drv_lmac_get_tsf_lo(int vif_id);
+#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()
+#define portGET_RUN_TIME_COUNTER_VALUE() drv_lmac_get_tsf_lo(0)
+#define portALT_GET_RUN_TIME_COUNTER_VALUE(x) do {x = (uint32_t)drv_lmac_get_tsf_lo(0);} while(0)
+#endif /* NRC_FREERTOS */
+
 /* trace macro define */
 //#define traceTASK_SWITCHED_IN() vPortSwitchIn()  
 //#define traceTASK_SWITCHED_OUT() vPortSwitchOut()

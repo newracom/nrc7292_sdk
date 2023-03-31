@@ -1,0 +1,24 @@
+AT
+WAIT 1s
+
+AT+SCLOSE
+AT+SOPEN="tcp",50000
+AT+SLIST?
+
+ECHO "Run TCP client. (IPv4)"
+ECHO " - Port : 50000"
+HOLD
+
+ECHO "Send data to the client. (length: 1024-byte, count: 1024)"
+HOLD
+
+LOOP 2 1024
+AT+SSEND=1,1024
+DATA 1024
+
+WAIT 5s
+AT
+
+WAIT 2s
+AT+SCLOSE
+AT+SLIST?

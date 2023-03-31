@@ -1,7 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 Newracom, Inc.
+ * Copyright (c) 2022 Newracom, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,9 +26,10 @@
 #ifndef __WIFI_CONNECT_COMMON_H__
 #define __WIFI_CONNECT_COMMON_H__
 
+#include "wifi_config_setup.h"
+
 int wifi_init(WIFI_CONFIG *param);
 int wifi_connect(WIFI_CONFIG *param);
 int wifi_start_softap(WIFI_CONFIG *param);
-
 
 #endif /* __WIFI_CONNECT_COMMON_H__ */

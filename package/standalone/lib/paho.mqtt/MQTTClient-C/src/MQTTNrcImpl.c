@@ -195,6 +195,8 @@ int NetworkConnect(Network* n, char* addr, int port)
 	if ((rc = getaddrinfo(addr, NULL, &hints, &result)) == 0) {
 		struct addrinfo *res = result;
 
+		oled_log(0, 0,  "[0:Network conn 1]");
+
 		/* prefer ip4 addresses */
 		while (res) {
 			if (res->ai_family == AF_INET) {
@@ -204,33 +206,50 @@ int NetworkConnect(Network* n, char* addr, int port)
 			res = res->ai_next;
 		}
 
+		oled_log(0, 0,  "[0:Network conn 2]");
 		if (result->ai_family == AF_INET) {
 			address.sin_port = htons(port);
 			address.sin_family = AF_INET;
 			address.sin_addr = ((struct sockaddr_in *)(result->ai_addr))->sin_addr;
+#if !defined(INCLUDE_MEASURE_AIRTIME)
 			system_printf("[%s]ip address found: %s\n", __func__, inet_ntoa(address.sin_addr));
+#endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
 		} else {
 			rc = -1;
 		}
 		freeaddrinfo(result);
 	}
+	else {
+		oled_log(0, 0,  "[0:Network conn 3]");
+	}
 
 	/* create client socket */
 	if (rc == 0) {
 		int opval = 1;
-		n->my_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-		if (n->my_socket < 0)
+		//n->my_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		n->my_socket = socket(AF_INET, SOCK_STREAM, 0);
+		if (n->my_socket < 0) {
+			system_printf("[%s]Socket is not found: %d\n", __func__,
+				n->my_socket);
 			return -1;
-
+		}
 		/* connect remote servers*/
 		rc = connect(n->my_socket, (struct sockaddr *)&address, sizeof(address));
 		if (rc < 0) {
-			close(n->my_socket);
+			oled_log(0, 0,  "[0:Network conn 4]");
+			if (n->my_socket >= 0) {
+				system_printf("Shutting down and close socket %d\n",n->my_socket);
+				shutdown(n->my_socket, SHUT_RDWR);
+				close(n->my_socket);
+			}
 			system_printf("[%s] error: mqtt socket connect fail: rc=%d\n", __func__, rc);
 			return -2;
 		}
 
 		setsockopt(n->my_socket, IPPROTO_TCP, TCP_NODELAY, &opval, sizeof(opval));
+	}
+	else {
+		oled_log(0, 0,  "[0:Network conn 5]");
 	}
 
 	return rc;
