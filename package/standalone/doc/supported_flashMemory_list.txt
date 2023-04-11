@@ -4,7 +4,7 @@
 *                                                                               *
 *********************************************************************************
 
-                                                             (Updated 03-22-2023)
+                                                             (Updated 04-11-2023)
 +----------------+------------+------------------------------------+---------------+
 | NAME           | JEDEC ID   | Manufacturer                       |          Size |
 +----------------+------------+------------------------------------+---------------+
@@ -35,9 +35,6 @@
 | XT25Q32F       | 0x0B6016   | XTX Technology Limited             | 4 MB          |
 | P25Q16U        | 0x856015   | Puya Semiconductor                 | 2 MB          |
 | P25Q32U        | 0x856016   | Puya Semiconductor                 | 4 MB          |
-| UC25WQ08       | 0xB36014   | UCUN Technology                    | 1 MB          |
-| UC25WQ16       | 0xB36015   | UCUN Technology                    | 2 MB          |
-| UC25WQ32       | 0xB36016   | UCUN Technology                    | 4 MB          |
 | GT25Q16A       | 0xC46015   | Giantec Semiconductor Corp         | 2 MB          |
 | GT25Q32A       | 0xC46016   | Giantec Semiconductor Corp         | 4 MB          |
 | FM25W16A       | 0xA12815   | Shanghai Fudan Microelectronics    | 2 MB          |
