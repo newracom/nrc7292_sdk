@@ -1,6 +1,7 @@
 # NRC7292 Standalone SDK Package
 
 ## Notice
+- Starting from version 1.4, the normal passthrough mode is not supported in UART mode as mentioned at 7.4 of https://github.com/newracom/nrc7292_sdk/blob/master/package/standalone/doc/UG-7292-006-AT_Command.pdf. However, it can still be used in UART-HFC and HSPI modes.
 - Starting from version 1.4, kindly utilize the FirmwareFlashTool.exe located in the package/standalone/tools/external directory.
 - Please do not use package/standalone/tools/external_tools/FirmwareFlashTool.exe of v1.3.4 rev08. Use other v1.3.4 revision's one instead.
 
