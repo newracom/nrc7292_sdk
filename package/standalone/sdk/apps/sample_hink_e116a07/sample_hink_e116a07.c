@@ -82,11 +82,11 @@ nrc_err_t run_sample_hink_e116a07(void)
 	Paint_Clear(BLACK);
 	EPD_HINK_11IN6_BW_Display(ImageBuffer, true);
 	EPD_HINK_11IN6_Sleep(1000);
-	EPD_HINK_11IN6_RED_Display(ImageBuffer, true); 
+	EPD_HINK_11IN6_RED_Display(ImageBuffer, true);
 	EPD_HINK_11IN6_Sleep(1000);
 #endif
-#if 1	
-	nrc_usr_print("Draw\n");		
+#if 1
+	nrc_usr_print("Draw\n");
 	Paint_Clear(WHITE);
 	Paint_DrawPoint(10, 80, BLACK, DOT_PIXEL_1X1, DOT_STYLE_DFT);
 	Paint_DrawPoint(10, 90, BLACK, DOT_PIXEL_2X2, DOT_STYLE_DFT);
@@ -109,11 +109,11 @@ nrc_err_t run_sample_hink_e116a07(void)
 	Paint_DrawString_CN(130, 0,"콱봤abc", &Font12CN, BLACK, WHITE);
 	Paint_DrawString_EN(10, 20, "hello world", &Font12, WHITE, BLACK);
 	Paint_DrawNum(10, 33, 123456789, &Font12, BLACK, WHITE);
-	EPD_HINK_11IN6_RED_Display(ImageBuffer, true); 
+	EPD_HINK_11IN6_RED_Display(ImageBuffer, true);
 	EPD_HINK_11IN6_Sleep(1000);
 #endif
 #if 1
-	nrc_usr_print("Paint\n");		
+	nrc_usr_print("Paint\n");
 	Paint_Clear(WHITE);
 	GUI_ReadBmpImage((struct BMP_IMAGE *)patient_care_board_b, 0, 0);
 	EPD_HINK_11IN6_BW_Display(ImageBuffer, false);

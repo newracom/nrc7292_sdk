@@ -23,7 +23,7 @@ void util_fota_set_ready(bool ready);
 bool util_fota_is_ready(void);
 int util_fota_update_firmware(fota_info_t* fw_info);
 void util_fota_reboot_firmware(void);
-int util_fota_update_done(fota_info_t* fw_info);
+int util_fota_update_done(void);
 void util_fota_update_done_bootloader(fota_info_t* fw_info);
 int util_fota_update_run(fota_info_t* fw_info);
 uint32_t util_fota_cal_crc(uint8_t* data, uint32_t len);

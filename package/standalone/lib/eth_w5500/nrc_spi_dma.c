@@ -44,7 +44,7 @@ static SemaphoreHandle_t rx_sem;
 
 spi_device_t spi_dma;
 
-static void spi_tx_dma_inttc_isr (int channel)
+ATTR_NC __attribute__((optimize("O3"))) static void spi_tx_dma_inttc_isr (int channel)
 {
     BaseType_t	xHigherPriorityTaskWoken = pdFALSE;
     xSemaphoreGiveFromISR(tx_sem, &xHigherPriorityTaskWoken);
@@ -53,7 +53,7 @@ static void spi_tx_dma_inttc_isr (int channel)
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
-static void spi_tx_dma_interr_isr (int channel)
+ATTR_NC __attribute__((optimize("O3"))) static void spi_tx_dma_interr_isr (int channel)
 {
     BaseType_t	xHigherPriorityTaskWoken = pdFALSE;
 //	system_printf("[%s] spi_tx_dma_interr_isr(%d) failed.\n\n",__func__, channel);
@@ -62,7 +62,7 @@ static void spi_tx_dma_interr_isr (int channel)
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
-static void spi_rx_dma_inttc_isr (int channel)
+ATTR_NC __attribute__((optimize("O3"))) static void spi_rx_dma_inttc_isr (int channel)
 {
     BaseType_t	xHigherPriorityTaskWoken = pdFALSE;
 //	system_printf("[%s] spi_rx_dma_inttc_isr(%d).\n\n",__func__, channel);
@@ -71,7 +71,7 @@ static void spi_rx_dma_inttc_isr (int channel)
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
-static void spi_rx_dma_interr_isr (int channel)
+ATTR_NC __attribute__((optimize("O3"))) static void spi_rx_dma_interr_isr (int channel)
 {
     BaseType_t	xHigherPriorityTaskWoken = pdFALSE;
 //	system_printf("[%s] spi_rx_dma_interr_isr(%d) failed.\n\n",__func__, channel);
@@ -116,7 +116,7 @@ static void init_dma_desc(bool tx)
 //	system_printf("[%s] returns for %s.\n",__func__, tx? "TX": "RX");
 }
 
-static void prepare_dma_desc(bool tx, uint32_t addr, uint32_t size)
+ATTR_NC __attribute__((optimize("O3"))) static void prepare_dma_desc(bool tx, uint32_t addr, uint32_t size)
 {
     dma_peri_t *peri;
     int i = 0;
@@ -201,14 +201,31 @@ static int spi_rx_dma_init()
     return 0;
 }
 
-void spi_dma_write(uint8_t *data, uint32_t size)
+ATTR_NC __attribute__((optimize("O3"))) static void spi_dma_start_xfer(spi_device_t *spi)
+{
+	nrc_ssp_flush(spi->controller);
+	nrc_gpio_outputb(spi->pin_cs, 0);
+}
+
+ATTR_NC __attribute__((optimize("O3"))) static void spi_dma_stop_xfer(spi_device_t *spi)
+{
+	nrc_gpio_outputb(spi->pin_cs, 1);
+}
+
+ATTR_NC __attribute__((optimize("O3"))) static void spi_dma_enable(spi_device_t* spi, bool enable)
+{
+	nrc_ssp(spi->controller, enable);
+	nrc_ssp_flush(spi->controller);
+}
+
+ATTR_NC __attribute__((optimize("O3"))) void spi_dma_write(uint8_t *data, uint32_t size)
 {
     int err = 1;
 
 //	system_printf("[%s] TX prepare_dma_desc.\n",__func__);
     prepare_dma_desc(true, (uint32_t) data, size);
 
-    nrc_spi_dma_start_xfer(&spi_dma);
+    spi_dma_start_xfer(&spi_dma);
     err =  nrc_dma_start(DMA_TX_CHANNEL, tx_desc);
     if (err) {
         system_printf("[%s] nrc_dma_start() failed with err %d.\n",__func__, err);
@@ -216,16 +233,16 @@ void spi_dma_write(uint8_t *data, uint32_t size)
     }
 
     /* enable SPI controller here after start transfering data */
-    nrc_spi_enable(&spi_dma, true);
+    spi_dma_enable(&spi_dma, true);
 
     xSemaphoreTake(tx_sem, portMAX_DELAY);
     nrc_dma_stop(DMA_TX_CHANNEL);
     /* disable SPI controller once the data transmission completes */
-    nrc_spi_enable(&spi_dma,false);
-    nrc_spi_dma_stop_xfer(&spi_dma);
+    spi_dma_enable(&spi_dma,false);
+    spi_dma_stop_xfer(&spi_dma);
 }
 
-void spi_dma_read(uint8_t *addr, uint8_t *data, uint32_t size)
+ATTR_NC __attribute__((optimize("O3"))) void spi_dma_read(uint8_t *addr, uint8_t *data, uint32_t size)
 {
     int err = 1;
 
@@ -241,7 +258,7 @@ void spi_dma_read(uint8_t *addr, uint8_t *data, uint32_t size)
         return;
     }
 
-    nrc_spi_dma_start_xfer(&spi_dma);
+    spi_dma_start_xfer(&spi_dma);
     err =  nrc_dma_start(DMA_TX_CHANNEL, tx_desc);
     if (err) {
         system_printf("[%s] nrc_dma_start() failed with err %d.\n",__func__, err);
@@ -249,14 +266,14 @@ void spi_dma_read(uint8_t *addr, uint8_t *data, uint32_t size)
     }
 
     /* enable SPI to start the SPI operation */
-    nrc_spi_enable(&spi_dma, true);
+    spi_dma_enable(&spi_dma, true);
 
     xSemaphoreTake(rx_sem, portMAX_DELAY);
     nrc_dma_stop(DMA_TX_CHANNEL);
     nrc_dma_stop(DMA_RX_CHANNEL);
     /* stop the SPI, so that DMA won't retrieve garbage data when next time DMA RX starts */
-    nrc_spi_enable(&spi_dma, false);
-    nrc_spi_dma_stop_xfer(&spi_dma);
+    spi_dma_enable(&spi_dma, false);
+    spi_dma_stop_xfer(&spi_dma);
 }
 
 int spi_dma_init(void)

@@ -8,26 +8,37 @@ Overview
 
 Tool Version
 ------------
-* v6.1
+* v6.2 (Default: FirmwareFlashTool.exe)
+* v7.0 (Multi Upload: MultiFirmwareFlashTool.exe)
 
 Binary Files
 ------------
 
 .. warning::
-   Make sure that the correct 2nd bootloader, XIP bootloader and XIP firmware binaries corresponding to the module types (e.g. NRC7292, NRC7393, NRC7394) are selected!
+   Make sure that the correct 2nd bootloader, XIP bootloader and XIP firmware binaries corresponding to the module types (NRC7292 or NRC7394) are selected!
 
 **2nd Bootloader (written on RAM)**:
     is the 2nd bootloader binary file to be temporarily written on RAM to replace the mask ROM bootloader to augment the bootloader functionalities.
 
 **XIP Bootloader (written on flash)**:
-    is the XIP bootloader binary file to be stored on the flash memory. The XIP bootloader only needs to be flahsed once.
+    is the XIP bootloader binary file to be stored on the flash memory. If the non-default 5s-wait XIP bootloader is uploaded on the module, the bootloader will wait for 5 seconds to handle firmware upload requests from the tool before jumping to the XIP firmware following a reset. This can be useful during the initial development phase for achieving a quick upload-test-debug cycle.
 
 **XIP Firmware (written on flash)**:
     is the XIP firmware binary file to be stored on the flash memory.
 
-Basic Functionality
--------------------
+**Auto-reset**:
+    is an optional feature that triggers the bootloader to execute the uploaded XIP firmware following the upload procedure. This option is only valid with the non-default 5s-wait XIP bootloader operating in the standalone operation mode.
+
+**Clear NVS Sector**:
+    clears the NVS sector on the flash memory if selected.
+
+Operation
+---------
 1. Set the DIP switch (for NRC7292) or jumper configuration (for NRC739X) to **Firmware Download / RAM Operation** mode as described on the instructions panel.
 2. Select the desired procedures by using the corresponding check boxes: MAC adresss write, XIP bootloader write, and XIP firmware write.
 3. Reset the board, and press the **START** button to run the selected procedures.
 
+Multi Firmware Flash Tool
+-------------------------
+*Multi Firmware Flash Tool* is a variant of the *Firmware Flash Tool* that allows concurrent uploads.
+    .. image:: images/multi_firmware_flash_tool.png

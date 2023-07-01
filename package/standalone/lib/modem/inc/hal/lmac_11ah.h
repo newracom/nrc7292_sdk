@@ -234,6 +234,22 @@ typedef enum {
 	MAX_AC /* 11 */
 } VIFAC;
 
+#elif defined(NRC5292)
+typedef enum {
+	VIF0_BK = 0,
+	VIF0_BE,
+	VIF0_VI,
+	VIF0_VO,
+	VIF0_BEACON,
+	VIF_CONC,
+	VIF1_BK, /* 6 */
+	VIF1_BE,
+	VIF1_VI,
+	VIF1_VO,
+	VIF1_BEACON,
+	MAX_AC /* 11 */
+} VIFAC;
+
 #else
 #error "Please, implement this"
 #endif /* defined(NRC7292) || defined(NRC7391) */
@@ -345,7 +361,8 @@ typedef struct _LMAC_TXHDR {
 			uint32_t    rate_index	        : 8;    // LMAC FW use only, Used for Rate Control
 			uint32_t    data_length         : 11;   // data length
 			uint32_t    segment             : 2;    // MPDU segmentation
-			uint32_t    reserved6           : 3;
+			uint32_t    qos_null_pm1_ack    : 2;	// ack for qos_null frame with pm1 bit. (0: wait, 1: success, 2: fail)
+			uint32_t    reserved6           : 1;
 			uint32_t    ac                 : 4;	// LMAC FW use only, Assigned Queue Manager ID
 			uint32_t    tx_count            : 4;    // LMAC FW use only, check whether it exceeds retry limit
 		};
@@ -416,7 +433,8 @@ typedef struct _LMAC_TXBD {
 			uint32_t    rate_index	        : 8;    // LMAC FW use only, Used for Rate Control
 			uint32_t    data_length         : 11;   // data length
 			uint32_t    segment             : 2;    // MPDU segmentation
-			uint32_t    reserved6           : 3;
+			uint32_t    qos_null_pm1_ack    : 2;	// ack for qos_null frame with pm1 bit. (0: wait, 1: success, 2: fail)
+			uint32_t    reserved6           : 1;
 			uint32_t    ac                 : 4;	// LMAC FW use only, Assigned Queue Manager ID
 			uint32_t    tx_count            : 4;    // LMAC FW use only, check whether it exceeds retry limit
 		};
@@ -532,7 +550,8 @@ typedef struct _LMAC_TXBUF {
 			uint32_t    rate_index	        : 8;    // LMAC FW use only, Used for Rate Control
 			uint32_t    data_length         : 11;   // data length
 			uint32_t    segment             : 2;    // MPDU segmentation
-			uint32_t    reserved6           : 3;
+			uint32_t    qos_null_pm1_ack    : 2;	// ack for qos_null frame with pm1 bit. (0: wait, 1: success, 2: fail)
+			uint32_t    reserved6           : 1;
 			uint32_t    ac                 : 4;	// LMAC FW use only, Assigned Queue Manager ID
 			uint32_t    tx_count            : 4;    // LMAC FW use only, check whether it exceeds retry limit
 		};

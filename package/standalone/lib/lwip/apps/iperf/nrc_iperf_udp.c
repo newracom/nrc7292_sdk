@@ -30,6 +30,14 @@
 #include "nrc_iperf.h"
 #include "nrc_iperf_tcp.h"
 
+#include "api_wifi.h"
+
+struct udp_client_data {
+	iperf_opt_t *option;
+	struct udp_client_data *next;
+};
+
+static struct udp_client_data *udp_client_list = NULL;
 
 extern void sys_arch_msleep(u32_t delay_ms);
 extern bool wpa_driver_get_associate_status(uint8_t vif);
@@ -94,12 +102,20 @@ static void iperf_udp_client_report (iperf_opt_t * option)
 	uint32_t byte = option->client_info.datagram_cnt * option->mBufLen;
 	uint32_t bps = byte_to_bps(interval, byte);
 
-	A("[iperf UDP Client Report]\n");
+	uint8_t snr = 0;
+	int8_t rssi = 0;
+
+	nrc_wifi_get_snr(&snr);
+	nrc_wifi_get_rssi(&rssi);
+
+	nrc_iperf_spin_lock();
+	A("[iperf UDP Client Report for server %s, snr:%u, rssi:%d]\n", ipaddr_ntoa(&option->addr), snr, rssi);
 	A("  Interval          Transfer      Bandwidth\n");
 	A("  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec\n",
 					start_time, end_time,
 					byte_to_string(byte), bps_to_string(bps));
 	A("  sent : %ld datagrams\n", option->client_info.datagram_cnt);
+	nrc_iperf_spin_unlock();
 }
 
 static void iperf_udp_client_report_from_server (iperf_server_header_t *header)
@@ -110,6 +126,7 @@ static void iperf_udp_client_report_from_server (iperf_server_header_t *header)
 	int32_t errors = ntohl(header->error_cnt);
 	iperf_time_t jitter = ntohl(header->jitter1) + (ntohl(header->jitter2) / 1000000.);
 
+	nrc_iperf_spin_lock();
 	A("  Server Report:\n");
 	A("  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec  %.3f ms  %ld/%ld (%.2g%%)\n",
 					0., time,
@@ -118,6 +135,7 @@ static void iperf_udp_client_report_from_server (iperf_server_header_t *header)
 					jitter * 1000,
 					errors, datagrams,
 					(double)((errors * 100.) / datagrams));
+	nrc_iperf_spin_unlock();
 }
 
 static int iperf_await_server_fin_packet (iperf_opt_t * option, 	iperf_udp_datagram_t *datagram)
@@ -193,7 +211,7 @@ void iperf_udp_client(void *pvParameters)
 	iperf_udp_datagram_t *datagram = NULL;
 	iperf_opt_t * option  = pvParameters;
 	int alloc_size = (option->mBufLen < IPERF_DEFAULT_DATA_BUF_LEN) ? IPERF_DEFAULT_DATA_BUF_LEN : option->mBufLen;
-	A("%s Start\n", __func__);
+
 #if LWIP_IPV6
 	if(IP_IS_V6(&option->addr) && !ip6_addr_isipv4mappedipv6(ip_2_ip6(&option->addr))) {
 		A("[%s] Unsupported IPV6\n", __func__);
@@ -251,12 +269,14 @@ void iperf_udp_client(void *pvParameters)
 
 	iperf_udp_client_init_datagram(option, datagram);
 
+	nrc_iperf_spin_lock();
 	A("------------------------------------------------------------\n");
 	A("Client connecting to %s, UDP port %d\n",
 		ipaddr_ntoa(&option->addr), option->mPort);
 	A("Sending %ld byte datagrams, Duration %4.1f sec\n",
 		option->mBufLen, option->mAmount / 100.0);
 	A("------------------------------------------------------------\n");
+	nrc_iperf_spin_unlock();
 
 	iperf_get_time(&start_time);
 
@@ -314,34 +334,93 @@ exit:
 	}
 
 task_exit:
-	A("%s End\n", __func__);
 	iperf_option_free(option);
 	vTaskDelete(NULL);
 }
 
+static struct udp_client_data *udp_new_client(iperf_opt_t *option)
+{
+	struct udp_client_data *udp_c_data = NULL;
 
-static void iperf_udp_server_report (iperf_opt_t * option,
-										iperf_time_t jitter, int32_t total, int32_t datagrams,
-										int32_t errors, int32_t outoforder)
+	udp_c_data = (struct udp_client_data *) mem_malloc(sizeof(struct udp_client_data));
+	if (!udp_c_data) {
+		A("[%s] new client malloc failed\n", __func__);
+		return NULL;
+	}
+
+	memset(udp_c_data, 0, sizeof(struct udp_client_data));
+
+	udp_c_data->option = (iperf_opt_t *) mem_malloc(sizeof(iperf_opt_t));
+	memcpy(udp_c_data->option, option, sizeof(iperf_opt_t));
+	udp_c_data->next = udp_client_list;
+	udp_client_list = udp_c_data;
+
+	return udp_c_data;
+}
+
+static struct udp_client_data *find_matching_client(iperf_opt_t *option)
+{
+	struct udp_client_data *client;
+	struct udp_client_data *next_client;
+
+	if (!udp_client_list) {
+		return NULL;
+	}
+
+	for (client = udp_client_list; client; client = next_client) {
+		next_client = client->next;
+		struct sockaddr_in *from_in_client = (struct sockaddr_in *) &client->option->server_info.clientaddr;
+		struct sockaddr_in *from = (struct sockaddr_in *) &option->server_info.clientaddr;
+		if ((from_in_client->sin_addr.s_addr == from->sin_addr.s_addr)
+			&& (from_in_client->sin_port == from->sin_port)) {
+			return client;
+		}
+	}
+	return NULL;
+}
+
+static void udp_free_client(struct udp_client_data *client)
+{
+	struct udp_client_data *tmp;
+
+	if (!client) {
+		return;
+	}
+
+	if (client == udp_client_list) {
+		udp_client_list = udp_client_list->next;
+	} else {
+		for (tmp = udp_client_list; (tmp->next != client) && tmp; tmp = tmp->next);
+		tmp->next = client->next;
+	}
+	mem_free(client->option);
+	mem_free(client);
+}
+
+static void iperf_udp_server_report (struct udp_client_data *client)
 {
 	iperf_time_t start_time = 0;
-	iperf_time_t stop_time = option->server_info.stop_time - option->server_info.start_time;
+	iperf_time_t stop_time = client->option->server_info.stop_time - client->option->server_info.start_time;
 	iperf_time_t interval = stop_time;
-	uint64_t byte = option->server_info.recv_byte;
+	uint64_t byte = client->option->server_info.recv_byte;
 	uint32_t bps = (interval)? (byte*8)/interval : 0;
+	struct sockaddr_in *from = (struct sockaddr_in*)&client->option->server_info.clientaddr;
 
-	A("[iperf UDP Server Report]\n");
+	nrc_iperf_spin_lock();
+	A("[iperf UDP Server Report for %s:%d]\n", inet_ntoa(from->sin_addr), ntohs(from->sin_port));
 	A("  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec  %6.3f ms  %4ld/%5ld (%.2g%%)",
-					start_time, stop_time,
-					byte_to_string(byte), bps_to_string(bps),
-					jitter * 1000,
-					errors, total,
-					(double)(errors * 100.) / total);
+	  start_time, stop_time,
+	  byte_to_string(byte), bps_to_string(bps),
+	  client->option->server_info.jitter * 1000,
+	  client->option->server_info.error_cnt,
+	  client->option->server_info.datagram_seq,
+	  (double)(client->option->server_info.error_cnt * 100.) / client->option->server_info.datagram_seq);
 
-	if (outoforder > 0)
-		A("\t OUT_OF_ORDER(%ld)\n", outoforder);
+	if (client->option->server_info.outoforder_cnt > 0)
+		A("\t OUT_OF_ORDER(%ld)\n", client->option->server_info.outoforder_cnt);
 	else
 		A("\n");
+	nrc_iperf_spin_unlock();
 }
 
 
@@ -481,8 +560,10 @@ static void iperf_udp_server_recv (iperf_opt_t * option, char *buf, int len)
 #if LWIP_IPV4
 			if(IP_IS_V4(&option->addr)) {
 				struct sockaddr_in *from4 = (struct sockaddr_in*)&option->server_info.clientaddr;
+				nrc_iperf_spin_lock();
 				A("UDP server connected with %s port %d\n",
 					   inet_ntoa(from4->sin_addr), ntohs(from4->sin_port));
+				nrc_iperf_spin_unlock();
 			}
 #endif /* LWIP_IPV4 */
 		} else 	{
@@ -513,7 +594,9 @@ static void iperf_udp_server_recv (iperf_opt_t * option, char *buf, int len)
 		option->server_info.stop_time = now;
 	}
 	else {
+		nrc_iperf_spin_lock();
 		A("len=%d\n", len);
+		nrc_iperf_spin_unlock();
 	}
 }
 
@@ -534,7 +617,11 @@ void iperf_udp_server(void *pvParameters)
 	/* Setup fd_set structure */
 	fd_set fds;
 
+	struct udp_client_data *client = NULL;
+
+	nrc_iperf_spin_lock();
 	A("%s Start\n", __func__);
+	nrc_iperf_spin_unlock();
 #if LWIP_IPV6
 		if(IP_IS_V6(&option->addr) && !ip6_addr_isipv4mappedipv6(ip_2_ip6(&option->addr))) {
 			A("[%s] Unsupported IPV6\n", __func__);
@@ -594,7 +681,8 @@ void iperf_udp_server(void *pvParameters)
 	timeout_recv.tv_usec = 0;
 
 	while(!option->mForceStop){
-		while (!option->server_info.done){
+		int client_done = 0;
+		while (!client_done) {
 			if(option->mForceStop){
 				option->server_info.done = 1;
 				continue;
@@ -611,37 +699,36 @@ void iperf_udp_server(void *pvParameters)
 			bytes_received = 0;
 			bytes_received = recvfrom(sock, buf, IPERF_UDP_MAX_RECV_SIZE, 0,
 				(struct sockaddr *) &option->server_info.clientaddr, &sin_size);
+			client = find_matching_client(option);
 
-			if(bytes_received < 0 ){	// disconnected
-				option->server_info.done = 1;
-			} else {
-				iperf_udp_server_recv(option, buf, bytes_received);
-				elapse_time = option->server_info.stop_time - option->server_info.start_time;
-				if (option->server_info.start &&
-					(option->server_info.send_time > 0 && elapse_time >= option->server_info.send_time)) {
-					option->server_info.done = 1;
+			if (!client) {
+				if ((client = udp_new_client(option)) == NULL) {
+					A("[%s] failed to create new client\n", __func__);
+					break;
 				}
 			}
-		}
-		if(option->server_info.start == 1){
-			iperf_udp_server_report(option,
-					option->server_info.jitter,
-					option->server_info.datagram_seq,
-					option->server_info.datagram_cnt,
-					option->server_info.error_cnt,
-					option->server_info.outoforder_cnt);
 
-			iperf_udp_server_report_to_client(option);
+			if(bytes_received < 0 ){	// disconnected
+				client->option->server_info.done = 1;
+			} else {
+				iperf_udp_server_recv(client->option, buf, bytes_received);
+				elapse_time = client->option->server_info.stop_time - client->option->server_info.start_time;
+				if (client->option->server_info.start &&
+					(client->option->server_info.send_time > 0 && elapse_time >= client->option->server_info.send_time)) {
+					client->option->server_info.done = 1;
+				}
+			}
 
-			option->server_info.start = 0;
-			option->server_info.send_byte = 0;
-			option->server_info.recv_byte = 0;
-			option->server_info.datagram_cnt = 0;
-			option->server_info.datagram_seq = 0;
-			option->server_info.error_cnt = 0;
-			option->server_info.outoforder_cnt = 0;
+			if (client->option->server_info.done) {
+				client_done = 1;
+			}
 		}
-		option->server_info.done = 0;
+
+		if(client->option->server_info.start == 1){
+			iperf_udp_server_report(client);
+			iperf_udp_server_report_to_client(client->option);
+			udp_free_client(client);
+		}
 	}
 
 exit:
@@ -653,7 +740,9 @@ exit:
 	}
 
 task_exit:
+	nrc_iperf_spin_lock();
 	A("%s End\n", __func__);
+	nrc_iperf_spin_unlock();
 	iperf_option_free(option);
 	vTaskDelete(NULL);
 }

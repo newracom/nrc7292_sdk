@@ -33,6 +33,10 @@ struct lmac_stats {
 	uint16_t	m_ndpba_send_fail_cnt;
 	uint16_t	m_ndpba_send_fail_max_delay;
 	struct lmac_wa_tx wa_tx;
+#if !defined(NRC7292)
+	uint32_t	m_rx_cnt;
+	uint32_t	m_rx_avg_snr;
+#endif
 };
 
 void lmac_stats_init();

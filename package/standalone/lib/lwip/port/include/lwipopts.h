@@ -41,20 +41,24 @@
 #define DEFAULT_TCP_RECVMBOX_SIZE 16
 #define DEFAULT_UDP_RECVMBOX_SIZE 16
 #define DEFAULT_RAW_RECVMBOX_SIZE 16
-#define DEFAULT_ACCEPTMBOX_SIZE 5
+#define DEFAULT_ACCEPTMBOX_SIZE 8
 #define TCPIP_MBOX_SIZE 16
 
 #define NO_SYS                          0
 #define LWIP_NETCONN                    !NO_SYS
 #define LWIP_SOCKET                     !NO_SYS
 
-#define LWIP_SNMP 0
 #define LWIP_IGMP 1
 #define LWIP_ICMP 1
+#define LWIP_SNMP 0
+#define MIB2_STATS (LWIP_SNMP)
 
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
 #define LWIP_NAT 1
 #define LWIP_NAT_ICMP 1
+#define LWIP_NAT_ICMP_IP 1
+#define LWIP_NAT_USE_OLDEST 1
+
 struct pbuf;
 struct netif;
 extern int ip4_input_nat(struct pbuf *p, struct netif *inp);
@@ -205,13 +209,13 @@ a lot of data that needs to be copied, this should be set high. */
 #else
 /* MEMP_NUM_UDP_PCB: the number of UDP protocol control blocks. One
    per active UDP "connection". */
-#define MEMP_NUM_UDP_PCB        4
+#define MEMP_NUM_UDP_PCB        20
 /* MEMP_NUM_TCP_PCB: the number of simulatenously active TCP
    connections. */
-#define MEMP_NUM_TCP_PCB        12
+#define MEMP_NUM_TCP_PCB        20
 /* MEMP_NUM_TCP_PCB_LISTEN: the number of listening TCP
    connections. */
-#define MEMP_NUM_TCP_PCB_LISTEN 2
+#define MEMP_NUM_TCP_PCB_LISTEN 12
 #endif
 /* MEMP_NUM_TCP_SEG: the number of simultaneously queued TCP
    segments. */
@@ -224,9 +228,9 @@ a lot of data that needs to be copied, this should be set high. */
 /* The following four are used only with the sequential API and can be
    set to 0 if the application only will use the raw API. */
 /* MEMP_NUM_NETBUF: the number of struct netbufs. */
-#define MEMP_NUM_NETBUF         12
+#define MEMP_NUM_NETBUF         20
 /* MEMP_NUM_NETCONN: the number of struct netconns. */
-#define MEMP_NUM_NETCONN        12
+#define MEMP_NUM_NETCONN        20
 /* MEMP_NUM_APIMSG: the number of struct api_msg, used for
    communication between the TCP/IP stack and the sequential
    programs. */

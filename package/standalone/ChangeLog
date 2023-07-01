@@ -4,6 +4,55 @@
 *
 *******************************************************************
 
+[2023-06-30]
+Change summary for version 1.5:
+
+    New features
+    * Broadcast FOTA (v1.5)
+
+    Bugfix
+    * Duplicated memory free bug when disabling and enabling the network
+    * UART2 flow control GPIO setting bugs
+    * DHCP server to assign the same IP for the same station
+    * CSA failure on the same center frequency channels
+    * Beacon loss check for switching to new channel using the same 1MHz primary channel
+    * Remove redundant TIM checking
+    * Wrong 1MHz primary channel location and primary channel number
+    * Fail to receive BU from AP after waking up from deep sleep
+    * Heap leakage in updating beacon
+    * Multicast frame's sequence number is non sequencial when the duty cycle is on
+    * AP sends legacy CTS even when receiving RTS with response indication option of 1 (NDP-Response)
+
+    Changes
+    * Update ATCMD
+      o Update raspi-atcmd-cli
+      o Update AT commands: refer to UG-7292-006-AT_Command document
+    * Update SDK
+      o Update connection event notification
+      o Support to register multiple event handler
+      o Update and modified sample applications
+      o Add netmask, gateway parameter for softap IP setting
+      o Update sample applications
+      o Increase max number of scan results
+      o Set 1M Primary location according to AP's S1G operation IE
+      o Update SDK APIs: refer to UG-7292-005-Standalone SDK API document
+    * Update 3rd party libraries
+      o Update http_server
+    * Power save operation enhancement
+      o Enhancement PM1 QoS Null frame transmission process
+      o Update TIM mode sleep
+      o Update GPIO configuration for deep sleep mode
+    * Regulation related updates
+      o Update board data for K0/K1/K2 channels
+      o K0/K1/K2 channel table
+      o Refactoring of LBT
+
+    Known Issues
+    * The initial connection time for WPA3-SAE/OWE can be quite lengthy (> 15 seconds)
+      due to the substantial computational load required by software for large number operations.
+    * The SoftAP disable/enable sequence on the standalone mode is not supported.
+    * During an echo test with UART HFC, there is a low probability of a receive data count mismatch in conjunction with delays resulting from RTS deassertion during data transmission.
+
 [2023-03-30]
     Change summary for version 1.4:
 
@@ -23,7 +72,7 @@
 	  o Sample application updates
 
     Known Issues
-	* The initial connection time for WPA3-SAE/OWE can be quite lengthy (> 15 seconds) 
+	* The initial connection time for WPA3-SAE/OWE can be quite lengthy (> 15 seconds)
 	  due to the substantial computational load required by software for large number operations.
 	* The SoftAP disable/enable sequence on the standalone mode is not supported.
 

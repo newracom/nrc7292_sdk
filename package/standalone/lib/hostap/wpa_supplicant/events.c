@@ -52,6 +52,7 @@
 #if defined (CONFIG_SAE) ||defined (CONFIG_OWE)
 #include "driver_nrc_ps.h"
 #endif
+#include "driver_nrc.h"
 
 #define MAX_OWE_TRANSITION_BSS_SELECT_COUNT 5
 
@@ -1585,7 +1586,7 @@ int wpa_supplicant_connect(struct wpa_supplicant *wpa_s,
 			return 0;
 		}
 		wpa_msg(wpa_s, MSG_DEBUG, "Request association with " MACSTR,
-			MAC2STR(selected->bssid));		
+			MAC2STR(selected->bssid));
 		wpa_supplicant_associate(wpa_s, selected, ssid);
 	} else {
 		wpa_dbg(wpa_s, MSG_DEBUG, "Already associated or trying to "
@@ -1939,9 +1940,9 @@ static int _wpa_supplicant_event_scan_results(struct wpa_supplicant *wpa_s,
 		wpa_s->scan_work = NULL;
 		radio_work_done(work);
 	}
-#if defined(INCLUDE_SCAN_DEBUG)	
+#if defined(INCLUDE_SCAN_DEBUG)
 	wpa_printf(MSG_DEBUG, "[%s] connect call\n", __func__);
-#endif	
+#endif
 	return wpas_select_network_from_last_scan(wpa_s, 1, own_request);
 
 scan_work_done:
@@ -1988,7 +1989,7 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 
 #if defined(INCLUDE_SCAN_DEBUG)
 	wpa_printf(MSG_DEBUG, "[%s] selected: %p\n", __func__, selected);
-#endif	
+#endif
 	if (selected) {
 		int skip;
 		skip = !wpa_supplicant_need_to_roam(wpa_s, selected, ssid);
@@ -2025,26 +2026,38 @@ static int wpas_select_network_from_last_scan(struct wpa_supplicant *wpa_s,
 	} else {
 		wpa_dbg(wpa_s, MSG_DEBUG, "No suitable network found");
 		ssid = wpa_supplicant_pick_new_network(wpa_s);
-#if defined(INCLUDE_SCAN_DEBUG)		
-		wpa_printf(MSG_DEBUG, "[%s] ssid: %p\n", __func__, ssid);	
-#endif		
+#if defined(INCLUDE_SCAN_DEBUG)
+		wpa_printf(MSG_DEBUG, "[%s] ssid: %p\n", __func__, ssid);
+#endif
 		if (ssid) {
 			wpa_dbg(wpa_s, MSG_DEBUG, "Setup a new network");
-#if defined(INCLUDE_SCAN_DEBUG)			
-			wpa_printf(MSG_DEBUG, "[%s] auth path\n", __func__);	
-#endif			
+#if defined(INCLUDE_SCAN_DEBUG)
+			wpa_printf(MSG_DEBUG, "[%s] auth path\n", __func__);
+#endif
 			wpa_supplicant_associate(wpa_s, NULL, ssid);
 			if (new_scan)
 				wpa_supplicant_rsn_preauth_scan_results(wpa_s);
 		} else if (own_request) {
-#if defined(INCLUDE_SCAN_DEBUG)			
-			wpa_printf(MSG_DEBUG, "[%s] own_request\n", __func__);	
-#endif			
+#if defined(INCLUDE_SCAN_DEBUG)
+			wpa_printf(MSG_DEBUG, "[%s] own_request\n", __func__);
+#endif
 			/*
 			 * No SSID found. If SCAN results are as a result of
 			 * own scan request and not due to a scan request on
 			 * another shared interface, try another scan.
 			 */
+#if defined(INCLUDE_SCAN_BACKOFF) // For scanning backoff operation
+			int scanning_cnt_temp   = wpa_s->scanning_retry_count - nrc_get_backoff_start_count();
+			int scanning_interval   = 0;
+
+			wpa_printf(MSG_INFO, "[%s] scanning_retry_count: %d\n", __func__, wpa_s->scanning_retry_count);
+			if(scanning_cnt_temp > 0) {
+				scanning_interval = generateRandomBackoff(scanning_cnt_temp);
+				wpa_printf(MSG_INFO, "[%s] scanning_interval: %d\n", __func__, scanning_interval);
+				wpa_supplicant_set_scan_interval(wpa_s, scanning_interval);
+			}
+			wpa_s->scanning_retry_count++;
+#endif /* INCLUDE_SCAN_BACKOFF */
 			int timeout_sec = wpa_s->scan_interval;
 			int timeout_usec = 0;
 #ifdef CONFIG_P2P
@@ -2190,9 +2203,9 @@ int wpa_supplicant_fast_associate(struct wpa_supplicant *wpa_s)
 		wpa_printf(MSG_DEBUG, "Fast associate: Old scan results");
 		return -1;
 	}
-#if defined(INCLUDE_SCAN_DEBUG)	
+#if defined(INCLUDE_SCAN_DEBUG)
 	wpa_printf(MSG_DEBUG, "[%s] connect call\n", __func__);
-#endif	
+#endif
 	return wpas_select_network_from_last_scan(wpa_s, 0, 1);
 #endif /* CONFIG_NO_SCAN_PROCESSING */
 }
@@ -2530,7 +2543,9 @@ static int wpa_supplicant_event_associnfo(struct wpa_supplicant *wpa_s,
 	}
 
 	if (skip_owe_process) {
+#if defined(INCLUDE_TRACE_WAKEUP)
 		wpa_msg(wpa_s, MSG_INFO, "SME: skip processing owe ie in assoc resp");
+#endif /* INCLUDE_TRACE_WAKEUP */
 	} else {
 		if ( wpa_s->key_mgmt == WPA_KEY_MGMT_OWE &&
 			(wpa_drv_get_bssid(wpa_s, bssid) < 0 ||
@@ -2846,7 +2861,9 @@ static void wpa_supplicant_event_assoc(struct wpa_supplicant *wpa_s,
 	wpa_s->sme.last_unprot_disconnect.sec = 0;
 #endif /* CONFIG_SME */
 
+#if defined(INCLUDE_TRACE_WAKEUP)
 	wpa_msg(wpa_s, MSG_INFO, "Associated with " MACSTR, MAC2STR(bssid));
+#endif /* INCLUDE_TRACE_WAKEUP */
 	if (wpa_s->current_ssid) {
 		/* When using scanning (ap_scan=1), SIM PC/SC interface can be
 		 * initialized before association, but for other modes,
@@ -4303,11 +4320,13 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 		     (!(wpa_s->drv_flags & WPA_DRIVER_FLAGS_SME) &&
 		      wpa_fils_is_completed(wpa_s->wpa))))
 			wpa_supplicant_event_assoc_auth(wpa_s, data);
+#if defined(INCLUDE_TRACE_WAKEUP)
 		if (data) {
 			wpa_msg(wpa_s, MSG_INFO,
 				WPA_EVENT_SUBNET_STATUS_UPDATE "status=%u",
 				data->assoc_info.subnet_status);
 		}
+#endif /* INCLUDE_TRACE_WAKEUP */
 		break;
 	case EVENT_DISASSOC:
 		wpas_event_disassoc(wpa_s,
@@ -4379,9 +4398,9 @@ void wpa_supplicant_event(void *ctx, enum wpa_event_type event,
 			wpa_dbg(wpa_s, MSG_DEBUG, "Scan completed in %ld.%06ld seconds",
 				diff.sec, diff.usec);
 		}
-#if defined(INCLUDE_SCAN_DEBUG)		
+#if defined(INCLUDE_SCAN_DEBUG)
 		wpa_printf(MSG_DEBUG, "[%s] wpa_supplicant_event_scan_results call\n", __func__);
-#endif		
+#endif
 		if (wpa_supplicant_event_scan_results(wpa_s, data))
 			break; /* interface may have been removed */
 		if (!(data && data->scan_info.external_scan))

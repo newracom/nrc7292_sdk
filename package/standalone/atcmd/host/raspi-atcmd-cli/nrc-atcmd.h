@@ -123,6 +123,7 @@ typedef void (*atcmd_rxd_cb_t) (atcmd_rxd_t *rxd, char *data);
 
 extern char *nrc_atcmd_param_to_str (const char *param, char *str, int len);
 
+extern int nrc_atcmd_send (char *buf, int len);
 extern int nrc_atcmd_send_cmd (const char *fmt, ...);
 extern int nrc_atcmd_send_data (char *data, int len);
 extern void nrc_atcmd_recv (char *buf, int len);

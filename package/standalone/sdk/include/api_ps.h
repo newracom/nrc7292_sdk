@@ -207,15 +207,15 @@ nrc_err_t  nrc_ps_add_gpio_callback(bool net_init, scheduled_callback func);
 nrc_err_t nrc_ps_start_schedule();
 
 /**********************************************
- * @fn void nrc_ps_resume_deep_sleep()
+ * @fn nrc_err_t nrc_ps_resume_deep_sleep()
  *
  * @brief Command the device to go to deep sleep for remaining scheduled time.
  *        This function is used to sleep after none-scheduled wakeup such as GPIO interrupt.
  *
  *
- * @return NONE.
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-void nrc_ps_resume_deep_sleep();
+nrc_err_t nrc_ps_resume_deep_sleep();
 
 #ifdef __cplusplus
 }

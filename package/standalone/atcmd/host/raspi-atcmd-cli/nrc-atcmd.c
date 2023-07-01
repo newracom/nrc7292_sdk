@@ -140,7 +140,9 @@ static void nrc_atcmd_wait_return (char *cmd)
 
 	if (strcmp(cmd, "ATZ\r\n") == 0)
 		timeout = 3;
-	else if (strlen(cmd) > 11 && memcmp(cmd, "AT+UART=", 8) == 0)
+	else if (strlen(cmd) > 8 && memcmp(cmd, "AT+UART=", 8) == 0)
+		timeout = 1;
+	else if (strlen(cmd) > 14 && memcmp(cmd, "AT+WDEEPSLEEP=", 14) == 0)
 		timeout = 1;
 
 	pthread_mutex_lock(&g_atcmd_info.ret.mutex);
@@ -181,7 +183,7 @@ static void nrc_atcmd_wait_return (char *cmd)
 	}
 }
 
-static int nrc_atcmd_send (char *buf, int len)
+int nrc_atcmd_send (char *buf, int len)
 {
 	int retry;
 	int ret;
@@ -209,9 +211,8 @@ static int nrc_atcmd_send (char *buf, int len)
 		}
 	}
 
-	if (retry > 0)
-//		atcmd_log_send("retry=%d\n", retry);
-		log_info("SEND: retry=%d\n", retry);
+/*	if (retry > 0)
+		atcmd_log_send("retry=%d\n", retry); */
 
 	return len;
 }

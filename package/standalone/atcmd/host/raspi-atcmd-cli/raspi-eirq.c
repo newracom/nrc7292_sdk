@@ -109,16 +109,16 @@ void raspi_eirq_close (void)
 int raspi_eirq_poll (int timeout)
 {
 	if (g_raspi_eirq.fd >= 0)
-	{	
+	{
 		struct gpioevent_data evdata;
 		struct pollfd fdset;
-		int ret; 
+		int ret;
 
 		fdset.fd = g_raspi_eirq.req.fd;
 		fdset.events = POLLIN;
 		fdset.revents = 0;
 
-		ret = poll(&fdset, 1, timeout); 
+		ret = poll(&fdset, 1, timeout);
 
 		if (ret < 0)
 		{
@@ -132,7 +132,7 @@ int raspi_eirq_poll (int timeout)
 
 			return -ETIME;
 		}
-		else if (fdset.revents & POLLIN) 
+		else if (fdset.revents & POLLIN)
 		{
 /*			log_debug("%s: POLLIN\n", __func__); */
 
@@ -147,7 +147,7 @@ int raspi_eirq_poll (int timeout)
 					return -errno;
 				}
 				else if (ret == sizeof(evdata))
-				{				
+				{
 /*					log_debug("%s: id=%d timestamp=%lld\n", __func__, evdata.id, evdata.timestamp); */
 
 					if (evdata.id != (g_raspi_eirq.req.eventflags & 0x3))

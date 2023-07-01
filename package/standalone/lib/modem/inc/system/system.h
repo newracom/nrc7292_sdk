@@ -545,7 +545,7 @@ typedef struct {
 #if defined(CPU_CM3)
 #define VTOR (*((volatile uint32_t *)(0xE000ED08)))
 #endif
-#define SCR  (*((volatile uint32_t *)(0xE000ED10)))
+#define ARMSCR  (*((volatile uint32_t *)(0xE000ED10)))
 
 
 #define IRQ_PRIO_ADDR       (0xE000E400)

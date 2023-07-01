@@ -3,10 +3,9 @@
 
 #define VERSION_BRANCH "gerrit/nrc7292-release-sdk"
 
-#define VERSION_BUILD "8622c6f"
+#define VERSION_BUILD "8905af0"
 #define VERSION_MAJOR 1
-#define VERSION_MINOR 4
+#define VERSION_MINOR 5
 #define VERSION_REVISION 0
 #define SW_ID 1
-#define VERSION_DESCRIPTION ""
 #endif //_BUILD_VER_H_

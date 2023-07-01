@@ -10,9 +10,10 @@
 #include "netif/etharp.h"
 #include "netif/bridgeif.h"
 #include "nat/nat.h"
+#include "lwip/tcpip.h"
 
 #include "nrc_lwip.h"
-#include "driver_nrc.h"
+
 #ifdef ETH_DRIVER_ENC28J60
 #include "enc28j60.h"
 #endif
@@ -23,6 +24,7 @@
 
 /* FreeRTOS includes. */
 #include "FreeRTOS.h"
+#include "ctrl_iface_freeRTOS.h"
 
 #include "nrc_eth_if.h"
 #include "standalone.h"
@@ -37,7 +39,8 @@ struct eth_addr peer_mac;
 static esp_eth_mac_t *nrc_eth_mac;
 static nrc_eth_mode_t eth_mode = NRC_ETH_MODE_AP;
 static nrc_network_mode_t network_mode = NRC_NETWORK_MODE_BRIDGE;
-bool eth_dhcp_started = false;
+static nrc_eth_ip_mode_t ip_mode = NRC_ETH_IP_MODE_DHCP;
+static uint32_t eth_linkup_count = 0;
 
 extern struct netif* nrc_netif[MAX_IF];
 
@@ -57,7 +60,7 @@ static void print_buffer(uint8_t *buffer, uint32_t size)
 	LWIP_PLATFORM_DIAG(("\n\n"));
 }
 
-static err_t nrc_eth_output( struct netif *net_if, struct pbuf *p )
+ATTR_NC __attribute__((optimize("O3"))) static err_t nrc_eth_output( struct netif *net_if, struct pbuf *p )
 {
 	struct pbuf *q;
 	err_t xReturn = ERR_OK;
@@ -74,7 +77,7 @@ static err_t nrc_eth_output( struct netif *net_if, struct pbuf *p )
 //		print_buffer(buffer, length);
 
 		if (nrc_eth_mac->transmit(nrc_eth_mac, buffer, length) != NRC_SUCCESS) {
-			E(TT_NET, "[%s] transmission failed...\n", __func__);
+			V(TT_NET, "[%s] transmission failed...\n", __func__);
 			return ERR_IF;
 		}
 
@@ -149,6 +152,29 @@ static void link_callback(struct netif *eth_if)
 {
 	if (netif_is_link_up(eth_if)) {
 		I(TT_NET, "[%s] UP\n", __func__);
+		if (ip_mode == NRC_ETH_IP_MODE_DHCP) {
+			wifi_station_dhcpc_start(0);
+			/* If wifi was associated, disconnect to renew IP */
+			if ((eth_linkup_count > 0) && (eth_mode == NRC_ETH_MODE_AP)) {
+				/* STA_LIST defined in nrc_types.h */
+				STA_LIST info;
+				char mac_addr[20];
+				/* Retrieve all station currently associated */
+				if (nrc_wifi_softap_get_sta_list(0, &info) == WIFI_SUCCESS) {
+					for (int i = 0; i < info.total_num; i++) {
+						sprintf(mac_addr, "%02x:%02x:%02x:%02x:%02x:%02x",
+								info.sta[i].addr[0],
+								info.sta[i].addr[1],
+								info.sta[i].addr[2],
+								info.sta[i].addr[3],
+								info.sta[i].addr[4],
+								info.sta[i].addr[5]);
+						ctrl_iface_receive_response(0, "deauthenticate %s", mac_addr);
+					}
+				}
+			}
+		}
+		eth_linkup_count++;
 	} else {
 	    I(TT_NET, "[%s] DOWN\n", __func__);
 	}
@@ -169,7 +195,7 @@ static void nrc_bind_eth_if(esp_eth_mac_t *mac)
 
     /* set MAC hardware address to be used by lwIP */
     mac->get_addr(mac, eth_netif.hwaddr);
-    netif_add(&eth_netif, &ipaddr, &netmask, &gw, NULL, eth_init, ethernet_input);
+    netif_add(&eth_netif, &ipaddr, &netmask, &gw, NULL, eth_init, tcpip_input);
     netif_set_status_callback(&eth_netif, status_callback);
     netif_set_link_callback(&eth_netif, link_callback);
 
@@ -180,21 +206,17 @@ static void nrc_bind_eth_if(esp_eth_mac_t *mac)
 	netif_set_link_down(&eth_netif);
 
 	if (network_mode == NRC_NETWORK_MODE_BRIDGE) {
-		if (eth_mode == NRC_ETH_MODE_AP) {
-			memcpy(bridge_data.ethaddr.addr, eth_netif.hwaddr, 6);
-			if (bridge_data.ethaddr.addr[3] < 0xff) {
-				bridge_data.ethaddr.addr[3]++;
-			} else {
-				bridge_data.ethaddr.addr[3] = 0;
-			}
+		memcpy(bridge_data.ethaddr.addr, nrc_netif[0]->hwaddr, 6);
+		if (bridge_data.ethaddr.addr[3] < 0xff) {
+			bridge_data.ethaddr.addr[3]++;
 		} else {
-			memcpy(bridge_data.ethaddr.addr, nrc_netif[0]->hwaddr, 6);
+			bridge_data.ethaddr.addr[3] = 0;
 		}
 		bridge_data.max_ports = 2;
 		bridge_data.max_fdb_dynamic_entries = 128;
 		bridge_data.max_fdb_static_entries = 16;
 
-		netif_add(&br_netif, &ipaddr, &netmask, &gw, &bridge_data, bridgeif_init, ethernet_input);
+		netif_add(&br_netif, &ipaddr, &netmask, &gw, &bridge_data, bridgeif_init, tcpip_input);
 		bridgeif_add_port(&br_netif, &eth_netif);
 
 		bridgeif_fdb_add(&br_netif, &ethbroadcast, BR_FLOOD);
@@ -207,47 +229,31 @@ static void nrc_bind_eth_if(esp_eth_mac_t *mac)
 	}
 }
 
-static nrc_err_t eth_copy_buffer_to_pbuf(uint8_t *buffer, uint32_t length, struct pbuf **p)
+ATTR_NC __attribute__((optimize("O3"))) static struct pbuf* eth_copy_buffer_to_pbuf(uint8_t *buffer, uint32_t length)
 {
-	struct pbuf *q;
-	int remain = length;
-	int offset = 0;
-
-	*p = pbuf_alloc(PBUF_RAW, length, PBUF_POOL);
-	if (*p == NULL) {
-		return NRC_FAIL;
-	} else {
-		for (q = *p; q != NULL; (q = q->next) && remain) {
-			memcpy(q->payload, (uint8_t *) buffer + offset, (remain > q->len) ? q->len : remain);
-			remain -= q->len;
-			offset += q->len;
-		}
-	}
-	return NRC_SUCCESS;
+    struct pbuf *p = pbuf_alloc(PBUF_RAW, length, PBUF_POOL);
+    if (p == NULL) {
+        return NULL;
+    }
+    uint32_t remain = length;
+    uint8_t *payload_ptr = p->payload;
+    struct pbuf *q = p;
+    while (q && remain > 0) {
+        uint32_t copy_len = q->len < remain ? q->len : remain;
+        memcpy(payload_ptr, buffer, copy_len);
+        buffer += copy_len;
+        payload_ptr += copy_len;
+        remain -= copy_len;
+        q = q->next;
+    }
+    return p;
 }
 
-static nrc_err_t eth_stack_input_handler(esp_eth_handle_t eth_handle, uint8_t *buffer, uint32_t length, void *priv)
+ATTR_NC __attribute__((optimize("O3"))) static nrc_err_t eth_stack_input_handler(esp_eth_handle_t eth_handle, uint8_t *buffer, uint32_t length, void *priv)
 {
 	struct pbuf *p = NULL;
 	struct eth_hdr *ethhdr = (struct eth_hdr *) buffer;
-	struct nrc_wpa_if *intf = wpa_driver_get_interface(0);
-	struct nrc_wpa_sta *sta = NULL;
 
-	if (eth_mode == NRC_ETH_MODE_AP) {
-		if (intf) {
-			V(TT_NET, "[%s] nrc_wpa_if found...\n", __func__);
-			if (intf->is_ap) {
-				sta = nrc_wpa_find_sta(intf, ethhdr->dest.addr);
-				if (sta) {
-					V(TT_NET, "[%s] station found ...\n", __func__);
-				} else {
-					V(TT_NET, "[%s] station not found...\n", __func__);
-				}
-			} else {
-				V(TT_NET, "[%s] nrc_wpa_if not AP...\n", __func__);
-			}
-		}
-	}
 	V(TT_NET, "[%s] buffer of size %d received...\n", __func__, length);
 //	print_buffer(buffer, length);
 
@@ -268,8 +274,9 @@ static nrc_err_t eth_stack_input_handler(esp_eth_handle_t eth_handle, uint8_t *b
 #endif /* PPPOE_SUPPORT */
 		case ETHTYPE_IP:
 			V(TT_NET, "[%s] eth_copy_buffer_to_pbuf...\n", __func__);
-			if (eth_copy_buffer_to_pbuf(buffer, length, &p) == NRC_FAIL) {
+			if ((p = eth_copy_buffer_to_pbuf(buffer, length)) == NULL) {
 				vPortFree(buffer);
+				buffer = NULL;
 				V(TT_NET, "[%s] eth_copy_buffer_to_pbuf failed...\n", __func__, length);
 				return NRC_FAIL;
 			} else {
@@ -302,21 +309,8 @@ static nrc_err_t eth_linkdown_handler(esp_eth_handle_t eth_handle)
 	I(TT_NET, "[%s] ethernet disconnected...\n", __func__);
 
 	if (network_mode == NRC_NETWORK_MODE_BRIDGE) {
-		if (eth_mode == NRC_ETH_MODE_AP) {
-			if (eth_dhcp_started) {
-				dhcp_stop(&br_netif);
-				dhcp_cleanup(&br_netif);
-			}
-		}
-#if defined(SUPPORT_ETHERNET_ACCESSPOINT)
-		else {
+		if (eth_mode == NRC_ETH_MODE_STA) {
 			memset(peer_mac.addr, 0, ETH_HWADDR_LEN);
-		}
-#endif
-	} else {
-		if (eth_dhcp_started) {
-			dhcp_stop(&eth_netif);
-			dhcp_cleanup(&eth_netif);
 		}
 	}
 	netif_set_link_down(&eth_netif);
@@ -329,34 +323,34 @@ void nrc_eth_raw_transmit(uint8_t *buffer, uint32_t length)
 	nrc_eth_mac->transmit(nrc_eth_mac, buffer, length);
 }
 
-nrc_err_t set_ethernet_mode(nrc_eth_mode_t mode)
+void nrc_eth_set_ethernet_mode(nrc_eth_mode_t mode)
 {
 	eth_mode = mode;
-
-	if (eth_mode == NRC_ETH_MODE_STA) {
-		if (eth_dhcp_started) {
-			dhcp_stop(&eth_netif);
-			dhcp_cleanup(&eth_netif);
-		}
-	}
-	return NRC_SUCCESS;
 }
 
-nrc_eth_mode_t get_ethernet_mode()
+nrc_eth_mode_t nrc_eth_get_ethernet_mode()
 {
 	return eth_mode;
 }
 
-nrc_err_t set_network_mode(nrc_network_mode_t mode)
+void nrc_eth_set_network_mode(nrc_network_mode_t mode)
 {
 	network_mode = mode;
-
-	return NRC_SUCCESS;
 }
 
-nrc_network_mode_t get_network_mode()
+nrc_network_mode_t nrc_eth_get_network_mode()
 {
 	return network_mode;
+}
+
+void nrc_eth_set_ip_mode(nrc_eth_ip_mode_t mode)
+{
+	ip_mode = mode;
+}
+
+nrc_eth_ip_mode_t nrc_eth_get_ip_mode()
+{
+	return ip_mode;
 }
 
 int nat_add(struct netif *out_if, struct netif *in_if)

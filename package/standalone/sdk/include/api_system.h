@@ -33,33 +33,6 @@ extern "C" {
 #include "util_trace.h"
 
 /**********************************************
- * @fn nrc_err_t nrc_wifi_set_log_level(TRACE_TYPES type_id, TRACE_LEVEL level)
- *
- * @brief Set the log_level of input type_id
- *
- * @param type_id: defined TRACE_TYPES in util_trace.h
- *
- * @param level: 0(TL_VB) or 1(TL_INFO) or 2(TL_ERR)
- *
- * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
- ***********************************************/
-nrc_err_t nrc_wifi_set_log_level(TRACE_TYPES type_id, TRACE_LEVEL level);
-
-
-/**********************************************
- * @fn nrc_err_t nrc_wifi_get_log_level(TRACE_TYPES type_id, TRACE_LEVEL *level)
- *
- * @brief Get the log_level of input type_id
- *
- * @param type_id: defined TRACE_TYPES in util_trace.h
- *
- * @param level: A pointer for 0(TL_VB) or 1(TL_INFO) or 2(TL_ERR)
- *
- * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
- ***********************************************/
-nrc_err_t nrc_wifi_get_log_level(TRACE_TYPES type_id, TRACE_LEVEL *level);
-
-/**********************************************
  * @fn nrc_err_t nrc_get_rtc(uint64_t *rtc_time);
  *
  * @brief Read RTC time since boot

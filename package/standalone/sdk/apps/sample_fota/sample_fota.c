@@ -30,6 +30,7 @@
 #include "lwip/ip_addr.h"
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
+#include "sample_fota_version.h"
 
 #include "cJSON.h"
 
@@ -44,17 +45,66 @@
 #define SERVER_URL "http://192.168.200.1:8080/"
 #endif
 
-#define CURRENT_FW_VER 105
-#define CHECK_VER SERVER_URL "version"
+#define CHECK_VER_URL SERVER_URL "version" // Unique URL for retrieving the version information
 #define CHUNK_SIZE 2048
 
+
+typedef struct{
+	uint8_t major;
+	uint8_t minor;
+	uint8_t patch;
+}version_t;
+
 typedef struct {
-	int version;
+	version_t version;
+	uint8_t force;
 	uint32_t crc;
 	char fw_url[128];
 } update_info_t;
 
-update_info_t update_info = {0, 0, {'\0'}};
+update_info_t update_info;
+
+version_t getCurrentVersion() {
+    version_t currentVersion;
+
+    currentVersion.major = SAMPLE_FOTA_MAJOR;
+    currentVersion.minor = SAMPLE_FOTA_MINOR;
+    currentVersion.patch = SAMPLE_FOTA_PATCH;
+    return currentVersion;
+}
+
+void parseVersionString(const char* versionString, size_t versionStringLen, version_t* parsedVersion) {
+    char versionCopy[128];
+    size_t copyLen = versionStringLen < sizeof(versionCopy) ? versionStringLen : sizeof(versionCopy) - 1;
+    strncpy(versionCopy, versionString, copyLen);
+    versionCopy[copyLen] = '\0';
+
+    char* token = strtok(versionCopy, ".");
+    if (token != NULL)
+        parsedVersion->major = atoi(token);
+
+    token = strtok(NULL, ".");
+    if (token != NULL)
+        parsedVersion->minor = atoi(token);
+
+    token = strtok(NULL, ".");
+    if (token != NULL)
+        parsedVersion->patch = atoi(token);
+}
+
+ bool isCurrentVersionLower(version_t* parsedVersion) {
+	 version_t targetVersion = *parsedVersion;
+	 version_t currentVersion = getCurrentVersion();
+
+	 if (currentVersion.major < targetVersion.major)
+		 return true;
+	 else if (currentVersion.major == targetVersion.major && currentVersion.minor < targetVersion.minor)
+		 return true;
+	 else if (currentVersion.major == targetVersion.major && currentVersion.minor == targetVersion.minor && currentVersion.patch < targetVersion.patch)
+		 return true;
+	 else
+		 return false;
+ }
 
 int get_json_str_value(cJSON *cjson, char *key, char **value)
 {
@@ -77,6 +127,7 @@ void parse_response_version (char * data, uint32_t length)
 	char *version = NULL;
 	char *crc = NULL;
 	char *fw_url = NULL;
+	char *force = NULL;
 
 	char* token = strtok(data, "\r\n");
 	uint32_t body_length = 0;
@@ -98,7 +149,7 @@ void parse_response_version (char * data, uint32_t length)
 	if (cjson) {
 		if (get_json_str_value(cjson, "version", &version)) {
 			nrc_usr_print("[%s] version : %s\n", __func__, version);
-			update_info.version  = atoi(version);
+			parseVersionString(version, strlen(version), &update_info.version);
 		} else {
 			goto exit;
 		}
@@ -115,6 +166,14 @@ void parse_response_version (char * data, uint32_t length)
 			sprintf(update_info.fw_url, "%s%s", SERVER_URL, fw_url);
 		} else {
 			goto exit;
+		}
+
+		if (get_json_str_value(cjson, "force", &force)) {
+			nrc_usr_print("[%s] force : %s\n", __func__, force);
+			update_info.force = atoi(force);
+		} else {
+			/* set default update mode */
+			update_info.force = 0;
 		}
 	} else{
 		nrc_usr_print("[%s] JSON parse error\n", __func__);
@@ -133,8 +192,12 @@ exit:
 		if (fw_url)
 			free(fw_url);
 
-		nrc_usr_print("[%s] version: %d,  crc: %x  fw_url: %s\n",
-			__func__,  update_info.version, update_info.crc, update_info.fw_url);
+		if (force)
+			free(force);
+
+		nrc_usr_print("[%s] version: %d.%d.%d,  crc: %x  fw_url: %s force: %s\n",
+			__func__,  update_info.version.major, update_info.version.minor,update_info.version.patch,
+			update_info.crc, update_info.fw_url, update_info.force);
 	}
 }
 
@@ -257,7 +320,7 @@ nrc_err_t run_sample_fota()
 	data.data_in_length = CHUNK_SIZE;
 
 	nrc_usr_print("=========================================\n");
-	nrc_usr_print("STEP 1. Check firmware version in server (%s).\n", CHECK_VER);
+	nrc_usr_print("STEP 1. Check firmware version in server (%s).\n", CHECK_VER_URL);
 	nrc_usr_print("=========================================\n");
 	while (1) {
 		uint32_t data_size = 0;
@@ -265,9 +328,9 @@ nrc_err_t run_sample_fota()
 		memset(buf, 0, CHUNK_SIZE);
 
 #if defined( SUPPORT_MBEDTLS ) && defined( RUN_HTTPS )
-		ret = nrc_httpc_get(&handle, CHECK_VER, NULL, &data, &certs);
+		ret = nrc_httpc_get(&handle, CHECK_VER_URL, NULL, &data, &certs);
 #else
-		ret = nrc_httpc_get(&handle, CHECK_VER, NULL, &data, NULL);
+		ret = nrc_httpc_get(&handle, CHECK_VER_URL, NULL, &data, NULL);
 #endif
 
 		while (ret == HTTPC_RET_OK) {
@@ -286,9 +349,10 @@ nrc_err_t run_sample_fota()
 		nrc_usr_print("%s\n", buf);
 		parse_response_version(buf, data_size);
 
-		if (update_info.version > CURRENT_FW_VER)
+		bool isLower = isCurrentVersionLower(&update_info.version);
+		if (isLower || update_info.force) {
 			break;
-
+		}
 		_delay_ms(10000);
 	}
 
@@ -377,7 +441,7 @@ nrc_err_t run_sample_fota()
 	nrc_usr_print("=================================================\n");
 	nrc_usr_print("STEP 4. Firmware update to new one and reboot.\n");
 	nrc_usr_print("=================================================\n\n");
-	nrc_fota_update_done(&fota_info);
+	nrc_fota_update_done();
 
 	while(1);
 

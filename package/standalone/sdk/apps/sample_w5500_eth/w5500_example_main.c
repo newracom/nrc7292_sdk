@@ -1,4 +1,4 @@
-/* ENC28J60 Example
+/* W5500 Bridge mode Example
 
    This example code is in the Public Domain (or CC0 licensed, at your option.)
 
@@ -177,10 +177,7 @@ void check_fw_version(void)
 void user_init(void)
 {
 	httpd_handle_t httpd;
-
 	char value[32];
-	size_t length = sizeof(value);
-
 	uint8_t mac[6] = {0,};
 	uint8_t *addr = NULL;
 	uint8_t device_mode = 0;
@@ -192,6 +189,7 @@ void user_init(void)
 
 	nrc_uart_console_enable(true);
 	nrc_led_trx_init(TX_LED_GPIO, RX_LED_GPIO, 500, false);
+	nrc_wifi_set_use_4address(true);
 
 	nrc_wifi_set_config(&wifi_config);
 
@@ -210,40 +208,42 @@ void user_init(void)
 	}
 #endif
 
-	set_ethernet_mode(wifi_config.device_mode); /* 0:STA, 1:AP */
-	set_network_mode(wifi_config.network_mode); /*0:bridge, 1:NAT */
+	nrc_eth_set_ethernet_mode(wifi_config.device_mode); /* 0:STA, 1:AP */
+	nrc_eth_set_network_mode(wifi_config.network_mode); /*0:bridge, 1:NAT */
 
 	if (ethernet_init(addr) != NRC_SUCCESS) {
 		nrc_usr_print("[%s] Error initializing ethernet...\n", __func__);
 		return;
 	}
 
-	/* set ip addresses for interfaces according to configuration saved in nvs */
 	if (wifi_config.network_mode == WIFI_NETWORK_MODE_BRIDGE) {
-		/* Run STA or AP */
-		if (wifi_config.device_mode == WIFI_MODE_STATION) {
-			nrc_usr_print("[%s] Device in Station mode...\n", __func__);
-			nrc_usr_print("[%s] Connecting to \"%s\"...\n", __func__, wifi_config.ssid);
-			if (connect_to_ap(&wifi_config) == NRC_SUCCESS) {
-				nrc_usr_print("Connection to AP successful...\n");
-			} else {
-				nrc_usr_print("Error connecting to AP...\n");
+		/* Set IP address */
+		if (wifi_config.ip_mode ==  WIFI_STATIC_IP) {
+			nrc_eth_set_ip_mode(NRC_ETH_IP_MODE_STATIC);
+			memset(str, 0x0, sizeof(str));
+			sprintf(str, "br %s -n %s -g %s", wifi_config.static_ip,
+				wifi_config.netmask,  wifi_config.gateway);
+			A("wifi_config : %s\n", str);
+			if (str_to_argc_argv(str, &argc, &argv) == -1) {
+				A("Failed to convert string to argc and argv\n");
+				return;
 			}
+			wifi_ifconfig(argc, argv);
+			nrc_usr_print("The bridge IP address set to : %s\n", wifi_config.static_ip);
+
+			nrc_mem_free(argv[0]);
+			nrc_mem_free(argv);
 		} else {
-			nrc_usr_print("[%s] Device in Access Point mode...\n", __func__);
-			nrc_usr_print("[%s] Starting AP with ssid \"%s\"...\n", __func__, wifi_config.ssid);
-			if (start_softap(&wifi_config) == NRC_SUCCESS) {
-				nrc_usr_print("Soft AP Started...\n");
-				nrc_usr_print ("\033[31m [%s] dhcp_server start? %d \033[39m\n",
-					__func__, wifi_config.dhcp_server);
-			} else {
-				nrc_usr_print("Error Starting Soft AP...\n");
-			}
-			nrc_usr_print("[%s] ssid %s security %d channel %d\n", __func__,
-				wifi_config.ssid, wifi_config.security_mode, wifi_config.channel);
+			nrc_eth_set_ip_mode(NRC_ETH_IP_MODE_DHCP);
+			nrc_usr_print("Starting DHCP client on the bridge...\n");
+			/* If bridge ip is not set, start DHCP client */
+			/* Call wifi_station_dhcpc_start with vif set to 0 */
+			/* vif will be ignored by below call if the network mode is bridge */
+			/* API name is set to _station_, but it is applicable for AP as well */
+			wifi_station_dhcpc_start(0);
 		}
 
-		/* Set IP address */
+		/* set DHCP server */
 		if (wifi_config.dhcp_server == 1 && wifi_config.device_mode == WIFI_MODE_AP) {
 			nrc_usr_print("The DHCP server on bridge interface\n");
 			memset(str, 0x0, sizeof(str));
@@ -256,32 +256,8 @@ void user_init(void)
 			wifi_dhcps(argc, argv);
 			nrc_mem_free(argv[0]);
 			nrc_mem_free(argv);
-		} else {
-			if (wifi_config.ip_mode ==  WIFI_STATIC_IP) {
-				nrc_usr_print("The bridge IP address has been set : %s\n", wifi_config.static_ip);
-				memset(str, 0x0, sizeof(str));
-				sprintf(str, "br %s -n %s -g %s", wifi_config.static_ip,
-					wifi_config.netmask,  wifi_config.gateway);
-				A("wifi_config : %s\n", str);
-				if (str_to_argc_argv(str, &argc, &argv) == -1) {
-					A("Failed to convert string to argc and argv\n");
-					return;
-				}
-				wifi_ifconfig(argc, argv);
-				nrc_mem_free(argv[0]);
-				nrc_mem_free(argv);
-			} else {
-				nrc_usr_print("The bridge IP address has not been set\n");
-				nrc_usr_print("The DHCP client on the bridge interface is starting\n");
-				/* If bridge ip is not set, start DHCP client */
-				/* Call wifi_station_dhcpc_start with vif set to 0 */
-				/* vif will be ignored by below call if the network mode is bridge */
-				/* API name is set to _station_, but it is applicable for AP as well */
-				wifi_station_dhcpc_start(0);
-			}
 		}
 	} else {
-		length = sizeof(value);
 		nrc_usr_print("Setting eth address to %s...\n", WEB_SERVER_DEFAULT_IP);
 		memset(str, 0x0, sizeof(str));
 		sprintf(str, "eth %s", WEB_SERVER_DEFAULT_IP);
@@ -294,7 +270,7 @@ void user_init(void)
 		nrc_mem_free(argv[0]);
 		nrc_mem_free(argv);
 
-		nrc_usr_print("The DHCP server on bridge interface\n");
+		nrc_usr_print("The DHCP server on ethernet interface\n");
 		memset(str, 0x0, sizeof(str));
 		sprintf(str, "-i eth -lt %d", 5);
 		A("dhcps : %s\n", str);
@@ -305,6 +281,47 @@ void user_init(void)
 		wifi_dhcps(argc, argv);
 		nrc_mem_free(argv[0]);
 		nrc_mem_free(argv);
+
+		if (wifi_config.ip_mode ==  WIFI_STATIC_IP) {
+			nrc_usr_print("The wlan0 IP address has been set : %s\n", wifi_config.static_ip);
+			memset(str, 0x0, sizeof(str));
+			sprintf(str, "wlan0 %s -n %s -g %s", wifi_config.static_ip,
+					wifi_config.netmask,  wifi_config.gateway);
+			A("wifi_config : %s\n", str);
+			if (str_to_argc_argv(str, &argc, &argv) == -1) {
+				A("Failed to convert string to argc and argv\n");
+				return;
+			}
+			wifi_ifconfig(argc, argv);
+			nrc_mem_free(argv[0]);
+			nrc_mem_free(argv);
+		}
+	}
+
+	/* Run STA or AP */
+	if (wifi_config.device_mode == WIFI_MODE_STATION) {
+		/* 4 address support only necessary for Bridge with multiple ethernet devices */
+		nrc_wifi_set_use_4address(false);
+
+		nrc_usr_print("[%s] Device in Station mode...\n", __func__);
+		nrc_usr_print("[%s] Connecting to \"%s\"...\n", __func__, wifi_config.ssid);
+		if (connect_to_ap(&wifi_config) == NRC_SUCCESS) {
+			nrc_usr_print("Connection to AP successful...\n");
+		} else {
+			nrc_usr_print("Error connecting to AP...\n");
+		}
+	} else {
+		nrc_usr_print("[%s] Device in Access Point mode...\n", __func__);
+		nrc_usr_print("[%s] Starting AP with ssid \"%s\"...\n", __func__, wifi_config.ssid);
+		if (start_softap(&wifi_config) == NRC_SUCCESS) {
+			nrc_usr_print("Soft AP Started...\n");
+			nrc_usr_print ("\033[31m [%s] dhcp_server start? %d \033[39m\n",
+				__func__, wifi_config.dhcp_server);
+		} else {
+			nrc_usr_print("Error Starting Soft AP...\n");
+		}
+		nrc_usr_print("[%s] ssid %s security %d channel %d\n", __func__,
+			wifi_config.ssid, wifi_config.security_mode, wifi_config.channel);
 	}
 	run_http_server(&wifi_config);
 }

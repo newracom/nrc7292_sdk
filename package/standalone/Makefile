@@ -53,19 +53,24 @@ ifneq ($(MAKEFILE), )
         BLPARAM := $(subst xip,,$(BLPARAM))
 endif
 
-ifeq ($(SYSTEM), $(filter $(SYSTEM),nrc7393 nrc7394))
-ifeq ($(findstring epa, $(ALIAS)), )
-	PANAME := N
-else
-	PANAME := A
-endif
-endif
+# Extract the filename using pattern matching and substitution
+BDF_INPUT := $(lastword $(filter %.dat,$(subst +, ,$(ALIAS))))
 BDFFOLDER := ./bdf
 BDFNAME := bd.dat
 BDFHEADERNAME := bd.h
-BDFSYSDATA := $(BDFFOLDER)/$(SYSTEM)/$(SYSTEM)$(PANAME)_$(BDFNAME)
+ifneq ($(BDF_INPUT), )
+	BDFSYSDATA := $(BDFFOLDER)/$(SYSTEM)/$(BDF_INPUT)
+else
+	BDFSYSDATA := $(BDFFOLDER)/$(SYSTEM)/$(SYSTEM)_$(BDFNAME)
+endif
 BDFDATA := $(BDFFOLDER)/$(BDFNAME)
 BDFHDR := $(BDFFOLDER)/$(BDFHEADERNAME)
+
+ifeq ($(UTARGET), $(filter $(UTARGET),standalone))
+$(info =================================================)
+$(info BDFSYSDATA : $(BDFSYSDATA))
+$(info =================================================)
+endif
 
 ######### BUILD ########################################################
 all: ucode bdf second_bl
@@ -138,7 +143,7 @@ bdf:
 	@echo "#endif" >> $(BDFHDR)
 
 second_bl:
-ifeq ($(BLSYSTEM), $(filter $(BLSYSTEM),nrc7292 nrc7393 nrc7394))
+ifeq ($(BLSYSTEM), $(filter $(BLSYSTEM),nrc7292 nrc7393 nrc7394 nrc5292))
 ifeq ($(BLTARGET), $(filter $(BLTARGET),boot))
 ifneq ($(findstring xip, $(ALIAS)), )
 	$(PREFIX).$(BLMAKEFILE) $(BLPARAM)
@@ -149,7 +154,7 @@ endif
 endif
 
 second_blclean:
-ifeq ($(BLSYSTEM), $(filter $(BLSYSTEM),nrc7292 nrc7393 nrc7394))
+ifeq ($(BLSYSTEM), $(filter $(BLSYSTEM),nrc7292 nrc7393 nrc7394 nrc5292))
 ifeq ($(BLTARGET), $(filter $(BLTARGET),boot))
 ifneq ($(findstring xip, $(ALIAS)), )
 	$(PREFIX).$(BLMAKEFILE) $(BLPARAM) clean

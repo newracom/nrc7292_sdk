@@ -390,7 +390,7 @@ static inline void WPA_PUT_LE64(u8 *a, u64 val)
 
 #ifdef _FREERTOS
 #define PRINTF_FORMAT(a,b)
-#define STRUCT_PACKED
+#define STRUCT_PACKED __attribute__ ((packed))
 #else
 #ifdef __GNUC__
 #define PRINTF_FORMAT(a,b) __attribute__ ((format (printf, (a), (b))))

@@ -23,6 +23,13 @@ enum {
     MODEM_SEMAPHORE_REC_ISR     = 3,
 };
 
+typedef struct _CCA_RESULT_4M
+{
+    double cca_1m_prim;
+    double cca_2m_prim;
+    double cca_2m_sec;
+} CCA_RESULT_4M;
+
 #if !defined (INCLUDE_NO_USE_LMAC_SEM)
 #define LMAC_PS_SEM_TAKE(a) do{lmac_take_modem_semaphore(a);}while(0)
 #define LMAC_PS_SEM_TAKE_RET(a) lmac_take_modem_semaphore(a)
@@ -112,29 +119,8 @@ uint8_t     lmac_get_ch_bw(uint8_t vif_id);
 
 struct      cipher_def; // declare
 
-// cca threshold register type
-typedef struct {
-	uint32_t cca_threshold_reg2;
-	uint32_t cca_threshold_reg3;
-} cca_thresthold_reg_t;
-
-#define CCA_THRESHOLD_MIN	(-85)
-#define CCA_THRESHOLD_MAX	(-75)
-#define CCA_THRESHOLD_SIZE (CCA_THRESHOLD_MAX - CCA_THRESHOLD_MIN + 1)
-
-static volatile const cca_thresthold_reg_t cca_threshold_table[CCA_THRESHOLD_SIZE] = {
-	{0x0000abae, 0xababaeae},	/* - 85 dBm */
-	{0x0000acaf, 0xacacafaf},	/* - 84 dBm */
-	{0x0000adb0, 0xadadb0b0},	/* - 83 dBm */
-	{0x0000aeb1, 0xaeaeb1b1},	/* - 82 dBm */
-	{0x0000afb2, 0xafafb2b2},	/* - 81 dBm */
-	{0x0000b0b3, 0xb0b0b3b3},	/* - 80 dBm */
-	{0x0000b1b4, 0xb1b1b4b4},	/* - 79 dBm */
-	{0x0000b2b5, 0xb2b2b5b5},	/* - 78 dBm */
-	{0x0000b3b6, 0xb3b3b6b6},	/* - 77 dBm */
-	{0x0000b4b7, 0xb4b4b7b7},	/* - 76 dBm */
-	{0x0000b5b8, 0xb5b5b8b8},	/* - 75 dBm */
-};
+#define CCA_THRESHOLD_MIN	(-100)
+#define CCA_THRESHOLD_MAX	(-35)
 
 #if defined(NRC5291)
 void        sbr_init(int vector);
@@ -178,6 +164,7 @@ bool        lmac_is_concurrent(void);
 void        lmac_set_cca_ignore(bool ignore);
 bool        lmac_scan_set_channel(int vif_id, double freq, bw_t bw);
 double      lmac_scan_read_cca(int vif_id, double freq, bw_t bw, uint32_t scan_duration);
+bool        lmac_scan_read_cca_fast(int vif_id, double freq, bw_t bw, uint32_t scan_duration, CCA_RESULT_4M *cca_results);
 void        lmac_set_cipher_ignore(bool ignore, uint8_t dir);
 void        lmac_set_promiscuous_mode(int vif_id, uint8_t);
 bool        lmac_get_promiscuous_mode(int vif_id);
@@ -217,6 +204,9 @@ int8_t      lmac_get_ibss_vif_id();
 #endif
 
 void        lmac_set_cfo_cal_en(bool en);
+
+void		lmac_inc_bcmc_cnt(uint8_t bcmc_cnt);
+uint8_t		lmac_get_bcmc_cnt(void);
 
 void        lmac_uplink_request(LMAC_TXBUF *buf);
 void        lmac_uplink_request2(LMAC_TXBUF *buf, int txque, bool reschedule);
@@ -292,8 +282,8 @@ void        lmac_update_stats(uint8_t dir, void *hdr, uint8_t mcs, uint8_t statu
 uint8_t     get_run_rx_gain_auto_test();
 int         lmac_get_cca_device_type(void);
 bool        lmac_set_cca_device_type(int device_type);
-bool        lmac_set_cca_threshold(int cca_threshold);
-int         lmac_get_cca_threshold(void);
+bool        lmac_set_cca_threshold(int8_t cca_threshold);
+int8_t      lmac_get_cca_threshold(void);
 void        lmac_set_mcs(int vif_id, uint8_t mcs);
 uint8_t     lmac_get_mcs(int vif_id);
 bool        lmac_get_rf_kill();
@@ -311,6 +301,8 @@ void lmac_tx_power_init();
 #if !defined(NRC7292)
 void lmac_set_rx_buffer_lookup(bool v);
 #endif /* !defined(NRC7292) */
+/* To test lookup interrupt, define LOOK_UP_INT_TEST */
+//#define LOOK_UP_INT_TEST
 
 void lmac_task_handle_data(void *param);
 void lmac_task_send_queue(LMacEvent evt, uint8_t sub_evt);
@@ -334,4 +326,7 @@ bool lmac_check_tx_pause_flag();
 void lmac_set_ack_configure(uint8_t type);
 #endif
 void lmac_set_sw_reset();
+
+void udelay(uint32_t delay);
+void mdelay(uint32_t delay);
 #endif /* HAL_LMAC_COMMON_H */

@@ -33,14 +33,14 @@
  */
 #define NRC_SUBCMD_RM_VENDOR_IE				0xDE
 
-/*
+/**
  * GPIO pin number on Raspberry Pi.
  * This is used to wake up the target in deep-sleep.
  * [direction]: OUTPUT
  */
 #define RPI_GPIO_FOR_PS						(20) //NRC7292 EVB
 
-/*
+/**
  * GPIO pin number on the target device.
  * This is used to designate the GPIO pin on target
  * which will read signal from RPI_GPIO_FOR_RS for waking up target.
@@ -48,13 +48,25 @@
  */
 #define TARGET_GPIO_FOR_WAKEUP				(11) //NRC7292 EVB
 
-/*
+/**
  * GPIO pin number on the target device.
  * This is used to designate the GPIO pin on target
  * which will raise signal to wake up host system.
  * [direction]: OUTPUT
  */
 #define TARGET_GPIO_FOR_WAKEUP_HOST			(10)
+
+/**
+ * GPIO configuration during deep sleep operation.
+ * Each direction(input:0, output:1), out(low:0, high:1)
+ * and pull-up(floating:0, pull-up:1) can be configured with
+ * a bit-wise values.
+ * For example, bit-0 corresponds to GPIO0 in target.
+ */
+#define TARGET_DEEP_SLEEP_GPIO_DIR_7292		(0x07FFFF7F) // NRC default: 07, 27-31 => input
+#define TARGET_DEEP_SLEEP_GPIO_DIR_739X		(0xCFEF8D07) // NRC default: 03-07, 09, 12-14, 20, 28-29 => input
+#define TARGET_DEEP_SLEEP_GPIO_OUT			(0x0)
+#define TARGET_DEEP_SLEEP_GPIO_PULLUP		(0x0)
 
 #define RPI_GPIO_FOR_RST					(4)
 
@@ -66,6 +78,11 @@ enum nrc_vendor_event {
 	NRC_SUBCMD_ANNOUNCE5,
 	NRC_SUBCMD_REMOTECMD,
 	NRC_SUBCMD_WOWLAN_PATTERN,
+	NRC_SUBCMD_BCAST_FOTA_INFO,
+	NRC_SUBCMD_BCAST_FOTA_1,
+	NRC_SUBCMD_BCAST_FOTA_2,
+	NRC_SUBCMD_BCAST_FOTA_3,
+	NRC_SUBCMD_BCAST_FOTA_4,
 	NUM_VENDOR_EVENT,
 	MAX_VENDOR_EVENT = NUM_VENDOR_EVENT - 1
 };

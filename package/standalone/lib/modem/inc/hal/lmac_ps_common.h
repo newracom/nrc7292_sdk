@@ -58,6 +58,12 @@ typedef enum _ps_pm_type {
 	PS_PM_DEEPSLEEP_NONTIM
 } ps_pm_type;
 
+typedef enum _ps_pm_send_state {
+	PS_PM_SEND_PROCESSING,
+	PS_PM_SEND_SUCCESS,
+	PS_PM_SEND_FAIL
+} ps_pm_send_state;
+
 typedef void (*ps_doze_cb)(void);
 typedef void (*ps_wake_cb)(void);
 
@@ -127,8 +133,6 @@ typedef struct _lmac_ps_info {
 void lmac_ps_init_base();
 void lmac_ps_init(uint32_t wait_tx , uint32_t wait_rx , uint64_t wakeup_after_deepsleep_us );
 bool lmac_ps_get_modem_sleep_support();
-void lmac_ps_set_pm0_sent(bool sent);
-bool lmac_ps_get_pm0_sent();
 bool hal_lmac_ps_doze();
 bool hal_lmac_ps_wake();
 bool lmac_can_start_ps();
@@ -165,8 +169,6 @@ void lmac_ps_check_qm();
 static inline void lmac_ps_init_base() {}
 static inline void lmac_ps_init(uint32_t wait_tx , uint32_t wait_rx , uint64_t wakeup_after_deepsleep_us ) {}
 static inline bool lmac_ps_get_modem_sleep_support() {return false;}
-static inline void lmac_ps_set_pm0_sent(bool sent) {}
-static inline bool lmac_ps_get_pm0_sent() {return false;}
 static inline bool hal_lmac_ps_doze() {return false;}
 static inline bool hal_lmac_ps_wake() {return false;}
 static inline bool lmac_can_start_ps() {return false;};
@@ -197,6 +199,8 @@ void lmac_ps_go_doze();
 void lmac_ps_execute_sleepmode(uint64_t after_ms);
 ps_mode lmac_ps_get_mode();
 ps_state lmac_ps_get_state();
+void lmac_ps_set_pm0_sent(bool sent);
+bool lmac_ps_get_pm0_sent();
 
 /* API for SDK */
 void lmac_ps_go_sleep_alone(uint8_t mode, uint64_t duration);
@@ -248,7 +252,9 @@ void lmac_ps_set_short_beacon_interval(uint32_t sbi);
 void lmac_ps_set_dtim_period(uint8_t period);
 void lmac_ps_set_1m_ctrl_resp_preamble(uint8_t support);
 void lmac_ps_set_ps_mode(uint8_t mode, uint64_t duration);
-void lmac_ps_set_usr_timer_tsf(uint8_t vif_id, uint32_t timeout_ms);
+void lmac_ps_set_qos_null_pm1_ack_flag(int ack_flag);
+int lmac_ps_get_qos_null_pm1_ack_flag();
+void lmac_ps_set_usr_timer(uint8_t vif_id, uint32_t timeout_ms);
 void lmac_ps_set_target_wake(uint8_t wake);
 void lmac_ps_set_statype(uint8_t sta_type);
 void lmac_ps_set_aid(uint16_t aid);
@@ -267,6 +273,7 @@ void lmac_ps_set_duty_info(uint32_t window, uint32_t token, uint16_t margin, uin
 #endif /* defined(INCLUDE_DUTYCYCLE) */
 void lmac_ps_set_short_bcn_interval(uint16_t short_bcn_interval);
 void lmac_ps_set_bcn_interval(uint16_t bcn_interval);
+void lmac_ps_set_1m_prim_loc(uint8_t prim_loc);
 
 /* Dynamic PS API */
 void lmac_dyn_ps_init();

@@ -140,7 +140,7 @@ nat_init(void)
 #if LWIP_TIMERS
 //	SYS_ARCH_DECL_PROTECT(lev);
 //	SYS_ARCH_PROTECT(lev);
-	sys_timeout(LWIP_NAT_TICK_PERIOD_MS, nat_timer_tick,
+	sys_timeout(LWIP_NAT_TICK_PERIOD_MS, nat_timer,
 					(u32_t *) LWIP_NAT_TICK_PERIOD_MS);
 //	SYS_ARCH_UNPROTECT(lev);
 #endif

@@ -225,7 +225,7 @@ setup_page_http(httpd_req_t* req)
 		nrc_usr_print("[%s] Failed to send HTTP response: 0x%04x\n", __func__, ret_httpd_resp);
 		return ESP_FAIL;
 	} else {
-		nrc_usr_print("[%s] HTTP response sent successfully\n", __func__);
+//		nrc_usr_print("[%s] HTTP response sent successfully\n", __func__);
 		return ESP_OK;
 	}
 }

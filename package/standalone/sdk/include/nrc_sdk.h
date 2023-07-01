@@ -46,6 +46,7 @@
 #include "system_modem_api.h"
 
 #include "util_fota.h"
+#include "util_bcast_fota.h"
 #include "util_trace.h"
 #include "util_cli_freertos.h"
 
@@ -59,7 +60,6 @@
 #include "api_wifi.h"
 #include "api_system.h"
 #include "api_uart.h"
-#include "api_timer.h"
 #include "api_gpio.h"
 #include "api_i2c.h"
 #include "api_adc.h"
@@ -67,6 +67,7 @@
 #include "api_spi.h"
 #include "api_httpc.h"
 #include "api_fota.h"
+#include "api_bcast_fota.h"
 #include "api_ps.h"
 
 #ifndef __must_check

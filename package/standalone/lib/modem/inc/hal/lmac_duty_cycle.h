@@ -13,6 +13,8 @@ uint32_t lmac_get_duty_window (void);
 uint32_t lmac_get_tx_duration (void);
 uint16_t lmac_get_duty_margin (void);
 uint16_t lmac_get_duty_beacon_margin (void);
+bool lmac_duty_is_on( void );
+uint32_t lmac_duty_get_token( void );
 #else
 static inline void lmac_duty_cycle_init() {return;};
 static inline bool lmac_duty_cycle_schedule(uint16_t s, int a, bool i) {return true;};

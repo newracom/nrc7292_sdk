@@ -217,7 +217,7 @@ static void nrc_dma_regs_print (void)
 static dma_isr_t g_dmac_inttc_isr[NRC_DMA_CHANNEL_MAX];
 static dma_isr_t g_dmac_interr_isr[NRC_DMA_CHANNEL_MAX];
 
-static void nrc_dma_inttc_isr (int vector)
+ATTR_NC __attribute__((optimize("O3"))) static void nrc_dma_inttc_isr (int vector)
 {
     static uint8_t status;
     static int channel;
@@ -246,7 +246,7 @@ static void nrc_dma_inttc_isr (int vector)
     }
 }
 
-static void nrc_dma_interr_isr (int vector)
+ATTR_NC __attribute__((optimize("O3"))) static void nrc_dma_interr_isr (int vector)
 {
     static uint8_t status;
     static int channel;
@@ -275,7 +275,7 @@ static void nrc_dma_interr_isr (int vector)
     }
 }
 
-static void nrc_dma_inttc_clear (int channel)
+ATTR_NC __attribute__((optimize("O3"))) static void nrc_dma_inttc_clear (int channel)
 {
     volatile rDMAC_t *dmac = g_dma_regs;
 
@@ -285,7 +285,7 @@ static void nrc_dma_inttc_clear (int channel)
         dmac->IntTCClear = ~0;
 }
 
-static void nrc_dma_interr_clear (int channel)
+ATTR_NC __attribute__((optimize("O3"))) static void nrc_dma_interr_clear (int channel)
 {
     volatile rDMAC_t *dmac = g_dma_regs;
 
@@ -440,7 +440,7 @@ void nrc_dma_disable (void)
     }
 }
 
-bool nrc_dma_is_enabled (void)
+ATTR_NC __attribute__((optimize("O3"))) bool nrc_dma_is_enabled (void)
 {
     volatile rDMAC_t *dmac = g_dma_regs;
 
@@ -469,7 +469,7 @@ int nrc_dma_get_channel (int highest)
     return -1;
 }
 
-bool nrc_dma_valid_channel (int channel)
+ATTR_NC __attribute__((optimize("O3"))) bool nrc_dma_valid_channel (int channel)
 {
     if (channel < 0 || channel >= NRC_DMA_CHANNEL_MAX)
         return false;
@@ -504,7 +504,7 @@ int nrc_dma_config_p2p (int channel,
     return nrc_dma_config(channel, src, dest, inttc_isr, interr_isr, false);
 }
 
-int nrc_dma_start (int channel, dma_desc_t *desc)
+ATTR_NC __attribute__((optimize("O3"))) int nrc_dma_start (int channel, dma_desc_t *desc)
 {
     volatile rDMACC_t *dmacc;
 
@@ -532,7 +532,7 @@ int nrc_dma_start (int channel, dma_desc_t *desc)
     return 0;
 }
 
-int nrc_dma_stop (int channel)
+ATTR_NC __attribute__((optimize("O3"))) int nrc_dma_stop (int channel)
 {
     volatile rDMACC_t *dmacc;
 
@@ -667,7 +667,7 @@ int nrc_dma_desc_init (dma_desc_t *desc, uint32_t src_addr, uint32_t dest_addr, 
     return 0;
 }
 
-int nrc_dma_desc_link (dma_desc_t *desc, dma_desc_t *next)
+ATTR_NC __attribute__((optimize("O3"))) int nrc_dma_desc_link (dma_desc_t *desc, dma_desc_t *next)
 {
     if (!desc || !next)
         return NRC_DMA_EINVAL;
@@ -682,7 +682,7 @@ int nrc_dma_desc_link (dma_desc_t *desc, dma_desc_t *next)
     return 0;
 }
 
-int nrc_dma_desc_set_addr (dma_desc_t *desc, uint32_t src_addr, uint32_t dest_addr)
+ATTR_NC __attribute__((optimize("O3"))) int nrc_dma_desc_set_addr (dma_desc_t *desc, uint32_t src_addr, uint32_t dest_addr)
 {
     if (!desc || !src_addr | !dest_addr)
         return NRC_DMA_EINVAL;
@@ -704,7 +704,7 @@ int nrc_dma_desc_set_addr_inc (dma_desc_t *desc, bool src_inc, bool dest_inc)
     return 0;
 }
 
-int nrc_dma_desc_set_size (dma_desc_t *desc, uint16_t size)
+ATTR_NC __attribute__((optimize("O3"))) int nrc_dma_desc_set_size (dma_desc_t *desc, uint16_t size)
 {
     if (!desc)
         return NRC_DMA_EINVAL;
@@ -750,7 +750,7 @@ int nrc_dma_desc_set_bsize (dma_desc_t *desc, uint8_t src_bsize, uint8_t dest_bs
     return 0;
 }
 
-int nrc_dma_desc_set_inttc (dma_desc_t *desc, bool inttc)
+ATTR_NC __attribute__((optimize("O3"))) int nrc_dma_desc_set_inttc (dma_desc_t *desc, bool inttc)
 {
     if (!desc)
         return NRC_DMA_EINVAL;

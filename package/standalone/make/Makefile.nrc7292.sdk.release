@@ -123,7 +123,7 @@ CONFIG_PS_DEBUG_ALWAYSONMEM=n
 CONFIG_AUTH_CONTROL=n
 
 # For use of broadcast fota in STA side
-CONFIG_BCAST_FOTA_STA=n
+CONFIG_BCAST_FOTA_STA=y
 
 # Ucode
 CONFIG_UCODE=y
@@ -199,6 +199,15 @@ CONFIG_MODEM_SLEEP=n
 # Serial Flash Deep power down mode
 CONFIG_SFLASH_DP=n
 
+# (AP) AP sends 1/2/4M BW probe response according to BW of probe request
+CONFIG_MATCH_OP_BW_PREQ_PRSP=y
+ifeq ($(CONFIG_ONLY_STA),y)
+CONFIG_MATCH_OP_BW_PREQ_PRSP=n
+endif
+
+# Operation with 8MHz Bandwidth AP
+CONFIG_STA_SUPPORT_8M=y
+
 #// --------------------------------------------------
 #// 3rd party library
 #// --------------------------------------------------
@@ -218,15 +227,6 @@ ifneq ($(findstring ipv6, $(ALIAS)), )
 # Support IPV6
 CONFIG_IPV6=y
 endif
-
-ifeq ($(CONFIG_BCAST_FOTA_AP),y)
-CONFIG_MQTT		= y
-endif # CONFIG_BCAST_FOTA_AP
-
-ifeq ($(CONFIG_BCAST_FOTA_STA),y)
-CONFIG_MQTT		= y
-endif # CONFIG_BCAST_FOTA_STA
-
 
 #// --------------------------------------------------
 #// APP Core
@@ -326,6 +326,7 @@ DEFINE				+=	-DINCLUDE_TRACE_INFO
 DEFINE				+=	-DINCLUDE_TRACE_ERROR
 DEFINE				+=	-DINCLUDE_TRACE_ALWAYS
 DEFINE				+=	-DINCLUDE_TRACE_ASSERT
+DEFINE				+=	-DINCLUDE_TRACE_WAKEUP
 else
 DEFINE				+=	-DINCLUDE_TRACE_ERROR
 DEFINE				+=	-DINCLUDE_TRACE_ASSERT
@@ -474,7 +475,7 @@ else
 ifeq ($(CONFIG_IPV6),y)
 DEFINE	+= -DconfigTOTAL_HEAP_SIZE=220000
 else
-DEFINE	+= -DconfigTOTAL_HEAP_SIZE=280000
+DEFINE	+= -DconfigTOTAL_HEAP_SIZE=260000
 endif #ipv6
 endif #small ram
 

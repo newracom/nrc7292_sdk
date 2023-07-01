@@ -288,7 +288,9 @@ static void sme_send_authentication(struct wpa_supplicant *wpa_s,
 		skip sending auth */
 	if (wpa_key_mgmt_sae(ssid->key_mgmt) && !wpa_driver_ps_get_recovered()) {
 		skip_auth = 1;
+#if defined(INCLUDE_TRACE_WAKEUP)
 		wpa_msg(wpa_s, MSG_INFO, "SME: skip auth");
+#endif /* INCLUDE_TRACE_WAKEUP */
 	}
 #endif
 
@@ -784,9 +786,11 @@ no_fils:
 	wpa_supplicant_cancel_sched_scan(wpa_s);
 	wpa_supplicant_cancel_scan(wpa_s);
 
+#if defined(INCLUDE_TRACE_WAKEUP)
 	wpa_msg(wpa_s, MSG_INFO, "SME: Trying to authenticate with " MACSTR
 		" (SSID='%s' freq=%d MHz)", MAC2STR(params.bssid),
 		wpa_ssid_txt(params.ssid, params.ssid_len), params.freq);
+#endif /* INCLUDE_TRACE_WAKEUP */
 
 	eapol_sm_notify_portValid(wpa_s->eapol, FALSE);
 	wpa_clear_keys(wpa_s, bss->bssid);
@@ -1609,7 +1613,9 @@ void sme_associate(struct wpa_supplicant *wpa_s, enum wpas_mode mode,
 		}
 
 		if (skip_owe_ie_build) {
+#if defined(INCLUDE_TRACE_WAKEUP)
 			wpa_msg(wpa_s, MSG_INFO, "SME: skip building owe ie in assoc req");
+#endif /* INCLUDE_TRACE_WAKEUP */
 		} else {
 			if (wpa_s->current_ssid && wpa_s->current_ssid->owe_group) {
 				group = wpa_s->current_ssid->owe_group;
@@ -1820,10 +1826,12 @@ pfs_fail:
 	if (wpa_s->sme.prev_bssid_set)
 		params.prev_bssid = wpa_s->sme.prev_bssid;
 
+#if defined(INCLUDE_TRACE_WAKEUP)
 	wpa_msg(wpa_s, MSG_INFO, "SME: Trying to associate with " MACSTR
 		" (SSID='%s' freq=%d MHz)", MAC2STR(params.bssid),
 		params.ssid ? wpa_ssid_txt(params.ssid, params.ssid_len) : "",
 		params.freq.freq);
+#endif /* INCLUDE_TRACE_WAKEUP */
 
 	wpa_supplicant_set_state(wpa_s, WPA_ASSOCIATING);
 

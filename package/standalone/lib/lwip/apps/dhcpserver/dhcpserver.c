@@ -667,17 +667,6 @@ static s16_t parse_msg(struct dhcps_msg* m, u16_t len)
 		s16_t ret = parse_options(&m->options[4], len);;
 
 		if (ret == DHCPS_STATE_RELEASE) {
-			if (pnode != NULL) {
-				node_remove_from_list(&plist, pnode);
-				mem_free(pnode);
-				pnode = NULL;
-			}
-
-			if (pdhcps_pool != NULL) {
-				mem_free(pdhcps_pool);
-				pdhcps_pool = NULL;
-			}
-
 			memset(&client_address, 0x0, sizeof(client_address));
 		}
 #if 0

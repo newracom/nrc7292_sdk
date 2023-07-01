@@ -7,6 +7,9 @@
   <title>Tool Usage (Firmware Flash Tool) &mdash; NRC Tools 1.6 documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="_static/panels-bootstrap.5fd3999ee7762ccc51105388f4a9d115.css" type="text/css" />
+      <link rel="stylesheet" href="_static/panels-main.c949a650a448cc0ae9fd3441c0e17fb0.css" type="text/css" />
+      <link rel="stylesheet" href="_static/panels-variables.06eb56fa6e07937060861dad626602ad.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
@@ -18,8 +21,7 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Tool Usage (Board Data Editor)" href="tool_usage_board_data_editor.html" />
-    <link rel="prev" title="Tool Usage (DM)" href="tool_usage_dm.html" /> 
+    <link rel="prev" title="Running the Tools on Windows/Mac/Linux" href="running_the_tools_on_mac_linux.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -42,20 +44,14 @@
 <li class="toctree-l1"><a class="reference internal" href="requirements.html">Setup and Requirements</a></li>
 <li class="toctree-l1"><a class="reference internal" href="board_operation_mode_selection.html">NRC Board Operation Mode Selection and Power Supply</a></li>
 <li class="toctree-l1"><a class="reference internal" href="running_the_tools_on_mac_linux.html">Running the Tools on Windows/Mac/Linux</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tool_usage_at_cmd_tool.html">Tool Usage (AT-CMD Test Tool)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tool_usage_dut2dut.html">Tool Usage (DUT2DUT)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tool_usage_dm.html">Tool Usage (DM)</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Tool Usage (Firmware Flash Tool)</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#tool-version">Tool Version</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#binary-files">Binary Files</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#basic-functionality">Basic Functionality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#operation">Operation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#multi-firmware-flash-tool">Multi Firmware Flash Tool</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="tool_usage_board_data_editor.html">Tool Usage (Board Data Editor)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tool_usage_site_survey_tool.html">Tool Usage (Site Survey Tool)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="appendix_common_ram_mode_tool_setup.html">Appendix (Common RAM Mode Tool Setup Instructions)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="appendix_noise_level_estimation.html">Appendix (Noise Level Estimation Module)</a></li>
 </ul>
 
         </div>
@@ -94,31 +90,43 @@
 <section id="tool-version">
 <h2>Tool Version<a class="headerlink" href="#tool-version" title="Permalink to this headline"></a></h2>
 <ul class="simple">
-<li><p>v6.1.3</p></li>
+<li><p>v6.2 (Default: FirmwareFlashTool.exe)</p></li>
+<li><p>v7.0 (Multi Upload: MultiFirmwareFlashTool.exe)</p></li>
 </ul>
 </section>
 <section id="binary-files">
 <h2>Binary Files<a class="headerlink" href="#binary-files" title="Permalink to this headline"></a></h2>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p>Make sure that the correct 2nd bootloader, XIP bootloader and XIP firmware binaries corresponding to the module types (e.g. NRC7292, NRC7393, NRC7394) are selected!</p>
+<p>Make sure that the correct 2nd bootloader, XIP bootloader and XIP firmware binaries corresponding to the module types (NRC7292 or NRC7394) are selected!</p>
 </div>
 <dl class="simple">
 <dt><strong>2nd Bootloader (written on RAM)</strong>:</dt><dd><p>is the 2nd bootloader binary file to be temporarily written on RAM to replace the mask ROM bootloader to augment the bootloader functionalities.</p>
 </dd>
-<dt><strong>XIP Bootloader (written on flash)</strong>:</dt><dd><p>is the XIP bootloader binary file to be stored on the flash memory. The XIP bootloader only needs to be flahsed once. Two types of boot XIP binaries are provided: the default binary identified with no suffix in its file name [(e.g.) nrc7394_boot_xip.bin] and the 5-second-wait binary with the “waiting5s” suffix [(e.g.) nrc7394_boot_xip_waiting5s.bin]. If the latter type is used, a 5-second window is introduced during the booting step to handle the firmware flashing request from the tool following a reset in standalone operation mode. This convenience feature is intended for achieving faster iterative development cycles (code -&gt; test -&gt; debug -&gt; code -&gt; …).</p>
+<dt><strong>XIP Bootloader (written on flash)</strong>:</dt><dd><p>is the XIP bootloader binary file to be stored on the flash memory. If the non-default 5s-wait XIP bootloader is uploaded on the module, the bootloader will wait for 5 seconds to handle firmware upload requests from the tool before jumping to the XIP firmware following a reset. This can be useful during the initial development phase for achieving a quick upload-test-debug cycle.</p>
 </dd>
 <dt><strong>XIP Firmware (written on flash)</strong>:</dt><dd><p>is the XIP firmware binary file to be stored on the flash memory.</p>
 </dd>
+<dt><strong>Auto-reset</strong>:</dt><dd><p>is an optional feature that triggers the bootloader to execute the uploaded XIP firmware following the upload procedure. This option is only valid with the non-default 5s-wait XIP bootloader operating in the standalone operation mode.</p>
+</dd>
+<dt><strong>Clear NVS Sector</strong>:</dt><dd><p>clears the NVS sector on the flash memory if selected.</p>
+</dd>
 </dl>
 </section>
-<section id="basic-functionality">
-<h2>Basic Functionality<a class="headerlink" href="#basic-functionality" title="Permalink to this headline"></a></h2>
+<section id="operation">
+<h2>Operation<a class="headerlink" href="#operation" title="Permalink to this headline"></a></h2>
 <ol class="arabic simple">
 <li><p>Set the DIP switch (for NRC7292) or jumper configuration (for NRC739X) to <strong>Firmware Download / RAM Operation</strong> mode as described on the instructions panel.</p></li>
 <li><p>Select the desired procedures by using the corresponding check boxes: MAC adresss write, XIP bootloader write, and XIP firmware write.</p></li>
 <li><p>Reset the board, and press the <strong>START</strong> button to run the selected procedures.</p></li>
 </ol>
+</section>
+<section id="multi-firmware-flash-tool">
+<h2>Multi Firmware Flash Tool<a class="headerlink" href="#multi-firmware-flash-tool" title="Permalink to this headline"></a></h2>
+<dl>
+<dt><em>Multi Firmware Flash Tool</em> is a variant of the <em>Firmware Flash Tool</em> that allows concurrent uploads.</dt><dd><img alt="_images/multi_firmware_flash_tool.png" src="_images/multi_firmware_flash_tool.png" />
+</dd>
+</dl>
 </section>
 </section>
 
@@ -126,8 +134,7 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="tool_usage_dm.html" class="btn btn-neutral float-left" title="Tool Usage (DM)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="tool_usage_board_data_editor.html" class="btn btn-neutral float-right" title="Tool Usage (Board Data Editor)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="running_the_tools_on_mac_linux.html" class="btn btn-neutral float-left" title="Running the Tools on Windows/Mac/Linux" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
 
   <hr/>

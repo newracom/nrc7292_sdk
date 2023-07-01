@@ -45,7 +45,7 @@ typedef unsigned int u32;
 typedef int64_t s64;
 typedef uint64_t u64;
 
-#define MAX_SCAN_RESULTS				(10)
+#define MAX_SCAN_RESULTS				(30)
 #define MAX_SSID_LENGTH					(32)
 #define MAX_BSSID_LENGTH				(17)
 #define MAX_CC_LENGTH					(3)
@@ -106,6 +106,11 @@ typedef enum {
 
 typedef void (*event_callback_fn)(int vif, tWIFI_EVENT_ID event, int data_len, void *data);
 
+typedef struct event_callback_list {
+	event_callback_fn fn;
+	struct event_callback_list* next;
+}event_callback_list_t;
+
 /** @brief Wi-Fi security mode */
 typedef enum {
 	WIFI_SEC_OPEN = 0,
@@ -153,10 +158,11 @@ typedef enum {
 typedef enum {
 	WIFI_CC_UNKNOWN = -1,
 
-	WIFI_CC_JP = 0,
+	WIFI_CC_US = 0,
+	WIFI_CC_JP,
+	WIFI_CC_K0,
 	WIFI_CC_K1,
 	WIFI_CC_TW,
-	WIFI_CC_US,
 	WIFI_CC_EU,
 	WIFI_CC_CN,
 	WIFI_CC_NZ,
@@ -198,12 +204,27 @@ typedef enum {
 	WIFI_SCAN_MAX,
 } tWIFI_SCAN;
 
-/** @brief Wi-Fi bandwidth 	*/
+/** @brief Wi-Fi STA state 	*/
 typedef enum {
 	WIFI_STA_INVALID = 0xFF,
 	WIFI_STA_AUTH = 0,
 	WIFI_STA_ASSOC = 1,
 } tWIFI_STA_STATE;
+
+/** @brief Wi-Fi TID (Traffic Identifier) */
+typedef enum {
+	WIFI_TID_BE,
+	WIFI_TID_BK,
+	WIFI_TID_VI,
+	WIFI_TID_VO,
+} tWIFI_TID;
+
+/** @brief Wi-Fi Guard interval type */
+typedef enum {
+	WIFI_GI_UNKNOWN,
+	WIFI_GI_LONG,
+	WIFI_GI_SHORT,
+} tWIFI_GI;
 
 /** @brief scan item */
 typedef union {

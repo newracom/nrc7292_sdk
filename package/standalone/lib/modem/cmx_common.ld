@@ -116,6 +116,15 @@ SECTIONS
 	PROVIDE(__ebss = .);
 	. = ALIGN(4);
 
+	.uninit (NOLOAD) :
+	{
+		PROVIDE(__uninit_start__ = .);
+		. = ALIGN(4);
+		*(.uninit)
+		. = ALIGN(4);
+		PROVIDE(__uninit_end__ = .);
+	} > RAM
+
 	.buffer_pool (NOLOAD) :
 	{
 		PROVIDE(__buffer_pool_start__ = .);

@@ -18,11 +18,19 @@ typedef enum {
 	NRC_NETWORK_MODE_NAT,
 } nrc_network_mode_t;
 
+typedef enum {
+	NRC_ETH_IP_MODE_DHCP,
+	NRC_ETH_IP_MODE_STATIC,
+} nrc_eth_ip_mode_t;
+
 void nrc_eth_raw_transmit(uint8_t *buffer, uint32_t length);
-nrc_err_t set_ethernet_mode(nrc_eth_mode_t mode);
+void nrc_eth_set_ethernet_mode(nrc_eth_mode_t mode);
 nrc_eth_mode_t get_ethernet_mode();
-nrc_err_t set_network_mode(nrc_network_mode_t mode);
-nrc_network_mode_t get_network_mode();
+void nrc_eth_set_network_mode(nrc_network_mode_t mode);
+nrc_network_mode_t nrc_eth_get_network_mode();
+void nrc_eth_set_ip_mode(nrc_eth_ip_mode_t mode);
+nrc_eth_ip_mode_t nrc_get_ip_mode();
+
 nrc_err_t ethernet_init(uint8_t *mac_addr);
 #if defined(SUPPORT_ETHERNET_ACCESSPOINT)
 void set_peer_mac(const uint8_t *eth);

@@ -62,7 +62,7 @@ struct ucode_stats {
 	uint32_t	pmc_err_cnt:6;			//#of PMC Error before WFI
 	uint32_t	rtc_err_cnt:6;			//#of RTC Error before WFI
 	uint32_t	pmc_int_cnt:6;			//#of PMC INT before WFI
-	uint32_t	fw_force_rst_cnt:7;		//#of FW Deep sleep by force (without CB of Null Frame)
+	uint32_t	fw_ps_fail_cnt:7;		//#of Deep sleep failed, because of no ack
 	uint32_t	fw_assert_cnt:7;		//#of FW ASSERT right before Deep Sleep
 	uint16_t	wake_rsn_cnt[PS_WAKE_RSN_MAX];	//Wake-up Reason (2*13(26B))
 	uint32_t	wake_margin_us;			//wakeup margin time in us
@@ -247,7 +247,8 @@ struct ret_ucodeinfo {
 	uint32_t	assert:1;	//(1: Assert right before Deep Sleep)
 	uint32_t	ucode_test_mode:1;
 	uint32_t	execute_rf_init:1;
-	uint32_t	reserved:3;
+	uint32_t	qos_null_pm1_ack:2;		// ack for qos_null frame with pm1 bit. (0: wait, 1: success, 2: fail)
+	uint32_t	reserved:1;
 	/* To calculate the deepsleep interval */
 	uint32_t	last_beacon_tsf_lower;	// last received beacon timestamp tsf lower
 	uint32_t	last_beacon_tsf_upper;	// last received beacon timestamp tsf upper
@@ -259,10 +260,10 @@ struct ret_ucodeinfo {
 
 // 7B
 struct ret_drvinfo {
-	uint16_t fw_boot_mode:2;	//FW boot mode (1B) : 0(XIP), 1 or 2(ROM, it must be distinguished in the code based on the core type)
-	uint16_t do_reset:1;		//FW reboot mode in uCode (1B) : 0(reboot with jump), 1(reboot with reset)
+	uint16_t fw_boot_mode:2;		//FW boot mode (1B) : 0(XIP), 1 or 2(ROM, it must be distinguished in the code based on the core type)
+	uint16_t do_reset:1;			//FW reboot mode in uCode (1B) : 0(reboot with jump), 1(reboot with reset)
 	uint16_t cqm_off:1;
-	uint16_t kern_ver:12;		// 4bit for major. 8bit for minor. 
+	uint16_t kern_ver:12;			// 4bit for major. 8bit for minor. 
 	uint8_t sw_enc:2;
 	uint8_t brd_rev:2;
 	uint8_t bitmap_encoding:1;
@@ -283,7 +284,6 @@ struct ret_dutyinfo {
 
 #if defined (INCLUDE_WOWLAN_PATTERN)
 // 56B
-
 /* This must be matched with wim_pm_param */
 #define WOWLAN_PATTER_SIZE      48
 struct ret_wowlanptns {
@@ -360,7 +360,7 @@ struct ret_airtimeinfo {
 #define RET_PMK_SIZE 32
 #if defined(NRC7292)
 #define WOWLAN_MAX_PATTERNS 1
-#elif defined(NRC7393)||defined(NRC7394)
+#elif defined(NRC7393)||defined(NRC7394)||defined(NRC5292)
 #define WOWLAN_MAX_PATTERNS 2
 #else
 #error "define wowlan pattern size, if ret size is enough, set 2 or set 1"
@@ -373,16 +373,17 @@ struct ret_airtimeinfo {
  */
 
 #if defined(NRC7393)||defined(NRC7394)
-#if !(defined(BOOT_LOADER) || defined(MASKROM))
+#if !(defined(BOOT_LOADER) || (MASKROM) || (INCLUDE_RF_NRC7292RFE) || (LMAC_TEST))
 #include "drv_port.h"
 #include "../fdk/lib/hal/hal_modem.h" 
+#include "nrc_retention.h"
 #endif
 #endif
 
 struct retention_info {
 #if defined(NRC7393)||defined(NRC7394)
-#if !(defined(BOOT_LOADER) || defined(MASKROM))
-	hal_modem_ret_info_t hal_modem_ret_info; 
+#if !(defined(BOOT_LOADER) || (MASKROM) || (INCLUDE_RF_NRC7292RFE) || (LMAC_TEST))
+	nrc_ret_info_t			nrc_ret_info;
 #endif
 #endif
 	struct ret_stainfo		sta_info;		//station info (20B)
@@ -391,18 +392,18 @@ struct retention_info {
 	struct ret_keyinfo		key_info;		//key info (105B)
 	struct ret_usrinfo		usr_conf_info;		//user config info (4B)
 	struct ret_chinfo		ch_info;		//channel info (5B)
-	struct ret_wakeupinfo		wakeup_info;		//wakeup source (3B)
+	struct ret_wakeupinfo	wakeup_info;		//wakeup source (3B)
 	struct ret_acinfo		ac_info;		//info per AC (40B)
 	struct ret_tidinfo		tid_info;		//info per TID ( 76B)
 	struct ret_ipinfo		ip_info;		//ip info (12B)
 	struct ret_lbtinfo		lbt_info;		//lbt info (10B)
 	struct ret_rfinfo		rf_info;		//rf info (375B)
-	struct ret_ucodeinfo		ucode_info;		//ucode info (58B)
+	struct ret_ucodeinfo	ucode_info;		//ucode info (58B)
 	struct ret_drvinfo		drv_info;		//driver info (3B)
 	struct ret_dutyinfo		duty_info;		//duty cycle info (12B)
 #if defined (INCLUDE_WOWLAN_PATTERN)
-	struct ret_wowlanptns		wowlan_patterns[WOWLAN_MAX_PATTERNS];	//wowlan patterns (65B * 2)
-	struct ret_wowlaninfo		wowlan_info;		//wowlan info (2B)
+	struct ret_wowlanptns	wowlan_patterns[WOWLAN_MAX_PATTERNS];	//wowlan patterns (56B * WOWLAN_MAX_PATTERNS)
+	struct ret_wowlaninfo	wowlan_info;		//wowlan info (2B)
 #endif
 #if defined(INCLUDE_MEASURE_AIRTIME) || defined(INCLUDE_MEASURE_AIRTIME_NONESL)
 	struct ret_airtimeinfo	airtime_info;			//airtime info (116B)
@@ -440,7 +441,9 @@ struct retention_info {
 	uint8_t				fota_in_progress:1;	//fota in progress flag(1bit) (1: in progress, 0: not in progress)
 	uint8_t				fota_done:1;		//fota done flag(1bit) (1: done, 0: not compeleted)
 	uint8_t				wake_by_usr:1;		//wakeup in ucode for user timer(1bit) (1: wakeup, 0: none)
-	uint8_t				reserved:5;		//reserved 6bit
+	uint8_t				xtal_status:2;		// 0(not checked), 1(working), 2(not working)
+	uint8_t				ps_null_pm0:1;		//0(nothing) 1(need to send null with PM0 after wakeup)
+	uint8_t				reserved:2;		//reserved 3 bits
 	bool				recovered;		//recovery status(1B) (true:recovered, false:not recovered)
 	bool				sleep_alone;		//sleep without connection(1B) (true:alone false:with AP)
 
@@ -495,10 +498,8 @@ void nrc_ps_init();
 void nrc_ps_init_retention_info(bool cold_boot);
 void nrc_ps_recovery();
 int nrc_ps_config_wakeup_pin(bool check_debounce, int pin_number);
-int nrc_ps_config_power_indication_pin(bool enable, int pin_number);
 int nrc_ps_config_wakeup_source(uint8_t wakeup_source);
 int nrc_ps_get_wakeup_pin(bool *check_debounce, int *pin_number);
-int nrc_ps_get_power_indication_pin(bool *enable, int *pin_number);
 int nrc_ps_get_wakeup_source(uint8_t *wakeup_source);
 int nrc_ps_get_wakeup_reason(uint8_t *wakeup_reason);
 int nrc_ps_get_wakeup_count(uint32_t *wakeup_count);
@@ -594,6 +595,9 @@ bool nrc_ps_callback_run(uint32_t index);
 #endif /* INCLUDE_PS_SCHEDULE */
 
 #endif /* !defined(UCODE) */
+
+int nrc_ps_config_power_indication_pin(bool enable, int pin_number);
+int nrc_ps_get_power_indication_pin(bool *enable, int *pin_number);
 void ps_gpio_config_wakeup_pin();
 void ps_gpio_set_deepsleep(uint32_t pullup_mask, uint32_t gpio_out_mask, uint32_t gpio_dir_mask);
 void ps_set_gpio_direction(uint32_t mask);

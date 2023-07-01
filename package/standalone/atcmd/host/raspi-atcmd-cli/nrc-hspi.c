@@ -471,7 +471,7 @@ static int hspi_eirq_enable (int mode, int enable)
 
 	if (hspi_regs_read_eirq(&eirq) == 0)
 		hspi_regs_print_eirq(&eirq);
-#endif	
+#endif
 
 	return 0;
 }

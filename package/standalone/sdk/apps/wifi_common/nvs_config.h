@@ -26,7 +26,7 @@
 #define NVS_WIFI_PMK_PASSWORD "wifi_pmk_pw"
 
 /* Wifi Channel */
-/* CLI : nvs set_u32 wifi_channel <channel> */
+/* CLI : nvs set_u16 wifi_channel <channel> */
 #define NVS_WIFI_CHANNEL "wifi_channel"
 
 /* Wifi Channel bandwidth to be used in AP mode, set_u8 value */
@@ -106,4 +106,20 @@
 /* If not set, default network mode will be nat(1) */
 #define NVS_NETWORK_MODE "network_mode"
 
+/* Wi-Fi Rate Control: Determines whether rate control is enabled or disabled. */
+#define NVS_WIFI_RATE_CONTROL "wifi_rc"
+
+/* Wi-Fi MCS (Modulation and Coding Scheme): Specifies the data rate and error correction capability for Wi-Fi transmissions. */
+#define NVS_WIFI_MCS "wifi_mcs"
+
+/* Wi-Fi GI (Guard Interval): Specifies the guard interval type for Wi-Fi transmissions. */
+#define NVS_WIFI_GI "wifi_gi"
+
+/* Wi-Fi CCA (Clear Channel Assessment) Threshold: Specifies the signal strength threshold for Wi-Fi channel assessment. */
+#define NVS_WIFI_CCA_THRES "wifi_cca_thres"
+
+#ifdef INCLUDE_SCAN_BACKOFF
+#define NVS_SCAN_BACKOFF_START_COUNT "backoff_cnt"
+#define NVS_SCAN_MAX_INTERVAL "backoff_max"
+#endif
 #endif

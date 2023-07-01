@@ -94,7 +94,7 @@ int wifi_station_dhcpc_start(int vif)
 	struct netif *target_if;
 
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
-	if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+	if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
 		target_if = &br_netif;
 	} else {
 		target_if = nrc_netif[vif];
@@ -229,7 +229,7 @@ static void ifconfig_display_all()
 {
 	int i;
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
-	if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+	if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
 		ifconfig_display(BRIDGE_INTERFACE);
 	}
 	ifconfig_display(ETHERNET_INTERFACE);
@@ -324,8 +324,7 @@ bool wifi_ifconfig(int argc, char *argv[])
 #endif
 
 	if (ip == NULL) {
-		ifconfig_help_display();
-		return true;
+		goto exit;
 	}
 
 #if LWIP_IPV4
@@ -364,19 +363,6 @@ bool wifi_ifconfig(int argc, char *argv[])
 		return false;
 	}
 
-	if (mtu != NULL)
-		nif->mtu =atoi(mtu);
-
-	if (dns1 == NULL || dns2 == NULL) {
-		/* Set DNS Server */
-		dns1 = WIFI_PRIMARY_DNS_SERVER;
-		dns2 = WIFI_SECONDARY_DNS_SERVER;
-	}
-	inet_pton(AF_INET, dns1, &dnsserver);
-	dns_setserver(0, &dnsserver);
-	inet_pton(AF_INET, dns2, &dnsserver);
-	dns_setserver(1, &dnsserver);
-
 	/* For Wifi interfaces, save static ip configured into ipinfo, */
 	/* so that ip can be retrieved if disconnect happens. */
 	if ((if_idx == 0) || (if_idx == 1)) {
@@ -385,6 +371,19 @@ bool wifi_ifconfig(int argc, char *argv[])
 		ipinfo[if_idx].gw = nif->gw;
 	}
 
+exit:
+	if (mtu != NULL)
+		nif->mtu =atoi(mtu);
+
+	if (dns1 != NULL) {
+		inet_pton(AF_INET, dns1, &dnsserver);
+		dns_setserver(0, &dnsserver);
+	}
+
+	if (dns2 != NULL) {
+		inet_pton(AF_INET, dns2, &dnsserver);
+		dns_setserver(1, &dnsserver);
+	}
 	ifconfig_display(if_idx);
 	return true;
 }
@@ -582,12 +581,16 @@ status_callback(struct netif *state_netif)
 	struct ip_info if_ip;
 
 	if (netif_is_up(state_netif)) {
+#if defined(INCLUDE_TRACE_WAKEUP)
 		A("%s wlan%d is up.\n", module_name(), netif_get_index(state_netif) - 1);
+#endif /* INCLUDE_TRACE_WAKEUP */
 #if LWIP_IPV4
 		if (!ip4_addr_isany_val(*netif_ip4_addr(state_netif))) {
+#if defined(INCLUDE_TRACE_WAKEUP)
 			A("%s IP is ready : ", module_name());
 			ip_addr_debug_print_val(LWIP_DBG_ON, (state_netif->ip_addr));
 			A("\n", module_name());
+#endif /* INCLUDE_TRACE_WAKEUP */
 			set_dhcp_status(true);
 			set_standalone_ipaddr(0,
 				ip4_addr_get_u32(ip_2_ip4(&state_netif->ip_addr)),
@@ -615,6 +618,23 @@ link_callback(struct netif *state_netif)
 #endif
 	} else {
 		A("link_callback==DOWN\n");
+	}
+}
+
+static void set_default_dns_server(void)
+{
+	ip_addr_t *dnsserver = NULL;
+
+	dnsserver = (ip_addr_t *)dns_getserver(0);
+	if (ip_addr_isany(dnsserver)) {
+		inet_pton(AF_INET, WIFI_PRIMARY_DNS_SERVER, dnsserver);
+		dns_setserver(0, dnsserver);
+	}
+
+	dnsserver = (ip_addr_t *)dns_getserver(1);
+	if (ip_addr_isany(dnsserver)) {
+		inet_pton(AF_INET, WIFI_SECONDARY_DNS_SERVER, dnsserver);
+		dns_setserver(1, dnsserver);
 	}
 }
 
@@ -662,6 +682,7 @@ static void lwip_handle_interfaces(void * param)
 		nd6_restart_netif( nrc_netif[i] );
 	}
 #endif
+	set_default_dns_server();
 }
 
 #if LWIP_IPV6

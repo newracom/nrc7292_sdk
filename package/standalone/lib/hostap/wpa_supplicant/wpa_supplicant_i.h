@@ -610,6 +610,9 @@ struct wpa_supplicant {
 	int sched_scanning;
 	unsigned int sched_scan_stop_req:1;
 	int new_connection;
+	#if defined(INCLUDE_SCAN_BACKOFF) // For scanning backoff operation
+	int scanning_retry_count;
+	#endif /* INCLUDE_SCAN_BACKOFF */
 
 	int eapol_received; /* number of EAPOL packets received after the
 			     * previous association event */

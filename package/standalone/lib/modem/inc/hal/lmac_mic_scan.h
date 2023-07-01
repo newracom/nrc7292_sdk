@@ -11,23 +11,17 @@
 /* FixME : just considering KR Wireless MIC Band */
 
 #if defined(INCLUDE_MIC_SCAN)
-#define MIC_START_FREQ		9250 //Start Freq : 925MHz
-#define MIC_FREQ_SCAN_START	9255 //Scan Start Freq : 925.5MHz (1MH)
-#define MIC_FREQ_SCAN_END	9305 //Scan END Freq  : 930.5MHz (1MH)
-#define MIC_FREQ_START		9255 //Scan Start Freq : 925.5MHz (1MH)
-#define MIC_FREQ_END		9305 //Scan End Freq : 930.5MHz (1MH)
-#define MIC_1M_COUNT		6  //1M CH Count (925.5 ~ 930.5)
-#define MIC_SCAN_LIST_SIZE	12  //SCAN CH Count
+#define MIC_START_FREQ		9175 //Start Freq : 9175MHz
+#define MIC_SCAN_LIST_SIZE	16  //SCAN CH Count
 #define MIC_1M_DIFF			10	//1MHz
 #define MIC_SCAN_RANGE		20	//2MHz (Scan within +- 2MHz Range)
 #define MIC_FREQ_INTERVAL	5	//0.5MHz
 #define MIC_SHORT_SCAN_RATIO	10	//decrease scan interval ratio
 //#define FREQ_TO_IDX(freq)	(freq - MIC_FREQ_SCAN_START) / MIC_1M_DIFF
-//1M CH index => 9255(1) 9265(3) 9275(5) 9285(7) 9295(9) 9305(11)
-//2M CH index => 9270(4) 9290 (8)
-//4M CH index => 9280 (6)
-#define FREQ_TO_IDX(freq)	(freq - MIC_START_FREQ) / MIC_FREQ_INTERVAL
-#define IDX_TO_FREQ(index)	MIC_START_FREQ + (index * MIC_FREQ_INTERVAL)
+//1M CH index => 9255(16) 9265(18) 9275(20) 9285(22) 9295(24) 9305(26)
+//2M CH index => 9270(19) 9290 (23)
+#define FREQ_TO_IDX(freq)	((freq - MIC_START_FREQ) / MIC_FREQ_INTERVAL) - 13
+#define IDX_TO_FREQ(index)	MIC_START_FREQ + ((index + 13) * MIC_FREQ_INTERVAL)
 #define BW_FREQ_OFFSET(bw)  bw == BW_1M ? 0 : bw == BW_2M ? 5 : 15
 void lmac_mic_scan_timer_init();
 void lmac_mic_scan_periodic_start(bool release);

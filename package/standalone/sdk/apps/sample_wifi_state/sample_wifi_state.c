@@ -48,8 +48,20 @@ nrc_err_t run_sample_wifi_state(WIFI_CONFIG *param)
 
 	nrc_usr_print("[%s] Sample App for Wi-Fi State \n",__func__);
 	nrc_usr_print(" - ssid : %s\n", param->ssid);
-	nrc_usr_print(" - security : %s\n", param->security_mode == WIFI_SEC_WPA2 ? "wpa2" : "open");
-	nrc_usr_print(" - password : %s\n", param->security_mode == WIFI_SEC_WPA2 ? (char *)param->password : "");
+	nrc_usr_print(" - security : ");
+	if (param->security_mode == WIFI_SEC_OPEN) {
+		nrc_usr_print("open\n");
+	} else if (param->security_mode == WIFI_SEC_WPA2) {
+		nrc_usr_print("wpa2\n");
+	} else if (param->security_mode == WIFI_SEC_WPA3_OWE) {
+		nrc_usr_print("wpa3-owe\n");
+	} else if (param->security_mode == WIFI_SEC_WPA3_SAE) {
+		nrc_usr_print("wpa3-sae\n");
+	} else {
+		nrc_usr_print("unknown\n");
+	}
+	nrc_usr_print(" - password : %s\n",
+				  (param->security_mode == WIFI_SEC_WPA2) || (param->security_mode == WIFI_SEC_WPA3_SAE) ? (char *)param->password : "");
 
 	count = 10;
 	interval =3000;

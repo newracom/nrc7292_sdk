@@ -878,6 +878,11 @@ void wpa_supplicant_set_state(struct wpa_supplicant *wpa_s,
 		wpas_connect_work_done(wpa_s);
 		/* Reinitialize normal_scan counter */
 		wpa_s->normal_scans = 0;
+#if defined(INCLUDE_SCAN_BACKOFF) // For scanning backoff operation
+		wpa_s->scanning_retry_count = 0;
+		wpa_printf(MSG_INFO, "[%s] reset scanning_retry_count: %d\n", __func__, wpa_s->scanning_retry_count);
+		wpa_supplicant_set_scan_interval(wpa_s, 5);
+#endif /* INCLUDE_SCAN_BACKOFF */
 	}
 
 #ifdef CONFIG_P2P
@@ -920,6 +925,7 @@ void wpa_supplicant_set_state(struct wpa_supplicant *wpa_s,
 		    wpa_auth_alg_fils(wpa_s->auth_alg))
 			fils_hlp_sent = 1;
 
+#if defined(INCLUDE_TRACE_WAKEUP)
 #if defined(CONFIG_CTRL_IFACE) || !defined(CONFIG_NO_STDOUT_DEBUG)
 		wpa_msg(wpa_s, MSG_INFO, WPA_EVENT_CONNECTED "- Connection to "
 			MACSTR " completed [id=%d id_str=%s%s]",
@@ -928,6 +934,7 @@ void wpa_supplicant_set_state(struct wpa_supplicant *wpa_s,
 			ssid && ssid->id_str ? ssid->id_str : "",
 			fils_hlp_sent ? " FILS_HLP_SENT" : "");
 #endif /* CONFIG_CTRL_IFACE || !CONFIG_NO_STDOUT_DEBUG */
+#endif /* INCLUDE_TRACE_WAKEUP */
 		wpas_clear_temp_disabled(wpa_s, ssid, 1);
 		wpa_blacklist_clear(wpa_s);
 		wpa_s->extra_blacklist_count = 0;

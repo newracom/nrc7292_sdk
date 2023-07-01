@@ -4,7 +4,6 @@
 /* Set below definition to 1 to enable Fota callback */
 #define SAMPLE_FOTA_ENABLED 0
 /* Firmware version checked against version json file see below */
-#define CURRENT_FW_VER 100
 
 //#define RUN_HTTPS
 #if defined( SUPPORT_MBEDTLS ) && defined( RUN_HTTPS )
@@ -17,13 +16,14 @@
 /* Example json used see fota document for details. */
 /*
   {
-  "version" : "101",
+  "version" : "1.0.1",
   "crc" : "9423a59f",
+  "force_update" : "0",
   "fw_name" : "nrc7292_standalone_xip_sample_ps_schedule.bin"
   }
 */
 
-#define CHECK_VER SERVER_URL "fota-version.json"
+#define CHECK_VER_URL SERVER_URL "fota-version.json"
 
 /* Download 2048 bytes at a time */
 #define CHUNK_SIZE 2048

@@ -195,9 +195,11 @@ ctrl_iface_resp_t *ctrl_iface_receive_response(int vif_id, const char *fmt, ...)
 			char *reply;
 			int i;
 
+#if defined(INCLUDE_TRACE_WAKEUP)
 #if !defined(INCLUDE_MEASURE_AIRTIME)
 			wpa_printf(MSG_EXCESSIVE, "[%s] cmd: %s", __func__, cmd);
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
+#endif /* INCLUDE_TRACE_WAKEUP */
 
 			for (i = 0 ; cmd[i] != ' ' && cmd[i] != '\0' ; i++)
 				cmd[i] = toupper(cmd[i]);
@@ -210,6 +212,7 @@ ctrl_iface_resp_t *ctrl_iface_receive_response(int vif_id, const char *fmt, ...)
 				else
 					reply[reply_len] = '\0';
 
+#if defined(INCLUDE_TRACE_WAKEUP)
 #if !defined(INCLUDE_MEASURE_AIRTIME)
 				wpa_printf(MSG_EXCESSIVE, "reply_len: %d\n", reply_len);
 
@@ -232,6 +235,7 @@ ctrl_iface_resp_t *ctrl_iface_receive_response(int vif_id, const char *fmt, ...)
 					}
 				}
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
+#endif /* INCLUDE_TRACE_WAKEUP */
 
 				if (memcmp(reply, "FAIL", 4) != 0 && strcmp(reply, "UNKNOWN COMMAND") != 0)
 				{

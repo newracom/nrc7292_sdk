@@ -48,3 +48,6 @@ void lmac_set_edca_cw(int vif_id, uint8_t dst_ac, uint8_t src_ac);
 #include "hal_sflash.h"
 void get_auth_ctrl_param();
 #endif /* defined(INCLUDE_AUTH_CONTROL) */
+
+/* Sync to AP about PM */
+bool lmac_notify_pm_to_ap (void);

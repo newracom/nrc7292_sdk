@@ -37,9 +37,6 @@ extern "C" {
 #define XT25Q32F_JEDEC_ID (0x0B6016)
 #define P25Q32U_JEDEC_ID (0x856016)
 #define P25Q16U_JEDEC_ID (0x856015)
-#define UC25WQ08_JEDEC_ID (0xB36014)
-#define UC25WQ16_JEDEC_ID (0xB36015)
-#define UC25WQ32_JEDEC_ID (0xB36016)
 #define GT25Q16A_JEDEC_ID (0xC46015)
 #define GT25Q32A_JEDEC_ID (0xC46016)
 #define FM25W16A_JEDEC_ID (0xA12815)
@@ -180,6 +177,10 @@ enum sf_reg_override_ctrl {
 #define SF_SLOT_CRC_OFFSET 8
 #define SF_SLOT_MAX_LEN 4084 /* 4KB - size of Header */
 
+#define SYSCONFIG_SECTOR_SIZE               4096
+#define SYSCONFIG_PRE_USER_FACTORY_SIZE      256
+#define SYSCONFIG_USER_FACTORY_SIZE          512
+
 typedef struct {
 	uint32_t signature; /*'nrct'*/
 	uint32_t crc32; /*computed by util_crc_compute_crc32() in util_crc.c*/
@@ -208,8 +209,16 @@ typedef struct {
 	uint32_t hw_version:16; /* HW Version */
 	struct sf_reg_override rf_pllldo12_tr;
 	uint8_t reserved1[228];
-	char user_factory[512];
+	char user_factory[SYSCONFIG_USER_FACTORY_SIZE];
 } sf_sys_config_t;
+
+typedef struct {
+	uint32_t valid;
+	uint32_t version;
+	uint32_t cal_use; /*enable/disable the usage of calibration data*/
+	uint32_t hw_version; /* HW Version */
+	struct sf_reg_override rf_pllldo12_tr;
+} sf_sys_config_mem_t;
 
 typedef struct {
 	uint32_t fw_size;
@@ -267,6 +276,7 @@ bool nrc_sf_update_hw_version(uint16_t version);
 bool nrc_sf_update_memory_map(sf_mem_map_t *mem_map);
 bool nrc_sf_set_etag_id(uint16_t etag_id);
 uint16_t nrc_sf_get_etag_id(void);
+uint8_t nrc_sf_get_cal_use(void);
 #if defined(INCLUDE_AUTH_CONTROL)
 bool nrc_sf_set_auth_ctrl(sf_auth_ctrl_t  *auth_ctrl);
 bool nrc_sf_get_auth_ctrl(sf_auth_ctrl_t  *auth_ctrl);

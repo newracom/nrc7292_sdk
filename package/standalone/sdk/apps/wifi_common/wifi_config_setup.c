@@ -33,7 +33,6 @@
 #endif
 #include "crypto/sha1.h"
 
-#define WIFI_CONFIG_NVS_UPDATE 1
 #define DISPLAY_WIFI_CONFIG_SETTING 0
 
 static WIFI_CONFIG* g_wifi_config;
@@ -54,7 +53,7 @@ static WIFI_CONFIG* g_wifi_config;
 		return NRC_FAIL;
 
 	memcpy(wifi_config->ssid,  STR_SSID, sizeof(STR_SSID));
-	memset(wifi_config->bssid,  0x0,  (MAX_BSSID_LENGTH+1));
+	memcpy(wifi_config->bssid,  STR_BSSID,  (MAX_BSSID_LENGTH+1));
 	memcpy(wifi_config->country,  COUNTRY_CODE, sizeof(COUNTRY_CODE));
 	wifi_config->security_mode = NRC_WIFI_SECURE;
 	memcpy(wifi_config->password, NRC_WIFI_PASSWORD, sizeof(NRC_WIFI_PASSWORD));
@@ -84,6 +83,10 @@ static WIFI_CONFIG* g_wifi_config;
 	wifi_config->bss_retry_cnt = WIFI_BSS_RETRY_CNT;
 	wifi_config->device_mode = WIFI_DEVICE_MODE;
 	wifi_config->network_mode = WIFI_NETWORK_MODE;
+	wifi_config->rc = NRC_WIFI_RATE_CONTROL ;
+	wifi_config->mcs = NRC_WIFI_MCS_DEFAULT ;
+	wifi_config->gi = NRC_WIFI_GUARD_INTERVAL_DEFAULT;
+	wifi_config->cca_thres = NRC_WIFI_CCA_THRES_DEFAULT;
 
 	return NRC_SUCCESS;
 }
@@ -143,6 +146,10 @@ nrc_err_t nrc_save_wifi_config(WIFI_CONFIG* wifi_config)
 	nvs_set_i32(nvs_handle, NVS_BSS_MAX_IDLE, (int32_t)wifi_config->bss_max_idle);
 	nvs_set_u8(nvs_handle, NVS_DEVICE_MODE, (uint8_t)wifi_config->device_mode);
 	nvs_set_u8(nvs_handle, NVS_NETWORK_MODE, (uint8_t)wifi_config->network_mode);
+	nvs_set_u8(nvs_handle, NVS_WIFI_RATE_CONTROL, (uint8_t)wifi_config->rc);
+	nvs_set_u8(nvs_handle, NVS_WIFI_MCS, (uint8_t)wifi_config->mcs);
+	nvs_set_u8(nvs_handle, NVS_WIFI_GI, (uint8_t)wifi_config->gi);
+	nvs_set_i8(nvs_handle, NVS_WIFI_CCA_THRES, (int8_t)wifi_config->cca_thres);
 
 	err = nvs_commit(nvs_handle);
 	if (NVS_OK != err)
@@ -216,8 +223,12 @@ void print_settings(WIFI_CONFIG* wifi_config)
 	nrc_usr_print("bss_retry_cnt %d\n", wifi_config->bss_retry_cnt);
 	nrc_usr_print("device_mode %d [%s]\n",wifi_config->device_mode,
 		( wifi_config->device_mode == 0) ? "STA" : "AP");
-	nrc_usr_print("network_mode %d [%s]\n",wifi_config->device_mode,
+	nrc_usr_print("network_mode %d [%s]\n",wifi_config->network_mode,
 		( wifi_config->network_mode == 0) ? "Bridge" : "NAT");
+	nrc_usr_print("rate control %d [%s]\n",wifi_config->rc,
+		( wifi_config->rc == 0) ? "OFF" : "ON");
+	nrc_usr_print("mcs %d\n", wifi_config->mcs);
+	nrc_usr_print("cca threshol %d\n", wifi_config->cca_thres);
 	nrc_usr_print("-----------------------------------------------\n\n");
 #endif
 }
@@ -389,6 +400,13 @@ nrc_err_t nrc_wifi_set_config(WIFI_CONFIG* wifi_config)
 		return NRC_FAIL;
 	}
 
+/*
+   To utilize the NVS values for Wi-Fi configuration and enable NVS updates,
+   please include the following define in your project's Makefile:
+   DEFINE += -DWIFI_CONFIG_NVS_UPDATE=1
+   This will ensure that the Wi-Fi configuration can be stored and retrieved
+   from the NVS.
+ */
 #if defined(WIFI_CONFIG_NVS_UPDATE) && (WIFI_CONFIG_NVS_UPDATE == 1)
 	err = nvs_get_u8(nvs_handle, NVS_IP_MODE, &wifi_config->ip_mode);
 	nrc_usr_print("[%s] ip_mode is %d\n", __func__, wifi_config->ip_mode);
@@ -461,6 +479,10 @@ nrc_err_t nrc_wifi_set_config(WIFI_CONFIG* wifi_config)
 	nvs_get_i32(nvs_handle, NVS_BSS_RETRY_CNT, (int32_t*)&wifi_config->bss_retry_cnt);
 	nvs_get_u8(nvs_handle, NVS_DEVICE_MODE, (uint8_t*)&wifi_config->device_mode);
 	nvs_get_u8(nvs_handle, NVS_NETWORK_MODE, (uint8_t*)&wifi_config->network_mode);
+	nvs_get_u8(nvs_handle, NVS_WIFI_RATE_CONTROL, (uint8_t*)&wifi_config->rc);
+	nvs_get_u8(nvs_handle, NVS_WIFI_MCS, (uint8_t*)&wifi_config->mcs);
+	nvs_get_u8(nvs_handle, NVS_WIFI_GI, (uint8_t*)&wifi_config->gi);
+	nvs_get_i8(nvs_handle, NVS_WIFI_CCA_THRES, (int8_t*)&wifi_config->cca_thres);
 
 	if (nvs_handle)
 		nvs_close(nvs_handle);
@@ -521,6 +543,10 @@ nrc_err_t nrc_erase_all_wifi_nvs(void)
 	nvs_erase_key(nvs_handle, NVS_WIFI_SHORT_BCN_INTERVAL);
 	nvs_erase_key(nvs_handle, NVS_DEVICE_MODE);
 	nvs_erase_key(nvs_handle, NVS_NETWORK_MODE);
+	nvs_erase_key(nvs_handle, NVS_WIFI_RATE_CONTROL);
+	nvs_erase_key(nvs_handle, NVS_WIFI_MCS);
+	nvs_erase_key(nvs_handle, NVS_WIFI_GI);
+	nvs_erase_key(nvs_handle, NVS_WIFI_CCA_THRES);
 
 	if (nvs_handle)
 		nvs_close(nvs_handle);

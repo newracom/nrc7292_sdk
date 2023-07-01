@@ -601,7 +601,7 @@ struct wim_cap_param {
 	uint16_t listen_interval;
 	uint16_t bss_max_idle;
 	uint16_t max_vif;
-	struct wim_vif_cap_param vif_caps[];
+	struct wim_vif_cap_param vif_caps[NR_NRC_VIF];
 } __packed;
 
 struct wim_ready_param {
@@ -614,6 +614,7 @@ struct wim_ready_param {
 	bool has_macaddr[NR_NRC_VIF];
 	uint16_t hw_version;
 	struct wim_cap_param cap;
+	uint8_t xtal_status;
 } __packed;
 WIM_DECLARE(wim_ready);
 
@@ -734,6 +735,9 @@ struct wim_drv_info_param {
 	uint32_t kern_ver			:12;
 	uint32_t reserved			:14;
 	uint32_t vendor_oui;
+	uint32_t deepsleep_gpio_dir;
+	uint32_t deepsleep_gpio_out;
+	uint32_t deepsleep_gpio_pullup;
 } __packed;
 WIM_DECLARE(wim_drv_info);
 

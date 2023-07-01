@@ -182,6 +182,7 @@ enum CipherType {
 };
 
 enum {
+	GI_UNKNOWN = -1,
 	GI_LONG = 0,
 	GI_SHORT = 1,
 	GI_CAPA = 2,

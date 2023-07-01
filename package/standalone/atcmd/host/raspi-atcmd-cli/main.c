@@ -58,7 +58,7 @@ static int raspi_get_time (double *time) /* usec */
 
 static void raspi_cli_version (void)
 {
-	const char *version = "1.3.1";
+	const char *version = "1.3.3";
 
 	printf("raspi-atcmd-cli version %s\n", version);
  	printf("Copyright (c) 2019-2023  <NEWRACOM LTD>\n");

@@ -17,6 +17,10 @@
 #endif
 #endif /* !defined(MAX_STA) */
 
+//STA_INFO and AP_INFO keep only 2 KEYs to decrease total size of umacinfo
+//AP_INFO : 2 GTKs(idx_1, idx_2),  STA_INFO : 2 PTKs (idx_0)
+#define MAX_UINFO_KEY_ID 2
+
 /* STA's State */
 typedef enum _STA_STATE{
 	INVALID = 0xFF,
@@ -120,7 +124,7 @@ typedef struct _CIPHER_INFO {
 typedef struct _KEY_INFO {
 	uint16_t key_aid;
 	uint8_t key_addr[MAC_ADDR_LEN];
-	CIPHER_INFO cipher_info[MAX_KEY_ID];
+	CIPHER_INFO cipher_info[MAX_UINFO_KEY_ID];
 } __attribute__((packed)) KEY_INFO;
 
 #if defined(INCLUDE_TWT_SUPPORT)

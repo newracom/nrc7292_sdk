@@ -90,9 +90,9 @@ int raspi_hif_open (int type, char *device, uint32_t speed, uint32_t flags)
 		{
 			const char *str_eirq_mode[] = { "low", "high", "falling", "rising" };
 			enum HSPI_EIRQ_MODE eirq_mode = HSPI_EIRQ_MODE_NONE;
-			
+
 			if (flags & RASPI_HIF_EIRQ_MASK)
-			{	
+			{
 				int i;
 
 				for (i = 1 ; i <= 4 ; i++)
@@ -138,12 +138,12 @@ int raspi_hif_open (int type, char *device, uint32_t speed, uint32_t flags)
 							const char *gpiochip = "/dev/gpiochip0";
 							const int gpio = 5;
 							const bool nonblock = false;
-							bool rising = false; 
+							bool rising = false;
 
 							switch (eirq_mode)
 							{
 								case HSPI_EIRQ_MODE_HIGH:
-								case HSPI_EIRQ_MODE_FALLING: 
+								case HSPI_EIRQ_MODE_FALLING:
 									rising = true;
 
 								default:

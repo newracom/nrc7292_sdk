@@ -99,6 +99,11 @@ enum {
 	VEVENT_VENDOR_IE_CMD_2 = 0x2,
 	VEVENT_VENDOR_IE_CMD_3 = 0x3,
 	VEVENT_VENDOR_IE_CMD_4 = 0x4,
+	VEVENT_VENDOR_IE_BCAST_FOTA_INFO = 0x7,
+	VEVENT_VENDOR_IE_BCAST_FOTA_1 = 0x8,
+	VEVENT_VENDOR_IE_BCAST_FOTA_2 = 0x9,
+	VEVENT_VENDOR_IE_BCAST_FOTA_3 = 0xA,
+	VEVENT_VENDOR_IE_BCAST_FOTA_4 = 0xB,
 };
 
 struct nrc_wpa_key {
@@ -159,44 +164,32 @@ struct sta_ampdu_mlme {
 	unsigned long agg_session_valid[MAX_TID];
 	unsigned long unexpected_agg[MAX_TID];
 	/* tx */
-#if 0	
+#if 0
 	struct work_struct work;
 	struct tid_ampdu_tx __rcu *tid_tx[MAX_TID];
 	struct tid_ampdu_tx *tid_start_tx[MAX_TID];
 	unsigned long last_addba_req_time[MAX_TID];
-#endif	
+#endif
 	u8 addba_req_num[MAX_TID];
 	//u8 dialog_token_allocator;
 };
 
 #endif //#if defined (INCLUDE_EARLY_FREE_SYSRXBUF)
 
-#ifdef SUPPORT_USE_4ADDRESS
-struct ieee80211_hdr_4addr {
-	le16 frame_control;
-	le16 duration_id;
-	u8 addr1[ETH_ALEN];
-	u8 addr2[ETH_ALEN];
-	u8 addr3[ETH_ALEN];
-	le16 seq_ctrl;
-	u8 addr4[ETH_ALEN];
-} __packed __aligned(2);
-#define IEEE80211_4ADDR_HDRLEN (sizeof(struct ieee80211_hdr_4addr))
-#endif //SUPPORT_USE_4ADDRESS
 struct nrc_wpa_sta {
 	struct nrc_wpa_key		key;
 	uint8_t 				addr[6];
-#ifdef SUPPORT_USE_4ADDRESS
+
 	/* only use softAP */
 	uint8_t 				ethaddr[6];
 	bool					use_4addr;
-#endif //SUPPORT_USE_4ADDRESS
+
 	uint16_t				aid;
 	uint8_t 				state;
 	bool					qos;
 	uint16_t 				last_mgmt_stype;
 	enum block_ack_state 	block_ack[MAX_TID];
-#if defined (INCLUDE_AMPDU_REORDER) || defined (INCLUDE_EARLY_FREE_SYSRXBUF) 
+#if defined (INCLUDE_AMPDU_REORDER) || defined (INCLUDE_EARLY_FREE_SYSRXBUF)
 	struct sta_ampdu_mlme   ampdu_mlme;
 #endif
 };
@@ -256,7 +249,7 @@ struct nrc_wpa_rx_data {
 	struct nrc_wpa_rx_data		*next;
 	struct nrc_wpa_rx_data		*prev;
     struct nrc_rx_data_cb	     cb;
-#endif	
+#endif
 	struct nrc_wpa_if* intf;
 	struct nrc_wpa_sta* sta;
 	LMAC_RXHDR *rxh;
@@ -265,11 +258,7 @@ struct nrc_wpa_rx_data {
 	union {
 		uint8_t *frame;
 		struct ieee80211_mgmt *mgmt;
-#ifdef SUPPORT_USE_4ADDRESS
-		struct ieee80211_hdr_4addr *hdr;
-#else
 		struct ieee80211_hdr *hdr;
-#endif //SUPPORT_USE_4ADDRESS
 	} u;
 	bool is_8023;
 	uint16_t offset_8023;
@@ -346,6 +335,7 @@ int nrc_raw_transmit(struct nrc_wpa_if* intf, uint8_t *frm, const uint16_t len,
 				const int ac);
 int nrc_get_sec_hdr_len(struct nrc_wpa_key *key);
 void nrc_start_keep_alive(struct nrc_wpa_if* intf);
+void run_wim_set_bssid(int vif_id, uint8_t* bssid);
 #if defined(SOFT_AP_BSS_MAX_IDLE)
 bool softap_bss_max_idle_is_on(void);
 void softap_bss_max_idle_period_update(int period);
@@ -378,4 +368,13 @@ static inline bool is_key_ccmp(struct nrc_wpa_key *key)
 {
 	return (key && is_ccmp(key->cipher));
 }
+
+void nrc_set_use_4address(bool value);
+bool nrc_get_use_4address(void);
+void nrc_set_scan_max_interval(uint32_t interval);
+uint32_t nrc_get_scan_max_interval();
+void nrc_set_backoff_start_count(uint32_t count);
+uint32_t nrc_get_backoff_start_count();
+int generateRandomBackoff(int retry_count) ;
+
 #endif // _DRIVER_NRC_H_

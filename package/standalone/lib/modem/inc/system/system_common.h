@@ -49,11 +49,13 @@ bw_t str_to_bw(const char *str);
 #define BUILD_CHIP_ID   0x7393
 #elif defined (NRC7394)
 #define BUILD_CHIP_ID   0x7394
+#elif defined (NRC5292)
+#define BUILD_CHIP_ID   0x5292
 #else
 #error "Please add new chip id"
 #endif
 
-#if defined (NRC7291) || (NRC7292) || (NRC7391) || (NRC7392) || (NRC4791) || (NRC5291) || (NRC7393) || (NRC4792) || (NRC7394)
+#if defined (NRC7291) || (NRC7292) || (NRC7391) || (NRC7392) || (NRC4791) || (NRC5291) || (NRC5292) || (NRC7393) || (NRC4792) || (NRC7394)
 // -- General Include --
 // -- Hal Include --
 #if defined(NRC7291)
@@ -87,11 +89,11 @@ bw_t str_to_bw(const char *str);
 #include "hal_adc_sfc.h"
 #include "hal_sflash.h"
 #if defined(NRC7292_LMACTEST_FPGA_AVIA)
-    #include "hal_phy_avia.h"
-    #include "hal_rf_avia.h"
+#include "hal_phy_avia.h"
+#include "hal_rf_avia.h"
 #else
-    #include "hal_phy.h"
-    #include "hal_rf.h"
+#include "hal_phy.h"
+#include "hal_rf.h"
 #endif /* defined(NRC7292_LMACTEST_FPGA_AVIA) */
 /* TODO: This has to be accessed through HAL and driver. */
 #include "reg_gdma.h"
@@ -119,7 +121,7 @@ bw_t str_to_bw(const char *str);
 #include     "hal_phy.h"
 #endif /* defined(NRC7391) */
 
-#if defined(NRC7392) || defined(NRC4791) || defined(NRC5291) || defined(NRC7393) || defined(NRC4792)|| defined(NRC7394)
+#if defined(NRC7392) || defined(NRC4791) || defined(NRC5291) || defined(NRC5292) || defined(NRC7393) || defined(NRC4792)|| defined(NRC7394)
 #include    "hal_uart.h"
 #include    "hal_gpio.h"
 #include   "hal_clock.h"
@@ -128,7 +130,7 @@ bw_t str_to_bw(const char *str);
 
 #if defined(INCLUDE_RF_NRC7292RFE)
 #include      "hal_rf_nrc7292rfe.h"
-#include      "hal_phy.h"
+#include      "hal_phy_nrc7292rfe.h"
 #else
 #include      "hal_rf.h"
 #include      "hal_phy.h"
@@ -147,8 +149,13 @@ bw_t str_to_bw(const char *str);
 #include "hal_adc_sfc.h"
 #include  "hal_sflash_lib.h"
 #else
+#if defined(BOOT_LOADER) || (INCLUDE_RF_NRC7292RFE) || (LMAC_TEST)
 #include "hal_adc_sfc.h"
+#include  "hal_sflash_legacy.h"
+#else
 #include  "hal_sflash.h"
+#endif
+
 #endif /* defined(NRC_ROMLIB) */
 #endif /* defined(NRC7392) || defined(NRC4791) || defined(NRC5291) */
 
@@ -160,18 +167,32 @@ bw_t str_to_bw(const char *str);
 #include "util_core_dump.h"
 #endif /* defined(NRC7292) */
 
+/**
+ * Let's synchronize the order between
+ * COUNTRY_CODE_INDEX below and COUNTRIES in bd file.
+ */
 typedef enum _COUNTRY_CODE_INDEX {
-	COUNTRY_CODE_JP = 0,
+	COUNTRY_CODE_US,
+	COUNTRY_CODE_JP,
+	COUNTRY_CODE_K0,
 	COUNTRY_CODE_K1,
 	COUNTRY_CODE_TW,
-	COUNTRY_CODE_US,
 	COUNTRY_CODE_EU,
-	COUNTRY_CODE_CN, //5
-	COUNTRY_CODE_NZ, //6
-	COUNTRY_CODE_AU, //7
-	COUNTRY_CODE_K2, //8
+	COUNTRY_CODE_CN, //6
+	COUNTRY_CODE_NZ, //7
+	COUNTRY_CODE_AU, //8
+	COUNTRY_CODE_K2, //9
 	COUNTRY_CODE_MAX,
-} CONTRY_CODE_INDEX;
+} COUNTRY_CODE_INDEX;
+
+typedef struct {
+	COUNTRY_CODE_INDEX	cc_index;
+	const char*			alpha2_cc;
+} country_codes;
+
+extern const country_codes _country_codes[];
+
+COUNTRY_CODE_INDEX system_get_cc_index(const char* cc);
 
 // -- IRQ --
 void system_init();
@@ -277,10 +298,17 @@ void msdelay(unsigned int delay);
 #define NOTIFY_DRIVER_W_DISABLE_ASSERTED	(0xAB000000)
 #define NOTIFY_DRIVER_REQUEST_FW_DOWNLOAD	(0xDC000000)
 #define NOTIFY_DRIVER_FW_READY_FROM_PS		(0xEC000000)
-#define MAX_SHOWN_RSSI				(-10)
+/* Actually all noti message use upper 16bits of the msg3 reg */
+#define NOTIFY_DRIVER_FAILED_TO_ENTER_PS    (0xED00)
+
+#if defined(NRC7292)
+#define MAX_SHOWN_RSSI						(-10)
+#else
+#define MAX_SHOWN_RSSI						(0)
+#endif
 
 sys_info *get_sys_info();
-
+void system_notify_to_host (uint16_t msg);
 bool system_schedule_work_queue_from_isr( sys_task_func func , void* param , sys_task_func_cb cb );
 bool system_schedule_work_queue         ( sys_task_func func , void* param , sys_task_func_cb cb );
 

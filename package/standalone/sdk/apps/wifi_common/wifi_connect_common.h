@@ -32,4 +32,25 @@ int wifi_init(WIFI_CONFIG *param);
 int wifi_connect(WIFI_CONFIG *param);
 int wifi_start_softap(WIFI_CONFIG *param);
 
+/**********************************************
+ * @fn void  wifi_set_ip_to_static(uint8_t mode)
+ *
+ * @brief Override IP setting mode to static if mode set to 1.
+ *
+ * @param mode : 1 to override IP setting to static
+ * regardless of initial setting
+ *
+ * @return None
+ ***********************************************/
+void wifi_set_ip_to_static(uint8_t mode);
+
+/**********************************************
+ * @fn bool  nrc_get_ip_override()
+ *
+ * @brief Returns IP mode overriden value.
+ *
+ * @return 1 indicating static IP setting used.
+ *         0 system initial setting will be used.
+ ***********************************************/
+uint8_t wifi_get_ip_override();
 #endif /* __WIFI_CONNECT_COMMON_H__ */

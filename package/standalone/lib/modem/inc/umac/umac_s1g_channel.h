@@ -47,10 +47,11 @@ typedef struct {
 
 #if defined(NRC_ROMLIB)
 enum {
-	JP = 0,
+	US = 0,
+	JP,
+	K0,
 	K1,
 	TW,
-	US,
 	EU,
 	CN,
 	NZ,
@@ -74,6 +75,7 @@ uint16_t GetS1GFreqByChannelIndex(uint8_t index);
 uint16_t GetStartS1GFreqByChspacing(uint8_t spacing);
 uint16_t GetEndS1GFreqByChspacing(uint8_t spacing);
 uint16_t GetNonS1GDefaultFreq(void);
+uint16_t GetStartIndexByBW(bw_t bw);
 uint8_t GetS1GChIDFromS1GFreq(const uint16_t s1g_freq);
 
 bool SetChannelConf(const CHANNEL_MAPPING_TABLE *item);
@@ -113,7 +115,7 @@ bool umac_s1g_freq_check(uint16_t freq);
 void umac_set_channel_table(const struct s1g_channel_table *cc_table, uint8_t chans_num);
 #endif /*  defined(INCLUDE_NEW_CHANNEL_CTX) */
 uint32_t GetS1GFreqByNonS1GFreq(const uint16_t nons1g_freq);
-void UpdateCHTableByCC(uint8_t *country_code);
+void UpdateCHTableByCC(const char* country_code);
 void CheckNUpdateCHTableByVif(int vif_id);
 
 #if defined(INCLUDE_BD_SUPPORT)

@@ -184,7 +184,7 @@ void lwif_input(struct nrc_wpa_if* intf, void *buffer, int data_len)
 		case ETHTYPE_IPV6:
 #endif	//LWIP_IPV6
 #if defined(SUPPORT_ETHERNET_ACCESSPOINT)
-			if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+			if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
 				if (!intf->is_ap) {
 					/* prevent receiving frames that are retransmitted by the AP */
 					if(memcmp(ethhdr->src.addr, get_peer_mac()->addr, 6) == 0){

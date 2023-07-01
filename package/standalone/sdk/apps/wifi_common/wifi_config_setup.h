@@ -67,6 +67,10 @@ typedef struct  {
 	uint32_t bss_retry_cnt;
 	uint8_t device_mode;
 	uint8_t network_mode;
+	uint8_t rc;
+	uint8_t mcs;
+	uint8_t gi;
+	int8_t cca_thres;
 }WIFI_CONFIG;
 #define WIFI_CONFIG_SIZE	sizeof (WIFI_CONFIG)
 

@@ -84,15 +84,13 @@ nrc_err_t nrc_fota_erase(void);
 nrc_err_t nrc_fota_set_info(uint32_t len, uint32_t crc);
 
 /**********************************************
- * @fn nrc_err_t nrc_fota_update_done(FOTA_INFO* fw_info)
+ * @fn nrc_err_t nrc_fota_update_done(void)
  *
  * @brief Updated firmware and reboot
  *
- * @param fw_info: fota binary information (binary length and crc)
- *
  * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-nrc_err_t nrc_fota_update_done(FOTA_INFO* fw_info);
+nrc_err_t nrc_fota_update_done(void);
 
 /**********************************************
  * @fn nrc_err_t nrc_fota_update_done_bootloader(FOTA_INFO* fw_info)

@@ -15,7 +15,7 @@ struct cca_info_node
     uint8_t bw;
     struct cca_info_node * next;
 };
-struct self_conf_result
+struct cca_scan_results
 {
     int len;
     uint16_t best_nons1g_freq_idx;
@@ -26,5 +26,6 @@ struct self_conf_result
     struct cca_info_node * tail;
 };
 
-struct self_conf_result * self_config_scan_find_channel(int ccid, int pref_bw, int dwell_time);
+struct cca_scan_results * self_config_scan_find_channel(int ccid, int pref_bw, int dwell_time);
+struct cca_scan_results * fast_cca_scan_result(int ccid, int pref_bw, int dwell_time);
 bool self_config_get_status();

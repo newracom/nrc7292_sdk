@@ -37,6 +37,7 @@ struct _ping_parm
 	u32_t total_delay;
 	u32_t time_delay;
 	u16_t seq_num;
+	u16_t id;
 	u8_t force_stop;
 	sys_thread_t ping_thread;
 	ip_addr_t addr;

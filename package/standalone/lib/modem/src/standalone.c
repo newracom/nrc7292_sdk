@@ -22,7 +22,7 @@
 	};																	\
 	struct NAME##_Task s_##NAME##_task;
 
-#if defined(INCLUDE_MEASURE_AIRTIME)
+#if defined(INCLUDE_MEASURE_AIRTIME) || !defined(INCLUDE_TRACK_WAKEUP)
 #define CREATE_TASK(NAME, PRIO, FN)										\
 	s_##NAME##_task.handle = xTaskCreateStatic(							\
 		FN,#NAME, sizeof(s_##NAME##_task.stack) / sizeof(StackType_t),	\
@@ -102,15 +102,14 @@ int standalone_main()
 
 	if (net_init) {
 		//get_standalone_macaddr(g_standalone_addr);
-#if defined(INCLUDE_BCAST_FOTA_STA_SUPPORT)
-		bcast_fota_init();
-#endif /* defined(INCLUDE_BCAST_FOTA_STA_SUPPORT) */
 		CREATE_TASK(wpa_supplicant, NRC_TASK_PRIORITY, wpas_task_main);
 		wifi_lwip_init();
 	}
 
 #if defined (INCLUDE_PS_SCHEDULE)
+#if defined(INCLUDE_TRACE_WAKEUP)
 	A("[%s] ps_callback = %d\n", __func__, ps_callback);
+#endif /* INCLUDE_TRACE_WAKEUP */
 	/* set the priority of ps_callback_task lower than other system tasks by */
 	/* setting priority to NRC_TASK_PRIORITY - 1. */
 	if (ps_callback) {

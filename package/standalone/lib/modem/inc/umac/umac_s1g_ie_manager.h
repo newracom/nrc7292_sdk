@@ -45,6 +45,30 @@ typedef enum {
 };
 #endif
 
+typedef struct {
+	uint8_t peer_addr[MAC_ADDR_LEN]; //searching key (6B)
+	union {
+		s1g_operation_information op_info; //S1G Operation IE(4B)
+		struct {
+			uint32_t bw:4;
+			uint32_t tsf:28;
+		};
+	};
+	bool used;
+} op_ch_info;
+#define OP_CH_INFO_SIZE sizeof(op_ch_info) //11B
+#define S1G_OP_INFO_SIZE sizeof (s1g_operation_information)
+
+void umac_init_op_ch_info(uint8_t vif_id);
+void umac_deinit_op_ch_info(uint8_t vif_id);
+void umac_clear_all_op_ch_info(uint8_t vif_id);
+bool umac_add_op_ch_info(uint8_t vif_id, uint8_t *bssid, s1g_operation_information *op_info);
+op_ch_info *umac_get_op_ch_info(uint8_t *bssid);
+#if defined (MATCH_OP_BW_PREQ_PRSP)
+bool umac_add_op_bw_info(uint8_t vif_id, uint8_t *peer_addr, uint8_t bw);
+int umac_get_op_bw_info(uint8_t vif_id, uint8_t *peer_addr);
+#endif
+
 //////////////////////
 // Public Functions //
 //////////////////////

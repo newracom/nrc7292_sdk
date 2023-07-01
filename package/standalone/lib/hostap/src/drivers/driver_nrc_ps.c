@@ -219,9 +219,11 @@ static int wpa_ps_hook_handle_scan(struct retention_info *ret_info, void *param1
 	uint16_t ie_copy_len = 0;
 	u64 tsf = NOW;
 
+#if defined(INCLUDE_TRACE_WAKEUP)
 #if !defined(INCLUDE_MEASURE_AIRTIME)
 	E(TT_WPAS, TAG "%d scan start\n", vif_id);
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
+#endif /* INCLUDE_TRACE_WAKEUP */
 
 	scan_flush(intf->scan);
 
@@ -263,9 +265,11 @@ static int wpa_ps_hook_handle_scan(struct retention_info *ret_info, void *param1
 	ASSERT(ie_copy_len <= ie_chain_len);
 	dl_list_add(&intf->scan->scan_list, &scan_res->list);
 
+#if defined(INCLUDE_TRACE_WAKEUP)
 #if !defined(INCLUDE_MEASURE_AIRTIME)
 	E(TT_WPAS, TAG "%d scan done\n",vif_id);
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
+#endif /* INCLUDE_TRACE_WAKEUP */
 
 #if 0
 	I(TT_WPAS, TAG "%d scan entry bssid(" MACSTR "), freq(%d), bi(%d), "
@@ -281,6 +285,7 @@ static int wpa_ps_hook_handle_scan(struct retention_info *ret_info, void *param1
 		scan_res->res->ie_len);
 #else
 
+#if defined(INCLUDE_TRACE_WAKEUP)
 #if !defined(INCLUDE_MEASURE_AIRTIME)
 	E(TT_WPAS, TAG "%d bssid(" MACSTR "), freq(%d), bi(%d), caps(%d), level(%d)\n",
 		vif_id, MAC2STR(scan_res->res->bssid),
@@ -289,6 +294,7 @@ static int wpa_ps_hook_handle_scan(struct retention_info *ret_info, void *param1
 		scan_res->res->caps,
 		scan_res->res->level);
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
+#endif /* INCLUDE_TRACE_WAKEUP */
 
 #endif
 	//print_hex(scan_res->res+1, ie_chain_len);
@@ -308,9 +314,11 @@ static int wpa_ps_hook_handle_auth(struct retention_info *ret_info, void *param1
 		//return WPA_PS_HOOK_RET_SUCCESS;
 	}
 
+#if defined(INCLUDE_TRACE_WAKEUP)
 #if !defined(INCLUDE_MEASURE_AIRTIME)
 	E(TT_WPAS, TAG "%d auth\n", 0);
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
+#endif /* INCLUDE_TRACE_WAKEUP */
 
 	struct nrc_wpa_if *intf = (struct nrc_wpa_if *)(param1);
 	union wpa_event_data event;
@@ -338,15 +346,17 @@ static int wpa_ps_hook_handle_assoc(struct retention_info *ret_info, void *param
 	struct nrc_wpa_if *intf = (struct nrc_wpa_if *)(param1);
 	struct wpa_driver_associate_params *assoc_param= (struct wpa_driver_associate_params *)(param2);
 	union wpa_event_data event;
-	uint8_t* assoc_addr;
+	uint8_t* assoc_addr = NULL;
 	struct nrc_wpa_key *key = NULL;
 
 	os_memset(&event, 0, sizeof(event));
 
+#if defined(INCLUDE_TRACE_WAKEUP)
 #if !defined(INCLUDE_MEASURE_AIRTIME)
 	E(TT_WPAS, TAG "%d assoc (kms:%d)\n",
 		intf->vif_id, assoc_param->key_mgmt_suite);
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
+#endif /* INCLUDE_TRACE_WAKEUP */
 
 	intf->key_mgmt = assoc_param->key_mgmt_suite;
 	intf->associated = true;
@@ -379,9 +389,11 @@ static int wpa_ps_hook_handle_assoc(struct retention_info *ret_info, void *param
 		event.assoc_info.authorized = 1;
 	event.assoc_info.resp_ies_len = 0;
 	event.assoc_info.resp_ies = NULL;
+#if defined(INCLUDE_TRACE_WAKEUP)
 #if !defined(INCLUDE_MEASURE_AIRTIME)
 	E(TT_WPAS, TAG "%d bss max idle (%d)\n", intf->vif_id, intf->bss.max_idle);
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
+#endif /* INCLUDE_TRACE_WAKEUP */
 	if (intf->bss.max_idle) {
 		nrc_start_keep_alive(intf);
 	}
@@ -419,12 +431,16 @@ static int wpa_ps_hook_handle_assoc(struct retention_info *ret_info, void *param
 	}
 
 	assoc_addr = os_malloc(ETH_ALEN*sizeof(uint8_t));
-	os_memcpy(assoc_addr, key->addr, ETH_ALEN);
+	if(assoc_addr)
+		os_memcpy(assoc_addr, key->addr, ETH_ALEN);
 
+#if 0
+	/* 0623 : remove below. needed for ESL Project why? */
 	wpa_driver_notify_event_to_app(intf->vif_id, WIFI_EVT_CONNECT_SUCCESS, ETH_ALEN, assoc_addr);
 
 	/* currently, it's verified for the static ip assignment case on the ESL Project. */
 	lmac_send_qos_null_frame(false);
+#endif
 
 	return WPA_PS_HOOK_RET_SUCCESS;
 }
@@ -437,9 +453,11 @@ static int wpa_ps_hook_handle_port(struct retention_info *ret_info, void *param1
 	struct nrc_wpa_if *intf = (struct nrc_wpa_if *)(param1);
 	int authorized = *((int*)(param2));
 
+#if defined(INCLUDE_TRACE_WAKEUP)
 #if !defined(INCLUDE_MEASURE_AIRTIME)
 	E(TT_WPAS, TAG "%d set key (mgmt:%d, authorized:%d)\n", intf->vif_id, intf->key_mgmt, authorized);
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
+#endif /* INCLUDE_TRACE_WAKEUP */
 
 	if (!intf->key_mgmt || intf->key_mgmt == WPA_KEY_MGMT_NONE ||authorized)
 		return WPA_PS_HOOK_RET_FAIL;
@@ -460,7 +478,9 @@ static int wpa_ps_hook_handle_dhcp(struct retention_info *ret_info, void *param1
 	s8_t err;
 	struct eth_addr bssid;
 
+#if defined(INCLUDE_TRACE_WAKEUP)
 	E(TT_WPAS, TAG "%d dhcp\n",  vif_id);
+#endif /* INCLUDE_TRACE_WAKEUP */
 
 	/* Check IP validity */
 	if (ret_info->ip_info.ip_addr == 0) {
@@ -485,9 +505,6 @@ static int wpa_ps_hook_handle_dhcp(struct retention_info *ret_info, void *param1
 	wifi_set_dns_server(NULL, NULL);
 #endif
 
-	/* Set state of WLAN Manager as "GET_IP" */
-	//nrc_wifi_set_state(WIFI_STATE_GET_IP);
-
 #if LWIP_IPV4
 	/* Add AP's MAC into ARP Entery */
 	ip4_addr_t adrs;
@@ -497,11 +514,15 @@ static int wpa_ps_hook_handle_dhcp(struct retention_info *ret_info, void *param1
 	if(err != ERR_OK)
 		E(TT_WPAS, TAG "%s Fail to add ethar (err:%d)\n", __func__, err);
 	else
+#if defined(INCLUDE_TRACE_WAKEUP)
 		E(TT_WPAS, TAG "%d add arp\n", vif_id);
+#else
+		;
+#endif /* INCLUDE_TRACE_WAKEUP */
 #endif
 
 	/* Send Null for informing AP of Awake */
-	lmac_send_qos_null_frame(false);
+	ret_info->ps_null_pm0 = 1;
 
 	E(TT_WPAS, TAG "%d recovery is done\n", vif_id);
 	ret_info->recovered = false;

@@ -223,13 +223,14 @@ typedef struct
 
 	/* Client */
 	char server_ip[IPERF_IPADDR_LEN_MAX + 1]; /* -c */
+	int send_length; /* -l */
 	int send_time; /* -t , sec */
 	bool passthrough; /* -P */
 	bool negative; /* -N */
-	int datagram_size;
+	bool done_event; /* -D */
 
 	/* Miscellaneous */
-	bool log; /* -l */
+	int log; /* -L */
 } iperf_opt_t;
 
 extern int iperf_main (char *cmd);

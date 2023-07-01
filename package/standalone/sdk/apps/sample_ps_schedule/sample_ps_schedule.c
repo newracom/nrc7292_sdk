@@ -266,6 +266,7 @@ static void run_gpio_exception()
 {
 	uint64_t gpio_alert_time = 0;
 	WIFI_CONFIG param;
+	nrc_err_t ret;
 
 	memset(&param, 0, WIFI_CONFIG_SIZE);
 	nrc_wifi_set_config(&param);
@@ -280,7 +281,10 @@ static void run_gpio_exception()
 		send_alert_to_server(&param);
 	}
 
-	nrc_ps_resume_deep_sleep();
+	ret = nrc_ps_resume_deep_sleep();
+	if (ret == NRC_FAIL)
+		nrc_usr_print("[%s] Can not received ack of QoS NULL frame with pm1 \n", __func__);
+
 }
 
 /******************************************************************************
@@ -292,28 +296,32 @@ static void run_gpio_exception()
 nrc_err_t schedule_deep_sleep()
 {
 #if defined(WAKEUP_GPIO_PIN)
-    /* set check_bounce to true to use a switch to toggle GPIO interrupt */
+	/* set check_bounce to true to use a switch to toggle GPIO interrupt */
 	nrc_ps_set_gpio_wakeup_pin(true, WAKEUP_GPIO_PIN);
 	nrc_ps_set_wakeup_source(WAKEUP_SOURCE_RTC|WAKEUP_SOURCE_GPIO);
 #else
 	nrc_ps_set_wakeup_source(WAKEUP_SOURCE_RTC);
 #endif /* defined(WAKEUP_GPIO_PIN) */
 
-	/* set GPIO pullup/output/direction mask */
-	/* This configuration depends on how the GPIO pins connected on the target board */
+	/* Set GPIO pullup/output/direction mask */
+	/* The GPIO configuration should be customized based on the target board layout */
 	/* If values not set correctly, the board may consume more power during deep sleep */
-	/* Below configuration is for NRC7292 EVK Revision B board */
-	/* The default value is already set in SDK for NRC7292 Rev. B board */
-	/* This code is here to demonstrate how it should be done.*/
-
 #if defined(SUPPORT_DEVICEWORX)
-    nrc_ps_set_gpio_direction(0x3FFFFFCF);
-    nrc_ps_set_gpio_out(0x20004200);
-    nrc_ps_set_gpio_pullup(0x00000000);
+	nrc_ps_set_gpio_direction(0x3FFFFFCF);
+	nrc_ps_set_gpio_out(0x20004200);
+	nrc_ps_set_gpio_pullup(0x00000000);
 #else
+#ifdef NRC7292
+	/* Below configuration is for NRC7292 EVK Revision B board */
 	nrc_ps_set_gpio_direction(0x07FFFF30);
 	nrc_ps_set_gpio_out(0x0);
 	nrc_ps_set_gpio_pullup(0x0);
+#elif defined(NRC7394)
+	/* Below configuration is for NRC7394 EVK Revision board */
+	nrc_ps_set_gpio_direction(0x0FFFFFDFF);
+	nrc_ps_set_gpio_out(0x00000100);
+	nrc_ps_set_gpio_pullup(0xFFFFFFFF);
+#endif
 #endif
 
 	/* set the callbacks for scheduled callbacks */

@@ -12,6 +12,10 @@ bool bcast_fota_get_enable(void);
 void bcast_fota_set_enable(bool enable);
 bool bcast_fota_get_fast(void);
 uint16_t bcast_fota_get_bcn_intv(void);
+#if defined(INCLUDE_ESL_PARAM)
+const char* bcast_fota_get_mqtt_server_topic();
+void bcast_fota_set_mqtt_server_topic(const char* topic, int length);
+#endif
 
 enum bcast_fota_mode {
 	BC_FOTA_MODE_ANY = 1,

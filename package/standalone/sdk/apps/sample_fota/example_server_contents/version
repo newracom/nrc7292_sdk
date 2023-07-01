@@ -1,5 +1,6 @@
 {
-    "version" : "106",
+    "version" : "1.1.0",
     "crc" : "3cad437a",
+    "force" : "0",
     "fw_name" : "nrc7394_standalone_xip_hello_world.bin"
 }

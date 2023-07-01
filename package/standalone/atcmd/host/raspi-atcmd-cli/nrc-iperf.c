@@ -308,7 +308,9 @@ static int iperf_socket_open (iperf_socket_t *socket, bool ipv6)
 	if (socket->local_port >= 0 && socket->remote_port > 0)
 	{
 		if (nrc_atcmd_send_cmd("AT+UART=1") == ATCMD_RET_OK)
-			iperf_log("UART: Passthrough Send enabled\n");
+		{
+/*			iperf_log("UART: Passthrough Send enabled\n"); */
+		}
 	}
 
 	if (nrc_atcmd_send_cmd("AT+SRXLOGLEVEL=1") != ATCMD_RET_OK)
@@ -354,6 +356,8 @@ static int iperf_socket_close (iperf_socket_t *socket)
 
 		g_iperf_socket_send_idle = true;
 		g_iperf_socket_send_passthrough = false;
+
+		usleep(100 * 1000);
 	}
 
 	nrc_atcmd_unregister_callback(ATCMD_CB_INFO);
@@ -369,14 +373,18 @@ static int iperf_socket_close (iperf_socket_t *socket)
 	if (socket->local_port >= 0 && socket->remote_port > 0)
 	{
 		if (nrc_atcmd_send_cmd("AT+UART=0") == ATCMD_RET_OK)
-			iperf_log("UART: Passthrough Send disabled\n");
+		{
+/*			iperf_log("UART: Passthrough Send disabled\n"); */
+		}
 	}
 
 	return 0;
 }
 
-static int iperf_socket_send (iperf_socket_t *socket, char *buf, int len)
+static int iperf_socket_send (iperf_socket_t *socket, char *buf, int len, bool done_event)
 {
+	int ret;
+
 	if (g_iperf_socket_send_passthrough)
 	{
 		if (nrc_atcmd_send_cmd("AT") != ATCMD_RET_OK)
@@ -386,8 +394,12 @@ static int iperf_socket_send (iperf_socket_t *socket, char *buf, int len)
 		g_iperf_socket_send_passthrough = false;
 	}
 
-	if (nrc_atcmd_send_cmd("AT+SSEND=%d,\"%s\",%u,%d",
-			socket->id, socket->remote_addr, socket->remote_port, len) != ATCMD_RET_OK)
+	if (done_event)
+		ret = nrc_atcmd_send_cmd("AT+SSEND=%d,\"%s\",%u,%d,1", socket->id, socket->remote_addr, socket->remote_port, len);
+	else
+		ret = nrc_atcmd_send_cmd("AT+SSEND=%d,\"%s\",%u,%d", socket->id, socket->remote_addr, socket->remote_port, len);
+
+	if (ret != ATCMD_RET_OK)
 		return -1;
 
 	if (nrc_atcmd_send_data(buf, len) != ATCMD_RET_OK)
@@ -396,10 +408,12 @@ static int iperf_socket_send (iperf_socket_t *socket, char *buf, int len)
 	return 0;
 }
 
-static int iperf_socket_send_passthrough (iperf_socket_t *socket, char *buf, int len, bool negative)
+static int iperf_socket_send_passthrough (iperf_socket_t *socket, char *buf, int len, bool negative, bool done_event)
 {
 	if (!g_iperf_socket_send_passthrough)
 	{
+		int ret;
+
 		if (negative)
 			len *= -1;
 		else if (socket->protocol == IPERF_PROTO_TCP)
@@ -410,8 +424,12 @@ static int iperf_socket_send_passthrough (iperf_socket_t *socket, char *buf, int
 			return -1;
 		}
 
-		if (nrc_atcmd_send_cmd("AT+SSEND=%d,\"%s\",%u,%d",
-			socket->id, socket->remote_addr, socket->remote_port, len) != ATCMD_RET_OK)
+		if (done_event)
+			ret = nrc_atcmd_send_cmd("AT+SSEND=%d,\"%s\",%u,%d,1", socket->id, socket->remote_addr, socket->remote_port, len);
+		else
+			ret = nrc_atcmd_send_cmd("AT+SSEND=%d,\"%s\",%u,%d", socket->id, socket->remote_addr, socket->remote_port, len);
+
+		if (ret != ATCMD_RET_OK)
 			return -1;
 
 		g_iperf_socket_send_idle = false;
@@ -639,7 +657,7 @@ static void iperf_udp_server_report_to_client (iperf_udp_server_info_t *info)
 
 	iperf_udp_server_init_payload(datagram);
 
-	iperf_socket_send(&info->client, (char *)datagram, sizeof(buf));
+	iperf_socket_send(&info->client, (char *)datagram, sizeof(buf), false);
 }
 
 static void iperf_udp_server_measure_jitter (int32_t id,
@@ -865,8 +883,8 @@ static void iperf_udp_client_init_info (iperf_udp_client_info_t *info, iperf_opt
 		if (option->server_port > 0)
 			info->server_port = option->server_port;
 
-		if (option->datagram_size > 0)
-			info->datagram_size = option->datagram_size;
+		if (option->send_length > 0)
+			info->datagram_size = option->send_length;
 
 		if (option->send_time > 0)
 			info->send_time = option->send_time;
@@ -1020,9 +1038,9 @@ static int iperf_udp_client_run (iperf_socket_t *socket, iperf_opt_t *option)
 		iperf_udp_datagram_print(datagram, info->datagram_size, false, true);
 
 		if (option->passthrough)
-			ret = iperf_socket_send_passthrough(socket, (char *)datagram, info->datagram_size, option->negative);
+			ret = iperf_socket_send_passthrough(socket, (char *)datagram, info->datagram_size, option->negative, option->done_event);
 		else
-			ret = iperf_socket_send(socket, (char *)datagram, info->datagram_size);
+			ret = iperf_socket_send(socket, (char *)datagram, info->datagram_size, option->done_event);
 
 		if (ret == 0)
 			i++;
@@ -1338,8 +1356,8 @@ static void iperf_tcp_client_init_info (iperf_tcp_client_info_t *info, iperf_opt
 		if (option->server_port > 0)
 			info->server_port = option->server_port;
 
-		if (option->datagram_size > 0)
-			info->datagram_size = option->datagram_size;
+		if (option->send_length > 0)
+			info->datagram_size = option->send_length;
 
 		if (option->send_time > 0)
 			info->send_time = option->send_time;
@@ -1447,9 +1465,9 @@ static int iperf_tcp_client_run (iperf_socket_t *socket, iperf_opt_t *option) //
 		}
 
 		if (option->passthrough)
-			ret = iperf_socket_send_passthrough(socket, (char *)datagram, info->datagram_size, option->negative);
+			ret = iperf_socket_send_passthrough(socket, (char *)datagram, info->datagram_size, option->negative, option->done_event);
 		else
-			ret = iperf_socket_send(socket, (char *)datagram, info->datagram_size);
+			ret = iperf_socket_send(socket, (char *)datagram, info->datagram_size, option->done_event);
 
 		if (ret == 0)
 			i++;
@@ -1532,13 +1550,14 @@ static void iperf_option_init (iperf_opt_t *option)
 
 	option->passthrough = false;
 	option->negative = false;
+	option->done_event = false;
 
 	option->server_port = IPERF_DEFAULT_SERVER_PORT;
 	strcpy(option->server_ip, IPERF_IPADDR_ANY);
 
+	option->send_length = 0;
 	option->send_time = IPERF_DEFAULT_SEND_TIME;
 	option->report_interval = IPERF_DEFAULT_REPORT_INTERVAL;
-	option->datagram_size = IPERF_DEFAULT_UDP_DATAGRAM_SIZE;
 
 	option->log = false;
 }
@@ -1563,9 +1582,12 @@ static void iperf_option_help (char *cmd)
 
 	iperf_log("Client specific:\n");
 	iperf_log("  -c, --client <host>   run in client mode, connecting to <host>\n");
+/*	iperf_log("  -l, --length #        data length to transmit (default: TCP=%d UDP=%d\n",
+										IPERF_DEFAULT_TCP_DATA_SIZE, IPERF_DEFAULT_UDP_DATAGRAM_SIZE); */
 	iperf_log("  -t, --time #          time in seconds to transmit for (default: %d sec)\n", IPERF_DEFAULT_SEND_TIME);
 	iperf_log("  -P, --passthrough     transmit in passthrough mode\n");
 	iperf_log("  -N, --negative        use negative length for buffered passthrough mode (always negative in UDP)\n");
+	iperf_log("  -D, --done_vent       enable SEND_DONE event\n");
 	iperf_log("\r\n");
 
 	iperf_log("Miscellaneous:\n");
@@ -1589,11 +1611,11 @@ static void iperf_option_print (iperf_opt_t *option)
 	if (!option->server)
 	{
 		iperf_log(" - server_ip: %s\n", option->server_ip);
+		iperf_log(" - send_length: %d\n", option->send_length);
 		iperf_log(" - send_time: %d\n", option->send_time);
 		iperf_log(" - send_passthrough: %s %s\n", option->passthrough ? "on" : "off",
 												option->negative ? "(-)" : "");
-		if (option->udp)
-			iperf_log(" - datagram_size: %d\n", option->datagram_size);
+		iperf_log(" - send_done_event: %d\n", option->done_event);
 	}
 	iperf_log(" - report_interval: %d\n", option->report_interval);
 	iperf_log("\r\n");
@@ -1617,12 +1639,14 @@ static int iperf_option_parse (int argc, char *argv[], iperf_opt_t *option)
 
 		/* Client */
 		{ "client",			required_argument,		0, 	'c' },
+		{ "length",			required_argument,		0, 	'l' },
 		{ "time",			required_argument,		0, 	't' },
 		{ "passthrough",	no_argument,	    	0, 	'P' },
 		{ "negative",		no_argument,			0, 	'N' },
+		{ "done_event",		no_argument,			0, 	'D' },
 
 		/* Miscellaneous */
-		{ "log",			no_argument,			0,	'l' },
+		{ "log",			required_argument,		0,	'L' },
 		{ "help",			no_argument,			0,	'h' },
 
 		{ 0, 0, 0, 0 }
@@ -1635,9 +1659,9 @@ static int iperf_option_parse (int argc, char *argv[], iperf_opt_t *option)
 	for (optind = 0 ; ; )
 	{
 #if !defined(IPERF_IPV4_ONLY)
-		ret = getopt_long(argc, argv, "i:p:us46c:t:PNlh", opt_info, &opt_idx);
+		ret = getopt_long(argc, argv, "i:p:us46c:l:t:PNDL:h", opt_info, &opt_idx);
 #else
-		ret = getopt_long(argc, argv, "i:p:usc:t:PNlh", opt_info, &opt_idx);
+		ret = getopt_long(argc, argv, "i:p:usc:l:t:PNDL:h", opt_info, &opt_idx);
 #endif
 
 		switch (ret)
@@ -1645,6 +1669,29 @@ static int iperf_option_parse (int argc, char *argv[], iperf_opt_t *option)
 			case -1: // end
 				if (option->server)
 					option->passthrough = false;
+
+				if (option->udp)
+				{
+					if (option->send_length == 0)
+						option->send_length = IPERF_DEFAULT_UDP_DATAGRAM_SIZE;
+					else if (option->send_length > IPERF_DEFAULT_UDP_DATAGRAM_SIZE)
+					{
+						iperf_log("The value of the -l/--length option must be less than or equal to %d.\n",
+									IPERF_DEFAULT_UDP_DATAGRAM_SIZE);
+						return -1;
+					}
+				}
+				else
+				{
+					if (option->send_length == 0)
+						option->send_length = IPERF_DEFAULT_TCP_DATA_SIZE;
+					else if (option->send_length > IPERF_DEFAULT_TCP_DATA_SIZE)
+					{
+						iperf_log("The value of the -l/--length option must be less than or equal to %d.\n",
+									IPERF_DEFAULT_TCP_DATA_SIZE);
+						return -1;
+					}
+				}
 
 				if (!option->passthrough)
 				{
@@ -1717,6 +1764,10 @@ static int iperf_option_parse (int argc, char *argv[], iperf_opt_t *option)
 				strcpy(option->server_ip, optarg);
 				break;
 
+			case 'l': // length
+				option->send_length = atoi(optarg);
+				break;
+
 			case 't': // time
 				option->send_time = atoi(optarg);
 				break;
@@ -1729,11 +1780,21 @@ static int iperf_option_parse (int argc, char *argv[], iperf_opt_t *option)
 				option->negative = true;
 				break;
 
+			case 'D': // done_event
+				option->done_event = true;
+				break;
+
 			/*
 			 * Miscellaneous
 			 */
-			case 'l': // log
-				option->log = true;
+			case 'L': // log
+				option->log = atoi(optarg);
+
+				if (option->log <= 0 || option->log > 2)
+				{
+					iperf_log("invalid log level");
+					return -1;
+				}
 				break;
 
 			case 'h': // help
@@ -1798,13 +1859,15 @@ static int _iperf_main (int argc, char *argv[])
 
 /*	iperf_socket_print(&socket); */
 
-	if (!option.log)
-		nrc_atcmd_log_off();
+	nrc_atcmd_log_off();
+
+	if (option.log > 0)
+		nrc_atcmd_log_on();
 
 	if (iperf_socket_open(&socket, option.ipv6) == 0)
 	{
-/*		if (!option.log)
-			nrc_atcmd_log_off(); */
+		if (option.log == 1)
+			nrc_atcmd_log_off();
 
 		iperf_log("\r\n");
 
@@ -1854,17 +1917,16 @@ static int _iperf_main (int argc, char *argv[])
 
 		iperf_log("\r\n");
 
-/*		if (!option.log)
-			nrc_atcmd_log_on(); */
+		if (option.log == 1)
+			nrc_atcmd_log_on();
 
 		iperf_socket_close(&socket);
 	}
 
-	if (!option.log)
-	{
-		sleep(1);
+	sleep(1);
+
+	if (option.log == 0)
 		nrc_atcmd_log_on();
-	}
 
 	return 0;
 }

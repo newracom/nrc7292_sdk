@@ -301,21 +301,6 @@ nrc_err_t run_sample_udp_client(WIFI_CONFIG *param)
 	xTaskCreate(udp_client_task, "udp_client", 1024,
 					(void*)param, uxTaskPriorityGet(NULL), NULL) ;
 
-	_delay_ms(500);
-
-	if(nrc_wifi_get_state(0) == WIFI_STATE_CONNECTED) {
-		nrc_usr_print("[%s] Trying to DISCONNECT... for exit\n",__func__);
-		if (nrc_wifi_disconnect(0, 5000) != WIFI_SUCCESS) {
-			nrc_usr_print ("[%s] Fail for Wi-Fi disconnection\n", __func__);
-			return -1;
-		}
-	}
-
-	if (error_val < 0)
-		return -1;
-
-	nrc_usr_print("[%s] End of run_sample_udp_client!! \n",__func__);
-
 	return 0;
 }
 

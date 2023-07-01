@@ -8,11 +8,15 @@
 #include "lmac_ps_common.h"
 #include "lmac_common.h"
 #include "util_byte_stream.h"
-#if defined(NRC_ROMLIB) && !defined(NRC7393)
-#include "hal_sflash_lib.h"
+#if defined (BOOT_LOADER) || (INCLUDE_RF_NRC7292RFE) || (LMAC_TEST)
+#if defined (NRC7393) || defined (NRC7394)
+#include "hal_sflash_legacy.h"
 #else
 #include "hal_sflash.h"
-#endif /* defined(NRC_ROMLIB) */
+#endif
+#else
+#include "hal_sflash.h"
+#endif
 
 struct edca_param {
 	uint8_t aifsn;
@@ -127,7 +131,7 @@ void 	 system_modem_api_get_capabilities(struct wim_cap_param* param);
 #define system_modem_api_get_aggregation_ap_by_aid(x, y, z)		lmac_get_aggregation_ap(x, y, NULL, z)
 #define system_modem_api_support_lbt()		lmac_support_lbt()
 
-#define system_modem_api_set_user_timeout(x,y)	lmac_ps_set_usr_timer_tsf(x, y)
+#define system_modem_api_set_user_timeout(x,y)	lmac_ps_set_usr_timer(x, y)
 #define system_modem_api_set_dyn_ps_timeout(x,y)	lmac_dyn_ps_set_timeout(x, y)
 #define system_modem_api_support_modem_sleep()	lmac_ps_get_modem_sleep_support()
 #define system_modem_api_stop_modemsleep()	lmac_ps_modemsleep_stop()
@@ -157,6 +161,8 @@ bool     system_modem_api_set_channel(int vif_id, uint32_t ch_freq);
 bool     system_modem_api_set_channel_ps(int vif_id, struct ret_chinfo ch_info);
 #endif /* defined(INCLUDE_NEW_CHANNEL_CTX) */
 bool     system_modem_api_set_channel_width(int vif_id, uint8_t chan_width, uint8_t prim_loc);
+int8_t   system_modem_api_get_gi(int vif_id);
+bool     system_modem_api_set_gi(int vif_id, uint8_t type);
 void     system_modem_api_set_short_gi(int vif_id, uint8_t short_gi, bool gi_auto_flag);
 bool     system_modem_api_get_short_gi(int vif_id, GenericMacHeader *mqh);
 void     system_modem_api_set_rate_control(int vif_id, bool enable);
@@ -215,6 +221,7 @@ bool system_modem_api_set_hw_version(uint16_t version);
 void system_modem_api_update_probe_resp(uint8_t* probe, uint16_t len);
 void system_modem_api_read_signal_noise(int loc, uint32_t *signal, uint32_t *noise);
 uint32_t system_modem_api_get_snr(struct _SYS_BUF *packet);
+int system_modem_api_get_avg_snr(void);
 uint32_t system_modem_api_get_current_snr(int loc);
 uint32_t system_modem_api_get_current_snr_i(int loc);
 void system_modem_api_init_retention();
@@ -242,13 +249,11 @@ int system_modem_api_ap_get_sta_by_addr(uint8_t vif_id, uint8_t *addr, void *inf
 void system_modem_api_sw_reset(void);
 void system_modem_api_set_rf_power(bool power_on);
 #endif
-uint8_t system_modem_api_get_halow_certificate(void);
-bool system_modem_api_set_halow_certificate(uint8_t halow_value);
 bool system_modem_api_get_vendor_ie_probe_resp(void);
 bool system_modem_api_set_vendor_ie_probe_resp(bool flag);
 bool system_modem_api_powersave_set_sleep(uint8_t sleep_mode,\
 		uint64_t nontim_sleep_ms,uint32_t idle_timout_ms, uint32_t tim_sleep_ms, bool sleep_alone);
-void system_modem_api_ps_resume_deep_sleep();
+bool system_modem_api_ps_resume_deep_sleep();
 bool system_modem_api_ps_set_gpio_wakeup_pin(bool check_debounce, int pin_number);
 bool system_modem_api_ps_set_wakeup_source(uint8_t wakeup_source);
 void system_modem_api_ps_set_gpio_direction(uint32_t bitmask);

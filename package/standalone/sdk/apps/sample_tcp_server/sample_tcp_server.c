@@ -307,18 +307,6 @@ nrc_err_t run_sample_tcp_server(WIFI_CONFIG* param)
 	xTaskCreate(tcp_server_task, "tcp_server_task", 2048,
 					(void*)param, uxTaskPriorityGet(NULL), NULL);
 
-	_delay_ms(500);
-
-	if (nrc_wifi_get_state(0) == WIFI_STATE_CONNECTED) {
-		nrc_usr_print("[%s] Trying to DISCONNECT... for exit\n",__func__);
-		if (nrc_wifi_disconnect(0, 5000) != WIFI_SUCCESS) {
-			nrc_usr_print ("[%s] Fail for Wi-Fi disconnection\n", __func__);
-			return -1;
-		}
-	}
-
-	if (error_val < 0)
-		return -1;
 	return 0;
 }
 

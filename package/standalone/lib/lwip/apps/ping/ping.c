@@ -75,11 +75,6 @@
 #define PING_RCV_TIMEO 1000
 #endif
 
-/** ping identifier - must fit on a u16_t */
-#ifndef PING_ID
-#define PING_ID        0xAFAF
-#endif
-
 /** ping result action - no default action */
 #ifndef PING_RESULT
 #define PING_RESULT(ping_ok)
@@ -120,6 +115,8 @@ ping_parameters_init(void *arg)
 	ping_info->count = 0;
 	ping_info->success = 0;
 	ping_info->total_delay = 0;
+	/* unique ping ID for each session by taking thread_handle pointer */
+	ping_info->id = (uintptr_t) ping_info->ping_thread.thread_handle & 0xFFFF;
 }
 
 /** Prepare a echo ICMP request */
@@ -133,7 +130,7 @@ ping_prepare_echo(void *arg, struct icmp_echo_hdr *iecho, u16_t len)
 	ICMPH_TYPE_SET(iecho, ICMP_ECHO);
 	ICMPH_CODE_SET(iecho, 0);
 	iecho->chksum = 0;
-	iecho->id     = PING_ID;
+	iecho->id     = ping_info->id;
 	iecho->seqno  = htons(++ping_info->seq_num);
 
 	/* fill the additional data buffer with some data */
@@ -191,56 +188,34 @@ ping_recv(void *arg, int s)
 	ping_parm_t* ping_info = (ping_parm_t*)arg;
 	char buf[64];
 	int len;
-	struct sockaddr_storage from;
-	int fromlen = sizeof(from);
+	char from_str[INET_ADDRSTRLEN];
 
 	ping_info->time_delay=0;
 
-	while((len = lwip_recvfrom(s, buf, sizeof(buf), 0, (struct sockaddr*)&from, (socklen_t*)&fromlen)) > 0) {
+	while ((len = lwip_recv(s, buf, sizeof(buf), 0)) > 0) {
 		if (len >= (int)(sizeof(struct ip_hdr)+sizeof(struct icmp_echo_hdr))) {
-			ip_addr_t fromaddr;
-			memset(&fromaddr, 0, sizeof(fromaddr));
+			struct ip_hdr *iphdr;
+			struct icmp_echo_hdr *iecho;
 
-#if LWIP_IPV4
-			if(from.ss_family == AF_INET) {
-				struct sockaddr_in *from4 = (struct sockaddr_in*)&from;
-				inet_addr_to_ip4addr(ip_2_ip4(&fromaddr), &from4->sin_addr);
-				IP_SET_TYPE_VAL(fromaddr, IPADDR_TYPE_V4);
+			iphdr = (struct ip_hdr *)buf;
+			iecho = (struct icmp_echo_hdr *)(buf + (IPH_HL(iphdr) * 4));
+			if ((iecho->id == ping_info->id) && (iecho->seqno == lwip_htons(ping_info->seq_num))) {
+				ping_info->time_delay = (sys_now() - ping_info->time);
+				inet_ntop(AF_INET, &ping_info->addr, from_str, INET_ADDRSTRLEN);
+				ping_mutex_lock();
+				LWIP_DEBUGF( PING_DEBUG, ("ping: recv %s", from_str));
+				LWIP_DEBUGF( PING_DEBUG, (" [%d] ", ping_info->seq_num));
+				LWIP_DEBUGF( PING_DEBUG, (" %"U32_F" ms\n", ping_info->time_delay));
+				ping_mutex_unlock();
+
+				/* do some ping result processing */
+				PING_RESULT((ICMPH_TYPE(iecho) == ICMP_ER));
+				ping_info->total_delay += ping_info->time_delay;
+				ping_info->success++;
+				return;
 			}
-#endif /* LWIP_IPV4 */
-
-			/* todo: support ICMP6 echo */
-#if LWIP_IPV4
-			if (IP_IS_V4_VAL(fromaddr)) {
-				struct ip_hdr *iphdr;
-				struct icmp_echo_hdr *iecho;
-
-				iphdr = (struct ip_hdr *)buf;
-				iecho = (struct icmp_echo_hdr *)(buf + (IPH_HL(iphdr) * 4));
-				if ((iecho->id == PING_ID) && (iecho->seqno == lwip_htons(ping_info->seq_num))) {
-					ping_info->time_delay = (sys_now() -ping_info-> time);
-					ping_mutex_lock();
-					LWIP_DEBUGF( PING_DEBUG, ("ping: recv "));
-					ip_addr_debug_print_val(PING_DEBUG, fromaddr);
-					LWIP_DEBUGF( PING_DEBUG, (" [%d] ", ping_info->seq_num));
-					LWIP_DEBUGF( PING_DEBUG, (" %"U32_F" ms\n", ping_info->time_delay));
-					ping_mutex_unlock();
-
-					/* do some ping result processing */
-					PING_RESULT((ICMPH_TYPE(iecho) == ICMP_ER));
-					ping_info->total_delay += ping_info->time_delay;
-					ping_info->success++;
-					return;
-				} else {
-					ping_mutex_lock();
-					LWIP_DEBUGF( PING_DEBUG, ("ping: drop\n"));
-					ping_mutex_unlock();
-				}
-			}
-#endif /* LWIP_IPV4 */
 		}
-		fromlen = sizeof(from);
-  }
+	}
 
 	if (len == 0) {
 		ping_mutex_lock();

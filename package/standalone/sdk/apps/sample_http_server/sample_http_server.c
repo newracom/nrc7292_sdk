@@ -131,7 +131,7 @@ static nrc_err_t start_softap(WIFI_CONFIG* param)
 		return NRC_FAIL;
 	}
 	nrc_usr_print ("\033[31m [%s] calling nrc_wifi_softap_set_ip \033[39m\n", __func__);
-	if (nrc_wifi_softap_set_ip(0, (char *)param->static_ip) != WIFI_SUCCESS) {
+	if (nrc_wifi_softap_set_ip(0, (char *)&param->static_ip, (char *)&param->netmask, (char *)&param->gateway) != WIFI_SUCCESS) {
 		nrc_usr_print("[%s] Fail set AP's IP\n", __func__);
 		return NRC_FAIL;
 	}

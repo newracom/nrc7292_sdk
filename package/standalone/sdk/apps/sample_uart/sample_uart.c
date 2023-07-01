@@ -89,7 +89,7 @@ static int uart_init(NRC_UART_CONFIG* conf)
 char HalowRxBuffer[10]={'0', '1','2','3','4','5','6','7','8','9'};
 void SendtoDevice(NRC_UART_CONFIG* conf, int packetLen)
 {
-	unsigned char ucLoopCount = 0;
+	unsigned int ucLoopCount = 0;
 	nrc_usr_print("[%s] SendtoDevice :%d CH:%d\n",__func__, packetLen, conf->ch);
 
 	for(ucLoopCount=0; ucLoopCount<packetLen; ucLoopCount++){

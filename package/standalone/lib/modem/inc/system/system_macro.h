@@ -94,8 +94,13 @@
 #define IN32(reg) 			(*((volatile uint32_t *)(reg)))
 #define OUT32(reg, data)	((*((volatile uint32_t *)(reg)))=(uint32_t)(data))
 
+#ifndef MIN
 #define MIN(x, y)               (((x) < (y))? (x) : (y))
+#endif
+
+#ifndef MAX
 #define MAX(x, y)               (((x) > (y))? (x) : (y))
+#endif
 
 #define BITAND(A, B)            (((uint32_t)A)&((uint32_t)B))
 #define BITOR(A, B)             (((uint32_t)A)|((uint32_t)B))

@@ -73,10 +73,6 @@ static void mutex_unlock (struct mutex *m)
 		WARN_ON(xSemaphoreGive(m->handle) !=pdTRUE);
 }
 
-#define spin_lock_init(lock)    mutex_init(lock)
-#define spin_lock(lock)         mutex_lock(lock)
-#define spin_unlock(lock)       mutex_unlock(lock)
-
 /********************************************************************************/
 
 struct list_head
@@ -327,9 +323,24 @@ void iperf_option_free(iperf_opt_t* option)
 		mem_free(option);
 }
 
+void nrc_iperf_spin_lock_init(void)
+{
+	mutex_init(&iperf_lock);
+}
+
+void nrc_iperf_spin_lock(void)
+{
+	mutex_lock(&iperf_lock);
+}
+
+void nrc_iperf_spin_unlock(void)
+{
+	mutex_unlock(&iperf_lock);
+}
+
 int nrc_iperf_list_init(void)
 {
-	spin_lock_init(&iperf_lock);
+	nrc_iperf_spin_lock_init();
 	INIT_LIST_HEAD(&iperf_head);
 	return 0;
 }
@@ -338,25 +349,25 @@ void nrc_iperf_list_deinit(void)
 {
 	struct iperf_task *cur, *next;
 
-	spin_lock(&iperf_lock);
+	nrc_iperf_spin_lock();
 	list_for_each_entry_safe(cur, next, &iperf_head, list) {
 		list_del(&cur->list);
 		if(cur) mem_free(cur);
 	}
-	spin_unlock(&iperf_lock);
+	nrc_iperf_spin_unlock();
 }
 
 static void nrc_iperf_list_print(void)
 {
 	struct iperf_task *cur, *next;
 
-	spin_lock(&iperf_lock);
+	nrc_iperf_spin_lock();
 	list_for_each_entry_safe(cur, next, &iperf_head, list) {
 		A("%s ", (cur->option->mUDP == 1) ?  "UDP" : "TCP");
 		A("%s :", (cur->option->mThreadMode == kMode_Server) ?  "Server" : "Client");
 		A("%s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&cur->option->addr)));
 	}
-	spin_unlock(&iperf_lock);
+	nrc_iperf_spin_unlock();
 }
 
 int nrc_iperf_task_list_add(iperf_opt_t* option)
@@ -364,16 +375,16 @@ int nrc_iperf_task_list_add(iperf_opt_t* option)
 	struct iperf_task *task;
 	struct iperf_task *cur, *next;
 
-	spin_lock(&iperf_lock);
+	nrc_iperf_spin_lock();
 	list_for_each_entry_safe(cur, next, &iperf_head, list) {
 		if ((option->mThreadMode == cur->option->mThreadMode) &&
 				(option->mUDP == cur->option->mUDP) &&
 				(ip_addr_cmp(&cur->option->addr,&option->addr))) {
-			spin_unlock(&iperf_lock);
+			nrc_iperf_spin_unlock();
 			return -1;
 		}
 	}
-	spin_unlock(&iperf_lock);
+	nrc_iperf_spin_unlock();
 
 	task = mem_malloc(sizeof(struct iperf_task));
 	if (!task)
@@ -382,9 +393,9 @@ int nrc_iperf_task_list_add(iperf_opt_t* option)
 	task->option = option;
 	INIT_LIST_HEAD(&task->list);
 
-	spin_lock(&iperf_lock);
+	nrc_iperf_spin_lock();
 	list_add_tail(&task->list, &iperf_head);
-	spin_unlock(&iperf_lock);
+	nrc_iperf_spin_unlock();
 
 	return 0;
 }
@@ -394,7 +405,7 @@ int nrc_iperf_task_list_del(iperf_opt_t* option)
 	struct iperf_task *cur, *next;
 	int ret = -1;
 
-	spin_lock(&iperf_lock);
+	nrc_iperf_spin_lock();
 	list_for_each_entry_safe(cur, next, &iperf_head, list) {
 		if ((option->mThreadMode == cur->option->mThreadMode) &&
 				(option->mUDP == cur->option->mUDP) &&
@@ -405,7 +416,7 @@ int nrc_iperf_task_list_del(iperf_opt_t* option)
 			break;
 		}
 	}
-	spin_unlock(&iperf_lock);
+	nrc_iperf_spin_unlock();
 
 	return ret;
 }
@@ -416,7 +427,7 @@ static iperf_opt_t* nrc_iperf_task_get(iperf_opt_t* option)
 	struct iperf_task *cur, *next;
 	iperf_opt_t* ret_opt = NULL;
 
-	spin_lock(&iperf_lock);
+	nrc_iperf_spin_lock();
 	list_for_each_entry_safe(cur, next, &iperf_head, list) {
 		if ((option->mThreadMode == cur->option->mThreadMode) &&
 				(option->mUDP == cur->option->mUDP) &&
@@ -425,7 +436,7 @@ static iperf_opt_t* nrc_iperf_task_get(iperf_opt_t* option)
 			break;
 		}
 	}
-	spin_unlock(&iperf_lock);
+	nrc_iperf_spin_unlock();
 	return ret_opt;
 }
 
@@ -435,7 +446,7 @@ static int check_destination_address(iperf_opt_t* option)
 
 	if(option->mThreadMode == kMode_Client){
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
-		if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+		if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
 			if (ip4_addr_cmp(&br_netif.ip_addr, &option->addr)) {
 				return -1;
 			}
@@ -600,7 +611,7 @@ int iperf_stop(iperf_opt_t* option)
 	int i;
 	if(option->mThreadMode == kMode_Server){
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
-		if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+		if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
 			if(!ip4_addr_isany_val(br_netif.ip_addr)){
 				ip4_addr_copy(option->addr, br_netif.ip_addr);
 				iperf_stop_session(option);
@@ -668,7 +679,7 @@ int  iperf_run(int argc, char *argv[], void *report_cb)
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
 		struct netif *target_if;
 
-		if (get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+		if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
 			target_if = &br_netif;
 		} else {
 			target_if = &eth_netif;

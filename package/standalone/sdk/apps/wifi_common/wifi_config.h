@@ -43,13 +43,20 @@
 #define STR_SSID "halow_demo"
 #endif /* STR_SSID */
 
+/**
+ * BSSID (Basic Service Set Identifier)
+ * To set the AP BSSID to connect to when the device is in STA mode
+ * it represents the MAC physical address of an access point
+ */
+#ifndef STR_BSSID
+#define STR_BSSID "00:00:00:00:00:00"
+#endif /* STR_BSSID */
+
 
 /**
  * Country code
  * The ISO/IEC alpha2 country code for the country in which this device is
- * currently operating.
- * K1:Korea-USN, K2: Korea-MIC, JP: Japan, US:United States, TW: Taiwan
- * AU:Australia, NZ: New Zealand, CN: China , EU: EURO
+ * currently operating.{US|JP|K0|K1|TW|EU|CN|NZ|AU|K2}
  */
 #ifndef COUNTRY_CODE
 #define COUNTRY_CODE "US"
@@ -156,6 +163,7 @@
  *
  *     Fixed(2): The device will use a fixed Tx power level, which can be useful
  *               for testing or for applications where a consistent power level is required.
+ * The AUTO (0) and LIMIT (1) options operate auto TX gain adjustment using board data file.
  */
 #ifndef TX_POWER_TYPE
 #define TX_POWER_TYPE 1
@@ -296,7 +304,7 @@
  * disconnected to free up network resources.
  */
 #ifndef WIFI_BSS_MAX_IDLE
-#define WIFI_BSS_MAX_IDLE	60 /* bss_max_idle unit(second) */
+#define WIFI_BSS_MAX_IDLE	0 /* bss_max_idle unit(second) */
 #endif /* WIFI_BSS_MAX_IDLE */
 
 /**
@@ -419,5 +427,39 @@
 #ifndef NRC_WIFI_NETWORK_MODE_DEFAULT
 #define NRC_WIFI_NETWORK_MODE_DEFAULT WIFI_NETWORK_MODE_NAT
 #endif /* NRC_WIFI_NETWORK_MODE_DEFAULT */
+
+
+/**
+ * Wi-Fi Rate Control: Controls the rate at which data is transmitted over Wi-Fi.
+ */
+#ifndef NRC_WIFI_RATE_CONTROL
+#define NRC_WIFI_RATE_CONTROL 1
+#endif /* NRC_WIFI_RATE_CONTROL */
+
+
+/**
+ * Wi-Fi MCS (Modulation and Coding Scheme): Determines the data rate and error correction
+ * capability for Wi-Fi transmissions. Applied only when rate control is disabled.
+ */
+#ifndef NRC_WIFI_MCS_DEFAULT
+#define NRC_WIFI_MCS_DEFAULT 10
+#endif /* NRC_WIFI_MCS_DEFAULT*/
+
+
+/**
+ * Wi-Fi CCA (Clear Channel Assessment) Threshold: Specifies the signal strength threshold
+ * below which Wi-Fi considers the channel to be clear and available for transmission.
+ */
+#ifndef NRC_WIFI_CCA_THRES_DEFAULT
+#define NRC_WIFI_CCA_THRES_DEFAULT -75
+#endif /* NRC_WIFI_CCA_THRES_DEFAULT */
+
+/**
+ * Wi-Fi Guard Interval(GI) Type
+ * The default network mode Long GI(0) or Short GI(1) for Wi-Fi. The default value is Long GI(0)
+ */
+#ifndef NRC_WIFI_GUARD_INTERVAL_DEFAULT
+#define NRC_WIFI_GUARD_INTERVAL_DEFAULT 0
+#endif /* NRC_WIFI_GUARD_INTERVAL_DEFAULT*/
 
 #endif /* __WIFI_CONFIG_H__ */

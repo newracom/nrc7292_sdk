@@ -102,6 +102,7 @@ uint32_t drv_pmc_get_pwr_alarm_cnt(void);
 const char *drv_scfg_get_boot_reason_str(uint8_t reason);
 void drv_scfg_store_boot_reason();
 uint8_t drv_get_boot_reason();
+void drv_set_boot_reason(uint32_t br);
 uint8_t drv_scfg_get_boot_reason();
 void drv_scfg_clr_boot_reason();
 

@@ -3,20 +3,18 @@
 
 #include "system.h"
 
-#define HW_VERSION_GPIO_HIGH 27
-#define HW_VERSION_GPIO_MID 28
-#define HW_VERSION_GPIO_LOW 29
-
 // GPIO[27:29]
 #define NRC7292_A_VALUE 7 /* 0b111 */
 #define NRC7292_B_VALUE 0 /* 0b000 */
-#define NRC7292_C_VALUE 4 /* 0b100 */
+#define NRC7292_C_VALUE 1 /* 0b001 */
+#define NRC7292_F_VALUE 3 /* 0b011 */
 
 typedef enum {
     NRC7292_BOARD_REV_INVALID = -1,
     NRC7292_A = 0,
     NRC7292_B,
     NRC7292_C,
+    NRC7292_F,
     NRC7292_BOARD_REV_MAX
 } board_revision;
 

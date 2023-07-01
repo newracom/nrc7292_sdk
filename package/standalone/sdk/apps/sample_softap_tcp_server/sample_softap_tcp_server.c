@@ -292,7 +292,7 @@ nrc_err_t run_sample_softap_tcp_server(WIFI_CONFIG* param)
 		return NRC_FAIL;
 	}
 
-	if (nrc_wifi_softap_set_ip(0, (char *)&param->static_ip) != WIFI_SUCCESS) {
+	if (nrc_wifi_softap_set_ip(0, (char *)&param->static_ip, (char *)&param->netmask, (char *)&param->gateway) != WIFI_SUCCESS) {
 		nrc_usr_print("[%s] Fail set AP's IP\n", __func__);
 		return NRC_FAIL;
 	}
@@ -307,21 +307,6 @@ nrc_err_t run_sample_softap_tcp_server(WIFI_CONFIG* param)
 
 	xTaskCreate(softap_tcp_server_task, "softap_tcp_server_task", 2048,
 						(void*)param, uxTaskPriorityGet(NULL), NULL);
-
-	_delay_ms(500);
-
-	if (nrc_wifi_get_state(0) == WIFI_STATE_CONNECTED) {
-		nrc_usr_print("[%s] Trying to DISCONNECT... for exit\n",__func__);
-		if (nrc_wifi_disconnect(0, 5000) != WIFI_SUCCESS) {
-			nrc_usr_print ("[%s] Fail for Wi-Fi disconnection (results:%d)\n", __func__);
-			return NRC_FAIL;
-		}
-	}
-
-	if (error_val < 0)
-		return NRC_FAIL;
-
-	nrc_usr_print("[%s] End of user_init!! \n",__func__);
 
 	return NRC_SUCCESS;
 }

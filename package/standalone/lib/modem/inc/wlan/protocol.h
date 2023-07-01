@@ -88,10 +88,13 @@
 
 typedef struct _QoSField {
 	uint16_t    qos_tid                 : 4;
-    uint16_t    qos_eosp                : 1;
+	uint16_t    qos_eosp                : 1;
 	uint16_t    qos_ack_policy          : 2;   /* 00: normal ack, 01: no ack, 10: no explicit ack or scheduled ack under PSMP, 11: block ack */
 	uint16_t    qos_amsdu_present       : 1;   /* AMSDU Presence */
-	uint16_t    qos_bit8_15             : 8;
+	uint16_t    qos_mesh_ctl_present    : 1;
+	uint16_t    qos_mesh_ps_level       : 1;
+	uint16_t    qos_mesh_rspi           : 1;
+	uint16_t    qos_bit11_15            : 5;
 } QoSField;
 
 typedef struct _GenericMacHeader {
@@ -120,19 +123,22 @@ typedef struct _GenericMacHeader {
 	uint16_t    fragment_number    : 4;
 	uint16_t    sequence_number    : 12;
 
-    /* Qos Control Field(16bit) exist only subtype is QoS Data or Qos Null */
-    /* Word 6 : MAC Header Word 6(2Byte) */
-    union {
-        struct {
-        	uint16_t    qos_tid                 : 4;
-    	    uint16_t    qos_eosp                : 1;
-        	uint16_t    qos_ack_policy          : 2;   /* 00: normal ack, 01: no ack, 10: no explicit ack or scheduled ack under PSMP, 11: block ack */
-        	uint16_t    qos_amsdu_present       : 1;   /* AMSDU Presence */
-        	uint16_t    qos_bit8_15             : 8;
-            uint8_t     qos_payload[0];
-        };
-        uint8_t payload[0];
-    };
+	/* Qos Control Field(16bit) exist only subtype is QoS Data or Qos Null */
+	/* Word 6 : MAC Header Word 6(2Byte) */
+	union {
+		struct {
+			uint16_t    qos_tid                 : 4;
+			uint16_t    qos_eosp                : 1;
+			uint16_t    qos_ack_policy          : 2;   /* 00: normal ack, 01: no ack, 10: no explicit ack or scheduled ack under PSMP, 11: block ack */
+			uint16_t    qos_amsdu_present       : 1;   /* AMSDU Presence */
+			uint16_t    qos_mesh_ctl_present    : 1;
+			uint16_t    qos_mesh_ps_level       : 1;
+			uint16_t    qos_mesh_rspi           : 1;
+			uint16_t    qos_bit11_15            : 5;
+			uint8_t     qos_payload[0];
+		};
+		uint8_t payload[0];
+	};
 } GenericMacHeader;
 
 struct ieee80211_beacon {
@@ -388,11 +394,25 @@ typedef struct _UDPField {
 	uint16_t   cs;
 } UDPField;
 
+#define MESH_FLAGS_AE_A4    0x1
+#define MESH_FLAGS_AE_A5_A6 0x2
+#define MESH_FLAGS_AE       0x3
+typedef struct ieee80211s_hdr {
+	uint8_t    flags     : 2;
+	uint8_t    propagate : 1;
+	uint8_t    reserved  : 5;
+	uint8_t    ttl;
+	uint32_t   seqnum;
+	uint8_t    eaddr1[6];
+	uint8_t    eaddr2[6];
+} __attribute__((packed)) MeshControlField;
+
 int ieee80211_ver(void* frame);
 bool ieee80211_is_pv0(void* frame);
 bool ieee80211_is_pv1(void* frame);
 bool ieee80211_group_addr(uint8_t *addr);
 bool ieee80211_broadcast_addr(uint8_t *addr);
+bool ieee80211_null_addr(uint8_t *addr);
 bool ieee80211_is_pv1_mgmt(GenericMacHeader *gmh);
 bool ieee80211_is_mgmt(GenericMacHeader *gmh);
 bool ieee80211_is_ctrl(GenericMacHeader *gmh);

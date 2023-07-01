@@ -67,18 +67,17 @@ typedef struct {
         }                                                                                                  \
     } while (0)
 
-static inline bool w5500_lock(emac_w5500_t *emac)
+ATTR_NC __attribute__((optimize("O3"))) static inline bool w5500_lock(emac_w5500_t *emac)
 {
-//    return xSemaphoreTake(emac->spi_lock, pdMS_TO_TICKS(W5500_SPI_LOCK_TIMEOUT_MS)) == pdTRUE;
     return xSemaphoreTake(emac->spi_lock, portMAX_DELAY) == pdTRUE;
 }
 
-static inline bool w5500_unlock(emac_w5500_t *emac)
+ATTR_NC __attribute__((optimize("O3"))) static inline bool w5500_unlock(emac_w5500_t *emac)
 {
     return xSemaphoreGive(emac->spi_lock) == pdTRUE;
 }
 
-static nrc_err_t w5500_write(emac_w5500_t *emac, uint32_t address, const void *value, uint32_t len)
+ATTR_NC __attribute__((optimize("O3"))) static nrc_err_t w5500_write(emac_w5500_t *emac, uint32_t address, const void *value, uint32_t len)
 {
     nrc_err_t ret = NRC_SUCCESS;
     uint8_t *buffer = NULL;
@@ -109,7 +108,7 @@ static nrc_err_t w5500_write(emac_w5500_t *emac, uint32_t address, const void *v
     return ret;
 }
 
-static nrc_err_t w5500_read(emac_w5500_t *emac, uint32_t address, void *value, uint32_t len)
+ATTR_NC __attribute__((optimize("O3"))) static nrc_err_t w5500_read(emac_w5500_t *emac, uint32_t address, void *value, uint32_t len)
 {
     nrc_err_t ret = NRC_SUCCESS;
     uint8_t addr[3];
@@ -160,7 +159,7 @@ static nrc_err_t w5500_read(emac_w5500_t *emac, uint32_t address, void *value, u
     return ret;
 }
 
-static nrc_err_t w5500_send_command(emac_w5500_t *emac, uint8_t command, uint32_t timeout_ms)
+ATTR_NC __attribute__((optimize("O3"))) static nrc_err_t w5500_send_command(emac_w5500_t *emac, uint8_t command, uint32_t timeout_ms)
 {
     nrc_err_t ret = NRC_SUCCESS;
     MAC_CHECK(w5500_write(emac, W5500_REG_SOCK_CR(0), &command, sizeof(command)), err, "write SCR failed\n");
@@ -179,7 +178,7 @@ err:
     return ret;
 }
 
-static nrc_err_t w5500_get_tx_free_size(emac_w5500_t *emac, uint16_t *size)
+ATTR_NC __attribute__((optimize("O3"))) static nrc_err_t w5500_get_tx_free_size(emac_w5500_t *emac, uint16_t *size)
 {
     nrc_err_t ret = NRC_SUCCESS;
     uint16_t free0, free1 = 0;
@@ -196,7 +195,7 @@ err:
     return ret;
 }
 
-static nrc_err_t w5500_get_rx_received_size(emac_w5500_t *emac, uint16_t *size)
+ATTR_NC __attribute__((optimize("O3"))) static nrc_err_t w5500_get_rx_received_size(emac_w5500_t *emac, uint16_t *size)
 {
     nrc_err_t ret = NRC_SUCCESS;
     uint16_t received0, received1 = 0;
@@ -210,7 +209,7 @@ err:
     return ret;
 }
 
-static nrc_err_t w5500_write_buffer(emac_w5500_t *emac, const void *buffer, uint32_t len, uint16_t offset)
+ATTR_NC __attribute__((optimize("O3"))) static nrc_err_t w5500_write_buffer(emac_w5500_t *emac, const void *buffer, uint32_t len, uint16_t offset)
 {
     nrc_err_t ret = NRC_SUCCESS;
     uint32_t remain = len;
@@ -229,7 +228,7 @@ err:
     return ret;
 }
 
-static nrc_err_t w5500_read_buffer(emac_w5500_t *emac, void *buffer, uint32_t len, uint16_t offset)
+ATTR_NC __attribute__((optimize("O3"))) static nrc_err_t w5500_read_buffer(emac_w5500_t *emac, void *buffer, uint32_t len, uint16_t offset)
 {
     nrc_err_t ret = NRC_SUCCESS;
     uint32_t remain = len;
@@ -352,19 +351,52 @@ err:
     return ret;
 }
 
-static void w5500_isr_handler(void *arg)
+#ifdef ENABLE_ETHERNET_INTERRUPT
+ATTR_NC __attribute__((optimize("O3"))) static void w5500_intr_handler(int vector)
 {
-    emac_w5500_t *emac = (emac_w5500_t *)arg;
-    BaseType_t high_task_wakeup = pdFALSE;
-    /* notify w5500 task */
-    vTaskNotifyGiveFromISR(emac->rx_task_hdl, &high_task_wakeup);
-    if (high_task_wakeup != pdFALSE) {
-        V(TT_NET, "[%s] calling portYIELD_FROM_ISR\n", __func__);
-        portYIELD_FROM_ISR(high_task_wakeup);
-    }
-}
+    int input_high;
 
-static void emac_w5500_task(void *arg)
+    if (nrc_gpio_inputb(GPIO_INT_PIN, &input_high) < 0) {
+        return;
+    }
+
+#ifdef NRC7292
+    if (input_high) {
+        V(TT_NET, "[%s] input high\n", __func__);
+        V(TT_NET, "[%s] system_irq_mask. vector = 0x%x\n", __func__, interrupt_vector);
+#endif
+        interrupt_vector = vector;
+        system_irq_mask(interrupt_vector);
+//        w5500_isr_handler(isr_arg);
+		emac_w5500_t *emac = (emac_w5500_t *)isr_arg;
+		BaseType_t high_task_wakeup = pdFALSE;
+		/* notify w5500 task */
+		vTaskNotifyGiveFromISR(emac->rx_task_hdl, &high_task_wakeup);
+		if (high_task_wakeup != pdFALSE) {
+			V(TT_NET, "[%s] calling portYIELD_FROM_ISR\n", __func__);
+			portYIELD_FROM_ISR(high_task_wakeup);
+		}
+
+#ifdef NRC7394
+		V(TT_NET, "[%s] Clear EINT00STAT...\n", __func__);
+		volatile uint32_t *eint0_stat;
+		if (vector == EV_EXT0) {
+			eint0_stat = (uint32_t *) (0x40005000 + 0x844);
+		} else {
+			eint0_stat = (uint32_t *) (0x40005000 + 0x84C);
+		}
+		*eint0_stat |= 1;
+		system_irq_unmask(vector);
+#endif
+#ifdef NRC7292
+    } else {
+        V(TT_NET, "[%s] input low\n", __func__);
+    }
+#endif
+}
+#endif
+
+ATTR_NC __attribute__((optimize("O3"))) static void emac_w5500_task(void *arg)
 {
     emac_w5500_t *emac = (emac_w5500_t *)arg;
     uint8_t status = 0;
@@ -593,7 +625,7 @@ static nrc_err_t emac_w5500_set_peer_pause_ability(esp_eth_mac_t *mac, uint32_t 
     return NRC_FAIL;
 }
 
-static inline bool is_w5500_sane_for_rxtx(emac_w5500_t *emac)
+ATTR_NC __attribute__((optimize("O3"))) static inline bool is_w5500_sane_for_rxtx(emac_w5500_t *emac)
 {
     uint8_t phycfg;
     /* phy is ok for rx and tx operations if bits RST and LNK are set (no link down, no reset) */
@@ -603,7 +635,7 @@ static inline bool is_w5500_sane_for_rxtx(emac_w5500_t *emac)
     return false;
 }
 
-static nrc_err_t emac_w5500_transmit(esp_eth_mac_t *mac, uint8_t *buf, uint32_t length)
+ATTR_NC  __attribute__((optimize("O3"))) static nrc_err_t emac_w5500_transmit(esp_eth_mac_t *mac, uint8_t *buf, uint32_t length)
 {
     nrc_err_t ret = NRC_SUCCESS;
     emac_w5500_t *emac = __containerof(mac, emac_w5500_t, parent);
@@ -634,7 +666,7 @@ static nrc_err_t emac_w5500_transmit(esp_eth_mac_t *mac, uint8_t *buf, uint32_t 
     while (!(status & W5500_SIR_SEND)) {
         MAC_CHECK(w5500_read(emac, W5500_REG_SOCK_IR(0), &status, sizeof(status)), err, "read SOCK0 IR failed\n");
         if ((retry++ > 3 && !is_w5500_sane_for_rxtx(emac)) || retry > 10) {
-            E(TT_NET, "[%s] error transmission, retry = %d...\n", __func__, retry);
+            V(TT_NET, "[%s] error transmission, retry = %d...\n", __func__, retry);
             return NRC_FAIL;
         }
     }
@@ -646,7 +678,7 @@ err:
     return ret;
 }
 
-static nrc_err_t emac_w5500_receive(esp_eth_mac_t *mac, uint8_t *buf, uint32_t *length)
+ATTR_NC __attribute__((optimize("O3"))) static nrc_err_t emac_w5500_receive(esp_eth_mac_t *mac, uint8_t *buf, uint32_t *length)
 {
     nrc_err_t ret = NRC_SUCCESS;
     emac_w5500_t *emac = __containerof(mac, emac_w5500_t, parent);
@@ -683,41 +715,6 @@ err:
 }
 
 #ifdef ENABLE_ETHERNET_INTERRUPT
-static void w5500_intr_handler(int vector)
-{
-    int input_high;
-
-    if (nrc_gpio_inputb(GPIO_INT_PIN, &input_high) < 0) {
-        return;
-    }
-
-#ifdef NRC7292
-    if (input_high) {
-        V(TT_NET, "[%s] input high\n", __func__);
-        V(TT_NET, "[%s] system_irq_mask. vector = 0x%x\n", __func__, interrupt_vector);
-#endif
-        interrupt_vector = vector;
-        system_irq_mask(interrupt_vector);
-        w5500_isr_handler(isr_arg);
-
-#ifdef NRC7394
-		V(TT_NET, "[%s] Clear EINT00STAT...\n", __func__);
-		volatile uint32_t *eint0_stat;
-		if (vector == EV_EXT0) {
-			eint0_stat = (uint32_t *) (0x40005000 + 0x844);
-		} else {
-			eint0_stat = (uint32_t *) (0x40005000 + 0x84C);
-		}
-		*eint0_stat |= 1;
-		system_irq_unmask(vector);
-#endif
-#ifdef NRC7292
-    } else {
-        V(TT_NET, "[%s] input low\n", __func__);
-    }
-#endif
-}
-
 #ifdef NRC7394
 nrc_err_t eth_gpio_register_interrupt_handler(int intr_src, int pin, intr_handler_fn cb)
 {
@@ -926,9 +923,9 @@ esp_eth_mac_t *esp_eth_mac_new_w5500(const eth_mac_config_t *mac_config)
     emac->link = ETH_LINK_DOWN;
 
     /* create w5500 task */
-    I(TT_NET, "[%s] w5500_tsk running with priority:%d (NRC_TASK_PRIORITY - 1)\n", __func__, NRC_TASK_PRIORITY - 1);
+    I(TT_NET, "[%s] w5500_tsk running with priority: %d\n", __func__, LWIP_TASK_PRIORITY);
     BaseType_t xReturned = xTaskCreate(emac_w5500_task, "w5500_tsk", mac_config->rx_task_stack_size, emac,
-                                       NRC_TASK_PRIORITY - 1, &emac->rx_task_hdl);
+                                       LWIP_TASK_PRIORITY, &emac->rx_task_hdl);
     MAC_CHECK_ON_FALSE(xReturned == pdPASS, NULL, err, "create w5500 task failed\n");
     return &(emac->parent);
 

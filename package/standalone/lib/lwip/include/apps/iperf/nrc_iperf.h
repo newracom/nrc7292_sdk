@@ -254,6 +254,8 @@ void nrc_iperf_list_deinit(void);
 int nrc_iperf_task_list_add(iperf_opt_t* option);
 int nrc_iperf_task_list_del(iperf_opt_t* option);
 int  iperf_run(int argc, char *argv[], void *report_cb);
+void nrc_iperf_spin_lock(void);
+void nrc_iperf_spin_unlock(void);
 
 int iperf_get_time (iperf_time_t *time);
 uint32_t byte_to_bps (iperf_time_t time, uint32_t byte);
