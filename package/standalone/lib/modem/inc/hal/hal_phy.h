@@ -80,6 +80,7 @@ void phy_prf_rxgain_lut_write(uint32_t ram_type);
 void phy_nrf_txgain_lut_write(uint32_t ram_type);
 void phy_nrf_rxgain_lut_write(uint32_t ram_type);
 void phy_nrf_txgain_control(uint32_t nrf_txgain);
+void phy_nrf_self_tx_cal_lo_image();
 void phy_nrf_txgain_init_control(uint32_t nrf_txgain);
 void phy_nrf_rxgain_control(uint32_t nrf_rxgain);
 void phy_nrf_rxgain_fixed(uint32_t fixed_rxgain);

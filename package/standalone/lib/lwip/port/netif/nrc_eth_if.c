@@ -8,10 +8,11 @@
 #include "lwip/snmp.h"
 #include "lwip/dhcp.h"
 #include "netif/etharp.h"
-#include "netif/bridgeif.h"
 #include "nat/nat.h"
 #include "lwip/tcpip.h"
-
+#if LWIP_BRIDGE
+#include "netif/bridgeif.h"
+#endif /* LWIP_BRIDGE */
 #include "nrc_lwip.h"
 
 #ifdef ETH_DRIVER_ENC28J60
@@ -30,8 +31,10 @@
 #include "standalone.h"
 
 struct netif eth_netif;
-struct netif br_netif;
-bridgeif_initdata_t bridge_data;
+#if LWIP_BRIDGE
+extern struct netif br_netif;
+extern bridgeif_initdata_t bridge_data;
+#endif /* LWIP_BRIDGE */
 #if defined(SUPPORT_ETHERNET_ACCESSPOINT)
 struct eth_addr peer_mac;
 #endif
@@ -128,13 +131,13 @@ static err_t eth_init( struct netif *netif )
 
 static void status_callback(struct netif *eth_if)
 {
-	struct netif *target_if;
+	struct netif *target_if = eth_if;
 
+#if LWIP_BRIDGE
 	if (network_mode == NRC_NETWORK_MODE_BRIDGE) {
 		target_if = &br_netif;
-	} else {
-		target_if = eth_if;
 	}
+#endif /* LWIP_BRIDGE */
 
 	if (netif_is_up(eth_if)) {
 		if (!ip4_addr_isany_val(*netif_ip4_addr(target_if))) {
@@ -205,12 +208,12 @@ static void nrc_bind_eth_if(esp_eth_mac_t *mac)
 	/* start with link down */
 	netif_set_link_down(&eth_netif);
 
+#if LWIP_BRIDGE
 	if (network_mode == NRC_NETWORK_MODE_BRIDGE) {
-		memcpy(bridge_data.ethaddr.addr, nrc_netif[0]->hwaddr, 6);
-		if (bridge_data.ethaddr.addr[3] < 0xff) {
-			bridge_data.ethaddr.addr[3]++;
+		if (eth_mode == NRC_ETH_MODE_AP) {
+			memcpy(bridge_data.ethaddr.addr, eth_netif.hwaddr, 6);
 		} else {
-			bridge_data.ethaddr.addr[3] = 0;
+			memcpy(bridge_data.ethaddr.addr, nrc_netif[0]->hwaddr, 6);
 		}
 		bridge_data.max_ports = 2;
 		bridge_data.max_fdb_dynamic_entries = 128;
@@ -222,9 +225,13 @@ static void nrc_bind_eth_if(esp_eth_mac_t *mac)
 		bridgeif_fdb_add(&br_netif, &ethbroadcast, BR_FLOOD);
 		netif_set_default(&br_netif);
 		netif_set_up(&br_netif);
-	} else {
+	} else
+#endif /* LWIP_BRIDGE */
+	{
 		if (eth_mode == NRC_ETH_MODE_AP) {
 			netif_set_default(&eth_netif);
+		} else {
+			netif_set_default(nrc_netif[0]);
 		}
 	}
 }
@@ -308,11 +315,13 @@ static nrc_err_t eth_linkdown_handler(esp_eth_handle_t eth_handle)
 {
 	I(TT_NET, "[%s] ethernet disconnected...\n", __func__);
 
+#if LWIP_BRIDGE
 	if (network_mode == NRC_NETWORK_MODE_BRIDGE) {
 		if (eth_mode == NRC_ETH_MODE_STA) {
 			memset(peer_mac.addr, 0, ETH_HWADDR_LEN);
 		}
 	}
+#endif /* LWIP_BRIDGE */
 	netif_set_link_down(&eth_netif);
 	return NRC_SUCCESS;
 }

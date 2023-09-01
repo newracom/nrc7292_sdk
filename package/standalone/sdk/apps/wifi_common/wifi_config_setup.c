@@ -37,11 +37,11 @@
 
 static WIFI_CONFIG* g_wifi_config;
 
-/*********************************************************************
+ /*********************************************************************
  * @brief set default configuration
- *
+  *
  * Set default wifi configuration in memory
- *
+  *
  * @param wifi configuration ptr
  * @returns nrc_err_t
  **********************************************************************/
@@ -53,11 +53,11 @@ static WIFI_CONFIG* g_wifi_config;
 		return NRC_FAIL;
 
 	memcpy(wifi_config->ssid,  STR_SSID, sizeof(STR_SSID));
-	memcpy(wifi_config->bssid,  STR_BSSID,  (MAX_BSSID_LENGTH+1));
+	memcpy(wifi_config->bssid,	STR_BSSID,	(MAX_BSSID_LENGTH+1));
 	memcpy(wifi_config->country,  COUNTRY_CODE, sizeof(COUNTRY_CODE));
 	wifi_config->security_mode = NRC_WIFI_SECURE;
 	memcpy(wifi_config->password, NRC_WIFI_PASSWORD, sizeof(NRC_WIFI_PASSWORD));
-	memset(wifi_config->pmk,  0x0,  (MAX_PMK_LENGTH+1));
+	memset(wifi_config->pmk,  0x0,	(MAX_PMK_LENGTH+1));
 	memset(wifi_config->pmk_ssid,  0x0,  (MAX_SSID_LENGTH+1));
 	memset(wifi_config->pmk_pw,  0x0,  (MAX_PW_LENGTH+1));
 	nrc_set_default_scan_channel(wifi_config);
@@ -87,6 +87,9 @@ static WIFI_CONFIG* g_wifi_config;
 	wifi_config->mcs = NRC_WIFI_MCS_DEFAULT ;
 	wifi_config->gi = NRC_WIFI_GUARD_INTERVAL_DEFAULT;
 	wifi_config->cca_thres = NRC_WIFI_CCA_THRES_DEFAULT;
+	wifi_config->hidden_ssid = NRC_WIFI_HIDDEN_SSID_DEFAULT;
+	wifi_config->max_num_sta = NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT;
+	wifi_config->listen_interval = NRC_WIFI_LISTEN_INTERVAL_DEFAULT;
 
 	return NRC_SUCCESS;
 }
@@ -98,9 +101,11 @@ static WIFI_CONFIG* g_wifi_config;
  * Save wifi configration to key+value storage
  *
  * @param wifi configuration ptr
+ *
+ * @param rewrite : whether to forcefully rewrite configurations
  * @returns nrc_err_t
  **********************************************************************/
-nrc_err_t nrc_save_wifi_config(WIFI_CONFIG* wifi_config)
+nrc_err_t nrc_save_wifi_config(WIFI_CONFIG* wifi_config, int rewrite)
 {
 	nrc_usr_print("[%s]\n", __func__);
 
@@ -109,6 +114,7 @@ nrc_err_t nrc_save_wifi_config(WIFI_CONFIG* wifi_config)
 	nvs_handle_t nvs_handle = 0;
 	size_t length = 0;
 	int32_t nvs_signed_int = 0;
+	uint8_t written = 0;
 
 	if (!wifi_config)
 		goto failed;
@@ -116,6 +122,18 @@ nrc_err_t nrc_save_wifi_config(WIFI_CONFIG* wifi_config)
 	err = nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle);
 	if (NVS_OK != err)
 		goto failed;
+
+	if (!rewrite) {
+		if (nvs_get_u8(nvs_handle, NVS_CONFIG_WRITTEN, &written) == NVS_OK) {
+			if (written) {
+				if (nvs_handle)
+					nvs_close(nvs_handle);
+				return NRC_FAIL;
+			}
+		}
+	}
+
+	nvs_set_u8(nvs_handle, NVS_CONFIG_WRITTEN, 1);
 
 	nvs_set_str(nvs_handle, NVS_SSID, (char*)wifi_config->ssid);
 	nvs_set_str(nvs_handle, NVS_BSSID, (char*)wifi_config->bssid);
@@ -150,6 +168,9 @@ nrc_err_t nrc_save_wifi_config(WIFI_CONFIG* wifi_config)
 	nvs_set_u8(nvs_handle, NVS_WIFI_MCS, (uint8_t)wifi_config->mcs);
 	nvs_set_u8(nvs_handle, NVS_WIFI_GI, (uint8_t)wifi_config->gi);
 	nvs_set_i8(nvs_handle, NVS_WIFI_CCA_THRES, (int8_t)wifi_config->cca_thres);
+	nvs_set_u8(nvs_handle, NVS_WIFI_HIDDEN_SSID, (uint8_t)wifi_config->hidden_ssid);
+	nvs_set_u8(nvs_handle, NVS_WIFI_SOFTAP_MAX_NUM_STA, (uint8_t)wifi_config->max_num_sta);
+	nvs_set_u16(nvs_handle, NVS_WIFI_LISTEN_INTERVAL, (uint16_t)wifi_config->listen_interval);
 
 	err = nvs_commit(nvs_handle);
 	if (NVS_OK != err)
@@ -229,6 +250,9 @@ void print_settings(WIFI_CONFIG* wifi_config)
 		( wifi_config->rc == 0) ? "OFF" : "ON");
 	nrc_usr_print("mcs %d\n", wifi_config->mcs);
 	nrc_usr_print("cca threshol %d\n", wifi_config->cca_thres);
+	nrc_usr_print("hidden ssid %d\n", wifi_config->hidden_ssid);
+	nrc_usr_print("max_num_sta %d\n", wifi_config->max_num_sta);
+	nrc_usr_print("beacon_cnt %d\n", wifi_config->beacon_cnt);
 	nrc_usr_print("-----------------------------------------------\n\n");
 #endif
 }
@@ -244,8 +268,6 @@ void print_settings(WIFI_CONFIG* wifi_config)
  **********************************************************************/
 static nrc_err_t save_wifi_defaults(WIFI_CONFIG* wifi_config)
 {
-	nrc_err_t ret = NRC_FAIL;
-
 	nrc_usr_print("[%s]\n", __func__);
 
 	if (!wifi_config)
@@ -253,23 +275,25 @@ static nrc_err_t save_wifi_defaults(WIFI_CONFIG* wifi_config)
 
 	set_wifi_defaults(wifi_config);
 	print_settings(wifi_config);
-	ret = nrc_save_wifi_config(wifi_config);
-	return ret;
+	return NRC_SUCCESS;
 }
 
 
 /******************************************************************************
- * FunctionName : parse_channel_list
- * Description : Parses a comma-separated list of Wi-Fi channels and returns
- *                  an array containing the list of channels as uint16_t values.
- * Parameters : channel_list - A string containing a comma-separated list of
- *                                  Wi-Fi channels in MHz (e.g. "2412,2437,2462").
- *                 list_size    - A pointer to a the number of channels in the list.
- * Returns       : A pointer to an array of uint16_t values representing the list
- *                 of Wi-Fi channels. The array must be freed by the caller when
- *                 it is no longer needed.
+ * @fn parse_channel_list
+ *
+ * @brief Parses a comma-separated list of Wi-Fi channels and returns
+ *           an array containing the list of channels as uint16_t values.
+ *
+ * @param channel_list - A string containing a comma-separated list of
+ *                           Wi-Fi channels in MHz (e.g. "2412,2437,2462").
+ *           list_size    - A pointer to a the number of channels in the list.
+ *
+ * @return  A pointer to an array of uint16_t values representing the list
+ *            of Wi-Fi channels. The array must be freed by the caller when
+ *            it is no longer needed.
  *******************************************************************************/
-uint16_t* parse_channel_list(const char* channel_list, uint8_t * list_size) {
+static uint16_t* parse_channel_list(const char* channel_list, uint8_t * list_size) {
 	// Check for NULL or empty channel_list
 	if (channel_list == NULL || *channel_list == '\0') {
 		*list_size = 0;
@@ -303,10 +327,13 @@ uint16_t* parse_channel_list(const char* channel_list, uint8_t * list_size) {
 
 
 /******************************************************************************
- * FunctionName : nrc_set_default_scan_channel
- * Description  : set frequency channels to scan on
- * Parameters   : WIFI_CONFIG
- * Returns      : true or false
+ * @fn nrc_set_default_scan_channel
+ *
+ * @brief set frequency channels to scan on
+ *
+ * @param wifi configuration ptr
+ *
+ * @return true or false
  *******************************************************************************/
 bool nrc_set_default_scan_channel(WIFI_CONFIG *wifi_config)
 {
@@ -334,12 +361,17 @@ bool nrc_set_default_scan_channel(WIFI_CONFIG *wifi_config)
 
 
 /******************************************************************************
- * FunctionName : nrc_generate_pmk
- * Description  : generate PMK
- * Parameters   : ssid
- * Parameters   : passphrase
- * Parameters   : pmk (Pairwise Master Key)
- * Returns      : true or false
+ * @fn nrc_generate_pmk
+ *
+ * @brief generate PMK
+ *
+ * @param ssid
+ *
+ * @param passphrase
+ *
+ * @param pmk (Pairwise Master Key)
+ *
+ * @return true or false
  *******************************************************************************/
 static int nrc_generate_pmk(char* ssid, const char *passphrase, char *pmk)
 {
@@ -400,29 +432,7 @@ nrc_err_t nrc_wifi_set_config(WIFI_CONFIG* wifi_config)
 		return NRC_FAIL;
 	}
 
-/*
-   To utilize the NVS values for Wi-Fi configuration and enable NVS updates,
-   please include the following define in your project's Makefile:
-   DEFINE += -DWIFI_CONFIG_NVS_UPDATE=1
-   This will ensure that the Wi-Fi configuration can be stored and retrieved
-   from the NVS.
- */
-#if defined(WIFI_CONFIG_NVS_UPDATE) && (WIFI_CONFIG_NVS_UPDATE == 1)
-	err = nvs_get_u8(nvs_handle, NVS_IP_MODE, &wifi_config->ip_mode);
-	nrc_usr_print("[%s] ip_mode is %d\n", __func__, wifi_config->ip_mode);
-
-	if (NVS_ERR_NVS_NOT_FOUND == err) { /* no configuration set */
-		nvs_close(nvs_handle);
-		nrc_usr_print("[%s] configuration empty, saving default\n", __func__);
-		save_wifi_defaults(wifi_config);
-		err = nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle);
-		if (NVS_OK != err){
-			nrc_usr_print("[%s] Failed to open NVS\n", __func__);
-			return NRC_FAIL;
-		}
-	}
-#endif
-
+	nvs_get_u8(nvs_handle, NVS_IP_MODE, &wifi_config->ip_mode);
 	length = sizeof(wifi_config->ssid);
 	nvs_get_str(nvs_handle, NVS_SSID, (char *) wifi_config->ssid, &length);
 
@@ -483,6 +493,9 @@ nrc_err_t nrc_wifi_set_config(WIFI_CONFIG* wifi_config)
 	nvs_get_u8(nvs_handle, NVS_WIFI_MCS, (uint8_t*)&wifi_config->mcs);
 	nvs_get_u8(nvs_handle, NVS_WIFI_GI, (uint8_t*)&wifi_config->gi);
 	nvs_get_i8(nvs_handle, NVS_WIFI_CCA_THRES, (int8_t*)&wifi_config->cca_thres);
+	nvs_get_u8(nvs_handle, NVS_WIFI_HIDDEN_SSID, (uint8_t*)&wifi_config->hidden_ssid);
+	nvs_get_u8(nvs_handle, NVS_WIFI_SOFTAP_MAX_NUM_STA, (uint8_t*)&wifi_config->max_num_sta);
+	nvs_get_u16(nvs_handle, NVS_WIFI_LISTEN_INTERVAL, (uint16_t*)&wifi_config->listen_interval);
 
 	if (nvs_handle)
 		nvs_close(nvs_handle);
@@ -547,6 +560,7 @@ nrc_err_t nrc_erase_all_wifi_nvs(void)
 	nvs_erase_key(nvs_handle, NVS_WIFI_MCS);
 	nvs_erase_key(nvs_handle, NVS_WIFI_GI);
 	nvs_erase_key(nvs_handle, NVS_WIFI_CCA_THRES);
+	nvs_erase_key(nvs_handle, NVS_WIFI_HIDDEN_SSID);
 
 	if (nvs_handle)
 		nvs_close(nvs_handle);
@@ -560,7 +574,7 @@ nrc_err_t nrc_erase_all_wifi_nvs(void)
 }
 
 
-/*********************************************************************
+ /*********************************************************************
  * @brief get global config
  *
  * Get globally accessible configuration parameter
@@ -572,5 +586,4 @@ WIFI_CONFIG* nrc_get_global_wifi_config(void)
 {
 	return (WIFI_CONFIG*)g_wifi_config;
 }
-
 

@@ -81,7 +81,6 @@ typedef struct
 	struct
 	{
 		SemaphoreHandle_t mutex;
-		StaticSemaphore_t mutex_buffer;
 
 		fd_set read;
 		fd_set write;
@@ -109,6 +108,9 @@ typedef struct
 } lwip_socket_info_t;
 
 /**********************************************************************************************/
+
+extern int _lwip_socket_tcp_get_keepalive (int fd, int *keepalive, int *keepidle, int *keepcnt, int *keepintvl);
+extern int _lwip_socket_tcp_set_keepalive (int fd, int keepalive, int keepidle, int keepcnt, int keepintvl);
 
 extern int _lwip_socket_tcp_get_nodelay (int fd, bool *enabled);
 extern int _lwip_socket_tcp_set_nodelay (int fd, bool enable);

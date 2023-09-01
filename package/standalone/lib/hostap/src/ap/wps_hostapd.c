@@ -26,6 +26,9 @@
 #include "beacon.h"
 #include "sta_info.h"
 #include "wps_hostapd.h"
+#ifdef WPS_SDK_CB
+#include "api_pbc.h"
+#endif
 
 
 #ifdef CONFIG_WPS_UPNP
@@ -841,10 +844,20 @@ static void hostapd_wps_event_cb(void *ctx, enum wps_event event,
 		break;
 	case WPS_EV_FAIL:
 		hostapd_wps_event_fail(hapd, &data->fail);
+#ifdef WPS_SDK_CB
+		if(wps_pbc_ops->nrc_wifi_wps_pbc_fail) {
+			wps_pbc_ops->nrc_wifi_wps_pbc_fail(hapd->drv_priv);
+		}
+#endif /* WPS_SDK_CB */
 		break;
 	case WPS_EV_SUCCESS:
 		hostapd_wps_event_success(hapd, &data->success);
 		wpa_msg(hapd->msg_ctx, MSG_INFO, WPS_EVENT_SUCCESS);
+#ifdef WPS_SDK_CB
+		if(wps_pbc_ops->nrc_wifi_wps_pbc_success) {
+			wps_pbc_ops->nrc_wifi_wps_pbc_success(hapd->drv_priv, NULL, 0, 0, NULL);
+		}
+#endif /* WPS_SDK_CB */
 		break;
 	case WPS_EV_PWD_AUTH_FAIL:
 		hostapd_pwd_auth_fail(hapd, &data->pwd_auth_fail);
@@ -856,6 +869,11 @@ static void hostapd_wps_event_cb(void *ctx, enum wps_event event,
 	case WPS_EV_PBC_TIMEOUT:
 		hostapd_wps_event_pbc_timeout(hapd);
 		wpa_msg(hapd->msg_ctx, MSG_INFO, WPS_EVENT_TIMEOUT);
+#ifdef WPS_SDK_CB
+		if(wps_pbc_ops->nrc_wifi_wps_pbc_timeout) {
+			wps_pbc_ops->nrc_wifi_wps_pbc_timeout(hapd->drv_priv);
+		}
+#endif /* WPS_SDK_CB */
 		break;
 	case WPS_EV_PBC_ACTIVE:
 		hostapd_wps_event_pbc_active(hapd);

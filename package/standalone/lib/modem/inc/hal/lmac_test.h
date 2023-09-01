@@ -14,6 +14,10 @@ void lmac_test_tsf_handler();
 bool lmac_test_timer_busy();
 bool lmac_test_timer_start(uint32_t interval , int32_t (*cb)(void *param) );
 void lmac_test_timer_stop();
+#if defined(INCLUDE_MANUAL_CONT_TX_SUPPORT)
+bool lmac_test_cont_tx(bool enable, uint32_t freq_100k, int bw_idx, uint8_t mcs, uint8_t txpwr);
+bool lmac_test_cont_tx_interval(bool enable, uint32_t freq_100k, int bw_idx, uint8_t mcs, uint8_t txpwr, uint32_t interval);
+#endif
 int32_t test_on_timer(void *param);
 
 #if defined(TEST_SBR)

@@ -29,6 +29,7 @@
 #include "lwip/errno.h"
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
+#include "sample_ps_schedule_version.h"
 
 #include "nvs.h"
 #include "ps_config.h"
@@ -55,9 +56,8 @@
 
 #define REMOTE_TCP_PORT 8099
 #define MAX_RETRY 10
-#ifndef WAKEUP_GPIO_PIN
-#define WAKEUP_GPIO_PIN 15
-#endif /* WAKEUP_GPIO_PIN */
+
+//#define WAKEUP_GPIO_PIN 15
 
 static nvs_handle_t nvs_handle;
 static uint64_t time_woken = 0;
@@ -313,12 +313,12 @@ nrc_err_t schedule_deep_sleep()
 #else
 #ifdef NRC7292
 	/* Below configuration is for NRC7292 EVK Revision B board */
-	nrc_ps_set_gpio_direction(0x07FFFF30);
+	nrc_ps_set_gpio_direction(0x07FFFF7F);
 	nrc_ps_set_gpio_out(0x0);
 	nrc_ps_set_gpio_pullup(0x0);
 #elif defined(NRC7394)
 	/* Below configuration is for NRC7394 EVK Revision board */
-	nrc_ps_set_gpio_direction(0x0FFFFFDFF);
+	nrc_ps_set_gpio_direction(0xFFFFFDFF);
 	nrc_ps_set_gpio_out(0x00000100);
 	nrc_ps_set_gpio_pullup(0xFFFFFFFF);
 #endif
@@ -364,8 +364,15 @@ nrc_err_t schedule_deep_sleep()
 void user_init(void)
 {
 	nrc_err_t ret;
+	VERSION_T app_version;
 
 	nrc_uart_console_enable(true);
+
+	app_version.major = SAMPLE_PS_SCHEDULE_MAJOR;
+	app_version.minor = SAMPLE_PS_SCHEDULE_MINOR;
+	app_version.patch = SAMPLE_PS_SCHEDULE_PATCH;
+	nrc_set_app_version(&app_version);
+	nrc_set_app_name(SAMPLE_PS_SCHEDULE_APP_NAME);
 
 	/* Open nvram */
 	/* Note that nvs_init should have already called, and it is done in system start up. */

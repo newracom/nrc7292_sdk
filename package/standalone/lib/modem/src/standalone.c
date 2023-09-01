@@ -13,6 +13,7 @@
 #include "nvs_flash.h"
 #endif
 #include "system_modem_api.h"
+#include "util_version.h"
 
 #define DECLARE_TASK(NAME, STACK_SIZE)									\
 	struct NAME##_Task {												\
@@ -69,6 +70,7 @@ int standalone_main()
 {
 	bool net_init = true;
 	bool ps_callback = false;
+	initVersion();
 
 #if defined(SUPPORT_NVS_FLASH)
 	nvs_handle_t tmp_nvs_handle;

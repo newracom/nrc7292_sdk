@@ -26,6 +26,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include "lwip/if_api.h"
+#include "lwip/etharp.h"
 
 #include "nrc_iperf.h"
 #include "nrc_iperf_tcp.h"
@@ -34,15 +35,13 @@
 
 #include "api_wifi.h"
 
-struct client_data {
-	int sock;
-	struct in_addr client_addr;
-	iperf_opt_t *option;
-	struct client_data *next;
-};
+#if LWIP_BRIDGE
+extern struct netif br_netif;
+#endif
 
-static struct client_data *client_list = NULL;
-static int maxdesc = 0;
+struct client_data {
+	iperf_opt_t *option;
+};
 
 #if defined(LWIP_IPERF) && (LWIP_IPERF == 1)
 
@@ -65,16 +64,40 @@ static void iperf_tcp_client_report (iperf_opt_t * option )
 	nrc_wifi_get_device_mode(0, &mode);
 
 	if (mode == WIFI_MODE_STATION) {
-		nrc_wifi_get_snr(&snr);
-		nrc_wifi_get_rssi(&rssi);
+		nrc_wifi_get_snr(0, &snr);
+		nrc_wifi_get_rssi(0, &rssi);
+	} else {
+		const ip4_addr_t *ip_addr;
+		struct eth_addr *mac_addr;
+		STA_INFO info;
+		
+		if (etharp_find_addr(nrc_netif[0], (const ip4_addr_t *) &option->addr, &mac_addr, &ip_addr) >= 0) {
+			if (nrc_wifi_softap_get_sta_by_addr(0, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			}
+		} else if (etharp_find_addr(nrc_netif[1], (const ip4_addr_t *) &option->addr, &mac_addr, &ip_addr) >= 0) {
+			if (nrc_wifi_softap_get_sta_by_addr(1, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			}
+#if LWIP_BRIDGE
+		} else if (etharp_find_addr(&br_netif, (const ip4_addr_t *) &option->addr, &mac_addr, &ip_addr) >= 0) {
+			if (nrc_wifi_softap_get_sta_by_addr(0, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			} else if (nrc_wifi_softap_get_sta_by_addr(1, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			}
+#endif
+		} else {
+			A("##### [%s] etharp_find_addr failed\n", __func__);
+		}
 	}
 
 	nrc_iperf_spin_lock();
-	if (mode == WIFI_MODE_STATION) {
-		A("[iperf TCP Client Report for server %s, snr:%u, rssi:%d]\n", ipaddr_ntoa(&option->addr), snr, rssi);
-	} else {
-		A("[iperf TCP Client Report for server %s]\n", ipaddr_ntoa(&option->addr));
-	}
+	A("[iperf TCP Client Report for server %s, snr:%u, rssi:%d]\n", ipaddr_ntoa(&option->addr), snr, rssi);
 	A("     Interval        Transfer      Bandwidth\n");
 	A("  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec\n",
 					start_time, end_time,
@@ -125,6 +148,7 @@ void iperf_tcp_client(void *pvParameters)
 	char buffer[IPERF_DEFAULT_DATA_BUF_LEN];
 	iperf_tcp_datagram_t *datagram = (iperf_tcp_datagram_t *) buffer;
 	iperf_opt_t * option  = pvParameters;
+	TaskHandle_t periodic_report_task = NULL;
 
 #if LWIP_IPV6
 	if(IP_IS_V6(&option->addr) && !ip6_addr_isipv4mappedipv6(ip_2_ip6(&option->addr))) {
@@ -195,10 +219,16 @@ void iperf_tcp_client(void *pvParameters)
 
 	stop_time = start_time + (option->mAmount / 100.);
 
+	option->mSock = sock;
 	option->mBufLen = TCP_MSS;
 	option->client_info.start_time = start_time;
 
 	vif = wifi_get_vif_id(&option->addr);
+
+	if (option->mInterval > 0) {
+		xTaskCreate(nrc_iperf_periodic_report, "iperf periodic report",
+					1024, (void *) option, LWIP_IPERF_TASK_PRIORITY, &periodic_report_task);
+	}
 
 	while (1) {
 		if(wpa_driver_get_associate_status(vif)== false){
@@ -235,6 +265,9 @@ exit:
 	}
 
 task_exit:
+
+	if (periodic_report_task)
+		vTaskDelete(periodic_report_task);
 	iperf_option_free(option);
 	vTaskDelete(NULL);
 }
@@ -247,42 +280,73 @@ static void iperf_tcp_server_report (struct client_data *client)
 	uint64_t byte = client->option->server_info.recv_byte;
 	uint32_t bps = (interval)? (byte*8)/interval:0;
 
-	char client_str[INET_ADDRSTRLEN];
+	char peer_addr[INET_ADDRSTRLEN];
 	uint8_t snr = 0;
 	int8_t rssi = 0;
 	tWIFI_DEVICE_MODE mode;
 
 	nrc_wifi_get_device_mode(0, &mode);
 
+	if (mode == WIFI_MODE_STATION) {
+		nrc_wifi_get_snr(0, &snr);
+		nrc_wifi_get_rssi(0, &rssi);
+	} else {
+		ip4_addr_t client_ip;
+		const ip4_addr_t *ip_addr;
+		struct eth_addr *mac_addr;
+		STA_INFO info;
+
+		struct sockaddr_in *addr4 = (struct sockaddr_in *) &client->option->server_info.clientaddr;
+		client_ip.addr = addr4->sin_addr.s_addr;
+		if (etharp_find_addr(nrc_netif[0], &client_ip, &mac_addr, &ip_addr) >= 0) {
+			if (nrc_wifi_softap_get_sta_by_addr(0, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			}
+		} else if (etharp_find_addr(nrc_netif[1], &client_ip, &mac_addr, &ip_addr) >= 0) {
+			if (nrc_wifi_softap_get_sta_by_addr(1, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			}
+#if LWIP_BRIDGE
+		} else if (etharp_find_addr(&br_netif, &client_ip, &mac_addr, &ip_addr) >= 0) {
+			if (nrc_wifi_softap_get_sta_by_addr(0, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			} else if (nrc_wifi_softap_get_sta_by_addr(1, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			}
+#endif
+		} else {
+			A("##### [%s] etharp_find_addr failed\n", __func__);
+		}
+	}
+
 	nrc_iperf_spin_lock();
 	/* mode is 1 if softAP, 0 if station */
 	/* For SoftAP, rssi is meaningless */
-	A("\n[iperf TCP Server Report for client %s",
-	  inet_ntop(AF_INET, &client->client_addr, client_str, INET_ADDRSTRLEN));
-	if (mode) {
-		A("]\n");
-	} else {
-		nrc_wifi_get_snr(&snr);
-		nrc_wifi_get_rssi(&rssi);
-		A(", snr:%u, rssi:%d]\n", snr, rssi);
-	}
+	A("\n[iperf TCP Server Report for client %s, snr:%u, rssi:%d]\n",
+	  inet_ntop(AF_INET, client->option->server_info.clientaddr.s2_data2, peer_addr, INET_ADDRSTRLEN),
+	  snr, rssi);
 	A("[%3d]  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec\n",
-					client->sock,
+					client->option->server_info.client_sock,
 					start_time, stop_time,
 					byte_to_string(byte), bps_to_string(bps));
 	nrc_iperf_spin_unlock();
 }
 
-static void iperf_tcp_server_recv (iperf_opt_t *option, char *buf, int len)
+ATTR_NC __attribute__((optimize("O3"))) static void tcp_process_input(void *pvParameters)
 {
+	struct client_data *client = (struct client_data *) pvParameters;
+	iperf_opt_t *option = client->option;
+	int received = 0;
+	char buffer[IPERF_DEFAULT_DATA_BUF_LEN];
 	iperf_time_t now;
 
-	iperf_get_time(&now);
-	option->server_info.stop_time = now;
-
-	if (len > 0) {
+	while ((received = recv(option->server_info.client_sock, buffer, IPERF_DEFAULT_DATA_BUF_LEN, 0)) > 0) {
 		if (option->server_info.recv_byte == 0) {
-			iperf_tcp_datagram_t *datagram = (iperf_tcp_datagram_t *)buf;
+			iperf_tcp_datagram_t *datagram = (iperf_tcp_datagram_t *)buffer;
 			int32_t amount = ntohl(datagram->client_header.mAmount);
 
 			if (amount >= 0)
@@ -290,139 +354,102 @@ static void iperf_tcp_server_recv (iperf_opt_t *option, char *buf, int len)
 			else
 				option->server_info.send_time = -amount / 100; // sec
 
+			iperf_get_time(&now);
 			option->server_info.start_time = now;
 			option->server_info.start = true;
 		}
-		option->server_info.recv_byte += len;
+		option->server_info.recv_byte += received;
+
+		iperf_get_time(&now);
+		option->server_info.stop_time = now;
+		if (option->server_info.send_time) {
+			if ((option->server_info.stop_time - option->server_info.start_time) >= option->server_info.send_time) {
+				break;
+			}
+		}
+
+		if (option->server_info.send_byte) {
+			if (option->server_info.recv_byte >= option->server_info.send_byte) {
+				break;
+			}
+		}
 	}
+
+	close(option->server_info.client_sock);
+
+	iperf_tcp_server_report(client);
+
+	if (client->option->server_info.periodic_report_task) {
+		vTaskDelete(client->option->server_info.periodic_report_task);
+	}
+
+	mem_free(client->option);
+	mem_free(client);
+
+	vTaskDelete(NULL);
 }
 
-static int tcp_process_input(struct client_data *client)
+ATTR_NC __attribute__((optimize("O3"))) static struct client_data *tcp_new_client(iperf_opt_t *option)
 {
-	iperf_time_t now;
-	int received = 0;
-	char buffer[IPERF_DEFAULT_DATA_BUF_LEN];
-
-	iperf_get_time(&now);
-	memset(buffer, 0, sizeof(buffer));
-	if ((received = read(client->sock, buffer, sizeof(buffer))) > 0) {
-		iperf_tcp_server_recv(client->option, buffer, received);
-	} else {
-		return -1;
-	}
-	return 0;
-}
-
-static int tcp_new_client(iperf_opt_t *option)
-{
-	struct sockaddr_in incoming;
-	socklen_t len = sizeof(incoming);
-	int client_sock = -1;
+	socklen_t len = sizeof(struct sockaddr);
 	struct client_data *c_data = NULL;
 	char local_addr[INET_ADDRSTRLEN];
 	char client_addr[INET_ADDRSTRLEN];
-	if ((client_sock = accept(option->mSock, (struct sockaddr *) &incoming, &len)) < 0) {
-		return -1;
+	int flag = 1;
+
+	if ((option->server_info.client_sock
+		 = accept(option->mSock, (struct sockaddr *) &option->server_info.clientaddr, &len)) < 0) {
+		return NULL;
 	}
 
-	if (fcntl(client_sock, F_SETFL, O_NDELAY) == -1) {
-		return -1;
+	if (setsockopt(option->server_info.client_sock, IPPROTO_TCP, TCP_NODELAY, (void *) &flag, sizeof(int)) < 0) {
+		return NULL;
 	}
 
 	c_data = (struct client_data *) mem_malloc(sizeof(struct client_data));
 	if (!c_data) {
-		return -1;
+		return NULL;
 	}
 	memset(c_data, 0, sizeof(struct client_data));
 
-	c_data->sock = client_sock;
-	memcpy(&c_data->client_addr, &incoming.sin_addr, sizeof(struct in_addr));
 	c_data->option = (iperf_opt_t *) mem_malloc(sizeof(iperf_opt_t));
 	memcpy(c_data->option, option, sizeof(iperf_opt_t));
-	c_data->next = client_list;
-	client_list = c_data;
-
-	if (client_sock > maxdesc) {
-		maxdesc = client_sock;
-	}
 
 	nrc_iperf_spin_lock();
 	A("\n[%3d] local %s port %d connected with %s port %d\n",
-	  client_sock,
+	  c_data->option->server_info.client_sock,
 	  inet_ntop(AF_INET, &c_data->option->addr, local_addr, INET_ADDRSTRLEN),
-	  option->mPort,
-	  inet_ntop(AF_INET, &incoming.sin_addr, client_addr, INET_ADDRSTRLEN),
-	  ntohs(incoming.sin_port));
+	  c_data->option->mPort,
+	  inet_ntop(AF_INET, c_data->option->server_info.clientaddr.s2_data2, client_addr, INET_ADDRSTRLEN),
+	  ntohs(((struct sockaddr_in *) &c_data->option->server_info.clientaddr)->sin_port));
 	nrc_iperf_spin_unlock();
 
-	return 0;
+	if (c_data->option->mInterval > 0) {
+		xTaskCreate(nrc_iperf_periodic_report, "iperf periodic report",
+					1024, (void *) c_data->option, LWIP_IPERF_TASK_PRIORITY, &c_data->option->server_info.periodic_report_task);
+	}
+	return c_data;
 }
 
-static void tcp_close_socket(struct client_data *client)
+ATTR_NC __attribute__((optimize("O3"))) static void tcp_server_loop(iperf_opt_t *option)
 {
-	struct client_data *tmp;
-
-	if (!client) {
-		return;
-	}
-
-	close(client->sock);
-
-	if (client->sock == maxdesc) {
-		maxdesc--;
-	}
-
-	if (client == client_list) {
-		client_list = client_list ->next;
-	} else {
-		for (tmp = client_list; (tmp->next != client) && tmp; tmp = tmp->next);
-		tmp->next = client->next;
-	}
-
-	iperf_tcp_server_report(client);
-	mem_free(client->option);
-	mem_free(client);
-}
-
-static void tcp_server_loop(iperf_opt_t *option)
-{
-	fd_set input_set, output_set, exec_set;
+	fd_set input_set;
 	struct client_data *client;
-	struct client_data *next_client;
-
-	maxdesc = option->mSock;
 
 	while (!option->mForceStop) {
 		FD_ZERO(&input_set);
-		FD_ZERO(&output_set);
-		FD_ZERO(&exec_set);
 		FD_SET(option->mSock, &input_set);
 
-		for (client = client_list; client; client = next_client) {
-			next_client = client->next;
-			FD_SET(client->sock, &input_set);
-			FD_SET(client->sock, &output_set);
-			FD_SET(client->sock, &output_set);
-		}
-
-		if (select(maxdesc + 1, &input_set, &output_set, &exec_set, NULL) < 0) {
+		if (select(option->mSock + 1, &input_set, NULL, NULL, NULL) < 0) {
 			return;
 		}
 
 		if (FD_ISSET(option->mSock, &input_set)) {
-			if (tcp_new_client(option) < 0) {
+			if ((client = tcp_new_client(option)) != NULL) {
+				xTaskCreate(tcp_process_input, "iperf server client task",
+							LWIP_IPERF_TASK_STACK_SIZE, (void *) client, LWIP_IPERF_TASK_PRIORITY + 1, NULL);
+			} else {
 				system_printf("error new connection\n");
-			}
-		}
-
-		for (client = client_list; client; client = next_client) {
-			next_client = client->next;
-			if (FD_ISSET(client->sock, &input_set)) {
-				if (tcp_process_input(client) < 0) {
-					FD_CLR(client->sock, &input_set);
-					FD_CLR(client->sock, &output_set);
-					tcp_close_socket(client);
-				}
 			}
 		}
 	}
@@ -459,7 +486,6 @@ static int tcp_init_server(unsigned short port)
 
 void tcp_start_server(iperf_opt_t *option)
 {
-	client_list = NULL;
 	int server_socket = 0;
 
 	if ((option->mSock = tcp_init_server(option->mPort)) < 0) {

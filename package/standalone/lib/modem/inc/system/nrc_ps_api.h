@@ -30,7 +30,9 @@ struct edca_info {
 	uint8_t		acm;
 	uint16_t	cw_min;
 	uint16_t	cw_max;
+#if !defined(NRC7292) /* remove this to store rc info */
 	uint16_t	txop_limit;
+#endif
 } __attribute__ ((packed));
 
 //8B
@@ -282,6 +284,18 @@ struct ret_dutyinfo {
 } __attribute__ ((packed));
 #define RET_DUTY_INFO_SIZE sizeof(struct ret_dutyinfo)
 
+// 5B
+struct ret_rcinfo {
+	uint8_t maxtp;
+	uint8_t tp2;
+	uint8_t maxp;
+#if 0 /* no need */
+	uint8_t lowest;
+#endif
+	uint8_t probe;
+} __attribute__ ((packed));
+#define RET_RC_INFO_SIZE sizeof(struct ret_rcinfo)
+
 #if defined (INCLUDE_WOWLAN_PATTERN)
 // 56B
 /* This must be matched with wim_pm_param */
@@ -401,6 +415,7 @@ struct retention_info {
 	struct ret_ucodeinfo	ucode_info;		//ucode info (58B)
 	struct ret_drvinfo		drv_info;		//driver info (3B)
 	struct ret_dutyinfo		duty_info;		//duty cycle info (12B)
+	struct ret_rcinfo		rc_info;		//rc info (5B)
 #if defined (INCLUDE_WOWLAN_PATTERN)
 	struct ret_wowlanptns	wowlan_patterns[WOWLAN_MAX_PATTERNS];	//wowlan patterns (56B * WOWLAN_MAX_PATTERNS)
 	struct ret_wowlaninfo	wowlan_info;		//wowlan info (2B)
@@ -506,6 +521,7 @@ int nrc_ps_get_wakeup_count(uint32_t *wakeup_count);
 int nrc_ps_reset_wakeup_count();
 void nrc_ps_show_ucode_stats();
 void nrc_ps_set_ucode();
+void nrc_ps_set_last_beacon_tsf(uint32_t upper, uint32_t lower, uint32_t diff);
 
 #if defined (INCLUDE_PS_SCHEDULE)
 /**********************************************

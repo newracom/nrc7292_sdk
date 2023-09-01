@@ -26,6 +26,14 @@
 #ifndef __NRC_USER_APP_H__
 #define __NRC_USER_APP_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int nrc_user_app_main();
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

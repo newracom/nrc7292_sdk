@@ -210,6 +210,11 @@ ifeq ($(CONFIG_DMA_COPY),y)
 DEFINE += -DINCLUDE_GDMA_COPY
 endif #CONFIG_DMA_COPY
 
+ifeq ($(CONFIG_AMPDU_AUTO_TX),y)
+#On SAM, automatically trigger to send ADDBA.
+DEFINE += -DINCLUDE_AMPDU_AUTO_TX
+endif #CONFIG_AMPDU_AUTO_TX
+
 ifeq ($(CONFIG_AMPDU_REORDER),y)
 #Copy frame located in system rx buffer to heap
 #and free the system rx buffer early before data/mgmt_rx()
@@ -308,3 +313,7 @@ endif # CONFIG_MANUAL_CONT_TX_SUPPORT
 ifeq ($(CONFIG_STA_SUPPORT_8M),y)
 DEFINE += -DINCLUDE_STA_SUPPORT_8M
 endif # CONFIG_STA_SUPPORT_8M
+
+ifeq ($(CONFIG_RF_RECOVERY_BY_BCM),y)
+DEFINE += -DINCLUDE_RF_RECOVERY_BY_BCM
+endif # CONFIG_RF_RECOVERY_BY_BCM

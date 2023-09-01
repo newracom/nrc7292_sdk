@@ -57,115 +57,9 @@ enum _HIF_TYPE _hif_get_type (void)
 
 /********************************************************************************************/
 
-enum _HIF_MUTEX_ID
-{
-	_HIF_MUTEX_RX = 0,
-	_HIF_MUTEX_TX,
-
-	_HIF_MUTEX_NUM
-};
-
-static SemaphoreHandle_t g_hif_mutex[_HIF_MUTEX_NUM] = { NULL, NULL };
-
-static void _hif_mutex_delete (void)
-{
-	int i;
-
-	for (i = 0 ; i < _HIF_MUTEX_NUM ; i++)
-	{
-		if (g_hif_mutex[i])
-			vSemaphoreDelete(g_hif_mutex[i]);
-	}
-}
-
-static int _hif_mutex_create (void)
-{
-	static StaticSemaphore_t buffer[2];
-	int i;
-
-	for (i = 0 ; i < _HIF_MUTEX_NUM ; i++)
-	{
-		g_hif_mutex[i] = xSemaphoreCreateMutexStatic(&buffer[i]);
-		if (!g_hif_mutex[i])
-			break;
-	}
-
-	if (i < 2)
-	{
-		_hif_mutex_delete();
-		return -1;
-	}
-
-	return 0;
-}
-
-static bool _hif_mutex_take (enum _HIF_MUTEX_ID id, bool isr)
-{
-	SemaphoreHandle_t mutex = g_hif_mutex[id];
-	bool take = false;
-
-	if (mutex)
-	{
-		if (!isr)
-		{
-			int time_ms = 10000;
-
-			take = xSemaphoreTake(mutex, pdMS_TO_TICKS(time_ms));
-		}
-		else
-		{
-			BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
-			take = xSemaphoreTakeFromISR(mutex, &xHigherPriorityTaskWoken);
-
-			portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-		}
-
-		if (!take)
-			_hif_error("fail (id=%d, isr=%d)\n", id, isr);
-	}
-
-	return take;
-}
-
-static bool _hif_mutex_give (enum _HIF_MUTEX_ID id, bool isr)
-{
-	SemaphoreHandle_t mutex = g_hif_mutex[id];
-	bool give = false;
-
-	if (mutex)
-	{
-		if (!isr)
-			give = xSemaphoreGive(mutex);
-		else
-		{
-			BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
-			give = xSemaphoreGiveFromISR(mutex, &xHigherPriorityTaskWoken);
-
-			portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-		}
-
-		if (!give)
-			_hif_error("fail (id=%d, isr=%d)\n", id, isr);
-	}
-
-	return give;
-}
-
-/********************************************************************************************/
-
-#define _hif_read_lock(isr)			ASSERT(_hif_mutex_take(_HIF_MUTEX_RX, isr))
-#define _hif_read_unlock(isr)		ASSERT(_hif_mutex_give(_HIF_MUTEX_RX, isr))
-
-#define _hif_write_lock(isr)		ASSERT(_hif_mutex_take(_HIF_MUTEX_TX, isr))
-#define _hif_write_unlock(isr)		ASSERT(_hif_mutex_give(_HIF_MUTEX_TX, isr))
-
-static int __hif_read (char *buf, int len, bool isr)
+int _hif_read (char *buf, int len)
 {
 	int rd_size = 0;
-
-	_hif_read_lock(isr)
 
 	switch (_hif_get_type())
 	{
@@ -186,16 +80,12 @@ static int __hif_read (char *buf, int len, bool isr)
 			break;
 	}
 
-	_hif_read_unlock(isr);
-
 	return rd_size;
 }
 
-static int __hif_write (char *buf, int len, bool isr)
+int _hif_write (char *buf, int len)
 {
 	int wr_size = 0;
-
-	_hif_write_lock(isr);
 
 	switch (_hif_get_type())
 	{
@@ -216,29 +106,7 @@ static int __hif_write (char *buf, int len, bool isr)
 			break;
 	}
 
-	_hif_write_unlock(isr);
-
 	return wr_size;
-}
-
-int _hif_read (char *buf, int len)
-{
-	return __hif_read(buf, len, false);
-}
-
-int _hif_write (char *buf, int len)
-{
-	return __hif_write(buf, len, false);
-}
-
-int _hif_read_isr (char *buf, int len)
-{
-	return __hif_read(buf, len, true);
-}
-
-int _hif_write_isr (char *buf, int len)
-{
-	return __hif_write(buf, len, true);
 }
 
 /********************************************************************************************/
@@ -367,9 +235,6 @@ int _hif_open (_hif_info_t *info)
 	if (_hif_get_type() != _HIF_TYPE_NONE)
 		return -1;
 
-	if (_hif_mutex_create() != 0)
-		return -1;
-
 #ifdef CONFIG_HIF_FIFO_STATIC
 	info->rx_fifo.addr = g_nrc_hif_trx_fifo;
 #else
@@ -423,8 +288,6 @@ void _hif_close (void)
 	_hif_rx_task_delete();
 
 	close[_hif_get_type()]();
-
-	_hif_mutex_delete();
 
 	_hif_set_type(_HIF_TYPE_NONE);
 }

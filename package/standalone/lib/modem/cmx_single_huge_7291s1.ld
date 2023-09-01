@@ -1,6 +1,6 @@
 MEMORY
 {
-  FLASH (rx) 	: ORIGIN = 0x00010000, LENGTH = 1M
+  FLASH (rx) 	: ORIGIN = 0x00010000, LENGTH = 916K
   RAM (rwx)  	: ORIGIN = 0x10400000, LENGTH = 736K - STACK_SIZE
   /* mailbox test */
   /*RAM (rwx)  	: ORIGIN = 0x10420000, LENGTH = 384K */

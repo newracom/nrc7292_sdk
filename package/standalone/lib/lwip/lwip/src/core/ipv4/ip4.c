@@ -381,6 +381,15 @@ ip4_input_accept(struct netif *netif)
 
   /* interface is up and configured? */
   if ((netif_is_up(netif)) && (!ip4_addr_isany_val(*netif_ip4_addr(netif)))) {
+#if LWIP_IPV4_CHECK_SRC_ADDR
+    if (ip4_addr_cmp(ip4_current_src_addr(), netif_ip4_addr(netif))) {
+	  LWIP_DEBUGF(IP_DEBUG, ("ip4_input: source address %"U16_F".%"U16_F".%"U16_F".%"U16_F" is the same\n",
+                         ip4_addr1_16(ip4_current_src_addr()), ip4_addr2_16(ip4_current_src_addr()),
+                         ip4_addr3_16(ip4_current_src_addr()), ip4_addr4_16(ip4_current_src_addr())));
+	  return 0;
+    }
+#endif /* LWIP_IPV4_CHECK_SRC_ADDR */
+
     /* unicast to this interface address? */
     if (ip4_addr_cmp(ip4_current_dest_addr(), netif_ip4_addr(netif)) ||
         /* or broadcast on this interface network address? */

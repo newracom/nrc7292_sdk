@@ -415,10 +415,7 @@ void user_init(void)
 	memset(param, 0x0, WIFI_CONFIG_SIZE);
 	nrc_wifi_set_config(param);
 
-	for(int i=0; i<count; i++){
-		ret = run_sample_mqtt(param);
-		nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
-		nrc_sw_reset();
-	}
+	ret = run_sample_mqtt(param);
+	nrc_usr_print("[%s] test result!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
 }
 

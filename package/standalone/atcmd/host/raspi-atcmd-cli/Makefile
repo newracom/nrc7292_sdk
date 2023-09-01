@@ -15,7 +15,7 @@ SRCS := \
 	nrc-iperf.c \
 	main.c
 
-CFLAGS = -pthread -Wall #-Wno-unused-function
+CFLAGS = -pthread -Wall -Wno-unused-function
 LFLAGS = -lpthread -lz
 
 #########################################################

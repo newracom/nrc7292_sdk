@@ -55,7 +55,7 @@
  * ATTENTION: as ==0 relies on tcpip.h, the default depends on NO_SYS setting
  */
 #ifndef BRIDGEIF_PORT_NETIFS_OUTPUT_DIRECT
-#define BRIDGEIF_PORT_NETIFS_OUTPUT_DIRECT  NO_SYS
+#define BRIDGEIF_PORT_NETIFS_OUTPUT_DIRECT  1
 #endif
 
 /** BRIDGEIF_MAX_PORTS: this is used to create a typedef used for forwarding

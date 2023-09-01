@@ -32,6 +32,9 @@ struct nrc_wpa;
 #define NRC_WPA_INTERFACE_NAME_0		("wlan0")
 #define NRC_WPA_INTERFACE_NAME_1		("wlan1")
 
+#define NRC_WPA_ROUTE_TIMEOUT_SEC		60*5
+#define NRC_WPA_ROUTE_MAX				20
+
 #if defined(MAX_STA)
 #define NRC_WPA_SOFTAP_MAX_STA			MAX_STA
 #else
@@ -119,7 +122,6 @@ struct nrc_wpa_key {
 #define MAX_TID 8
 
 #if defined (INCLUDE_EARLY_FREE_SYSRXBUF) || defined (INCLUDE_AMPDU_REORDER )
-
 struct tid_ampdu_rx {
 	SemaphoreHandle_t reorder_lock;
 //	u64 reorder_buf_filtered;
@@ -128,12 +130,12 @@ struct tid_ampdu_rx {
 #else
 	struct nrxb_head *reorder_buf;
 #endif
-	unsigned long *reorder_time;
-	void * sta;				  // due to build error of nrc_wpa_sta
+	uint32_t *reorder_time;
+	void * sta;						// due to build error of nrc_wpa_sta
 	//struct timer_list reorder_timer;
 	//TimerHandle_t session_timer;
 	TimerHandle_t reorder_timer;
-	unsigned long last_rx;
+	uint32_t last_rx;
 	u16 head_seq_num;
 	u16 stored_mpdu_num;
 	u16 ssn;
@@ -147,9 +149,22 @@ struct tid_ampdu_rx {
 	   removed:1,
 	   started:1;
 };
+#endif //#if defined (INCLUDE_EARLY_FREE_SYSRXBUF)
 
+
+#if defined (INCLUDE_AMPDU_AUTO_TX)
+struct tid_ampdu_tx {
+	uint32_t state;
+	uint16_t timeout; //timeout: session timeout value to be filled in ADDBA requests
+	uint8_t dialog_token;
+	uint8_t tid;
+};
+#endif
 
 struct sta_ampdu_mlme {
+#if defined (INCLUDE_EARLY_FREE_SYSRXBUF) || defined (INCLUDE_AMPDU_REORDER ) || defined (INCLUDE_AMPDU_AUTO_TX)
+
+#if	defined (INCLUDE_EARLY_FREE_SYSRXBUF) || defined (INCLUDE_AMPDU_REORDER )
 	SemaphoreHandle_t mtx;
 	/* rx */
 #ifdef INCLUDE_STATIC_REORDER_INFO
@@ -157,31 +172,37 @@ struct sta_ampdu_mlme {
 #else
 	struct tid_ampdu_rx *tid_rx[MAX_TID];
 #endif
-	u8 tid_rx_token[MAX_TID];
-	unsigned long tid_rx_timer_expired[MAX_TID];
-	unsigned long tid_rx_stop_requested[MAX_TID];
-	unsigned long tid_rx_manage_offl[MAX_TID];
-	unsigned long agg_session_valid[MAX_TID];
-	unsigned long unexpected_agg[MAX_TID];
+	uint8_t tid_rx_token[MAX_TID];
+	uint32_t tid_rx_timer_expired[MAX_TID];
+	uint32_t tid_rx_stop_requested[MAX_TID];
+	uint32_t tid_rx_manage_offl[MAX_TID];
+	uint32_t agg_session_valid[MAX_TID];
+	uint32_t unexpected_agg[MAX_TID];
+#endif //defined (INCLUDE_EARLY_FREE_SYSRXBUF) || defined (INCLUDE_AMPDU_REORDER )
+
 	/* tx */
-#if 0
-	struct work_struct work;
-	struct tid_ampdu_tx __rcu *tid_tx[MAX_TID];
-	struct tid_ampdu_tx *tid_start_tx[MAX_TID];
-	unsigned long last_addba_req_time[MAX_TID];
+#if defined (INCLUDE_AMPDU_AUTO_TX)
+	struct tid_ampdu_tx *tid_tx[MAX_TID];
+	uint32_t last_addba_req_time[MAX_TID];
+	uint8_t addba_req_num[MAX_TID];
+	uint8_t dialog_token_allocator;
 #endif
-	u8 addba_req_num[MAX_TID];
-	//u8 dialog_token_allocator;
+
+#endif //defined (INCLUDE_EARLY_FREE_SYSRXBUF) || defined (INCLUDE_AMPDU_REORDER ) || defined (INCLUDE_AMPDU_AUTO_AGGR_TX)
 };
 
-#endif //#if defined (INCLUDE_EARLY_FREE_SYSRXBUF)
-
+struct nrc_wpa_route {
+	struct dl_list 			list;
+	bool 				used;
+  	uint32_t 				ts;
+	uint8_t 				addr[6];
+};
 struct nrc_wpa_sta {
 	struct nrc_wpa_key		key;
 	uint8_t 				addr[6];
 
 	/* only use softAP */
-	uint8_t 				ethaddr[6];
+	struct dl_list 			route_list;
 	bool					use_4addr;
 
 	uint16_t				aid;
@@ -189,8 +210,11 @@ struct nrc_wpa_sta {
 	bool					qos;
 	uint16_t 				last_mgmt_stype;
 	enum block_ack_state 	block_ack[MAX_TID];
-#if defined (INCLUDE_AMPDU_REORDER) || defined (INCLUDE_EARLY_FREE_SYSRXBUF)
+#if defined (INCLUDE_AMPDU_REORDER) || defined (INCLUDE_EARLY_FREE_SYSRXBUF) || defined (INCLUDE_AMPDU_AUTO_TX)
 	struct sta_ampdu_mlme   ampdu_mlme;
+#endif
+#if defined (INCLUDE_SOFT_AP)
+	uint16_t				listen_interval;
 #endif
 };
 
@@ -224,6 +248,7 @@ struct nrc_wpa_if {
 	struct nrc_wpa	*global;
 	struct nrc_wpa_sta *ap_sta[NRC_WPA_SOFTAP_MAX_STA];
 	int num_ap_sta;
+	uint8_t	num_route_list;
 	int key_mgmt ;
 };
 
@@ -233,7 +258,6 @@ struct nrc_wpa {
 };
 
 #if defined (INCLUDE_EARLY_FREE_SYSRXBUF) || defined (INCLUDE_AMPDU_REORDER )
-
 /* Control Block for Rx flow */
 struct nrc_rx_data_cb{
 	u8 vif_id;
@@ -241,7 +265,6 @@ struct nrc_rx_data_cb{
 	u8 center_freq;         //For nrc_wpa_scan_sta_rx(), nrc_wap_mgmt_ap_rx(),nrc_wpa_eapol()
 	u8 rssi;                //For nrc_wpa_scan_sta_rx();
 };
-
 #endif
 
 struct nrc_wpa_rx_data {
@@ -315,7 +338,8 @@ SYS_BUF * alloc_sys_buf_try(int hif_len, int nTry);
 
 struct nrc_wpa_if *wpa_driver_get_interface(int vif);
 struct nrc_wpa_sta* nrc_wpa_find_sta(struct nrc_wpa_if *intf,
-						const uint8_t addr[ETH_ALEN]);
+						const uint8_t addr[ETH_ALEN],
+						bool enabled);
 struct nrc_wpa_key *nrc_wpa_get_key_by_key_idx(struct nrc_wpa_if *intf,
 						int key_idx);
 struct nrc_wpa_key *nrc_wpa_get_key_by_addr(struct nrc_wpa_if *intf,
@@ -333,6 +357,8 @@ int nrc_transmit_pmf(struct nrc_wpa_if* intf, uint8_t *frm, const uint16_t len,
 		const uint16_t data_len, struct nrc_wpa_key *wpa_key);
 int nrc_raw_transmit(struct nrc_wpa_if* intf, uint8_t *frm, const uint16_t len,
 				const int ac);
+int nrc_send_deauthenticate(struct nrc_wpa_if *intf, const uint8_t *a1,
+				const uint8_t *a2, const uint8_t *a3, uint16_t reason_code);
 int nrc_get_sec_hdr_len(struct nrc_wpa_key *key);
 void nrc_start_keep_alive(struct nrc_wpa_if* intf);
 void run_wim_set_bssid(int vif_id, uint8_t* bssid);
@@ -369,6 +395,7 @@ static inline bool is_key_ccmp(struct nrc_wpa_key *key)
 	return (key && is_ccmp(key->cipher));
 }
 
+bool nrc_update_route(struct nrc_wpa_if* intf, struct nrc_wpa_sta* sta, uint8_t* addr);
 void nrc_set_use_4address(bool value);
 bool nrc_get_use_4address(void);
 void nrc_set_scan_max_interval(uint32_t interval);

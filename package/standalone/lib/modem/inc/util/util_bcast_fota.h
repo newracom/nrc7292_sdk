@@ -1,6 +1,8 @@
 #ifndef UTIL_BCAST_FOTA_H
 #define UTIL_BCAST_FOTA_H
 
+#include "util_version.h"
+
 void bcast_fota_enqueue_ready(int cmd, uint8_t* data);
 void bcast_fota_enqueue_write(int cmd, uint8_t* data, uint16_t len);
 void bcast_fota_init(void);
@@ -30,7 +32,10 @@ typedef struct {
 
 typedef struct {
 	uint32_t enable;
-	uint32_t version;
+	uint32_t chip_id;
+	char app_name[34];
+	version_t fw_version;
+	version_t app_version;
 	uint32_t crc;
 	uint32_t total_size;
 	uint32_t total_chunk;

@@ -704,53 +704,6 @@ static void atcmd_data_mode_task_delete (void)
 
 /*******************************************************************************************/
 
-static SemaphoreHandle_t g_atcmd_msg_mutex = NULL;
-
-static int atcmd_msg_mutex_create (void)
-{
-	static StaticSemaphore_t buffer;
-
-	g_atcmd_msg_mutex = xSemaphoreCreateMutexStatic(&buffer);
-
-	return !g_atcmd_msg_mutex ? -1 : 0;
-}
-
-static void atcmd_msg_mutex_delete (void)
-{
-	if (g_atcmd_msg_mutex)
-		vSemaphoreDelete(g_atcmd_msg_mutex);
-}
-
-static bool atcmd_msg_mutex_take (void)
-{
-	TickType_t timeout = pdMS_TO_TICKS(60000);
-	bool take = false;
-
-	if (g_atcmd_msg_mutex)
-		take = !!xSemaphoreTake(g_atcmd_msg_mutex, timeout);
-
-	if (!take)
-		_atcmd_error("timeout\n");
-
-	return take;
-}
-#define ATCMD_MSG_LOCK()	ASSERT(atcmd_msg_mutex_take())
-
-
-static bool atcmd_msg_mutex_give (void)
-{
-	bool give = false;
-
-	if (g_atcmd_msg_mutex)
-		give = !!xSemaphoreGive(g_atcmd_msg_mutex);
-
-	if (!give)
-		_atcmd_error("error\n");
-
-	return give;
-}
-#define ATCMD_MSG_UNLOCK()	ASSERT(atcmd_msg_mutex_give())
-
 int atcmd_msg_vsnprint (int type, char *buf, int len, const char *fmt, va_list ap)
 {
 	const char *prefix = "+";
@@ -793,15 +746,11 @@ int atcmd_msg_print (int type, const char *fmt, ...)
 	int len;
 	va_list ap;
 
-	ATCMD_MSG_LOCK();
-
 	va_start(ap, fmt);
 	len = atcmd_msg_vsnprint(type, buf, sizeof(buf) - 1, fmt, ap);
 	va_end(ap);
 
 	len = atcmd_transmit(buf, len);
-
-	ATCMD_MSG_UNLOCK();
 
 	return len;
 }
@@ -840,6 +789,7 @@ static atcmd_list_t g_atcmd_group_head =
 	.prev = NULL
 };
 
+#if 0
 void atcmd_group_print (void)
 {
 	atcmd_group_t *group;
@@ -859,6 +809,9 @@ void atcmd_group_print (void)
 						group->list.next, group->list.prev);
 	}
 }
+#else
+void atcmd_group_print (void) {}
+#endif
 
 atcmd_group_t *atcmd_group_search (enum ATCMD_GROUP_ID id)
 {
@@ -900,6 +853,7 @@ int atcmd_group_unregister (enum ATCMD_GROUP_ID id)
 
 /*******************************************************************************************/
 
+#if 0
 void atcmd_info_print (atcmd_group_t *group)
 {
 	if (group)
@@ -922,6 +876,9 @@ void atcmd_info_print (atcmd_group_t *group)
 		}
 	}
 }
+#else
+void atcmd_info_print (atcmd_group_t *group) {}
+#endif
 
 atcmd_info_t *atcmd_info_search (atcmd_group_t *group, enum ATCMD_ID id)
 {
@@ -1051,9 +1008,7 @@ static enum ATCMD_HANDLER atcmd_parse (char *cmd, int *argc, char **argv)
 
 					strupr(argv[0]);
 
-#ifdef CONFIG_ATCMD_DEBUG
-					atcmd_parse_print(type, *argc, argv);
-#endif
+/*					atcmd_parse_print(type, *argc, argv); */
 
 					switch (type)
 					{
@@ -1297,6 +1252,7 @@ static void atcmd_process_command (char *cmd, int len)
 			else if (atcmd_compare_command(cmd, "ATZ", 3) == 0)
 			{
 				_atcmd_info("System Reset\n");
+				_delay_ms(1);
 				util_fota_reboot_firmware();
 			}
 
@@ -1542,13 +1498,9 @@ static int _atcmd_receive_data (char *buf, int len)
 		return 0;
 
 	ret = atcmd_socket_send_data(&g_atcmd_data_mode.socket, buf, len);
-
-	if (ret != len)
+	if (ret < len)
 	{
-		_atcmd_error("send(%d) != ret(%d)\n", len, ret);
-
 		g_atcmd_data_mode.send_drop += len - ret;
-
 		atcmd_socket_event_send_drop(g_atcmd_data_mode.socket.id, len - ret);
 	}
 
@@ -1721,9 +1673,7 @@ static SemaphoreHandle_t g_atcmd_tx_mutex = NULL;
 
 static int atcmd_tx_mutex_create (void)
 {
-	static StaticSemaphore_t buffer;
-
-	g_atcmd_tx_mutex = xSemaphoreCreateMutexStatic(&buffer);
+	g_atcmd_tx_mutex = xSemaphoreCreateMutex();
 
 	return !g_atcmd_tx_mutex ? -1 : 0;
 }
@@ -1827,9 +1777,6 @@ int atcmd_enable (_hif_info_t *info)
 	if (atcmd_tx_mutex_create() != 0)
 		return -1;
 
-	if (atcmd_msg_mutex_create() != 0)
-		return -1;
-
 	if (atcmd_data_mode_task_create() != 0)
 		return -1;
 
@@ -1856,9 +1803,7 @@ int atcmd_enable (_hif_info_t *info)
 	atcmd_wifi_enable();
 	atcmd_basic_enable();
 
-#ifdef CONFIG_ATCMD_DEBUG
 	atcmd_group_print();
-#endif
 
 	info->rx_params.buf.addr = hif_rx_buf;
 	info->rx_params.buf.size = ATCMD_RXBUF_SIZE;
@@ -1884,7 +1829,6 @@ void atcmd_disable (void)
 
 	atcmd_data_mode_task_delete();
 
-	atcmd_msg_mutex_delete();
 	atcmd_tx_mutex_delete();
 }
 

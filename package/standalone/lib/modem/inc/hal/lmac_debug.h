@@ -1,7 +1,6 @@
 #ifndef LMAC_DEBUG_H
 #define LMAC_DEBUG_H
 
-#if defined(INCLUDE_LMAC_DEBUG)
 #define LMAC_STATUS( n , r , f)\
     static uint32_t n , n##_old;\
     reg = READ_REG( r );\
@@ -22,6 +21,8 @@
     n##_old = reg;
 
 void lmac_report();
+
+#if defined(INCLUDE_LMAC_DEBUG)
 void lmac_print_vector(LMAC_TXBUF* buf);
 void lmac_print_macheader(LMAC_TXBUF *buf);
 void lmac_print_txbd(LMAC_TXBUF* buf);
@@ -32,7 +33,6 @@ void lmac_show_tx_stats_mcs_agg();
 void lmac_print_sys_buf(struct _SYS_BUF *buffer);
 #endif /* defined(INCLUDE_COMPACT_CLI) */
 #else
-static inline void lmac_report() {};
 static inline void lmac_print_vector(LMAC_TXBUF* buf) {}
 static inline void lmac_print_macheader(LMAC_TXBUF *buf) {}
 static inline void lmac_print_txbd(LMAC_TXBUF* buf) {}

@@ -90,7 +90,7 @@ typedef struct {
 	uint32_t SYS_CONFIG;
 	uint32_t RF_CAL;
 	uint32_t FOTA;
-	uint32_t RESERVED;
+	uint32_t DEVICE_INFO;
 	uint32_t USER_DATA;
 	uint32_t FOTA_INFO;
 } sf_mem_map_t;
@@ -105,7 +105,7 @@ enum sf_store_area_e {
 	SF_USER_CONFIG_2_4MB = 0x1C7000,/*200KB*/
 	SF_USER_CONFIG_3_4MB = 0x1F9000,/*200KB*/
 	SF_USER_CONFIG_4_4MB = 0x22B000,/*200KB*/
-	SF_RESERVED_4MB = 0x25D000,/*4KB*/
+	SF_DEVICE_INFO_4MB = 0x25D000,/*4KB*/
 	SF_USER_DATA_4MB = 0x25E000,/*120KB*/
 	SF_SYSTEM_CONFIG_4MB = 0x27C000,
 	SF_MAC_ADDR_4MB = 0x27C000, /*not used*/
@@ -123,7 +123,7 @@ enum sf_store_area_e {
 	SF_USER_CONFIG_2_4MB = 0x3F8000,/*4KB*/
 	SF_USER_CONFIG_3_4MB = 0x3F9000,/*4KB*/
 	SF_USER_CONFIG_4_4MB = 0x3FA000,/*4KB*/
-	SF_RESERVED_4MB = 0x3FB000,/*4KB*/
+	SF_DEVICE_INFO_4MB = 0x3FB000,/*4KB*/
 	SF_SYSTEM_CONFIG_4MB = 0x3FC000,
 	SF_RF_CAL_4MB = 0x3FD000,
 	SF_FOTA_4MB = 0x1F5000,
@@ -142,7 +142,7 @@ enum sf_store_area_e {
 	SF_MAC_ADDR_MC_2MB = 0xFE008,
 	SF_RF_CAL_2MB = 0xFF000,
 	SF_FOTA_2MB = 0x100000,
-	SF_RESERVED_2MB = 0x1E5000,
+	SF_DEVICE_INFO_2MB = 0x1E5000,
 	SF_USER_DATA_2MB = 0x1E6000,
 	SF_FOTA_INFO_2MB = 0x1FF000
 };
@@ -163,7 +163,7 @@ static sf_mem_map_t sf_mem_map;
 #define SF_MAC_ADDR_MC half_addr_sf - 0x1FF8
 #define SF_RF_CAL nrc_sf_get_mem_map()->RF_CAL
 #define SF_FOTA nrc_sf_get_mem_map()->FOTA
-#define SF_RESERVED nrc_sf_get_mem_map()->RESERVED
+#define SF_DEVICE_INFO nrc_sf_get_mem_map()->DEVICE_INFO
 #define SF_FOTA_INFO nrc_sf_get_mem_map()->FOTA_INFO
 #define SF_USER_DATA nrc_sf_get_mem_map()->USER_DATA
 
@@ -180,6 +180,8 @@ enum sf_reg_override_ctrl {
 #define SYSCONFIG_SECTOR_SIZE               4096
 #define SYSCONFIG_PRE_USER_FACTORY_SIZE      256
 #define SYSCONFIG_USER_FACTORY_SIZE          512
+
+#define SF_DEVICE_INFO_SIZE 4096
 
 typedef struct {
 	uint32_t signature; /*'nrct'*/
@@ -281,8 +283,13 @@ uint8_t nrc_sf_get_cal_use(void);
 bool nrc_sf_set_auth_ctrl(sf_auth_ctrl_t  *auth_ctrl);
 bool nrc_sf_get_auth_ctrl(sf_auth_ctrl_t  *auth_ctrl);
 #endif /* defined(INCLUDE_AUTH_CONTROL) */
-bool nrc_sf_get_user_factory(char* data, uint16_t buf_len);
 bool nrc_sf_update_user_factory(char* data, uint16_t len);
+bool nrc_sf_get_user_factory(char* data, uint16_t buf_len);
+
+#if defined(NRC7292)
+bool nrc_sf_set_device_info(uint8_t* data, uint16_t len);
+bool nrc_sf_get_device_info(uint8_t* data, uint16_t buf_len);
+#endif
 
 #define NRC_SF_VERIFY_SLOT_OKAY           0
 #define NRC_SF_VERIFY_SLOT_MIN_SIZE_FAIL  1

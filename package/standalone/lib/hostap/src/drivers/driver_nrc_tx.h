@@ -18,6 +18,18 @@
 #define _DRIVER_NRC_TX_H_
 
 struct nrc_wpa_key;
+#if defined (INCLUDE_AMPDU_AUTO_TX)
+typedef struct auto_agg_tx_conf_info {
+	uint8_t		on : 1;
+	uint8_t		max_agg_num : 5;
+} tAUTO_AGG_TX_CONF;
+
+void nrc_show_auto_aggr_tx(uint8_t vif_id);
+int nrc_set_auto_aggr_tx(uint8_t vif_id, uint8_t tid, uint8_t max_agg_num);
+void nrc_set_auto_aggr_tx_all(uint8_t vif_id);
+
+#endif
+
 
 int nrc_transmit_from_8023(uint8_t vif_id,uint8_t *frame, const uint16_t len);
 int nrc_transmit_from_8023_mb(uint8_t vif_id, uint8_t **frames, uint16_t len[], int n_frames);

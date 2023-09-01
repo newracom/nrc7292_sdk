@@ -218,6 +218,9 @@ void lmac_ps_set_sync_time_ms(uint32_t time);
 uint32_t lmac_ps_get_sync_time_ms(void);
 void lmac_ps_set_addr(uint8_t *addr, bool ap);
 void lmac_ps_set_country(uint8_t *cc);
+#if defined(NRC7394)
+void lmac_ps_set_freq(uint32_t freq);
+#endif
 void lmac_ps_set_ssid(uint8_t *ssid, uint8_t  len);
 void lmac_ps_set_ndp_preq(uint8_t enable);
 void lmac_ps_set_guard_interval(uint8_t gi);
@@ -274,6 +277,7 @@ void lmac_ps_set_duty_info(uint32_t window, uint32_t token, uint16_t margin, uin
 void lmac_ps_set_short_bcn_interval(uint16_t short_bcn_interval);
 void lmac_ps_set_bcn_interval(uint16_t bcn_interval);
 void lmac_ps_set_1m_prim_loc(uint8_t prim_loc);
+void lmac_ps_set_rc_status(uint8_t maxtp, uint8_t tp2, uint8_t maxp, uint8_t lowest, uint8_t probe);
 
 /* Dynamic PS API */
 void lmac_dyn_ps_init();

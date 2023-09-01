@@ -33,55 +33,63 @@ extern "C" {
 typedef void (*func_void)(void);
 typedef void (*func_int)(int);
 
+#define PBC_IF_NUM  2
 struct pbc_ops {
-    uint8_t     GPIO_PushButton;
-    void		(*nrc_wifi_wps_pbc_fail)(void);
-    void		(*nrc_wifi_wps_pbc_timeout)(void);
-    void		(*nrc_wifi_wps_pbc_success)(uint8_t *, uint8_t, uint8_t, char *);
+    int8_t     GPIO_PushButton[PBC_IF_NUM];
+    void		(*nrc_wifi_wps_pbc_fail)(void *priv);
+    void		(*nrc_wifi_wps_pbc_timeout)(void *priv);
+    void		(*nrc_wifi_wps_pbc_success)(void *priv, uint8_t *, uint8_t, uint8_t, char *);
     void        (*nrc_wifi_wps_pbc_pressed)(int v);
 };
 
 /**********************************************
- * @fn  static void wps_pbc_fail_cb(void)
+ * @fn  static void wps_pbc_fail_cb(void *priv)
  *
  * @brief This callback is called when wps pbc operation fail
  *
- * @param void
+ * @param[in]  priv          : wpa interface
  *
  * @return void
  ***********************************************/
-static void wps_pbc_fail_cb(void);
+static void wps_pbc_fail_cb(void *priv);
 
 /**********************************************
- * @fn  static void wps_pbc_timeout_cb(void)
+ * @fn  static void wps_pbc_timeout_cb(void *priv)
  *
- * @brief This callback is called when there is no connection attempt for 120 second and timeout occurs.
+ * @brief This callback is called when there is no connection
+ *          attempt for 120 second and timeout occurs.
  *
- * @param void
+ * @param[in]  priv          : wpa interface
  *
  * @return void
  ***********************************************/
-static void wps_pbc_timeout_cb(void);
+static void wps_pbc_timeout_cb(void *priv);
 
 /**********************************************
- * @fn  static void wps_pbc_success_cb(uint8_t *ssid, uint8_t ssid_len, uint8_t security_mode, char *passphrase)
+ * @fn  static void wps_pbc_success_cb(void *priv, uint8_t *ssid,
+ *                     uint8_t ssid_len, uint8_t security_mode, char *passphrase)
  *
  * @brief This callback is called when wps pbc operation succeeds
  *
+ * @param[in]  priv          : wpa interface
  * @param[in]  ssid          : Service set identifier (network name)
  * @param[in]  ssid_len      : Length of the SSID
- * @param[in]  security_mode : WIFI_SEC_OPEN=0, WIFI_SEC_WPA2=1, WIFI_SEC_WPA3_OWE=2, WIFI_SEC_WPA3_SAE=3
- * @param[in]  passphrase    : WPA ASCII passphrase (ASCII passphrase must be between 8 and 63 characters)
+ * @param[in]  security_mode : WIFI_SEC_OPEN=0, WIFI_SEC_WPA2=1,
+ *                                  WIFI_SEC_WPA3_OWE=2, WIFI_SEC_WPA3_SAE=3
+ * @param[in]  passphrase    : WPA ASCII passphrase
+ *                           (ASCII passphrase must be between 8 and 63 characters)
  *
  * @return void
  ***********************************************/
-static void wps_pbc_success_cb(uint8_t *, uint8_t, uint8_t, char *);
+static void wps_pbc_success_cb(void *priv, uint8_t *ssid,
+	uint8_t ssid_len, uint8_t security_mode, char *passphrase);
 
 
 /**********************************************
  * @fn  static void wps_pbc_button_pressed_event(int vector)
  *
- * @brief This callback is called when user push the button which is connected with GPIO we register for interrupt.
+ * @brief This callback is called when user push the button which is
+ *          connected with GPIO we register for interrupt.
  *
  * @param void
  *

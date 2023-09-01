@@ -446,12 +446,6 @@ int uart_handler_init(void)
 	return _hif_open(&info);
 }
 
-static void init_broadcast_fota()
-{
-	nrc_bcast_fota_init();
-	nrc_bcast_fota_enable(true);
-	nrc_bcast_fota_set_mode(BC_FOTA_MODE_CONNECTED);
-}
 
 #ifdef INCLUDE_SCAN_BACKOFF
 static void init_default_backoff()
@@ -524,7 +518,8 @@ static int network_init()
 						(i+1), 	(char*)results.result[i].bssid,
 						(char*)results.result[i].freq, (char*)results.result[i].sig_level,
 						(char*)results.result[i].flags, (char*)results.result[i].ssid);
-					if(strcmp((char*)param->ssid, (char*)results.result[i].ssid)== 0 ){
+					if((strcmp((char*)param->ssid, (char*)results.result[i].ssid)== 0)
+					   && (results.result[i].security == param->security_mode)){
 						ssid_found = true;
 						scanning_retry_count = 0;
 						break;
@@ -586,8 +581,12 @@ static int network_init()
  *******************************************************************************/
 void user_init(void)
 {
-	nrc_usr_print("[%s] version : %d.%d.%d\n",__func__, SAMPLE_UART_TCP_BRIDGE_MAJOR,
-	SAMPLE_UART_TCP_BRIDGE_MINOR, SAMPLE_UART_TCP_BRIDGE_PATCH);
+	VERSION_T app_version;
+	app_version.major = SAMPLE_UART_TCP_CLIENT_MAJOR;
+	app_version.minor = SAMPLE_UART_TCP_CLIENT_MINOR;
+	app_version.patch = SAMPLE_UART_TCP_CLIENT_PATCH;
+	nrc_set_app_version(&app_version);
+	nrc_set_app_name(SAMPLE_UART_TCP_CLIENT_APP_NAME);
 
 	if (network_init() < 0) {
 		nrc_usr_print("** network init failed **\n");
@@ -601,6 +600,4 @@ void user_init(void)
 
 	start_ctrl_server();
 	start_tcp_client();
-
-	init_broadcast_fota();
 }

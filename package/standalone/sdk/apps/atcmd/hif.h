@@ -93,8 +93,6 @@ enum _HIF_TYPE
 
 typedef struct
 {
-#define CONFIG_HIF_FIFO_MUTEX
-
 	uint32_t size;
 	uint32_t cnt;
 
@@ -104,14 +102,6 @@ typedef struct
 	bool static_buffer;
 	char *buffer;
 	char *buffer_end;
-
-#ifdef CONFIG_HIF_FIFO_MUTEX
-	struct
-	{
-		SemaphoreHandle_t handle;
-		StaticSemaphore_t buffer;
-	} mutex;
-#endif
 } _hif_fifo_t;
 
 typedef struct
@@ -165,21 +155,14 @@ typedef struct
 
 #include "hif_dma.h"
 
-extern bool __hif_fifo_mutex_take (_hif_fifo_t *fifo, bool isr);
-extern bool __hif_fifo_mutex_give (_hif_fifo_t *fifo, bool isr);
-
-#define _hif_fifo_mutex_take(fifo)			__hif_fifo_mutex_take(fifo, false)
-#define _hif_fifo_mutex_take_isr(fifo)		__hif_fifo_mutex_take(fifo, true)
-#define _hif_fifo_mutex_give(fifo)			__hif_fifo_mutex_give(fifo, false)
-#define _hif_fifo_mutex_give_isr(fifo)		__hif_fifo_mutex_give(fifo, true)
-
-extern _hif_fifo_t *_hif_fifo_create (char *buffer, int size, bool mutex);
+extern _hif_fifo_t *_hif_fifo_create (char *buffer, int size);
 extern void _hif_fifo_delete (_hif_fifo_t *fifo);
 extern void _hif_fifo_reset (_hif_fifo_t *fifo);
 extern char *_hif_fifo_push_addr (_hif_fifo_t *fifo, int offset);
 extern char *_hif_fifo_pop_addr (_hif_fifo_t *fifo, int offset);
-extern int _hif_fifo_free_size (_hif_fifo_t *fifo);
-extern int _hif_fifo_fill_size (_hif_fifo_t *fifo);
+extern uint32_t _hif_fifo_size (_hif_fifo_t *fifo);
+extern uint32_t _hif_fifo_free_size (_hif_fifo_t *fifo);
+extern uint32_t _hif_fifo_fill_size (_hif_fifo_t *fifo);
 extern bool _hif_fifo_empty (_hif_fifo_t *fifo);
 extern bool _hif_fifo_full (_hif_fifo_t *fifo);
 extern char _hif_fifo_getc (_hif_fifo_t *fifo);
@@ -205,8 +188,6 @@ extern int _hif_open (_hif_info_t *info);
 extern void _hif_close (void);
 extern int _hif_read (char *buf, int len);
 extern int _hif_write (char *buf, int len);
-extern int _hif_read_isr (char *buf, int len);
-extern int _hif_write_isr (char *buf, int len);
 extern int _hif_rx_suspend (int time);
 extern void _hif_rx_resume (void);
 extern void _hif_rx_resume_isr (void);

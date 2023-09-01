@@ -112,15 +112,17 @@ nrc_err_t run_sample_hink_e116a07(void)
 	EPD_HINK_11IN6_RED_Display(ImageBuffer, true);
 	EPD_HINK_11IN6_Sleep(1000);
 #endif
-#if 1
+
 	nrc_usr_print("Paint\n");
 	Paint_Clear(WHITE);
+#if 1 // Display a black image
 	GUI_ReadBmpImage((struct BMP_IMAGE *)patient_care_board_b, 0, 0);
 	EPD_HINK_11IN6_BW_Display(ImageBuffer, false);
+#else // Display a red image
 	GUI_ReadBmpImage((struct BMP_IMAGE *)patient_care_board_r, 0, 0);
 	EPD_HINK_11IN6_RED_Display(ImageBuffer, true);
-	EPD_HINK_11IN6_Sleep(0);
 #endif
+	EPD_HINK_11IN6_Sleep(0);
 
 	while (0)
 	{

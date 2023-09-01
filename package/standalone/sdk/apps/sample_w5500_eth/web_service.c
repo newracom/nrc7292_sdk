@@ -425,7 +425,7 @@ update_settings_handler(httpd_req_t* req)
 		}
 		wifi_config->network_mode = WIFI_NETWORK_MODE_BRIDGE;
 
-		nrc_save_wifi_config(wifi_config);
+		nrc_save_wifi_config(wifi_config, 1);
 
 		_delay_ms(1000);
 

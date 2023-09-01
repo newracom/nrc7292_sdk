@@ -50,7 +50,7 @@ typedef uint64_t u64;
 #define MAX_BSSID_LENGTH				(17)
 #define MAX_CC_LENGTH					(3)
 #define MAX_STATIC_IP_LENGTH			(48)
-#define MAX_PW_LENGTH					(30)
+#define MAX_PW_LENGTH					(64)
 #define MAX_PMK_LENGTH                  (64)
 #define MAX_MAC_ADDR					(17)
 
@@ -160,7 +160,6 @@ typedef enum {
 
 	WIFI_CC_US = 0,
 	WIFI_CC_JP,
-	WIFI_CC_K0,
 	WIFI_CC_K1,
 	WIFI_CC_TW,
 	WIFI_CC_EU,
@@ -235,6 +234,7 @@ typedef union {
 		char *sig_level;
 		char *flags;
 		char *ssid;
+		tWIFI_SECURITY security;
 	};
 } SCAN_RESULT;
 
@@ -261,6 +261,8 @@ typedef struct {
 	tWIFI_STA_STATE state;
 	int8_t rssi;
 	uint8_t snr;
+	uint8_t tx_mcs;
+	uint8_t rx_mcs;
 	uint16_t aid;
 	uint8_t addr[6];
 } STA_INFO;
@@ -269,6 +271,12 @@ typedef struct {
 	uint16_t total_num;
 	STA_INFO sta[MAX_STA_CONN_NUM];
 } STA_LIST;
+
+typedef struct {
+	uint8_t major;
+	uint8_t minor;
+	uint8_t patch;
+} VERSION_T;
 
 typedef void (*intr_handler_fn)(int vector);
 

@@ -27,106 +27,9 @@
 #include "hif.h"
 
 
-/**********************************************************************************************/
-
-#ifdef CONFIG_HIF_FIFO_MUTEX
-
-static SemaphoreHandle_t g_hif_fifo_mutex = NULL;
-
-static int _hif_fifo_mutex_create (_hif_fifo_t *fifo)
-{
-	if (fifo)
-	{
-		fifo->mutex.handle = xSemaphoreCreateMutexStatic(&fifo->mutex.buffer);
-		if (fifo->mutex.handle)
-		{
-/*			_hif_info("fifo_mutex: fifo=%p handle=%p\n", fifo, fifo->mutex.handle); */
-		   return 0;
-		}
-	}
-
-	return -1;
-}
-
-static void _hif_fifo_mutex_delete (_hif_fifo_t *fifo)
-{
-	SemaphoreHandle_t handle = fifo ? fifo->mutex.handle : NULL;
-
-	if (handle)
-		vSemaphoreDelete(handle);
-}
-
-bool __hif_fifo_mutex_take (_hif_fifo_t *fifo, bool isr)
-{
-	SemaphoreHandle_t handle = fifo ? fifo->mutex.handle : NULL;
-	bool take;
-
-	if (!handle)
-		return true;
-
-	if (!isr)
-	{
-		int time_ms = 0; // block
-
-		take = xSemaphoreTake(handle, pdMS_TO_TICKS(time_ms));
-		if (!take)
-			_hif_error("failed\n");
-	}
-	else
-	{
-		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
-		take = xSemaphoreTakeFromISR(handle, &xHigherPriorityTaskWoken);
-
-		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-	}
-
-	return take;
-}
-
-bool __hif_fifo_mutex_give (_hif_fifo_t *fifo, bool isr)
-{
-	SemaphoreHandle_t handle = fifo ? fifo->mutex.handle : NULL;
-	bool give;
-
-	if (!handle)
-		return true;
-
-	if (!isr)
-	{
-		give = xSemaphoreGive(handle);
-		if (!give)
-			_hif_error("failed\n");
-	}
-	else
-	{
-		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
-		give = xSemaphoreGiveFromISR(handle, &xHigherPriorityTaskWoken);
-
-		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-	}
-
-	return give;
-}
-
-#else
-
-bool __hif_fifo_mutex_take (_hif_fifo_t *fifo, bool isr)
-{
-	return true;
-}
-
-bool __hif_fifo_mutex_give (_hif_fifo_t *fifo, bool isr)
-{
-	return true;
-}
-
-#endif /* #ifdef CONFIG_HIF_FIFO_MUTEX */
-
 /*********************************************************************************************/
 
-_hif_fifo_t *_hif_fifo_create (char *buffer, int size, bool mutex)
+_hif_fifo_t *_hif_fifo_create (char *buffer, int size)
 {
 	_hif_fifo_t *fifo;
 
@@ -153,14 +56,6 @@ _hif_fifo_t *_hif_fifo_create (char *buffer, int size, bool mutex)
 
 	fifo->buffer_end = fifo->buffer + size;
 
-#ifdef CONFIG_HIF_FIFO_MUTEX
-	if (mutex && _hif_fifo_mutex_create(fifo) != 0)
-	{
-		_hif_free(fifo);
-		return NULL;
-	}
-#endif
-
 	fifo->size = size;
 	fifo->cnt = 0;
 	fifo->push_idx = 0;
@@ -173,10 +68,6 @@ void _hif_fifo_delete (_hif_fifo_t *fifo)
 {
 	if (fifo)
 	{
-#ifdef CONFIG_HIF_FIFO_MUTEX
-		_hif_fifo_mutex_delete(fifo);
-#endif
-
 		if (!fifo->static_buffer)
 			_hif_free(fifo->buffer);
 
@@ -208,12 +99,19 @@ char *_hif_fifo_pop_addr (_hif_fifo_t *fifo, int offset)
 	return &fifo->buffer[buf_idx];
 }
 
-int _hif_fifo_free_size (_hif_fifo_t *fifo)
+uint32_t _hif_fifo_size (_hif_fifo_t *fifo)
 {
+	return fifo->size;
+}
+
+uint32_t _hif_fifo_free_size (_hif_fifo_t *fifo)
+{
+	ASSERT(fifo->cnt <= fifo->size);
+
 	return fifo->size - fifo->cnt;
 }
 
-int _hif_fifo_fill_size (_hif_fifo_t *fifo)
+uint32_t _hif_fifo_fill_size (_hif_fifo_t *fifo)
 {
 	return fifo->cnt;
 }

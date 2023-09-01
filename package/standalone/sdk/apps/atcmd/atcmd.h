@@ -40,7 +40,7 @@
 
 #define ATCMD_VER_MAJOR			(1)
 #define ATCMD_VER_MINOR			(23)
-#define ATCMD_VER_REVISION		(4)
+#define ATCMD_VER_REVISION		(6)
 
 /**********************************************************************************************/
 
@@ -55,10 +55,6 @@
 
 #ifndef CONFIG_ATCMD_USER
 /* #define CONFIG_ATCMD_USER */
-#endif
-
-#ifndef CONFIG_ATCMD_DEBUG
-/* #define CONFIG_ATCMD_DEBUG */
 #endif
 
 /* #define CONFIG_ATCMD_PREFIX_CHECK */
@@ -216,6 +212,8 @@ enum ATCMD_ID
 	ATCMD_WIFI_CCA_THRESHOLD,
 	ATCMD_WIFI_TX_TIME,
 	ATCMD_WIFI_TSF,
+	ATCMD_WIFI_BEACON_INTERVAL,
+	ATCMD_WIFI_LISTEN_INTERVAL,
 	ATCMD_WIFI_SCAN,
 	ATCMD_WIFI_CONNECT,
 	ATCMD_WIFI_DISCONNECT,
@@ -228,12 +226,12 @@ enum ATCMD_ID
 	ATCMD_WIFI_PING6,
 #endif
 	ATCMD_WIFI_DNS,
-/*	ATCMD_WIFI_ROAMING, */
 	ATCMD_WIFI_FOTA,
 	ATCMD_WIFI_DEEP_SLEEP,
 	ATCMD_WIFI_SOFTAP,
-	ATCMD_WIFI_STAINFO,
 	ATCMD_WIFI_BSS_MAX_IDLE,
+	ATCMD_WIFI_STA_INFO,
+	ATCMD_WIFI_MAX_STA,
 	ATCMD_WIFI_TIMEOUT,
 
 	/* Command for internal */
@@ -241,6 +239,7 @@ enum ATCMD_ID
 	ATCMD_WIFI_LBT,
 	ATCMD_WIFI_MIC_SCAN,
 	ATCMD_WIFI_BMT,
+	ATCMD_WIFI_CONTINUOUS_TX,
 
 /* 	ATCMD_GROUP_SOCKET
  *************************/
@@ -256,6 +255,7 @@ enum ATCMD_ID
 	ATCMD_SOCKET_RECV_INFO,
 	ATCMD_SOCKET_RECV_LOG,
 	ATCMD_SOCKET_ADDR_INFO,
+	ATCMD_SOCKET_TCP_KEEPALIVE,
 	ATCMD_SOCKET_TCP_NODELAY,
 	ATCMD_SOCKET_TIMEOUT,
 
@@ -375,8 +375,6 @@ inline uint32_t atcmd_sys_now (void)
 {
 	return xTaskGetTickCount() * portTICK_PERIOD_MS;
 }
-
-/* extern const char *atcmd_strerror (int err); */
 
 extern int atcmd_param_to_int8 (const char *param, int8_t *val);
 extern int atcmd_param_to_int16 (const char *param, int16_t *val);

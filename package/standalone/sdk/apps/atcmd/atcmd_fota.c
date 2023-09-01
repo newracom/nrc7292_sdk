@@ -567,7 +567,7 @@ static int _atcmd_fota_fw_check_callback (char *data, int len, int total)
 	return 0;
 }
 
-static int _atcmd_fota_fw_check (const char *server_url, bool *new_fw)
+static int _atcmd_fota_fw_check (const char *server_url, bool compare_version, bool *new_fw)
 {
 	const fw_ver_t fw_ver[FW_VER_NUM] =
 	{
@@ -598,7 +598,7 @@ static int _atcmd_fota_fw_check (const char *server_url, bool *new_fw)
 		return -1;
 	}
 
-	for (i = 0 ; i < FW_VER_NUM ; i++)
+	for (i = 0 ; compare_version && i < FW_VER_NUM ; i++)
 	{
 		cur_ver = fw_ver + i;
 		new_ver = g_atcmd_fota.info.fw_ver + i;
@@ -617,7 +617,7 @@ static int _atcmd_fota_fw_check (const char *server_url, bool *new_fw)
 		}
 	}
 
-	if (i < FW_VER_NUM)
+	if (!compare_version || i < FW_VER_NUM)
 	{
 		char sdk_ver[12];
 		char atcmd_ver[12];
@@ -758,6 +758,7 @@ static int _atcmd_fota_fw_update (void)
 
 static void _atcmd_fota_task (void *pvParameters)
 {
+	const bool compare_version = false;
 	bool new_fw = false;
 	bool failed = false;
 
@@ -800,7 +801,7 @@ static void _atcmd_fota_task (void *pvParameters)
 				fw_bin->crc32 = g_atcmd_fota.params.bin_crc32;
 				new_fw = true;
 			}
-			else if (_atcmd_fota_fw_check(g_atcmd_fota.params.server_url, &new_fw) != 0)
+			else if (_atcmd_fota_fw_check(g_atcmd_fota.params.server_url, compare_version, &new_fw) != 0)
 			{
 				failed = true;
 				continue;

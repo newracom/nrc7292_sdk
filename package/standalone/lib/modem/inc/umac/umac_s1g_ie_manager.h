@@ -69,6 +69,10 @@ bool umac_add_op_bw_info(uint8_t vif_id, uint8_t *peer_addr, uint8_t bw);
 int umac_get_op_bw_info(uint8_t vif_id, uint8_t *peer_addr);
 #endif
 
+uint8_t umac_probe_req_update(int vif_id, uint8_t* ven_ie, uint16_t len);
+uint8_t umac_probe_rsp_update(int vif_id, uint8_t* ven_ie, uint16_t len);
+uint8_t umac_assoc_req_update(int vif_id, uint8_t* ven_ie, uint16_t len);
+
 //////////////////////
 // Public Functions //
 //////////////////////
@@ -109,8 +113,10 @@ bool insert_ie_mesh_ch_switch_param(struct byte_stream *bs, bool is_tx, int8_t v
 bool insert_ie_mesh_awake_window(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 bool insert_ie_vendor_specific_wmm(struct byte_stream *bs, bool is_tx, int8_t vif_id, OUI_SUBTYPE oui_stype);
 bool insert_ie_vendor_specific_all_others(struct byte_stream *bs, bool is_tx, int8_t vif_id);
-bool insert_ie_vendor_specific_probe_resp(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 bool insert_ie_extension_all(struct byte_stream *bs, bool is_tx, int8_t vif_id);
+bool insert_ie_vendor_specific_probe_req(struct byte_stream *bs, bool is_tx, int8_t vif_id);
+bool insert_ie_vendor_specific_probe_rsp(struct byte_stream *bs, bool is_tx, int8_t vif_id);
+bool insert_ie_vendor_specific_assoc_req(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 #if defined(INCLUDE_H2E_SUPPORT)
 bool insert_ie_rsn_extension(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 #endif /* defined(INCLUDE_H2E_SUPPORT) */
@@ -153,7 +159,9 @@ bool parse_ie_s1g_twt(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool 
 bool parse_ie_rsn_extension(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 #endif /* defined(INCLUDE_H2E_SUPPORT) */
 // Functions for parsed information
-
+bool parse_ie_vendor_specific_probe_req(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
+bool parse_ie_vendor_specific_probe_rsp(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
+bool parse_ie_vendor_specific_assoc_req(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 #if defined (INCLUDE_IBSS)
 compatibility_info* get_g_cap_info(void);
 ie_ibss_param_set* get_g_ie_ibss_param_set(void);

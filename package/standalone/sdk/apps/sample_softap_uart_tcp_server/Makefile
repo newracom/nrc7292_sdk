@@ -1,5 +1,4 @@
 DEFINE += -DCONFIG_ATCMD_UART
-DEFINE += -DWIFI_CONFIG_NVS_UPDATE=1
 
 CSRCS += \
 	softap_uart_tcp_server.c \

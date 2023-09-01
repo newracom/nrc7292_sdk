@@ -28,24 +28,98 @@
 
 #include "wifi_config_setup.h"
 
-int wifi_init(WIFI_CONFIG *param);
-int wifi_connect(WIFI_CONFIG *param);
-int wifi_start_softap(WIFI_CONFIG *param);
+/*********************************************************************
+ * @fn wifi_init
+ *
+ * @brief initialize the wifi configurations
+ *
+ * @param wifi configuration ptr
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ **********************************************************************/
+tWIFI_STATUS wifi_init(WIFI_CONFIG *param);
+
+
+/*********************************************************************
+ * @fn wifi_connect
+ *
+ * @brief Connect to AP
+ *
+ * @param wifi configuration ptr
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ **********************************************************************/
+tWIFI_STATUS wifi_connect(WIFI_CONFIG *param);
+
+
+/*********************************************************************
+ * @fn wifi_start_softap
+ *
+ * @brief Start softAP
+ *
+ * @param wifi configuration ptr
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ **********************************************************************/
+tWIFI_STATUS wifi_start_softap(WIFI_CONFIG *param);
+
+
+/*********************************************************************
+ * @fn wifi_init_with_vif
+ *
+ * @brief initialize the wifi configurations
+ *
+ * @param vif
+ *
+ * @param wifi configuration ptr
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ **********************************************************************/
+tWIFI_STATUS wifi_init_with_vif(int vif, WIFI_CONFIG *param);
+
+
+/*********************************************************************
+ * @fn wifi_connect_with_vif
+ *
+ * @brief Connect to AP
+ *
+ * @param vif
+ *
+ * @param wifi configuration ptr
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ **********************************************************************/
+tWIFI_STATUS wifi_connect_with_vif(int vif, WIFI_CONFIG *param);
+
+
+/*********************************************************************
+ * @fn wifi_start_softap_with_vif
+ *
+ * @brief Start softAP with vif
+ *
+ * @param vif
+ *
+ * @param wifi configuration ptr
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ **********************************************************************/
+tWIFI_STATUS wifi_start_softap_with_vif(int vif, WIFI_CONFIG *param);
+
 
 /**********************************************
- * @fn void  wifi_set_ip_to_static(uint8_t mode)
+ * @fn wifi_set_ip_to_static
  *
  * @brief Override IP setting mode to static if mode set to 1.
  *
- * @param mode : 1 to override IP setting to static
- * regardless of initial setting
+ * @param mode 1 to override IP setting to static, regardless of initial setting
  *
  * @return None
  ***********************************************/
 void wifi_set_ip_to_static(uint8_t mode);
 
+
 /**********************************************
- * @fn bool  nrc_get_ip_override()
+ * @fn wifi_get_ip_override
  *
  * @brief Returns IP mode overriden value.
  *

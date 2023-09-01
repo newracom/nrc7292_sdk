@@ -56,7 +56,7 @@
 /**
  * Country code
  * The ISO/IEC alpha2 country code for the country in which this device is
- * currently operating.{US|JP|K0|K1|TW|EU|CN|NZ|AU|K2}
+ * currently operating.{US|JP|K1|TW|EU|CN|NZ|AU|K2}
  */
 #ifndef COUNTRY_CODE
 #define COUNTRY_CODE "US"
@@ -318,38 +318,6 @@
 
 
 /**
- * The minimum interval time for sending data over Wi-Fi. The default value is 100ms.
- */
-#ifndef WIFI_MIN_INTERVAL
-#define WIFI_MIN_INTERVAL 100
-#endif /* WIFI_MIN_INTERVAL */
-
-
-/**
- * The maximum beacon interval time for Wi-Fi. The default value is 300ms.
- */
-#ifndef WIFI_MAX_INTERVAL
-#define WIFI_MAX_INTERVAL 10000
-#endif /* WIFI_MAX_INTERVAL */
-
-
-/**
- * The minimum beacon interval time for Wi-Fi. The default value is 1ms.
- */
-#ifndef WIFI_MIN_BCN_INTERVAL
-#define WIFI_MIN_BCN_INTERVAL 1
-#endif /* WIFI_MIN_BCN_INTERVAL */
-
-
-/**
- * The minimum transmit power for Wi-Fi. The default value is 1.
- */
-#ifndef WIFI_MAX_BCN_INTERVAL
-#define WIFI_MAX_BCN_INTERVAL 300
-#endif /* WIFI_MAX_BCN_INTERVAL */
-
-
-/**
  * The minimum transmit power for Wi-Fi. The default value is 1.
  */
 #ifndef WIFI_MIN_TXPOWER
@@ -366,7 +334,7 @@
 
 
 /**
- * The default device mode STA(0) or AP(1) for Wi-Fi. The default value is STA(0).
+ * The device mode STA(0) or AP(1) for Wi-Fi. The default value is STA(0).
  */
 #ifndef WIFI_DEVICE_MODE
 #define WIFI_DEVICE_MODE 0
@@ -374,7 +342,7 @@
 
 
 /**
- * The default network mode Bridge(0) or NAP(1) for Wi-Fi. The default value is NAT(1).
+ * The network mode Bridge(0) or NAT(1) for Wi-Fi. The default value is NAT(1).
  */
 #ifndef WIFI_NETWORK_MODE
 #define WIFI_NETWORK_MODE 1
@@ -414,7 +382,7 @@
 
 
 /**
- * The default mode for Wi-Fi. The default value is WIFI_MODE_AP.
+ * The mode for Wi-Fi. The default value is WIFI_MODE_AP.
  */
 #ifndef NRC_WIFI_MODE_DEFAULT
 #define NRC_WIFI_MODE_DEFAULT WIFI_MODE_AP
@@ -422,7 +390,7 @@
 
 
 /**
- * The default network mode for Wi-Fi. The default value is WIFI_NETWORK_MODE_NAT.
+ * The network mode for Wi-Fi. The default value is WIFI_NETWORK_MODE_NAT.
  */
 #ifndef NRC_WIFI_NETWORK_MODE_DEFAULT
 #define NRC_WIFI_NETWORK_MODE_DEFAULT WIFI_NETWORK_MODE_NAT
@@ -456,10 +424,96 @@
 
 /**
  * Wi-Fi Guard Interval(GI) Type
- * The default network mode Long GI(0) or Short GI(1) for Wi-Fi. The default value is Long GI(0)
+ * The network mode Long GI(0) or Short GI(1) for Wi-Fi. The default value is Long GI(0)
  */
 #ifndef NRC_WIFI_GUARD_INTERVAL_DEFAULT
 #define NRC_WIFI_GUARD_INTERVAL_DEFAULT 0
 #endif /* NRC_WIFI_GUARD_INTERVAL_DEFAULT*/
+
+/**
+ * Wi-Fi hidden SSID (Service Set Identifier)
+ * A hidden SSID is a wireless network where the network name is not broadcasted
+ * to devices scanning for Wi-Fi networks.
+ * The hidden SSID is disable(0) or enable(1) for Wi-Fi. The default value is disable(0)
+ */
+#ifndef NRC_WIFI_HIDDEN_SSID_DEFAULT
+#define NRC_WIFI_HIDDEN_SSID_DEFAULT 0
+#endif /* NRC_WIFI_HIDDEN_SSID_DEFAULT */
+
+/**
+ * Maximum number of stations allowed in softAP (upto 10)
+ */
+#ifndef NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT
+#define NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT 10
+#endif /* NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT */
+
+/**
+ * Wi-Fi isten Interval
+ * Listen Interval Time (us) = listen_interval * beacon_interval * 1TU (1024 us)
+ */
+#ifndef NRC_WIFI_LISTEN_INTERVAL_DEFAULT
+#define NRC_WIFI_LISTEN_INTERVAL_DEFAULT 1000
+#endif /* NRC_WIFI_LISTEN_INTERVAL_DEFAULT*/
+
+
+/*************************************************************
+ * VIF1 configurations
+ * These are the interface-specific configurations for VIF1
+ *************************************************************/
+#ifndef VIF1_STR_SSID
+#define VIF1_STR_SSID "halow_demo_1"
+#endif /* VIF1_STR_SSID */
+
+#ifndef VIF1_NRC_WIFI_SECURE
+#define VIF1_NRC_WIFI_SECURE   WIFI_SEC_OPEN
+#endif /* VIF1_NRC_WIFI_SECURE */
+
+#ifndef VIF1_NRC_WIFI_IP_MODE
+#define VIF1_NRC_WIFI_IP_MODE	WIFI_DYNAMIC_IP
+#endif /* VIF1_NRC_WIFI_IP_MODE */
+
+#ifndef VIF1_NRC_REMOTE_ADDRESS
+#define VIF1_NRC_REMOTE_ADDRESS "192.168.200.1"
+#endif /* VIF1_NRC_REMOTE_ADDRESS */
+
+#ifndef VIF1_NRC_REMOTE_PORT
+#define VIF1_NRC_REMOTE_PORT		8099
+#endif /* VIF1_NRC_REMOTE_PORT */
+
+#ifndef VIF1_NRC_WIFI_PASSWORD
+#define VIF1_NRC_WIFI_PASSWORD  "12345678"
+#endif /* VIF1_NRC_WIFI_PASSWORD */
+
+#ifndef VIF1_NRC_STATIC_IP
+#define VIF1_NRC_STATIC_IP "192.168.200.14"
+#endif /* VIF1_NRC_STATIC_IP */
+
+#ifndef VIF1_NRC_NETMASK
+#define VIF1_NRC_NETMASK "255.255.255.0"
+#endif /* VIF1_NRC_NETMASK */
+
+#ifndef VIF1_NRC_GATEWAY
+#define VIF1_NRC_GATEWAY "192.168.200.1"
+#endif /* VIF1_NRC_GATEWAY */
+
+#ifndef VIF1_NRC_STATIC_IP6
+#define VIF1_NRC_STATIC_IP6 "fc00::c0a8:c80e"
+#endif /* VIF1_NRC_STATIC_IP6 */
+
+#ifndef VIF1_WIFI_DEVICE_MODE
+#define VIF1_WIFI_DEVICE_MODE 0
+#endif /* VIF1_WIFI_DEVICE_MODE */
+
+#ifndef VIF1_WIFI_NETWORK_MODE
+#define VIF1_WIFI_NETWORK_MODE 1
+#endif /* VIF1_WIFI_NETWORK_MODE */
+
+#ifndef VIF1_NRC_WIFI_NETWORK_MODE_DEFAULT
+#define VIF1_NRC_WIFI_NETWORK_MODE_DEFAULT WIFI_NETWORK_MODE_NAT
+#endif /* VIF1_NRC_WIFI_NETWORK_MODE_DEFAULT */
+
+#ifndef VIF1_NRC_WIFI_RATE_CONTROL
+#define VIF1_NRC_WIFI_RATE_CONTROL 1
+#endif /* VIF1_NRC_WIFI_RATE_CONTROL */
 
 #endif /* __WIFI_CONFIG_H__ */

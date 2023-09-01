@@ -48,15 +48,8 @@
 #define CHECK_VER_URL SERVER_URL "version" // Unique URL for retrieving the version information
 #define CHUNK_SIZE 2048
 
-
-typedef struct{
-	uint8_t major;
-	uint8_t minor;
-	uint8_t patch;
-}version_t;
-
 typedef struct {
-	version_t version;
+	VERSION_T version;
 	uint8_t force;
 	uint32_t crc;
 	char fw_url[128];
@@ -64,16 +57,8 @@ typedef struct {
 
 update_info_t update_info;
 
-version_t getCurrentVersion() {
-    version_t currentVersion;
 
-    currentVersion.major = SAMPLE_FOTA_MAJOR;
-    currentVersion.minor = SAMPLE_FOTA_MINOR;
-    currentVersion.patch = SAMPLE_FOTA_PATCH;
-    return currentVersion;
-}
-
-void parseVersionString(const char* versionString, size_t versionStringLen, version_t* parsedVersion) {
+static void parseVersionString(const char* versionString, size_t versionStringLen, VERSION_T* parsedVersion) {
     char versionCopy[128];
     size_t copyLen = versionStringLen < sizeof(versionCopy) ? versionStringLen : sizeof(versionCopy) - 1;
     strncpy(versionCopy, versionString, copyLen);
@@ -92,9 +77,9 @@ void parseVersionString(const char* versionString, size_t versionStringLen, vers
         parsedVersion->patch = atoi(token);
 }
 
- bool isCurrentVersionLower(version_t* parsedVersion) {
-	 version_t targetVersion = *parsedVersion;
-	 version_t currentVersion = getCurrentVersion();
+static  bool isCurrentVersionLower(VERSION_T* parsedVersion) {
+	 VERSION_T targetVersion = *parsedVersion;
+	 VERSION_T currentVersion = *nrc_get_app_version();
 
 	 if (currentVersion.major < targetVersion.major)
 		 return true;
@@ -242,7 +227,8 @@ static void connect_to_ap(WIFI_CONFIG *param)
 			if (nrc_wifi_scan_results(0, &results)== WIFI_SUCCESS) {
 				/* Find the ssid in scan results */
 				for(i=0; i<results.n_result ; i++){
-					if(strcmp((char*)param->ssid, (char*)results.result[i].ssid)== 0 ){
+					if((strcmp((char*)param->ssid, (char*)results.result[i].ssid)== 0)
+					   && (results.result[i].security == param->security_mode)){
 						ssid_found = true;
 						break;
 					}
@@ -459,13 +445,18 @@ WIFI_CONFIG* param = &wifi_config;
 
 void user_init(void)
 {
+	VERSION_T app_version;
 	nrc_uart_console_enable(true);
 
-	memset(param, 0x0, WIFI_CONFIG_SIZE);
+	app_version.major = SAMPLE_FOTA_MAJOR;
+	app_version.minor = SAMPLE_FOTA_MINOR;
+	app_version.patch = SAMPLE_FOTA_PATCH;
+	nrc_set_app_version(&app_version);
+	nrc_set_app_name(SAMPLE_FOTA_APP_NAME);
 
+	memset(param, 0x0, WIFI_CONFIG_SIZE);
 	nrc_wifi_set_config(param);
 	connect_to_ap(param);
-
 	run_sample_fota();
 }
 

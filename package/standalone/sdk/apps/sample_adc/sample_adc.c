@@ -25,7 +25,7 @@
 
 #include "nrc_sdk.h"
 
-#define TEST_COUNT 10
+#define TEST_COUNT 100
 #define TEST_INTERVAL 2000 /* msec */
 
 /******************************************************************************
@@ -42,13 +42,17 @@ nrc_err_t run_sample_adc(int count, int interval)
 	int i = 0;
 
 	nrc_usr_print("[%s] Sample App for ADC API \n", __func__);
-	nrc_adc_init();
+	nrc_adc_init(true);
 	_delay_ms(100);
 
 	for(i=0; i<count; i++) {
 		nrc_usr_print("[%s] ", __func__);
 
+#ifdef NRC7292
 		for (id = ADC1; id <= ADC3 ; id++) {
+#else
+		for (id = ADC0; id <= ADC1 ; id++) {
+#endif
 			data = nrc_adc_get_data(id);
 			nrc_usr_print("CH%d=%03d  ", id, data);
 		}

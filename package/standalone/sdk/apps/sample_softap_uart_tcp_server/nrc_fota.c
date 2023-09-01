@@ -36,14 +36,8 @@
 
 #include "nrc_fota.h"
 
-typedef struct{
-	uint8_t major;
-	uint8_t minor;
-	uint8_t patch;
-} version_t;
-
 typedef struct {
-	version_t version;
+	VERSION_T version;
 	uint8_t force_update;
 	uint32_t crc;
 	char fw_url[128];
@@ -51,16 +45,7 @@ typedef struct {
 
 update_info_t update_info;
 
-version_t getCurrentVersion() {
-    version_t currentVersion;
-
-    currentVersion.major = SAMPLE_SOFTAP_UART_TCP_SERVER_MAJOR;
-    currentVersion.minor = SAMPLE_SOFTAP_UART_TCP_SERVER_MINOR;
-    currentVersion.patch = SAMPLE_SOFTAP_UART_TCP_SERVER_PATCH;
-    return currentVersion;
-}
-
-void parseVersionString(const char* versionString, size_t versionStringLen, version_t* parsedVersion) {
+static void parseVersionString(const char* versionString, size_t versionStringLen, VERSION_T* parsedVersion) {
     char versionCopy[128];
     size_t copyLen = versionStringLen < sizeof(versionCopy) ? versionStringLen : sizeof(versionCopy) - 1;
     strncpy(versionCopy, versionString, copyLen);
@@ -79,9 +64,9 @@ void parseVersionString(const char* versionString, size_t versionStringLen, vers
         parsedVersion->patch = atoi(token);
 }
 
- bool isCurrentVersionLower(version_t* parsedVersion) {
-	 version_t targetVersion = *parsedVersion;
-	 version_t currentVersion = getCurrentVersion();
+ static bool isCurrentVersionLower(VERSION_T* parsedVersion) {
+	 VERSION_T targetVersion = *parsedVersion;
+	 VERSION_T currentVersion = *nrc_get_app_version();
 
 	 if (currentVersion.major < targetVersion.major)
 		 return true;

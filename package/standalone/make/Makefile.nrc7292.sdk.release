@@ -208,6 +208,18 @@ endif
 # Operation with 8MHz Bandwidth AP
 CONFIG_STA_SUPPORT_8M=y
 
+# Do RF Recovery when detecting continuous beacon loss
+CONFIG_RF_RECOVERY_BY_BCM=n
+
+# Manual Continuous Tx support
+CONFIG_MANUAL_CONT_TX_SUPPORT=y
+
+# Auto triggering to create Tx aggregation session.
+CONFIG_AMPDU_AUTO_TX=y
+
+# AMPDU reordering(draft version : need to tune more)
+CONFIG_AMPDU_REORDER=n
+
 #// --------------------------------------------------
 #// 3rd party library
 #// --------------------------------------------------
@@ -350,7 +362,7 @@ DEFINE				+=	-DINCLUDE_BUF_TRACKER
 DEFINE				+=	-DINCLUDE_EVENT_TRACKER
 DEFINE				+=	-DDEBUG_MAC_STATS
 else
-DEFINE				+=	-DINCLUDE_LMAC_DEBUG
+#DEFINE				+=	-DINCLUDE_LMAC_DEBUG
 DEFINE				+=	-DDEBUG_MAC_STATS
 endif
 DEFINE				+=	-DUTIL_TRACE_STACK

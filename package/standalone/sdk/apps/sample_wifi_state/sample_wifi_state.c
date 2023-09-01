@@ -83,7 +83,8 @@ nrc_err_t run_sample_wifi_state(WIFI_CONFIG *param)
 			if (nrc_wifi_scan_results(0, &results)== WIFI_SUCCESS) {
 				/* Find the ssid in scan results */
 				for(i=0; i<results.n_result ; i++){
-					if(strcmp((char*)param->ssid, (char*)results.result[i].ssid)== 0 ){
+					if((strcmp((char*)param->ssid, (char*)results.result[i].ssid)== 0)
+					   && (results.result[i].security == param->security_mode)){
 						ssid_found = true;
 						break;
 					}

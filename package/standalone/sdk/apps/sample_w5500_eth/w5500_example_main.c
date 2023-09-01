@@ -39,8 +39,13 @@
 #define WIRELESS_BRIDGE_FW_VERSION "1.0.0"
 #define WEB_SERVER_DEFAULT_IP "192.168.50.1"
 #define DHCP_LEASE_TIME 12*60 // min
+#ifdef NRC7292
 #define TX_LED_GPIO 8
 #define RX_LED_GPIO 11
+#else
+#define TX_LED_GPIO 10
+#define RX_LED_GPIO 11
+#endif
 #define DHCP_TIMEOUT  10 // sec
 
 static WIFI_CONFIG wifi_config;
@@ -189,6 +194,9 @@ void user_init(void)
 
 	nrc_uart_console_enable(true);
 	nrc_led_trx_init(TX_LED_GPIO, RX_LED_GPIO, 500, false);
+
+	run_http_server(&wifi_config);
+
 	nrc_wifi_set_use_4address(true);
 
 	nrc_wifi_set_config(&wifi_config);
@@ -202,9 +210,17 @@ void user_init(void)
 #if defined(USE_FLASH_ETHERNET_MAC_ADDR) && (USE_FLASH_ETHERNET_MAC_ADDR == 1)
 	if(get_user_factory_data(&user_factory_info) == NRC_SUCCESS){
 		addr = user_factory_info.eth_mac;
-		A("[%s] eth_mac : %02x:%02x:%02x:%02x:%02x:%02x\n", __func__,
-			addr[0], addr[1], addr[2],addr[3], addr[4], addr[5]);
-
+		if ((addr[0] == 0xFF) &&
+			(addr[1] == 0xFF) &&
+			(addr[2] == 0xFF) &&
+			(addr[3] == 0xFF) &&
+			(addr[4] == 0xFF) &&
+			(addr[5] == 0xFF)) {
+			addr = NULL;
+		} else {
+			A("[%s] eth_mac : %02x:%02x:%02x:%02x:%02x:%02x\n", __func__,
+			  addr[0], addr[1], addr[2],addr[3], addr[4], addr[5]);
+		}
 	}
 #endif
 
@@ -301,8 +317,9 @@ void user_init(void)
 	/* Run STA or AP */
 	if (wifi_config.device_mode == WIFI_MODE_STATION) {
 		/* 4 address support only necessary for Bridge with multiple ethernet devices */
-		nrc_wifi_set_use_4address(false);
-
+		if (wifi_config.network_mode != WIFI_NETWORK_MODE_BRIDGE) {
+			nrc_wifi_set_use_4address(false);
+		}
 		nrc_usr_print("[%s] Device in Station mode...\n", __func__);
 		nrc_usr_print("[%s] Connecting to \"%s\"...\n", __func__, wifi_config.ssid);
 		if (connect_to_ap(&wifi_config) == NRC_SUCCESS) {
@@ -323,5 +340,4 @@ void user_init(void)
 		nrc_usr_print("[%s] ssid %s security %d channel %d\n", __func__,
 			wifi_config.ssid, wifi_config.security_mode, wifi_config.channel);
 	}
-	run_http_server(&wifi_config);
 }

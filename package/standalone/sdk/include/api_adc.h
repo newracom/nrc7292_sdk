@@ -32,27 +32,27 @@ extern "C" {
 
 /** @brief channel number of ADC */
 typedef enum  {
+#ifdef NRC7292
 	ADC1 = 1,	/**< ADC channel 1 */
 	ADC2,		/**< ADC channel 2 */
 	ADC3,		/**< ADC channel 3 */
+#else
+	ADC0 = 2,	/**< ADC channel 2 */
+	ADC1,		/**< ADC channel 3 */
+#endif
 }ADC_CH;
 
-typedef enum {
-	ADC_AVRG_NO = 0,
-	ADC_AVRG_2 ,
-	ADC_AVRG_4 ,
-	ADC_AVRG_8,
-	ADC_AVRG_16
-} ADC_AVRG;
 
 /**********************************************
- * @fn nrc_err_t nrc_adc_init(void)
+ * @fn nrc_err_t nrc_adc_init(bool enable)
  *
  * @brief Initialize ADC controller
  *
+ * @param enable: Enable or disable ADC controller after initialized
+ *
  * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-nrc_err_t nrc_adc_init(void);
+nrc_err_t nrc_adc_init(bool enable);
 
 
 /**********************************************
@@ -66,6 +66,26 @@ nrc_err_t nrc_adc_deinit(void);
 
 
 /**********************************************
+ * @fn void nrc_adc_enable(void)
+ *
+ * @brief Enable ADC controller
+ *
+ * @return void
+ ***********************************************/
+void nrc_adc_enable(void);
+
+
+/**********************************************
+ * @fn void nrc_adc_disable(void)
+ *
+ * @brief Disable ADC controller
+ *
+ * @return  void
+ ***********************************************/
+void nrc_adc_disable(void);
+
+
+/**********************************************
  * @fn uint16_t nrc_adc_get_data(ADC_CH id)
  *
  * @brief Read the data from specific channel ID
@@ -75,18 +95,6 @@ nrc_err_t nrc_adc_deinit(void);
  * @return ADC value
  ***********************************************/
 uint16_t nrc_adc_get_data(ADC_CH id);
-
-/**********************************************
- * @fn  nrc_err_t nrc_adc_avrg_sel(ADC_AVRG mode)
- *
- * @brief ADC average selection
- *         (NRC7292 is not supported)
- *
- * @param mode: average mode
- *
- * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
- ***********************************************/
-nrc_err_t nrc_adc_avrg_sel(ADC_AVRG mode);
 
 #ifdef __cplusplus
 }

@@ -92,6 +92,8 @@ void update_cal_info_freq_pwr_delta_tbl(uint8_t index, int16_t value);
 void update_cal_info_country(uint8_t* code);
 void show_cal_info(void);
 
+int8_t hal_get_channel_type_kr();
+
 #if defined( NRC7292_LMACTEST_FREERTOS )
 void nrf_set_test_mode(int mode);
 uint32_t nrf_ssp_read(uint32_t addr, uint8_t* result);

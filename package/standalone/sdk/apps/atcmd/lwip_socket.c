@@ -229,33 +229,69 @@ static int _lwip_socket_set_reuse_addr (int fd, bool enable)
 	return 0;
 }
 
-static int _lwip_socket_tcp_get_keepalive (int fd)
+int _lwip_socket_tcp_get_keepalive (int fd, int *keepalive, int *keepidle, int *keepcnt, int *keepintvl)
 {
-	int keepalive, keepidle, keepcnt, keepintvl;
 	socklen_t len = sizeof(int);
+	int _keepalive = -1;
+	int _keepidle = -1;
+   	int _keepcnt = -1;
+   	int _keepintvl = -1;
 	int ret;
 
-	ret = getsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &keepalive, &len);
+	if (fd < 0)
+		return _lwip_socket_error(EINVAL);
+
+	ret = getsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &_keepalive, &len);
 	if (ret < 0)
 		return _lwip_socket_error(errno);
 
-	ret = getsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle, &len);
+	_keepalive = _keepalive ? 1 : 0;
+
+	ret = getsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &_keepidle, &len);
 	if (ret < 0)
 		return _lwip_socket_error(errno);
 
-	ret = getsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt, &len);
+	ret = getsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &_keepcnt, &len);
 	if (ret < 0)
 		return _lwip_socket_error(errno);
 
-	ret = getsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &keepintvl, &len);
+	ret = getsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &_keepintvl, &len);
 	if (ret < 0)
 		return _lwip_socket_error(errno);
 
-	_lwip_socket_log("[ Keepalive Info ]\n");
-	_lwip_socket_log(" - KEEPALIVE : %d\n", keepalive);
-	_lwip_socket_log(" - KEEPIDLE : %d\n", keepidle);
-	_lwip_socket_log(" - KEEPCNT : %d\n", keepcnt);
-	_lwip_socket_log(" - KEEPINTVL : %d\n", keepintvl);
+/*	_lwip_socket_log("tcp_keepalive_get: fd=%d keepalive=%d keepidle=%d keepcnt=%d keepintvl=%d\n",
+						fd, _keepalive, _keepidle, _keepcnt, _keepintvl); */
+
+	if (keepalive) *keepalive = _keepalive;
+	if (keepidle) *keepidle = _keepidle;
+	if (keepcnt) *keepcnt = _keepcnt;
+	if (keepintvl) *keepintvl = _keepintvl;
+
+	return 0;
+}
+
+int _lwip_socket_tcp_set_keepalive (int fd, int keepalive, int keepidle, int keepcnt, int keepintvl)
+{
+	int ret;
+
+	ret = setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle, sizeof(int));
+	if (ret < 0)
+		return _lwip_socket_error(errno);
+
+	ret = setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt, sizeof(int));
+	if (ret < 0)
+		return _lwip_socket_error(errno);
+
+	ret = setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &keepintvl, sizeof(int));
+	if (ret < 0)
+		return _lwip_socket_error(errno);
+
+	ret = setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(int));
+	if (ret < 0)
+		return _lwip_socket_error(errno);
+
+/* 	_lwip_socket_log("tcp_keepalive_set: fd=%d keepalive=%d keepidle=%d keepcnt=%d keepintvl=%d\n",
+						fd, keepalive, keepidle, keepcnt, keepintvl); */
 
 	return 0;
 }
@@ -706,7 +742,7 @@ int _lwip_socket_init (lwip_socket_cb_t *cb)
 	if (!info->send_done_event)
 		goto _lwip_socket_init_fail;
 
-	info->fds.mutex = xSemaphoreCreateMutexStatic(&info->fds.mutex_buffer);
+	info->fds.mutex = xSemaphoreCreateMutex();
 	if (!info->fds.mutex)
 		goto _lwip_socket_init_fail;
 
@@ -806,8 +842,6 @@ static int _lwip_socket_open (int type, int *fd,
 					return _lwip_socket_error(errno);
 
 				*fd = ret;
-
-				_lwip_socket_tcp_get_keepalive(*fd);
 
 				ret = _lwip_socket_set_reuse_addr(*fd, reuse_addr);
 				if (ret < 0)
@@ -1121,7 +1155,7 @@ int _lwip_socket_recv (int fd, ip_addr_t *remote_addr, uint16_t *remote_port,
 		int type;
 		int ret;
 
-		if (!data || !len)
+		if (!data)
 			return _lwip_socket_error(EINVAL);
 
 		if (_lwip_socket_get_type(fd, &type) != 0)
@@ -1520,4 +1554,3 @@ SUBCMD_MAND(atcmd,
 		cmd_atcmd_lwip,
 		"lwip_socket",
 		"atcmd lwip help");
-

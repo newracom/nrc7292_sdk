@@ -39,11 +39,11 @@ nvs_handle_t nvs_handle;
 #define MAX_RETRY 10
 
 /* TIM or NonTIM deep sleep (select one depending on services)*/
-#define TIM_DEEPSLEEP 0 //TIM (1) NonTIM(0)
+#define TIM_DEEPSLEEP 1 //TIM (1) NonTIM(0)
 /* in ms. STA can enter deep sleep if there is no traffic during timeout */
-#define IDLE_TIMEOUT 0 // ms
+#define IDLE_TIMEOUT 100 // ms
 /* in ms. STA wakes up if sleep time is expired during deep sleep*/
-#define SLEEP_TIME_MS 60000 // ms
+#define SLEEP_TIME_MS 0 // ms
 
 //#define WAKEUP_GPIO_PIN 15
 
@@ -143,9 +143,6 @@ nrc_err_t run_sample_wifi_power_save(WIFI_CONFIG *param)
 
 #if defined(NVS_USE) && (NVS_USE == 1)
 	if(get_nvs_ps_setting(&ps_mode, &ps_idle_timeout_ms, &ps_sleep_time_ms) < 0){
-		ps_mode = TIM_DEEPSLEEP;
-		ps_idle_timeout_ms = IDLE_TIMEOUT;
-		ps_sleep_time_ms = SLEEP_TIME_MS;
 		set_nvs_ps_setting(TIM_DEEPSLEEP,IDLE_TIMEOUT,  SLEEP_TIME_MS);
 	}
 #endif
@@ -178,7 +175,7 @@ nrc_err_t run_sample_wifi_power_save(WIFI_CONFIG *param)
 			_delay_ms(1000);
 			if (++retry_cnt > 2) {
 				nrc_usr_print("(connect) Exceeded retry limit (2), going into RTC deep sleep for 5000ms.");
-				nrc_ps_deep_sleep(ps_sleep_time_ms);
+				nrc_ps_sleep_alone(5000);
 			}
 		}
 	}
@@ -197,7 +194,7 @@ check_again:
 		if (++retry_cnt > 200) {
 			//waiting for connection for (total 200ms * 200 try = 40000 ms)
 			nrc_usr_print("Exceeded retry limit (200), going into RTC deep sleep for 5000ms.");
-			nrc_ps_deep_sleep(ps_sleep_time_ms);
+			nrc_ps_sleep_alone(5000);
 		}
 	}
 
@@ -209,20 +206,17 @@ check_again:
 	wakeup_source |= WAKEUP_SOURCE_RTC;
 	nrc_ps_set_wakeup_source(wakeup_source);
 
-	/* To detect disconnections, the operation time must exceed 3 seconds. */
-	user_operation(3000);
-
 	/* Set GPIO pullup/output/direction mask */
 	/* The GPIO configuration should be customized based on the target board layout */
 	/* If values not set correctly, the board may consume more power during deep sleep */
 #ifdef NRC7292
 	/* Below configuration is for NRC7292 EVK Revision B board */
-	nrc_ps_set_gpio_direction(0x07FFFF30);
+	nrc_ps_set_gpio_direction(0x07FFFF7F);
 	nrc_ps_set_gpio_out(0x0);
 	nrc_ps_set_gpio_pullup(0x0);
 #elif defined(NRC7394)
 	/* Below configuration is for NRC7394 EVK Revision board */
-	nrc_ps_set_gpio_direction(0x0FFFFFDFF);
+	nrc_ps_set_gpio_direction(0xFFFFFDFF);
 	nrc_ps_set_gpio_out(0x00000100);
 	nrc_ps_set_gpio_pullup(0xFFFFFFFF);
 #endif

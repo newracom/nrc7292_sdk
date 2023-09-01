@@ -36,9 +36,13 @@
 
 extern struct netif* nrc_netif[MAX_IF];
 extern struct netif eth_netif;
-#if defined(SUPPORT_ETHERNET_ACCESSPOINT)
+#if LWIP_BRIDGE
 extern struct netif br_netif;
-#endif
+#endif /* LWIP_BRIDGE */
+/* contec azuma --> */
+uint8_t wifiEchoCheck[1522];
+/* <-- contec azuma */
+
 /**
  * In this function, the hardware should be initialized.
  * Called from wlif_init().
@@ -80,10 +84,16 @@ static err_t low_level_output( struct netif *netif, struct pbuf *p )
 	uint8_t *frames[MAX_FRAME_NUM];
 	uint16_t frame_len[MAX_FRAME_NUM];
 	int i = 0;
-
+	/* contec azuma --> */
+	uint16_t length = 0;
+	/* <-- contec azuma */
 	for( q = p; q != NULL; q = q->next ) {
 		frames[i] = q->payload;
 		frame_len[i] = q->len;
+		/* contec azuma --> */
+		memcpy(wifiEchoCheck + length,q->payload,q->len); //send data save
+		length += q->len;
+		/* <-- contec azuma */
 		i++;
 	}
 	V(TT_NET, "[%s] netif->num = %d, output frames = %d, frame_len = %d...\n", __func__, netif->num, i, frame_len[0]);
@@ -167,13 +177,54 @@ void lwif_input(struct nrc_wpa_if* intf, void *buffer, int data_len)
 		LINK_STATS_INC(link.drop);
 		return;
 	}
-
+	/* contec azuma --> */
+	if(memcmp(buffer,wifiEchoCheck,data_len) == 0){
+		memset(wifiEchoCheck,0x00,sizeof(wifiEchoCheck));
+		goto pbuf_free;
+	}
+	/* <-- contec azuma */
 	/* points to packet payload, which starts with an Ethernet header */
 	ethhdr = p->payload;
 
 	switch (htons(ethhdr->type)) {
 		/* IP or ARP packet? */
 		case ETHTYPE_ARP:
+#if defined(SUPPORT_ETHERNET_ACCESSPOINT)
+			if (!nrc_get_use_4address() &&
+			    (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE)) {
+				arp_hdr = (struct etharp_hdr *)(p->payload + SIZEOF_ETH_HDR);
+				V(TT_NET, "[ARP][%s] ", htons(arp_hdr->opcode) == 1 ? "REQ" : "REP");
+				V(TT_NET, "dst("MACSTR"), src("MACSTR")\n", MAC2STR(ethhdr->dest.addr), MAC2STR(ethhdr->src.addr));
+				#if LWIP_BRIDGE
+				u32 target_ip_addr = (arp_hdr->dipaddr.addrw[1] << 16) | arp_hdr->dipaddr.addrw[0];
+				#endif /* LWIP_BRIDGE */
+				if (!intf->is_ap) { // br0 mac == wlan0 mac
+					if (htons(arp_hdr->opcode) == 1) { // ARP Request
+						if (!os_memcmp(arp_hdr->shwaddr.addr, netif->hwaddr, 6)) {
+							goto pbuf_free;
+						} else {
+							if (!(ethhdr->dest.addr[0] & 1)
+							#if LWIP_BRIDGE
+								&& target_ip_addr != br_netif.ip_addr.addr
+							#endif /* LWIP_BRIDGE */
+								) {
+								memcpy(ethhdr->dest.addr, get_peer_mac()->addr, 6);
+							}
+						}
+					} else { // ARP Reply
+						if (!os_memcmp(arp_hdr->dhwaddr.addr, netif->hwaddr, 6)
+							#if LWIP_BRIDGE
+							&& target_ip_addr != br_netif.ip_addr.addr
+							#endif /* LWIP_BRIDGE */
+							) {
+							memcpy(ethhdr->dest.addr, get_peer_mac()->addr, 6);
+							memcpy(arp_hdr->dhwaddr.addr, get_peer_mac()->addr, 6);
+						}
+					}
+				}
+				goto next;
+			}
+#endif
 #if PPPOE_SUPPORT
 		/* PPPoE packet? */
 		case ETHTYPE_PPPOEDISC:
@@ -184,14 +235,20 @@ void lwif_input(struct nrc_wpa_if* intf, void *buffer, int data_len)
 		case ETHTYPE_IPV6:
 #endif	//LWIP_IPV6
 #if defined(SUPPORT_ETHERNET_ACCESSPOINT)
-			if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
-				if (!intf->is_ap) {
-					/* prevent receiving frames that are retransmitted by the AP */
-					if(memcmp(ethhdr->src.addr, get_peer_mac()->addr, 6) == 0){
-						goto pbuf_free;
-					}
+			if (!nrc_get_use_4address() &&
+			    (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE)) {
+				ip_hdr = (struct ip_hdr *)(p->payload + SIZEOF_ETH_HDR);
+				if (!intf->is_ap) { // br0 mac == wlan0 mac
+					if (ip_hdr->dest.addr != 0 && ip_hdr->dest.addr != 0xffffffff
+					#if LWIP_BRIDGE
+						&& ip_hdr->dest.addr != br_netif.ip_addr.addr
+					#endif /* LWIP_BRIDGE */
+						) {
+						memcpy(ethhdr->dest.addr, get_peer_mac()->addr, 6);
+						}
 				}
 			}
+	next:
 #endif
 			/* full packet send to tcpip_thread to process */
 			if (netif->input(p, netif)!=ERR_OK) {

@@ -41,6 +41,9 @@
  * This file implements an example for an FDB (Forwarding DataBase)
  */
 
+#include "lwip/opt.h"
+
+#if LWIP_BRIDGE
 #include "netif/bridgeif.h"
 #include "lwip/sys.h"
 #include "lwip/mem.h"
@@ -210,3 +213,4 @@ bridgeif_fdb_init(u16_t max_fdb_entries)
 
   return fdb;
 }
+#endif /* LWIP_BRIDGE */

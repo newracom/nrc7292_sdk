@@ -64,10 +64,11 @@ struct netif;
 extern int ip4_input_nat(struct pbuf *p, struct netif *inp);
 
 #define LWIP_HOOK_IP4_INPUT		ip4_input_nat
-
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
+#if LWIP_BRIDGE
 #define BRIDGEIF_PORT_NETIFS_OUTPUT_DIRECT 1
 #define BRIDGEIF_MAX_PORTS 2
-#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
+#endif /* LWIP_BRIDGE */
 
 /* IP4 is default */
 #define LWIP_IPV4                   1
@@ -399,6 +400,9 @@ a lot of data that needs to be copied, this should be set high. */
 /* LWIP_DHCPS==1: Enable dhcp server application */
 #define LWIP_DHCPS            1
 
+/* LWIP_BRIDGE==1: Enable bridge interface application */
+#define LWIP_BRIDGE            1
+
 /* define for sys_arch.c */
 #define LWIP_FREERTOS_THREAD_STACKSIZE_IS_STACKWORDS  1
 #define LWIP_FREERTOS_SYS_ARCH_PROTECT_USES_MUTEX     1
@@ -411,4 +415,9 @@ a lot of data that needs to be copied, this should be set high. */
 /* allow to use thread-safe functions to add/remove netif in list,
  and to start/stop dhcp clients, using new functions from netifapi.h. */
 #define LWIP_NETIF_API 1
+
+/* validates source IP addresses for incoming IPv4 packets.
+ It drops packets with source addresses matching the local IP address */
+#define LWIP_IPV4_CHECK_SRC_ADDR              1
+
 #endif /* __LWIPOPTS_H__ */

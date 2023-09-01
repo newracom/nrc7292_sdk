@@ -1072,22 +1072,12 @@ static void wpa_supplicant_scan(void *eloop_ctx, void *timeout_ctx)
 		    wpa_s->last_scan_req == MANUAL_SCAN_REQ)
 			wpa_set_scan_ssids(wpa_s, &params, max_ssids);
 
-#ifdef NRC_WPA_SUPP /* For scanning in channel list */
 		for (tssid = wpa_s->conf->ssid;
-			 tssid;
-			 tssid = tssid->next) {
-			if ((params.freqs || !freqs_set) && tssid->scan_freq) {
-				int_array_concat(&params.freqs,
-						 tssid->scan_freq);
-			} else {
-				os_free(params.freqs);
-				params.freqs = NULL;
-			}
-			freqs_set = 1;
-		}
+#ifdef NRC_WPA_SUPP
+		     tssid;	 // For scanning in channel list
 #else
-		for (tssid = wpa_s->conf->ssid;
 		     wpa_s->last_scan_req != MANUAL_SCAN_REQ && tssid;
+#endif
 		     tssid = tssid->next) {
 			if (wpas_network_disabled(wpa_s, tssid))
 				continue;
@@ -1100,7 +1090,6 @@ static void wpa_supplicant_scan(void *eloop_ctx, void *timeout_ctx)
 			}
 			freqs_set = 1;
 		}
-#endif
 		int_array_sort_unique(params.freqs);
 	}
 

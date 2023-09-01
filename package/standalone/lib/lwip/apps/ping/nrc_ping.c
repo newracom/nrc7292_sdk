@@ -89,6 +89,7 @@ int  ping_run(int argc, char *argv[])
 {
 	ping_parm_t* ping_conn = NULL;
 	ping_parm_t* ping_stop_conn = NULL;
+	struct netif *target_if;
 	char *str = NULL;
 	int ret = true;
 	int i;
@@ -122,16 +123,15 @@ int  ping_run(int argc, char *argv[])
 		goto ping_stop;
 	}
 
-#ifndef SUPPORT_ETHERNET_ACCESSPOINT
-	for(i=0; i<MAX_IF; i++){
-		if(ip_addr_cmp(&nrc_netif[i]->ip_addr,&ping_conn->addr)){
+	for(i=0; i<END_INTERFACE; i++){
+		target_if = nrc_netif_get_by_idx(i);
+		if(ip_addr_cmp(&target_if->ip_addr,&ping_conn->addr)){
 			I(TT_NET, "%s ping address is own address\n",
 			module_name());
 			ret = false;
 			goto free_and_return;
 		}
 	}
-#endif
 
 	if(ping_get_session(&ping_conn->addr) != NULL){
 		I(TT_NET, "%s Ping application is already running\n",

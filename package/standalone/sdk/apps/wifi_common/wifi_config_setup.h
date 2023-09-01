@@ -30,6 +30,7 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
 #include "nrc_types.h"
 
 #define MAX_FREQ_NUM	50
@@ -71,57 +72,97 @@ typedef struct  {
 	uint8_t mcs;
 	uint8_t gi;
 	int8_t cca_thres;
+	uint8_t hidden_ssid;
+	uint8_t max_num_sta;
+	uint16_t listen_interval;
 }WIFI_CONFIG;
 #define WIFI_CONFIG_SIZE	sizeof (WIFI_CONFIG)
 
 /*********************************************************************
- * @FunctionName : nrc_wifi_set_config
- * @brief           : get wifi configration data
+ * @fn set default configuration
+ *
+ * @brief Set default wifi configuration in memory
+ *
+ * @param vif
+ *
  * @param wifi configuration ptr
- * @returns nrc_err_t
+ *
+ * @return nrc_err_t
  **********************************************************************/
-nrc_err_t nrc_wifi_set_config(WIFI_CONFIG *wifi_config);
+ static nrc_err_t set_wifi_defaults(WIFI_CONFIG* wifi_config);
+
 
 /*********************************************************************
- * @FunctionName : nrc_save_wifi_config
- * @brief save wifi config
+ * @fn nrc_save_wifi_config
  *
- * Get save wifi configuration parameter to NVS
+ * @brief Save wifi configration to key+value storage
  *
- * Parameters   : WIFI_CONFIG
- * @returns nrc_err_t
- *********************************************************************/
-nrc_err_t nrc_save_wifi_config(WIFI_CONFIG* wifi_config);
+ * @param wifi configuration ptr
+ *
+ * @param rewrite whether to forcefully rewrite configuration
+ *
+ * @return nrc_err_t
+ **********************************************************************/
+nrc_err_t nrc_save_wifi_config(WIFI_CONFIG* wifi_config, int rewrite);
+
 
 /*********************************************************************
- * FunctionName : nrc_set_default_scan_channel
- * Description  : set frequency channels to scan on
- * Parameters   : WIFI_CONFIG
- * Returns      : true or false
+ * @fn print_settings
+ *
+ * @brief Print settings to debug serial port
+ *
+ * @param wifi configuration ptr
+ *
+ * @return none
  **********************************************************************/
+void print_settings(WIFI_CONFIG* wifi_config);
 
+
+/*********************************************************************
+ * @fn nrc_set_default_scan_channel
+ *
+ * @brief set frequency channels to scan on
+ *
+ * @param wifi configuration ptr
+ *
+ * @return true or false
+ **********************************************************************/
 bool nrc_set_default_scan_channel(WIFI_CONFIG *wifi_config);
 
+
 /*********************************************************************
- * @brief nrc_erase_all_wifi_nvs
+ * @fn nrc_wifi_set_config
  *
- * Erase all wifi configuration in NVS
+ * @brief set wifi configration data
+ *
+ * @param wifi configuration ptr
+ * @return nrc_err_t
+ **********************************************************************/
+nrc_err_t nrc_wifi_set_config(WIFI_CONFIG* wifi_config);
+
+
+/*********************************************************************
+ * @fn nrc_erase_all_wifi_nvs
+ *
+ * @brief Erase all wifi configuration in NVS
  *
  * @param void
- * @returns nrc_err_t
+ *
+ * @return nrc_err_t
  **********************************************************************/
 nrc_err_t nrc_erase_all_wifi_nvs(void);
 
+
 /*********************************************************************
- * @brief get global config
+ * @fn nrc_get_global_wifi_config
  *
- * Get globally accessible configuration parameter
+ * @brief Get globally accessible configuration parameter
  *
  * @param void
- * @returns wifi configuration ptr
+ *
+ * @return wifi configuration ptr
  *********************************************************************/
 WIFI_CONFIG* nrc_get_global_wifi_config(void);
-
 
 #ifdef __cplusplus
 }

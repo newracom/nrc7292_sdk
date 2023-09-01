@@ -893,19 +893,22 @@ static void raspi_cli_run_loop (raspi_cli_hif_t *hif)
 
 /*				log_info("flowctrl=%d baudrate=%d\n", flowctrl, baudrate); */
 
-				if (flowctrl)
-					hif->flags |= RASPI_HIF_UART_HFC;
-				else
-					hif->flags &= ~RASPI_HIF_UART_HFC;
-
-				hif->speed = baudrate;
-
-				raspi_cli_close();
-
-				if (raspi_cli_open(hif) != 0)
+				if (nrc_atcmd_send_cmd("AT+UART=%d,%d", baudrate, flowctrl ? 1 : 0) >= 0)
 				{
-					log_info("failed\n\n");
-					return;
+					if (flowctrl)
+						hif->flags |= RASPI_HIF_UART_HFC;
+					else
+						hif->flags &= ~RASPI_HIF_UART_HFC;
+
+					hif->speed = baudrate;
+
+					raspi_cli_close();
+
+					if (raspi_cli_open(hif) != 0)
+					{
+						log_info("failed\n\n");
+						return;
+					}
 				}
 			}
 
@@ -979,6 +982,7 @@ static void raspi_cli_run_loop (raspi_cli_hif_t *hif)
 					if (argc >= 4 && argc <= 7)
 					{
 						const char *str_mode[3] = { "normal", "passthrough", "buffered-passthrough" };
+						bool atcmd_log_off = true;
 						bool tcp = (argc <= 5) ? true : false;
 						int id = atoi(argv[0]);
 						char *ipaddr = tcp ? NULL : argv[1];
@@ -987,6 +991,12 @@ static void raspi_cli_run_loop (raspi_cli_hif_t *hif)
 						int length = atoi(argv[tcp ? 2 : 4]);
 						int time = atoi(argv[tcp ? 3 : 5]);
 						int interval = (argc == 5 || argc == 7) ? atoi(argv[argc - 1]) : 0;
+
+						if (mode >= 3 && mode <= 5)
+						{
+							mode -= 3;
+							atcmd_log_off = false;
+						}
 
 						if ((id >= 0) && (tcp || (ipaddr && port)) && (mode >= 0 && mode <= 2) && (length > 0) && (time > 0) && (interval >= 0))
 						{
@@ -1023,9 +1033,16 @@ static void raspi_cli_run_loop (raspi_cli_hif_t *hif)
 									log_info("end_time : %lf\n", end_time);
 									log_info("report_time : %lf\n", report_time); */
 
+									if (atcmd_log_off)
+										nrc_atcmd_log_off();
+
 									if (nrc_atcmd_send_cmd("AT") != 0)
 									{
 										log_info("FAIL: send_cmd (%d)\n", __LINE__);
+
+										if (atcmd_log_off)
+											nrc_atcmd_log_on();
+
 										continue;
 									}
 
@@ -1094,6 +1111,9 @@ static void raspi_cli_run_loop (raspi_cli_hif_t *hif)
 
 										sleep(1);
 									}
+
+									if (atcmd_log_off)
+										nrc_atcmd_log_on();
 
 									continue;
 								}

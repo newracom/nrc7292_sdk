@@ -79,6 +79,10 @@
  * - priority handling? (although that largely depends on TX queue limitations and lwIP doesn't provide tx-done handling)
  */
 
+
+#include "lwip/opt.h"
+
+#if LWIP_BRIDGE
 #include "netif/bridgeif.h"
 #include "lwip/netif.h"
 #include "lwip/sys.h"
@@ -561,3 +565,4 @@ bridgeif_add_port(struct netif *bridgeif, struct netif *portif)
 }
 
 #endif /* LWIP_NUM_NETIF_CLIENT_DATA */
+#endif /* LWIP_BRIDGE */

@@ -170,8 +170,8 @@ typedef struct
 	bool start;
 	bool done;
 
-	iperf_time_t send_time;
-	int32_t send_byte;
+	uint32_t send_time;
+	uint32_t send_byte;
 	uint32_t recv_byte;
 	int32_t datagram_cnt;
 	int32_t datagram_seq;

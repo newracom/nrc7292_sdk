@@ -32,6 +32,9 @@ extern "C" {
 
 #include "nrc_types.h"
 
+#define WIFI_TX_POWER_MIN            1		/* minimum value of tx power input range */
+#define WIFI_TX_POWER_MAX            30		/* maximum value of tx power input range */
+
 /**********************************************
  * @fn tWIFI_STATUS nrc_wifi_get_device_mode (int vif_id, tWIFI_DEVICE_MODE *mode)
  *
@@ -61,15 +64,17 @@ tWIFI_STATUS nrc_wifi_get_mac_address (int vif_id, char *addr);
 
 
 /**********************************************
- * @fn int nrc_wifi_get_tx_power (uint8_t *txpower)
+ * @fn int nrc_wifi_get_tx_power (int vif_id, uint8_t *txpower)
  *
  * @brief Get TX Power
+ *
+ * @param vif_id: Network interface index
  *
  * @param txpower: TX Power (in dBm)
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-tWIFI_STATUS nrc_wifi_get_tx_power (uint8_t *txpower);
+tWIFI_STATUS nrc_wifi_get_tx_power (int vif_id, uint8_t *txpower);
 
 
 /**********************************************
@@ -87,27 +92,45 @@ tWIFI_STATUS nrc_wifi_set_tx_power (uint8_t txpower, uint8_t type);
 
 
 /**********************************************
- * @fn  tWIFI_STATUS nrc_wifi_get_rssi(int8_t* rssi)
+ * @fn  tWIFI_STATUS nrc_wifi_get_rssi(int vif_id, int8_t *rssi)
  *
- * @brief Get RSSI
+ * @brief Get the RSSI (Received Signal Strength Indication) from the latest packet
  *
- * @param rssi: RSSI value (in dB)
+ * @param vif_id: Network interface index
+ *
+ * @param rssi: Pointer to a variable where the RSSI value will be stored.(in dB)
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-tWIFI_STATUS nrc_wifi_get_rssi (int8_t *rssi);
+tWIFI_STATUS nrc_wifi_get_rssi(int vif_id, int8_t *rssi);
 
 
 /**********************************************
- * @fn tWIFI_STATUS nrc_wifi_get_snr(uint8_t* snr)
+ * @fn  tWIFI_STATUS nrc_wifi_get_average_rssi(int vif_id, int8_t *average_rssi)
+ *
+ * @brief Get the average RSSI based on the latest 4 packets
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param average_rssi: Pointer to a variable where the average RSSI value will be stored.
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_average_rssi(int vif_id, int8_t *average_rssi);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_snr(int vif_id, uint8_t* snr)
  *
  * @brief Get SNR
+ *
+ * @param vif_id: Network interface index
  *
  * @param snr: SNR value (in dB)
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-tWIFI_STATUS nrc_wifi_get_snr (uint8_t *snr);
+tWIFI_STATUS nrc_wifi_get_snr(int vif_id, uint8_t *snr);
 
 
 /**********************************************
@@ -136,15 +159,17 @@ bool nrc_wifi_get_rate_control(int vif_id);
 tWIFI_STATUS nrc_wifi_set_rate_control (int vif_id, bool enable);
 
 /**********************************************
- * @fn  tWIFI_STATUS nrc_wifi_get_mcs (uint8_t *mcs)
+ * @fn  tWIFI_STATUS nrc_wifi_get_mcs (int vif_id, uint8_t *mcs)
  *
- * @brief Get MCS, which is applied when rate control is disabled
+ * @brief Get MCS (RC_OFF : get manual MCS set by nrc_wifi_set_mcs, RC_ON : get latest MCS set by RC)
+ *
+ * @param vif_id: Network interface index
  *
  * @param MCS : Modulation Coding Scheme output
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-tWIFI_STATUS nrc_wifi_get_mcs (uint8_t *mcs);
+tWIFI_STATUS nrc_wifi_get_mcs (int vif_id, uint8_t *mcs);
 
 
 /**********************************************
@@ -166,7 +191,7 @@ tWIFI_STATUS nrc_wifi_set_mcs (uint8_t mcs);
  *
  * @param vif_id: Network interface index
  *
- * @param cca_threshold: CCA threshold output.(time unit: dBm) (-85 ~ -75)
+ * @param cca_threshold: CCA threshold output.(time unit: dBm) (-100 ~ -35)
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
@@ -180,7 +205,7 @@ tWIFI_STATUS nrc_wifi_get_cca_threshold (int vif_id, int *cca_threshold);
  *
  * @param vif_id: Network interface index
  *
- * @param cca_threshold: CCA threshold.(time unit: dBm) (-85 ~ -75)
+ * @param cca_threshold: CCA threshold.(time unit: dBm) (-100 ~ -35)
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
@@ -278,7 +303,7 @@ tWIFI_STATUS nrc_wifi_remove_network (int vif_id);
  *
  * @brief Get country code index from string
  *
- * @param str_cc: country code {"US","JP","K0","K1","TW","EU","CN","NZ","AU","K2"}
+ * @param str_cc: country code {"US","JP","K1","TW","EU","CN","NZ","AU","K2"}
  *
  * @return tWIFI_COUNTRY_CODE, see nrc_types.h
  ***********************************************/
@@ -422,6 +447,32 @@ tWIFI_STATUS nrc_wifi_set_bssid (int vif_id, char *bssid);
 
 
 /**********************************************
+ * @fn bool nrc_wifi_softap_get_hidden_ssid(int vif_id)
+ *
+ * @brief Get hidden SSID status
+ *
+ * @param vif_id: Network interface index
+ *
+ * @return If enabled, then true. Otherwise, false is returned.
+ ***********************************************/
+bool nrc_wifi_softap_get_hidden_ssid(int vif_id);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_softap_set_hidden_ssid(int vif_id, bool enable)
+ *
+ * @brief Set hidden SSID enable
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param enable: hidden SSID enable
+ * 0: hidden SSID not in use
+ * 1: send empty (length=0) SSID in beacon and ignore probe request for broadcast SSID
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_softap_set_hidden_ssid(int vif_id, bool enable);
+
+/**********************************************
  * @fn tWIFI_STATUS nrc_wifi_set_security (int vif_id, int mode, char *password)
  *
  * @brief Set security parameters for Wi-Fi connection
@@ -452,13 +503,13 @@ tWIFI_STATUS nrc_wifi_set_pmk(int vif_id, char *pmk);
 
 
 /**********************************************
- * @fn tWIFI_STATUS nrc_wifi_get_scan_freq (int vif_id, uint16_t *freq, uint8_t *num_freq)
+ * @fn tWIFI_STATUS nrc_wifi_get_scan_freq (int vif_id, uint16_t *freq_list, uint8_t *num_freq)
  *
- * @brief Set scan list for scan AP
+ * @brief Get scan list for scan AP
  *
  * @param vif_id: Network interface index
  *
- * @param freq: freq list to scan
+ * @param freq_list: freq list to scan
  *
  * @param num_freq: num of freq
 
@@ -468,19 +519,51 @@ tWIFI_STATUS nrc_wifi_get_scan_freq (int vif_id, uint16_t *freq, uint8_t *num_fr
 
 
 /**********************************************
- * @fn tWIFI_STATUS nrc_wifi_set_scan_freq (int vif_id, uint16_t *freq, uint8_t num_freq)
+ * @fn tWIFI_STATUS nrc_wifi_set_scan_freq (int vif_id, uint16_t *freq_list, uint8_t num_freq)
  *
  * @brief Set scan list for scan AP
  *
  * @param vif_id: Network interface index
  *
- * @param freq: freq list to scan
+ * @param freq_list: freq list to scan
  *
  * @param num_freq: num of freq
 
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
 tWIFI_STATUS nrc_wifi_set_scan_freq (int vif_id, uint16_t *freq_list, uint8_t num_freq);
+
+
+/**********************************************
+ * @fn  tWIFI_STATUS nrc_wifi_get_scan_freq_nons1g(int vif_id, uint16_t *freq_list, uint8_t *num_freq)
+ *
+ * @brief Get scan list for scan AP. It specifically focuses on setting frequencies for non-1g channels.
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param freq_list: freq list to scan
+ *
+ * @param num_freq: num of freq
+
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_scan_freq_nons1g(int vif_id, uint16_t *freq_list, uint8_t *num_freq);
+
+
+/**********************************************
+ * @fn  tWIFI_STATUS nrc_wifi_set_scan_freq_nons1g(int vif_id, uint16_t *freq_list, uint8_t num_freq)
+ *
+ * @brief Set scan list for scan AP. It specifically focuses on setting frequencies for non-1g channels.
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param freq_list: freq list to scan
+ *
+ * @param num_freq: num of freq
+
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_scan_freq_nons1g(int vif_id, uint16_t *freq_list, uint8_t num_freq);
 
 
 /**********************************************
@@ -646,6 +729,34 @@ tWIFI_STATUS nrc_wifi_softap_set_conf (int vif_id, char *ssid, uint16_t s1g_freq
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
 tWIFI_STATUS nrc_wifi_softap_set_bss_max_idle (int vif_id, int period, int retry_cnt);
+
+
+/**********************************************
+ * @fn  tWIFI_STATUS nrc_wifi_softap_get_max_num_sta(int vif_id, uint8_t *max_sta_num)
+ *
+ * @brief Get max station number to be connected
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param max_sta_num: max station number
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_softap_get_max_num_sta(int vif_id, uint8_t *max_sta_num);
+
+
+/**********************************************
+ * @fn  tWIFI_STATUS nrc_wifi_softap_set_max_num_sta(int vif_id, uint8_t max_sta_num)
+ *
+ * @brief Set max station number to be connected
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param max_sta_num: max station number. (Max 10)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_softap_set_max_num_sta(int vif_id, uint8_t max_sta_num);
 
 
 /**********************************************
@@ -980,6 +1091,25 @@ tWIFI_STATUS nrc_wifi_send_delba(int vif_id, tWIFI_TID tid, char * mac_addr);
 
 
 /**********************************************
+ * @fn  tWIFI_STATUS nrc_wifi_set_tx_aggr_auto(int vif_id, tWIFI_TID tid, uint8_t max_agg_num)
+ *
+ * @brief Enable automatic tx aggreation
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param tid: traffic identifier(WIFI_TID_BE, WIFI_TID_BK, WIFI_TID_VI, WIFI_TID_VO) in tWIFI_TID
+ *
+ * @param max_agg_num: maximum number to aggregate frames
+                       max_agg_num is up to 8 when channel bandwith is 1MHz.
+                       max_agg_num is up to 16 when channel bandwith is 2MHz or 4MHz.
+                       Even though you set 16 on 1MHz channel, it is set to 8.
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, WIFI_FAIL is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_tx_aggr_auto(int vif_id, tWIFI_TID tid, uint8_t max_agg_num);
+
+
+/**********************************************
  * @fn tWIFI_STATUS nrc_wifi_set_passive_scan(bool passive_scan_on)
  *
  * @brief Enable/Disable passive scan
@@ -1071,6 +1201,59 @@ tWIFI_STATUS nrc_wifi_get_gi(tWIFI_GI *gi);
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
 tWIFI_STATUS nrc_wifi_set_gi(tWIFI_GI gi);
+
+
+/**********************************************
+ * @fn  tWIFI_STATUS nrc_wifi_set_beacon_loss_detection(int vif_id, bool enable,
+ *                      uint8_t beacon_loss_thresh)
+ *
+ * @brief Sets the operation for beacon loss detection (only for STA).
+ *          the default :  beacon loss detection(1), beacon loss thresh(30)
+ *          30 * BI(100) * 1024us = about 3 sec
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param enable: Specifies whether to enable (1) or disable (0) beacon loss detection.
+ *
+ * @param beacon_loss_thresh: disconnection threshold about beacon loss
+ *
+ * @return If enabled, then WIFI_SUCCESS. Otherwise, WIFI_FAIL is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_beacon_loss_detection(int vif_id, bool enable, uint8_t beacon_loss_thresh);
+
+
+/**********************************************
+ * @fn  tWIFI_STATUS nrc_wifi_get_listen_interval(int vif_id, uint16_t *listen_interval, uint32_t *interval_ms)
+ *
+ * @brief Get listen interval (only for STA)
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param listen_interval: listen interval
+ *                      Listen Interval Time (us) = listen_interval * beacon_interval * 1TU (1024 us)
+ *
+ * @param interval_ms : listen interval_ms
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_listen_interval(int vif_id, uint16_t *listen_interval, uint32_t *interval_ms);
+
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_listen_interval(int vif_id, uint16_t listen_interval)
+ *
+ * @brief Set listen interval (only for STA)
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param listen_interval: listen interval
+ *                      Listen Interval Time (us) = listen_interval * beacon_interval * 1TU (1024 us)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_listen_interval(int vif_id, uint16_t listen_interval);
+
 
 #ifdef __cplusplus
 }

@@ -334,7 +334,7 @@ void handle_tlv_command(int sock, char *buffer, size_t received)
 		size = strlen(value) + 1;
 		break;
 	case TLV_CMD_GET_RSSI:
-		if (nrc_wifi_get_rssi(&i8_value) != WIFI_SUCCESS) {
+		if (nrc_wifi_get_rssi(0, &i8_value) != WIFI_SUCCESS) {
 			success = 0;
 			break;
 		}
@@ -342,7 +342,7 @@ void handle_tlv_command(int sock, char *buffer, size_t received)
 		size = strlen(value) + 1;
 		break;
 	case TLV_CMD_GET_SNR:
-		if (nrc_wifi_get_snr(&u8_value) != WIFI_SUCCESS) {
+		if (nrc_wifi_get_snr(0, &u8_value) != WIFI_SUCCESS) {
 			success = 0;
 			break;
 		}

@@ -46,20 +46,19 @@ static int _atcmd_basic_version_get (int argc, char *argv[])
 			snprintf(str_atcmd_ver, sizeof(str_atcmd_ver), "%u.%u.%u",
 						ATCMD_VER_MAJOR, ATCMD_VER_MINOR, ATCMD_VER_REVISION);
 
-#if !defined(SDK_VER_DESCRIPTION)
-			if (g_atcmd_version_verbose)
+			if (!g_atcmd_version_verbose)
+				ATCMD_MSG_INFO("VER", "\"%s\",\"%s\"", str_sdk_ver, str_atcmd_ver);
+			else
+			{
+#if defined(SDK_VER_DESCRIPTION)
+				ATCMD_MSG_INFO("VER", "\"%s%s\",\"%s\",\"%s, %s\"",
+						str_sdk_ver, SDK_VER_DESCRIPTION, str_atcmd_ver, __TIME__, __DATE__);
+#else
 				ATCMD_MSG_INFO("VER", "\"%s\",\"%s\",\"%s, %s\"",
 						str_sdk_ver, str_atcmd_ver, __TIME__, __DATE__);
-			else
-				ATCMD_MSG_INFO("VER", "\"%s\",\"%s\"", str_sdk_ver, str_atcmd_ver);
-#else
-			if (g_atcmd_version_verbose)
-				ATCMD_MSG_INFO("VER", "\"%s_%s\",\"%s\",\"%s, %s\"",
-						str_sdk_ver, SDK_VER_DESCRIPTION, str_atcmd_ver, __TIME__, __DATE__);
-			else
-				ATCMD_MSG_INFO("VER", "\"%s_%s\",\"%s\"",
-						str_sdk_ver, SDK_VER_DESCRIPTION, str_atcmd_ver);
 #endif
+			}
+
 			break;
 		}
 
@@ -221,6 +220,7 @@ static int _atcmd_basic_uart_set (int argc, char *argv[])
 				default: return ATCMD_ERROR_INVAL;
 			}
 
+			_atcmd_info("UART-PT %s\n", g_atcmd_uart_passthrough_support ? "ON" : "OFF");
 			break;
 		}
 
@@ -713,13 +713,56 @@ static atcmd_info_t g_atcmd_basic_gpio_value =
 
 /**********************************************************************************************/
 
+static bool g_atcmd_adc_enable = false;
+
+static void _atcmd_adc_init (void)
+{
+	 nrc_adc_init(false);
+
+	 g_atcmd_adc_enable = false;
+}
+
+static void _atcmd_adc_deinit (void)
+{
+	 nrc_adc_deinit();
+
+	 g_atcmd_adc_enable = false;
+}
+
+static void _atcmd_adc_enable (void)
+{
+	if (!g_atcmd_adc_enable)
+	{
+		_atcmd_info("ADC: enable\n");
+
+		g_atcmd_adc_enable = true;
+		nrc_adc_enable();
+	}
+}
+
+static void _atcmd_adc_disable (void)
+{
+	if (g_atcmd_adc_enable)
+	{
+		_atcmd_info("ADC: disable\n");
+
+		g_atcmd_adc_enable = false;
+		nrc_adc_disable();
+	}
+}
+
 static bool _atcmd_adc_channel_valid (int channel)
 {
 	switch (channel)
 	{
+#if defined(NRC7292)
 		case ADC1:
 		case ADC2:
 		case ADC3:
+#else
+		case ADC0:
+		case ADC1:
+#endif
 			return true;
 
 		default:
@@ -727,38 +770,32 @@ static bool _atcmd_adc_channel_valid (int channel)
 	}
 }
 
-static int _atcmd_adc_get_value (int channel)
+static uint16_t _atcmd_adc_get_value (int channel)
 {
-	uint16_t value;
-
-	nrc_adc_init();
-
-	_delay_ms(100);
-
-	value = nrc_adc_get_data(channel);
-
-	nrc_adc_deinit();
-
-	return value;
+	return nrc_adc_get_data(channel);
 }
 
 static int _atcmd_basic_adc_get (int argc, char *argv[])
 {
 	int channel = -1;
 
+	if (!g_atcmd_adc_enable)
+		return ATCMD_ERROR_NOTSUPP;
+
 	switch (argc)
 	{
 		case 1:
 			channel = atoi(argv[0]);
-
+#if !defined(NRC7292)
+			channel += 2;
+#endif
 			if (!_atcmd_adc_channel_valid(channel))
 				return ATCMD_ERROR_INVAL;
 
 		case 0:
 		{
-			int start = 1;
+			int start = 0;
 			int end = 3;
-			int value;
 
 			if (channel != -1)
 				start = end = channel;
@@ -768,9 +805,11 @@ static int _atcmd_basic_adc_get (int argc, char *argv[])
 				if (!_atcmd_adc_channel_valid(channel))
 					continue;
 
-				value = _atcmd_adc_get_value(channel);
-
-				ATCMD_MSG_INFO("ADC", "%d,%d", channel, value);
+#if defined(NRC7292)
+				ATCMD_MSG_INFO("ADC", "%d,%u", channel, _atcmd_adc_get_value(channel));
+#else
+				ATCMD_MSG_INFO("ADC", "%d,%u", channel - 2, _atcmd_adc_get_value(channel));
+#endif
 			}
 
 			break;
@@ -783,28 +822,28 @@ static int _atcmd_basic_adc_get (int argc, char *argv[])
 	return ATCMD_SUCCESS;
 }
 
-/*
 static int _atcmd_basic_adc_set (int argc, char *argv[])
 {
 	switch (argc)
 	{
 		case 0:
-			ATCMD_MSG_HELP("AT+ADC=<channel>");
+			ATCMD_MSG_HELP("AT+ADC={0|1}");
 			break;
 
 		case 1:
 		{
-			int channel = atoi(argv[0]);
-			int value;
+			int param = atoi(argv[0]);
 
-			if (!_atcmd_adc_channel_valid(channel))
-				return ATCMD_ERROR_INVAL;
-
-			value = _atcmd_adc_get_value(channel);
-
-			ATCMD_MSG_INFO("ADC", "%d,%d", channel, value);
-
-			break;
+			if (param == 1)
+			{
+				_atcmd_adc_enable();
+				break;
+			}
+			else if (param == 0)
+			{
+				_atcmd_adc_disable();
+				break;
+			}
 		}
 
 		default:
@@ -813,7 +852,6 @@ static int _atcmd_basic_adc_set (int argc, char *argv[])
 
 	return ATCMD_SUCCESS;
 }
-*/
 
 static atcmd_info_t g_atcmd_basic_adc =
 {
@@ -827,7 +865,7 @@ static atcmd_info_t g_atcmd_basic_adc =
 
 	.handler[ATCMD_HANDLER_RUN] = NULL,
 	.handler[ATCMD_HANDLER_GET] = _atcmd_basic_adc_get,
-	.handler[ATCMD_HANDLER_SET] = NULL,
+	.handler[ATCMD_HANDLER_SET] = _atcmd_basic_adc_set,
 };
 
 /**********************************************************************************************/
@@ -1325,9 +1363,9 @@ int atcmd_basic_enable (void)
 			return -1;
 	}
 
-#ifdef CONFIG_ATCMD_DEBUG
 	atcmd_info_print(&g_atcmd_group_basic);
-#endif
+
+	_atcmd_adc_init();
 
 	return 0;
 }
@@ -1335,6 +1373,8 @@ int atcmd_basic_enable (void)
 void atcmd_basic_disable (void)
 {
 	int i;
+
+	_atcmd_adc_deinit();
 
 	for (i = 0 ; g_atcmd_basic[i] ; i++)
 		atcmd_info_unregister(ATCMD_GROUP_BASIC, g_atcmd_basic[i]->id);

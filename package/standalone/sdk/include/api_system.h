@@ -33,7 +33,7 @@ extern "C" {
 #include "util_trace.h"
 
 /**********************************************
- * @fn nrc_err_t nrc_get_rtc(uint64_t *rtc_time);
+ * @fn nrc_err_t nrc_get_rtc(uint64_t *rtc_time)
  *
  * @brief Read RTC time since boot
  *
@@ -44,7 +44,7 @@ extern "C" {
 nrc_err_t nrc_get_rtc(uint64_t *rtc_time);
 
 /**********************************************
- * @fn void nrc_reset_rtc(void);
+ * @fn void nrc_reset_rtc(void)
  *
  * @brief Set RTC hardware to 0
  *
@@ -102,6 +102,117 @@ nrc_err_t nrc_led_trx_init(int tx_gpio, int rx_gpio, int timer_period, bool inve
  ***********************************************/
 nrc_err_t nrc_led_trx_deinit(void);
 
+
+/**********************************************
+ * @fn	nrc_err_t nrc_wdt_enable(void)
+ *
+ * @brief Enable watchdog monitoring. The default is enabled
+ *
+ * @param void
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_wdt_enable(void);
+
+
+/**********************************************
+ * @fn	nrc_err_t nrc_wdt_disable(void)
+ *
+ * @brief Disable watchdog monitoring. The default is enabled
+ *
+ * @param void
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_wdt_disable(void);
+
+
+/**********************************************
+ * @fn nrc_err_t nrc_set_app_version(VERSION_T* version)
+ *
+ * @brief Set application version, which is a mandatory to use broadcast FOTA
+ *
+ * @param A pointer application version
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_set_app_version(VERSION_T* version);
+
+
+/**********************************************
+ * @fn  VERSION_T* nrc_get_app_version(void)
+ *
+ * @brief Get application version, which is a mandatory to use broadcast FOTA
+ *
+ * @param void
+ *
+ * @return A pointer to version
+ ***********************************************/
+VERSION_T* nrc_get_app_version(void);
+
+
+/**********************************************
+ * @fn nrc_err_t nrc_set_app_name(char* appname)
+ *
+ * @brief Set application name, which is a mandatory to use broadcast FOTA
+ *
+ * @param A pointer application name
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_set_app_name(char* appname);
+
+
+/**********************************************
+ * @fn  char* nrc_get_app_name(void)
+ *
+ * @brief Get application name, which is a mandatory to use broadcast FOTA
+ *
+ * @param void
+ *
+ * @return A pointer to app name
+ ***********************************************/
+char* nrc_get_app_name(void);
+
+
+/**********************************************
+ * @fn	VERSION_T* nrc_get_sdk_version(void)
+ *
+ * @brief Get SDK version
+ *
+ * @param void
+ *
+ * @return A pointer to version
+ ***********************************************/
+VERSION_T* nrc_get_sdk_version(void);
+
+
+/**********************************************
+ * @fn     nrc_err_t nrc_set_flash_device_info(uint8_t* data, unit16_t len)
+ *
+ * @brief  Write data to the device info page on the flash memory.
+ *
+ * @param  data: the source buffer that holds the data to be written.
+ *
+ * @param  len:  the length of the data in bytes. (max 4096 bytes).
+ *
+ * @return If successful, NRC_SUCCESS is returned. Otherwise, NRC_FAIL is returned;
+ ***********************************************/
+nrc_err_t nrc_set_flash_device_info(uint8_t* data, uint16_t len);
+
+
+/**********************************************
+ * @fn     nrc_err_t nrc_get_flash_device_info(uint8_t* data, unit16_t len)
+ *
+ * @brief  Read data from the device info page on the flash memory.
+ *
+ * @param  data: the destination buffer that the data read from the flash memory will be copied to.
+ *
+ * @param  len:  the length of the data in bytes. (max 4096 bytes).
+ *
+ * @return If successful, NRC_SUCCESS is returned. Otherwise, NRC_FAIL is returned;
+ ***********************************************/
+nrc_err_t nrc_get_flash_device_info(uint8_t* data, uint16_t len);
 
 #ifdef __cplusplus
 }

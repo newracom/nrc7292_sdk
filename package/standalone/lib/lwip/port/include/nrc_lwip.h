@@ -39,8 +39,11 @@ typedef enum {
 	WLAN1_INTERFACE,
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
 	ETHERNET_INTERFACE,
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
+#if LWIP_BRIDGE
 	BRIDGE_INTERFACE,
-#endif
+#endif /* LWIP_BRIDGE */
+	END_INTERFACE,
 } WIFI_INTERFACE;
 
 enum dhcp_status {
@@ -91,6 +94,10 @@ typedef void (*lwiperf_report_cb_t) (const char *report_type,
 									uint32_t ms_duration,
 									uint32_t bandwidth_kbitpsec);
 
+struct netif * nrc_netif_get_by_idx(uint8_t idx);
+int nrc_idx_get_by_name(char *argv);
+int nrc_is_local_mac(uint8_t *addr);
+
 bool wifi_get_ip_info(int vif_id, struct ip_info *info);
 bool wifi_set_ip_info(int vif_id, struct ip_info *info);
 bool wifi_set_dns_server(ip_addr_t *pri_dns, ip_addr_t *sec_dns);
@@ -105,6 +112,9 @@ uint8_t wifi_get_vif_id(ip_addr_t* dest);
 void set_dhcp_status(bool status);
 bool get_dhcp_status(void);
 bool wifi_dhcps(int argc, char *argv[]);
+bool wifi_bridge(int argc, char *argv[]);
+bool setup_wifi_bridge_interface(void);
+bool delete_wifi_bridge_interface(void);
 
 #ifdef LWIP_DHCP
 int dhcp_run(int vif);

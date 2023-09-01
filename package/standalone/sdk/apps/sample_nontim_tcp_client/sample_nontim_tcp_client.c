@@ -95,16 +95,20 @@ static void send_data_to_server()
 		}
 	}
 
-	/* Sample server is simply "nc -k -l 8099" on another linux machine */
-	/* For real use case, implement something to make sure the sent data actually */
-	/* reached the server */
-	/* For our sample, we will simply put 1 sec delay hoping the data is received */
-	/* by server */
-	_delay_ms(1000);
+	/*
+	 * The TCP server is a Linux implementation utilizing the "nc" (netcat) command.
+	 * (ex) nc -k -l 8099
+	 */
 
 	if (sockfd >= 0) {
 		nrc_usr_print("Shutting down and close socket\n");
 		close(sockfd);
+
+		/* In order to gracefully terminate connection to the server,
+		   it is necessary to give some delay to wait for FIN ACK from server and send ACK for it. */
+		/* One can remove below delay and the server will eventually clean up the server socket
+		   when the TCP FIN timeout reached. */
+		_delay_ms(100);
 	}
 }
 
@@ -152,21 +156,22 @@ nrc_err_t schedule_deep_sleep()
 	/* If values not set correctly, the board may consume more power during deep sleep */
 #ifdef NRC7292
 	/* Below configuration is for NRC7292 EVK Revision B board */
-	nrc_ps_set_gpio_direction(0x07FFFF30);
+	nrc_ps_set_gpio_direction(0x07FFFF7F);
 	nrc_ps_set_gpio_out(0x0);
 	nrc_ps_set_gpio_pullup(0x0);
 #elif defined(NRC7394)
 	/* Below configuration is for NRC7394 EVK Revision board */
-	nrc_ps_set_gpio_direction(0x0FFFFFDFF);
+	nrc_ps_set_gpio_direction(0xFFFFFDFF);
 	nrc_ps_set_gpio_out(0x00000100);
 	nrc_ps_set_gpio_pullup(0xFFFFFFFF);
 #endif
 
-	if (nrc_ps_add_schedule(REPORT_DURATION, true, run_scheduled_client) != NRC_SUCCESS) {
-		return NRC_FAIL;
+	while (nrc_ps_deep_sleep(REPORT_DURATION) != NRC_SUCCESS) {
+		nrc_usr_print("[%s] FAILED TO SLEEP!\n", __func__);
+		_delay_ms(1000);
 	}
-
-	return nrc_ps_start_schedule();
+	/* NOT REACHED */
+	return NRC_SUCCESS;
 }
 
 /******************************************************************************
@@ -180,6 +185,8 @@ void user_init(void)
 	nrc_err_t ret;
 
 	nrc_uart_console_enable(true);
+
+	run_scheduled_client();
 
 	if (schedule_deep_sleep() == NRC_FAIL) {
 		nrc_usr_print("[%s] ** schedule_deep_sleep failed... **\n", __func__);

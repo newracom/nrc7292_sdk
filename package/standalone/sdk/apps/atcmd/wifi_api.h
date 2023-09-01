@@ -31,7 +31,9 @@ enum TX_POWER_TYPE
 {
 	TX_POWER_AUTO = 0,
 	TX_POWER_LIMIT,
-	TX_POWER_FIXED
+	TX_POWER_FIXED,
+	
+	TX_POWER_TYPE_MAX
 };
 
 enum
@@ -43,15 +45,49 @@ enum
 	DHCP_TIMEOUT = -4
 };
 
+#define UMAC_COUNTRY_CODES	1
+
+#if UMAC_COUNTRY_CODES == 0
+typedef struct
+{
+	int cc_index;
+	const char *alpha2_cc;
+} wifi_country_t;
+#else
+typedef country_codes	wifi_country_t;
+#endif
+
+typedef struct
+{
+	uint32_t s1g_freq:14;
+	uint32_t nons1g_freq:14;
+	uint32_t bw:3;
+	uint32_t scan:1;
+} wifi_channel_t;
+
+typedef struct
+{
+#define WIFI_CHANNEL_NUM_MAX	50
+
+	int n_channel;
+	wifi_channel_t channel[WIFI_CHANNEL_NUM_MAX];
+} wifi_channels_t;
+
 typedef void (*wifi_event_cb_t) (int, void *, int);
+
+/**********************************************************************************************/
+
+extern const char *str_txpwr_type[TX_POWER_TYPE_MAX];
+
+extern const wifi_country_t *g_wifi_country_list;
 
 extern int wifi_api_register_event_callback (wifi_event_cb_t event_cb[]);
 
 extern int wifi_api_get_rf_cal (bool *cal_use, char *country);
 extern int wifi_api_set_rf_cal (bool cal_use);
 
-extern uint16_t wifi_api_get_s1g_freq (uint16_t non_s1g_freq);
-extern int wifi_api_get_supported_channels (uint16_t s1g_freq[], int n_s1g_freq_max);
+extern int16_t wifi_api_get_s1g_freq (uint16_t non_s1g_freq);
+extern int wifi_api_get_supported_channels (const char *country, wifi_channels_t *channels);
 
 extern int wifi_api_get_macaddr (char *macaddr);
 
@@ -59,7 +95,7 @@ extern int wifi_api_get_country (char *country);
 extern int wifi_api_set_country (char *country);
 
 extern int wifi_api_get_tx_power (uint8_t *power);
-extern int wifi_api_set_tx_power (uint8_t power, enum TX_POWER_TYPE type);
+extern int wifi_api_set_tx_power (enum TX_POWER_TYPE type, uint8_t power);
 
 extern int wifi_api_get_rate_control (bool *enable);
 extern void wifi_api_set_rate_control (bool enable);
@@ -89,6 +125,11 @@ extern int wifi_api_set_mic_scan (bool enable, bool channel_move);
 
 extern int wifi_api_get_bmt (uint32_t *threshold);
 extern int wifi_api_set_bmt (uint32_t threshold);
+
+extern int wifi_api_get_beacon_interval (uint16_t *beacon_interval);
+
+extern int wifi_api_get_listen_interval (uint16_t *listen_interval, uint32_t *listen_interval_tu);
+extern int wifi_api_set_listen_interval (uint16_t listen_interval);
 
 extern int wifi_api_set_ssid (char *ssid);
 extern int wifi_api_set_bssid (char *bssid);
@@ -124,8 +165,10 @@ extern bool wifi_api_wakeup_done (void);
 extern int wifi_api_start_softap (int freq, int bw, char *ssid, char *security, char *password, uint32_t timeout);
 extern int wifi_api_stop_softap (void);
 
-extern int wifi_api_get_max_sta_aid (void);
-extern int wifi_api_get_sta_info (int aid, char *maddr, int8_t *rssi, uint8_t *snr, uint8_t *mcs);
+extern int wifi_api_get_max_num_sta (uint8_t *max_num_sta);
+extern int wifi_api_set_max_num_sta (uint8_t max_num_sta);
+
+extern int wifi_api_get_sta_info (int aid, char *maddr, int8_t *rssi, uint8_t *snr, uint8_t *tx_mcs, uint8_t *rx_mcs);
 
 extern int wifi_api_set_bss_max_idle (int period, int retry_cnt);
 

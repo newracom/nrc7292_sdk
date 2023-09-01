@@ -169,7 +169,8 @@ typedef struct
 typedef struct
 {
 	struct sockaddr_storage clientaddr;
-
+	uint32_t client_sock;
+	TaskHandle_t periodic_report_task;
 	bool start;
 	bool done;
 
@@ -229,6 +230,7 @@ struct client_hdr_ack {
 typedef struct iperf_opt
 {
 	uint32_t mAmount; // -n or -t
+	uint32_t mInterval;      // -i option (sec)     
 	uint32_t mBufLen;	// -l
 	uint32_t mAppRate; // -b
 	uint32_t mSock;
@@ -243,7 +245,7 @@ typedef struct iperf_opt
 	uint8_t mTOS ;	// -S
 	enum ThreadMode mThreadMode;         // -s or -c
 	bool   mUDP;                    // -u
-	bool   mForceStop;                    // -u
+	bool   mForceStop;
 } iperf_opt_t;
 
 
@@ -253,6 +255,7 @@ int nrc_iperf_list_init(void);
 void nrc_iperf_list_deinit(void);
 int nrc_iperf_task_list_add(iperf_opt_t* option);
 int nrc_iperf_task_list_del(iperf_opt_t* option);
+void nrc_iperf_periodic_report(void *pvParameters);
 int  iperf_run(int argc, char *argv[], void *report_cb);
 void nrc_iperf_spin_lock(void);
 void nrc_iperf_spin_unlock(void);

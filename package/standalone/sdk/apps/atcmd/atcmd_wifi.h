@@ -57,8 +57,8 @@
  * Default Settings
  */
 #define ATCMD_WIFI_INIT_COUNTRY			"US"
-#define ATCMD_WIFI_INIT_TXPOWER			24
-#define ATCMD_WIFI_INIT_TXPOWER_TYPE	24
+
+#define ATCMD_WIFI_INIT_TXPOWER_TYPE	TX_POWER_AUTO
 
 #define ATCMD_WIFI_INIT_SSID			"halow"
 #define ATCMD_WIFI_INIT_BSSID			"00:00:00:00:00:00"
@@ -75,10 +75,17 @@
 
 
 /*
- * Country Code
+ * RSSI
  */
-#define ATCMD_WIFI_COUNTRY_ARRAY		{ "AU", "CN", "EU", "JP", "NZ", "TW", "US", "K0", "K1", "K2" }
-#define ATCMD_WIFI_COUNTRY_STRING		"AU|CN|EU|JP|NZ|TW|US|K0|K1|K2"
+#define ATCMD_WIFI_RSSI_MIN		-128
+#define ATCMD_WIFI_RSSI_MAX		0
+
+
+/*
+ * TX Power
+ */
+#define ATCMD_WIFI_TXPOWER_MIN		WIFI_TX_POWER_MIN
+#define ATCMD_WIFI_TXPOWER_MAX		WIFI_TX_POWER_MAX
 
 
 /*
@@ -86,15 +93,6 @@
  */
 #define ATCMD_WIFI_DHCP_TASK_PRIORITY			ATCMD_TASK_PRIORITY
 #define ATCMD_WIFI_DHCP_TASK_STACK_SIZE			((4 * 1024) / sizeof(StackType_t))
-
-#define ATCMD_WIFI_ROAMING_TASK_PRIORITY		ATCMD_TASK_PRIORITY
-#define ATCMD_WIFI_ROAMING_TASK_STACK_SIZE		((4 * 1024) / sizeof(StackType_t))
-
-/*
- * RSSI
- */
-#define ATCMD_WIFI_RSSI_MAX		0
-#define ATCMD_WIFI_RSSI_MIN		-128
 
 /**********************************************************************************************/
 
@@ -122,24 +120,25 @@ enum ATCMD_WIFI_EVENT
 
 /**********************************************************************************************/
 
-typedef uint32_t atcmd_wifi_event_t;
 typedef uint8_t atcmd_wifi_power_t;
+typedef uint32_t atcmd_wifi_event_t;
 
-typedef char atcmd_wifi_ipaddr_t[ATCMD_WIFI_IPADDR_LEN_MAX + 1];
-typedef char atcmd_wifi_macaddr_t[ATCMD_WIFI_MACADDR_LEN + 1];
+typedef wifi_channel_t atcmd_wifi_channel_t;
+typedef wifi_channels_t atcmd_wifi_channels_t;
+
 typedef char atcmd_wifi_country_t[ATCMD_WIFI_COUNTRY_LEN + 1];
-typedef char atcmd_wifi_ssid_t[ATCMD_WIFI_SSID_LEN_MAX + 1];
+typedef char atcmd_wifi_macaddr_t[ATCMD_WIFI_MACADDR_LEN + 1];
 typedef char atcmd_wifi_bssid_t[ATCMD_WIFI_BSSID_LEN + 1];
+typedef char atcmd_wifi_ssid_t[ATCMD_WIFI_SSID_LEN_MAX + 1];
 typedef char atcmd_wifi_security_t[ATCMD_WIFI_SECURITY_LEN_MAX + 1];
 typedef char atcmd_wifi_password_t[ATCMD_WIFI_PASSWORD_LEN_MAX + 1];
+typedef char atcmd_wifi_ipaddr_t[ATCMD_WIFI_IPADDR_LEN_MAX + 1];
 
 typedef struct
 {
-#define ATCMD_WIFI_CHANNELS_MAX		50
-
-	int n_freq;
-	uint16_t freq[ATCMD_WIFI_CHANNELS_MAX];
-} atcmd_wifi_channels_t;
+	enum TX_POWER_TYPE type;
+	atcmd_wifi_power_t val;	
+} atcmd_wifi_txpower_t;
 
 typedef struct
 {
@@ -163,21 +162,6 @@ typedef struct
 
 typedef struct
 {
-	int scan_delay;
-	int rssi_threshold;
-	int rssi_level;
-} atcmd_wifi_roaming_params_t;
-
-typedef struct
-{
-	bool enable;
-	atcmd_wifi_roaming_params_t params;
-
-	TaskHandle_t task;
-} atcmd_wifi_roaming_t;
-
-typedef struct
-{
 #ifdef CONFIG_ATCMD_IPV6
 	_lwip_ping_params_t params[2];
 #else
@@ -193,6 +177,12 @@ typedef struct
 
 	uint16_t channel_bw;
 	uint16_t channel_freq;
+
+	struct
+	{
+		uint8_t system;
+		uint8_t current;
+	} max_num_sta;
 
 	struct
 	{
@@ -213,13 +203,12 @@ typedef struct
 	atcmd_wifi_event_t event;
 
 	atcmd_wifi_country_t country;
-	atcmd_wifi_channels_t channels;
-	atcmd_wifi_power_t txpower;
+	atcmd_wifi_channels_t supported_channels;
+	atcmd_wifi_txpower_t txpower;
 
 	atcmd_wifi_scan_t scan;
 	atcmd_wifi_connect_t connect;
 	atcmd_wifi_ping_t ping;
-	atcmd_wifi_roaming_t roaming;
 #ifdef CONFIG_ATCMD_SOFTAP
 	atcmd_wifi_softap_t softap;
 #endif

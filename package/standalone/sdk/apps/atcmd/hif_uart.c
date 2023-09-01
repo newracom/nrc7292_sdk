@@ -76,6 +76,18 @@
 
 /*********************************************************************************************/
 
+static struct
+{
+	uint32_t tx;
+	uint32_t rx;
+	uint32_t rx_isr;
+} g_cmd_uart_data =
+{
+	.tx = 0,
+	.rx = 0,
+	.rx_isr = 0
+};
+
 const uint32_t g_hif_uart_reg_base[4] =
 {
 	HSUART0_BASE_ADDR, HSUART1_BASE_ADDR,
@@ -142,7 +154,7 @@ static int _hif_uart_fifo_create (_hif_info_t *info)
 
 	if (rx_fifo->size > 0)
 	{
-		g_hif_uart_rx_fifo = _hif_fifo_create(rx_fifo->addr, rx_fifo->size, true);
+		g_hif_uart_rx_fifo = _hif_fifo_create(rx_fifo->addr, rx_fifo->size);
 		if (!g_hif_uart_rx_fifo)
 		{
 			_hif_error("_hif_fifo_create() failed, rx_addr=%p rx_size=%d\n",
@@ -154,7 +166,7 @@ static int _hif_uart_fifo_create (_hif_info_t *info)
 
 	if (tx_fifo->size > 0)
 	{
-		g_hif_uart_tx_fifo = _hif_fifo_create(tx_fifo->addr, tx_fifo->size, false);
+		g_hif_uart_tx_fifo = _hif_fifo_create(tx_fifo->addr, tx_fifo->size);
 		if (!g_hif_uart_tx_fifo)
 		{
 			_hif_error("_hif_fifo_create() failed, tx_addr=%p tx_size=%d\n",
@@ -403,7 +415,7 @@ static bool _hif_uart_channel_valid (int channel, bool hfc)
 	return true;
 }
 
-static bool _hif_uart_baudrate_valid (int baudrate, bool hfc)
+static bool _hif_uart_baudrate_valid (int baudrate)
 {
 	switch (baudrate)
 	{
@@ -412,8 +424,6 @@ static bool _hif_uart_baudrate_valid (int baudrate, bool hfc)
 		case 38400:
 		case 57600:
 		case 115200:
-			break;
-
 		case 230400:
 		case 460800:
 		case 500000:
@@ -423,10 +433,7 @@ static bool _hif_uart_baudrate_valid (int baudrate, bool hfc)
 		case 1152000:
 		case 1500000:
 		case 2000000:
-			if (hfc)
-				break;
-
-			_hif_error("Hardware flow control must be enabled to use baudrate %d.\n", baudrate);
+			break;
 
 		default:
 			return false;
@@ -457,16 +464,8 @@ int _hif_uart_getc (char *data)
 
 	if (g_hif_uart_rx_fifo)
 	{
-		if (_hif_fifo_mutex_take(g_hif_uart_rx_fifo))
-		{
-			if (_hif_fifo_read(g_hif_uart_rx_fifo, data, 1) != 1)
-			{
-				_hif_fifo_mutex_give(g_hif_uart_rx_fifo);
-				return -1;
-			}
-
-			_hif_fifo_mutex_give(g_hif_uart_rx_fifo);
-		}
+		if (_hif_fifo_read(g_hif_uart_rx_fifo, data, 1) != 1)
+			return -1;
 	}
 	else
 	{
@@ -486,16 +485,8 @@ int _hif_uart_putc (char data)
 
 	if (g_hif_uart_tx_fifo)
 	{
-		if (_hif_fifo_mutex_take(g_hif_uart_tx_fifo))
-		{
-			if (_hif_fifo_write(g_hif_uart_tx_fifo, &data, 1) != 1)
-			{
-				_hif_fifo_mutex_give(g_hif_uart_tx_fifo);
-				return -1;
-			}
-
-			_hif_fifo_mutex_give(g_hif_uart_tx_fifo);
-		}
+		if (_hif_fifo_write(g_hif_uart_tx_fifo, &data, 1) != 1)
+			return -1;
 	}
 	else
 	{
@@ -518,21 +509,16 @@ int _hif_uart_read (char *buf, int len)
 
 	if (g_hif_uart_rx_fifo)
 	{
-		if (_hif_fifo_mutex_take(g_hif_uart_rx_fifo))
+		if (g_hif_uart.hfc == UART_HFC_ENABLE)
 		{
-			if (g_hif_uart.hfc == UART_HFC_ENABLE)
-			{
-				_hif_uart_rx_int_disable();
-				rx_cnt = _hif_fifo_read(g_hif_uart_rx_fifo, buf, len);
-				_hif_uart_rx_int_enable();
-			}
-			else
-			{
-				_hif_uart_rx_dma_update_fifo();
-				rx_cnt = _hif_fifo_read(g_hif_uart_rx_fifo, buf, len);
-			}
-
-			_hif_fifo_mutex_give(g_hif_uart_rx_fifo);
+			_hif_uart_rx_int_disable();
+			rx_cnt = _hif_fifo_read(g_hif_uart_rx_fifo, buf, len);
+			_hif_uart_rx_int_enable();
+		}
+		else
+		{
+			_hif_uart_rx_dma_update_fifo();
+			rx_cnt = _hif_fifo_read(g_hif_uart_rx_fifo, buf, len);
 		}
 	}
 	else
@@ -546,6 +532,8 @@ int _hif_uart_read (char *buf, int len)
 		}
 	}
 
+	g_cmd_uart_data.rx += rx_cnt;
+
 	return rx_cnt;
 }
 
@@ -558,15 +546,10 @@ int _hif_uart_write (char *buf, int len)
 
 	if (g_hif_uart_tx_fifo)
 	{
-		if (_hif_fifo_mutex_take(g_hif_uart_tx_fifo))
-		{
-			tx_cnt = _hif_fifo_write(g_hif_uart_tx_fifo, buf, len);
+		tx_cnt = _hif_fifo_write(g_hif_uart_tx_fifo, buf, len);
 
-			_hif_fifo_mutex_give(g_hif_uart_tx_fifo);
-
-			if (tx_cnt > 0)
-				_hif_uart_tx_int_enable();
-		}
+		if (tx_cnt > 0)
+			_hif_uart_tx_int_enable();
 	}
 	else
 	{
@@ -585,6 +568,8 @@ int _hif_uart_write (char *buf, int len)
 		}
 	}
 
+	g_cmd_uart_data.tx += tx_cnt;
+
 	return tx_cnt;
 }
 
@@ -592,23 +577,20 @@ int _hif_uart_write (char *buf, int len)
 
 static void _hif_uart_rx_isr (void)
 {
-/*	if (_hif_fifo_mutex_take_isr(g_hif_uart_rx_fifo)) */
+	int fifo_size = _hif_fifo_free_size(g_hif_uart_rx_fifo);
+	int i;
+
+	for (i = 0 ; i < fifo_size ; i++)
 	{
-		int fifo_size = _hif_fifo_free_size(g_hif_uart_rx_fifo);
-		int i;
+		if (_hif_uart_rx_empty())
+			break;
 
-		for (i = 0 ; i < fifo_size ; i++)
-		{
-			if (_hif_uart_rx_empty())
-				break;
-
-			_hif_fifo_putc(g_hif_uart_rx_fifo, _hif_uart_rx_data());
-		}
-
-		_hif_rx_resume_isr();
-
-/*		_hif_fifo_mutex_give_isr(g_hif_uart_rx_fifo); */
+		_hif_fifo_putc(g_hif_uart_rx_fifo, _hif_uart_rx_data());
 	}
+
+	g_cmd_uart_data.rx_isr += i;
+
+	_hif_rx_resume_isr();
 }
 
 #if 0
@@ -621,8 +603,6 @@ static void _hif_uart_tx_isr (void)
 
 	if (g_hif_uart_tx_fifo)
 	{
-/*		_hif_fifo_mutex_take_isr(g_hif_uart_tx_fifo); */
-
 		if (cnt >= size)
 		{
 			cnt = 0;
@@ -633,8 +613,6 @@ static void _hif_uart_tx_isr (void)
 				return;
 			}
 		}
-
-/*		_hif_fifo_mutex_give_isr(g_hif_uart_tx_fifo); */
 
 		for (i = 0 ; i < (size - cnt) ; i++)
 		{
@@ -865,7 +843,7 @@ int _hif_uart_open (_hif_info_t *info)
 				if (!_hif_uart_channel_valid(uart->channel, uart->hfc))
 					goto uart_open_fail;
 
-				if (!_hif_uart_baudrate_valid(uart->baudrate, uart->hfc))
+				if (!_hif_uart_baudrate_valid(uart->baudrate))
 					goto uart_open_fail;
 
 				if (_hif_uart_fifo_create(info) != 0 || _hif_uart_enable(uart) != 0)
@@ -918,7 +896,7 @@ int _hif_uart_change (_hif_uart_t *new)
 	{
 		if (!_hif_uart_channel_valid(new->channel, new->hfc))
 			_hif_info("UART Change: invalid channel=%d\n", new->channel);
-		else if (!_hif_uart_baudrate_valid(new->baudrate, new->hfc))
+		else if (!_hif_uart_baudrate_valid(new->baudrate))
 			_hif_info("UART Change: invalid baudrate=%d\n", new->baudrate);
 		else
 		{
@@ -977,4 +955,117 @@ int _hif_uart_change (_hif_uart_t *new)
 
 	return -2; /* invalid */
 }
+
+/*********************************************************************************************/
+
+static int cmd_atcmd_uart_config (cmd_tbl_t *t, int argc, char *argv[])
+{
+	_hif_uart_t uart;
+
+	_hif_uart_get_info(&uart);
+
+	switch (argc)
+	{
+		case 0:
+			A(" - channel: %d\n", uart.channel);
+			A(" - baudrate: %d\n", uart.baudrate);
+			A(" - data bits: %d\n", uart.data_bits);
+			A(" - stop bits: %d\n", uart.stop_bits);
+			A(" - parity: %d\n", uart.parity);
+			A(" - hfc: %d\n", uart.hfc);
+			break;
+
+		default:
+			return CMD_RET_USAGE;
+	}
+
+	return CMD_RET_SUCCESS;
+}
+
+static int cmd_atcmd_uart_fifo (cmd_tbl_t *t, int argc, char *argv[])
+{
+	int ret = CMD_RET_SUCCESS;
+	int i;
+
+	switch (argc)
+	{
+		case 0:
+			if (g_hif_uart_rx_fifo)
+				A(" - RX : %u/%u\n", _hif_fifo_fill_size(g_hif_uart_rx_fifo), _hif_fifo_size(g_hif_uart_rx_fifo));
+
+			if (g_hif_uart_tx_fifo)
+				A(" - TX : %u %u\n", _hif_fifo_fill_size(g_hif_uart_tx_fifo), _hif_fifo_size(g_hif_uart_tx_fifo));
+			break;
+
+		default:
+			ret = CMD_RET_USAGE;
+	}
+
+	return ret;
+}
+
+static int cmd_atcmd_uart_data (cmd_tbl_t *t, int argc, char *argv[])
+{
+	int ret = CMD_RET_SUCCESS;
+	int i;
+
+	switch (argc)
+	{
+		case 1:
+			if (strcmp(argv[0], "clear") != 0)
+			{
+				ret = CMD_RET_USAGE;
+				break;
+
+			}
+
+			g_cmd_uart_data.tx = 0;
+			g_cmd_uart_data.rx = 0;
+			g_cmd_uart_data.rx_isr = 0;
+
+		case 0:
+			A(" tx=%u rx=%u/%u\n", g_cmd_uart_data.tx, g_cmd_uart_data.rx, g_cmd_uart_data.rx_isr);
+			break;
+
+		default:
+			ret = CMD_RET_USAGE;
+	}
+
+	return ret;
+}
+
+static int cmd_atcmd_uart (cmd_tbl_t *t, int argc, char *argv[])
+{
+	int ret = CMD_RET_USAGE;
+
+	if (argc >= 2)
+	{
+		if (strcmp(argv[1], "config") == 0)
+			ret = cmd_atcmd_uart_config(t, argc - 2, argv + 2);
+		else if (strcmp(argv[1], "fifo") == 0)
+			ret = cmd_atcmd_uart_fifo(t, argc - 2, argv + 2);
+		else if (strcmp(argv[1], "data") == 0)
+			ret = cmd_atcmd_uart_data(t, argc - 2, argv + 2);
+		else if (strcmp(argv[1], "help") == 0)
+		{
+			A("atcmd uart config\n");
+			A("atcmd uart fifo\n");
+			A("atcmd uart data [clear]\n");
+
+			return CMD_RET_SUCCESS;
+		}
+	}
+
+	return ret;
+}
+
+SUBCMD_MAND(atcmd,
+		uart,
+		cmd_atcmd_uart,
+		"atcmd_uart",
+		"atcmd uart help");
+
+
+
+
 

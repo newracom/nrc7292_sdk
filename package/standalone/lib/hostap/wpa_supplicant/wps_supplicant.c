@@ -879,7 +879,7 @@ static void wpa_supplicant_wps_event(void *ctx, enum wps_event event,
 		wpa_supplicant_wps_event_fail(wpa_s, &data->fail);
 #ifdef WPS_SDK_CB
 		if(wps_pbc_ops->nrc_wifi_wps_pbc_fail) {
-			wps_pbc_ops->nrc_wifi_wps_pbc_fail();
+			wps_pbc_ops->nrc_wifi_wps_pbc_fail(wpa_s->drv_priv);
 		}
 #endif /* WPS_SDK_CB */
 		break;
@@ -908,13 +908,24 @@ static void wpa_supplicant_wps_event(void *ctx, enum wps_event event,
 				else
 					nrc_security_mode = NRC_WIFI_SEC_UNKNOWN;
 
-				wps_pbc_ops->nrc_wifi_wps_pbc_success(ssid->ssid,
-								      ssid->ssid_len,
-								      nrc_security_mode,
-								      ssid->passphrase);
+				if(ssid->psk){
+					char hex[PMK_LEN * 2 + 1];
+					wpa_snprintf_hex(hex, PMK_LEN * 2 + 1, ssid->psk, PMK_LEN);
+					wps_pbc_ops->nrc_wifi_wps_pbc_success(wpa_s->drv_priv,
+										ssid->ssid,
+										ssid->ssid_len,
+										nrc_security_mode,
+										hex);					
+				}else{
+					wps_pbc_ops->nrc_wifi_wps_pbc_success(wpa_s->drv_priv,
+										ssid->ssid,
+										ssid->ssid_len,
+										nrc_security_mode,
+										ssid->passphrase);
+				}
 			}
 #else
-			wps_pbc_ops->nrc_wifi_wps_pbc_success(NULL, NULL, NULL, NULL);
+			wps_pbc_ops->nrc_wifi_wps_pbc_success(wpa_s->drv_priv, NULL, NULL, NULL, NULL);
 #endif /* CONFIG_NO_CONFIG_WRITE */
 		}
 #endif /* WPS_SDK_CB */
@@ -930,7 +941,7 @@ static void wpa_supplicant_wps_event(void *ctx, enum wps_event event,
 	case WPS_EV_PBC_TIMEOUT:
 #ifdef WPS_SDK_CB
 		if(wps_pbc_ops->nrc_wifi_wps_pbc_timeout) {
-			wps_pbc_ops->nrc_wifi_wps_pbc_timeout();
+			wps_pbc_ops->nrc_wifi_wps_pbc_timeout(wpa_s->drv_priv);
 		}
 #endif /* WPS_SDK_CB */
 		break;

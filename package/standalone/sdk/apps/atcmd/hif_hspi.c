@@ -492,8 +492,6 @@ int _hif_hspi_read (char *buf, int len)
 	if (!buf || !len)
 		return 0;
 
-	_hif_fifo_mutex_take(g_hif_hspi_rx_fifo);
-
 	rxq_done_cnt = rxq_total_cnt - _hif_hspi_queue_count(_HSPI_RXQ);
 	if (rxq_done_cnt > 0)
 	{
@@ -518,8 +516,6 @@ int _hif_hspi_read (char *buf, int len)
 	}
 
 	rxq_total_cnt += rxq_update_cnt;
-
-	_hif_fifo_mutex_give(g_hif_hspi_rx_fifo);
 
 /*	if (rxq_done_cnt > 0 || rxq_update_cnt > 0 || ret > 0) */
 	{
@@ -573,8 +569,6 @@ int _hif_hspi_write (char *buf, int len)
 	if (!buf || !len)
 		return 0;
 
-	_hif_fifo_mutex_take(g_hif_hspi_tx_fifo);
-
 	txq_update_cnt = (len / _HSPI_TX_SLOT_DATA_LEN_MAX) + ((len % _HSPI_TX_SLOT_DATA_LEN_MAX) ? 1 : 0);
 
 	txq_done_cnt = txq_total_cnt - _hif_hspi_queue_count(_HSPI_TXQ);
@@ -608,8 +602,6 @@ int _hif_hspi_write (char *buf, int len)
 
 		_hif_hspi_queue_event_to_host(_HSPI_TXQ);
 	}
-
-	_hif_fifo_mutex_give(g_hif_hspi_tx_fifo);
 
 /*	if (txq_done_cnt > 0 || txq_update_cnt > 0 || ret > 0) */
 	{
@@ -814,10 +806,10 @@ static int _hif_hspi_fifo_create (_hif_info_t *info)
 	_hif_buf_t *tx_fifo = &info->tx_fifo;
 
 	if (rx_fifo->size > 0)
-		g_hif_hspi_rx_fifo = _hif_fifo_create(rx_fifo->addr, rx_fifo->size, true);
+		g_hif_hspi_rx_fifo = _hif_fifo_create(rx_fifo->addr, rx_fifo->size);
 
 	if (tx_fifo->size > 0)
-		g_hif_hspi_tx_fifo = _hif_fifo_create(tx_fifo->addr, tx_fifo->size, true);
+		g_hif_hspi_tx_fifo = _hif_fifo_create(tx_fifo->addr, tx_fifo->size);
 
 	if (!g_hif_hspi_rx_fifo || !g_hif_hspi_tx_fifo)
 	{

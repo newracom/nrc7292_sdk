@@ -4150,7 +4150,11 @@ struct wpa_config * wpa_config_alloc_empty(const char *ctrl_interface,
 	config->bss_max_count = DEFAULT_BSS_MAX_COUNT;
 	config->bss_expiration_age = DEFAULT_BSS_EXPIRATION_AGE;
 	config->bss_expiration_scan_count = DEFAULT_BSS_EXPIRATION_SCAN_COUNT;
+#ifdef MAX_STA
+	config->max_num_sta = (DEFAULT_MAX_NUM_STA > MAX_STA) ? MAX_STA : DEFAULT_MAX_NUM_STA;
+#else
 	config->max_num_sta = DEFAULT_MAX_NUM_STA;
+#endif
 	config->ap_isolate = DEFAULT_AP_ISOLATE;
 	config->access_network_type = DEFAULT_ACCESS_NETWORK_TYPE;
 	config->scan_cur_freq = DEFAULT_SCAN_CUR_FREQ;

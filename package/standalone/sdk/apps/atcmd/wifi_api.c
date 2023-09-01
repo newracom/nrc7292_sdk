@@ -29,7 +29,35 @@
 #include "nrc_lwip.h"
 #include "nrc_ps_type.h"
 
+
 static const int vif_id = ATCMD_NETIF_INDEX;
+
+#if UMAC_COUNTRY_CODES == 0
+static const wifi_country_t _wifi_country_list[] =
+{
+	{ COUNTRY_CODE_AU, "AU" },
+	{ COUNTRY_CODE_CN, "CN" },
+	{ COUNTRY_CODE_EU, "EU" },
+	{ COUNTRY_CODE_JP, "JP" },
+	{ COUNTRY_CODE_NZ, "NZ" },
+	{ COUNTRY_CODE_TW, "TW" },
+	{ COUNTRY_CODE_US, "US" },
+	{ COUNTRY_CODE_K1, "K1" },
+	{ COUNTRY_CODE_K2, "K2" },
+
+	{ COUNTRY_CODE_MAX, "00" }
+};
+const wifi_country_t *g_wifi_country_list = _wifi_country_list;
+#else
+const wifi_country_t *g_wifi_country_list = _country_codes;
+#endif
+
+const char *str_txpwr_type[TX_POWER_TYPE_MAX] =
+{
+	[TX_POWER_AUTO] = "auto",
+	[TX_POWER_LIMIT] = "limit",
+	[TX_POWER_FIXED] = "fixed",
+};
 
 /**********************************************************************************************/
 
@@ -37,6 +65,9 @@ extern bool lmac_support_lbt (void);
 extern int lmac_set_lbt(uint16_t cs_duration, uint32_t pause_time, uint32_t tx_resume_time);
 extern int lmac_get_lbt(uint16_t *cs_duration, uint32_t *pause_time, uint32_t *tx_resume_time);
 extern bool lmac_send_qos_null_frame (bool pm);
+
+extern tWIFI_STATUS nrc_wifi_get_scan_freq_nons1g (int vif_id, uint16_t *freq_list, uint8_t *num_freq);
+extern tWIFI_STATUS nrc_wifi_set_scan_freq_nons1g (int vif_id, uint16_t *freq_list, uint8_t num_freq);
 
 /**********************************************************************************************/
 
@@ -127,21 +158,27 @@ int wifi_api_register_event_callback (wifi_event_cb_t event_cb[])
 
 int wifi_api_get_rf_cal (bool *cal_use, char *country)
 {
-	TX_PWR_CAL_PARAM tx_pwr_cal;
+#if defined(NRC7292)
+	uint8_t cal_cc[2];
+	uint8_t* rf_country = NULL;
 
 	if (!cal_use || !country)
 		return -1;
 
-#if !defined(NRC7292)
-	return -1;
-#else
+	rf_country = hal_rf_get_country();
+	if (!rf_country)
+		return -1;
+
 	*cal_use = !!hal_get_rf_cal_use();
-
-	system_api_get_rf_cal(SF_RF_CAL, (uint8_t*)&tx_pwr_cal, sizeof(tx_pwr_cal));
-	sprintf(country, "%c%c", tx_pwr_cal.country[0], tx_pwr_cal.country[1]);
-#endif
-
+	memcpy(cal_cc, rf_country, 2);
+	if(!memcmp (cal_cc, "KR", 2)){
+		cal_cc[1] = hal_get_channel_type_kr() +'0';
+	}
+	sprintf(country, "%c%c", cal_cc[0], cal_cc[1]);
 	return 0;
+#else
+	return -1;
+#endif
 }
 
 int wifi_api_set_rf_cal (bool cal_use)
@@ -155,7 +192,7 @@ int wifi_api_set_rf_cal (bool cal_use)
 	return 0;
 }
 
-uint16_t wifi_api_get_s1g_freq (uint16_t non_s1g_freq)
+int16_t wifi_api_get_s1g_freq (uint16_t non_s1g_freq)
 {
 	if (CheckSupportNonS1GFreq(non_s1g_freq))
 	{
@@ -169,37 +206,78 @@ uint16_t wifi_api_get_s1g_freq (uint16_t non_s1g_freq)
 	return 0;
 }
 
-int wifi_api_get_supported_channels (uint16_t s1g_freq[], int n_s1g_freq_max)
+int wifi_api_get_supported_channels (const char *country, wifi_channels_t *channels)
 {
-	uint16_t *nons1g_freq = NULL;
-	int n_nons1g_freq = 0;
-	int n_s1g_freq = 0;
-	uint16_t freq;
-	int i;
+	const CHANNEL_MAPPING_TABLE *channel_table;
+	int bw;
+	uint16_t s1g_freq;
+	uint16_t nons1g_freq;
+	int i, j;
 
-	if (!s1g_freq || !n_s1g_freq_max)
-		return -EINVAL;
-
-	system_api_get_supported_channels(&nons1g_freq, &n_nons1g_freq);
-
-	if (!nons1g_freq || !n_nons1g_freq)
-	{
-		_atcmd_error("failed to get supported channels\n");
+	if (strlen(country) != 2 || !channels)
 		return -1;
-	}
 
-	for (i = 0 ; i < n_nons1g_freq ; i++)
+/*	_atcmd_debug("%s: %s\n", __func__, channels->country_code); */
+
+	for (i = 0 ; g_wifi_country_list[i].cc_index < COUNTRY_CODE_MAX ; i++)
 	{
-		freq = wifi_api_get_s1g_freq(nons1g_freq[i]);
-		if(freq == 0)
-			continue;
+		if (strcmp(country, g_wifi_country_list[i].alpha2_cc) == 0)
+		{
+			channel_table = get_channel_mapping_tables(g_wifi_country_list[i].cc_index);
 
-		s1g_freq[n_s1g_freq] = freq;
-		if (++n_s1g_freq >= n_s1g_freq_max)
-			break;
+			memset(channels, 0, sizeof(wifi_channels_t));
+
+			for (j = 0 ; channel_table[j].s1g_freq != 0 ; j++)
+			{
+/*				_atcmd_debug("%s: %d %u %u %u\n", __func__, j,
+							channel_table[j].chan_spacing,
+							channel_table[j].s1g_freq,
+							channel_table[j].nons1g_freq); */
+
+				bw = channel_table[j].chan_spacing;
+				s1g_freq = channel_table[j].s1g_freq;
+				nons1g_freq = channel_table[j].nons1g_freq;
+
+				switch (bw)
+				{
+					case BW_1M:
+					case BW_2M:
+					case BW_4M:
+						if (strcmp(country, "K2") == 0)
+						{
+							switch (s1g_freq)
+							{
+								case 9245:
+								case 9315:
+									continue;
+
+								case 9280:
+								case 9300:
+									bw = BW_2M;
+									s1g_freq -= 10;
+							}
+						}
+
+						channels->channel[channels->n_channel].bw = (1 << bw);
+						channels->channel[channels->n_channel].scan = 1;
+						channels->channel[channels->n_channel].s1g_freq = s1g_freq;
+						channels->channel[channels->n_channel].nons1g_freq = nons1g_freq;
+						channels->n_channel++;
+
+/*						_atcmd_debug("%s: %d %u %u %u\n", __func__,
+									channels->n_channel - 1,
+									channels->channel[channels->n_channel - 1].bw,
+									channels->channel[channels->n_channel - 1].scan,
+									channels->channel[channels->n_channel - 1].s1g_freq,
+									channels->channel[channels->n_channel - 1].nons1g_freq); */
+				}
+			}
+
+			return 0;
+		}
 	}
 
-	return n_s1g_freq;
+	return -1;
 }
 
 int wifi_api_get_macaddr (char *macaddr)
@@ -258,29 +336,35 @@ int wifi_api_get_tx_power (uint8_t *power)
 	if (!power)
 		return -EINVAL;
 
-	if (nrc_wifi_get_tx_power(power) != WIFI_SUCCESS)
+	if (nrc_wifi_get_tx_power(vif_id, power) != WIFI_SUCCESS)
 		return -1;
 
 	return 0;
 }
 
-int wifi_api_set_tx_power (uint8_t power, enum TX_POWER_TYPE type)
+int wifi_api_set_tx_power (enum TX_POWER_TYPE type, uint8_t power)
 {
-	if (power == 0)
-		return -EINVAL;
+	tWIFI_TXPOWER_TYPE _type;
 
 	switch (type)
 	{
 		case TX_POWER_AUTO:
+			_type = WIFI_TXPOWER_AUTO;
+			break;
+		
 		case TX_POWER_LIMIT:
+			_type = WIFI_TXPOWER_LIMIT;
+			break;
+		
 		case TX_POWER_FIXED:
+			_type = WIFI_TXPOWER_FIXED;
 			break;
 
 		default:
 			return -EINVAL;
 	}
 
-	if (nrc_wifi_set_tx_power(power, type) != WIFI_SUCCESS)
+	if (nrc_wifi_set_tx_power(power, _type) != WIFI_SUCCESS)
 		return -1;
 
 	return 0;
@@ -306,7 +390,7 @@ int wifi_api_get_mcs (uint8_t *index)
 	if (!index)
 		return -EINVAL;
 
-	*index = system_modem_api_get_mcs();
+	*index = system_modem_api_get_mcs(vif_id);
 
 	return 0;
 }
@@ -326,7 +410,7 @@ int wifi_api_get_snr (uint8_t *snr)
 
 	*snr = 0;
 
-	if (nrc_wifi_get_snr(snr) != WIFI_SUCCESS)
+	if (nrc_wifi_get_snr(0, snr) != WIFI_SUCCESS)
 		return -1;
 
 	return 0;
@@ -339,7 +423,7 @@ int wifi_api_get_rssi (int8_t *rssi)
 
 	*rssi = ATCMD_WIFI_RSSI_MIN;
 
-	if (nrc_wifi_get_rssi(rssi) != WIFI_SUCCESS)
+	if (nrc_wifi_get_rssi(0, rssi) != WIFI_SUCCESS)
 		return -1;
 
 	return 0;
@@ -501,6 +585,41 @@ int wifi_api_set_bmt (uint32_t threshold)
 	return 0;
 }
 
+int wifi_api_get_beacon_interval (uint16_t *beacon_interval)
+{
+	uint16_t listen_interval;
+	uint32_t listen_interval_tu;
+
+	if (!beacon_interval)
+		return -EINVAL;
+
+	if (nrc_wifi_get_listen_interval(vif_id, &listen_interval, &listen_interval_tu) != WIFI_SUCCESS)
+		return -1;
+
+	*beacon_interval = listen_interval_tu / listen_interval;
+
+	return 0;
+}
+
+int wifi_api_get_listen_interval (uint16_t *listen_interval, uint32_t *listen_interval_tu)
+{
+	if (!listen_interval || !listen_interval_tu)
+		return -EINVAL;
+
+	if (nrc_wifi_get_listen_interval(vif_id, listen_interval, listen_interval_tu) != WIFI_SUCCESS)
+		return -1;
+
+	return 0;
+}
+
+int wifi_api_set_listen_interval (uint16_t listen_interval)
+{
+	if (nrc_wifi_set_listen_interval(vif_id, listen_interval) != WIFI_SUCCESS)
+		return -1;
+
+	return 0;
+}
+
 int wifi_api_set_ssid (char *ssid)
 {
 	if (!ssid)
@@ -588,7 +707,7 @@ int wifi_api_get_scan_freq (uint16_t freq[], uint8_t *n_freq)
 	if (!freq || !n_freq)
 		return -EINVAL;
 
-	if (nrc_wifi_get_scan_freq(vif_id, freq, n_freq) != WIFI_SUCCESS)
+	if (nrc_wifi_get_scan_freq_nons1g(vif_id, freq, n_freq) != WIFI_SUCCESS)
 		return -1;
 
 	return 0;
@@ -599,7 +718,7 @@ int wifi_api_set_scan_freq (uint16_t freq[], uint8_t n_freq)
 	if ((!freq && n_freq > 0) || (freq && n_freq == 0))
 		return -EINVAL;
 
-	if (nrc_wifi_set_scan_freq(vif_id, freq, n_freq) != WIFI_SUCCESS)
+	if (nrc_wifi_set_scan_freq_nons1g(vif_id, freq, n_freq) != WIFI_SUCCESS)
 		return -1;
 
 	return 0;
@@ -741,10 +860,14 @@ int wifi_api_set_ip_address (char *address, char *netmask, char *gateway)
 
 int wifi_api_start_dhcp_client (uint32_t timeout_msec)
 {
+	char *str_ip4addr_any = "0.0.0.0";
 	int i;
 
 	wifi_station_dhcpc_stop(vif_id);
 	set_dhcp_status(false);
+
+	if (wifi_api_set_ip_address(str_ip4addr_any, str_ip4addr_any, str_ip4addr_any) != 0)
+		_atcmd_error("failed to reset ip address\n");
 
 	if (dhcp_run(vif_id) < 0)
 		return DHCP_FAIL;
@@ -891,16 +1014,27 @@ int wifi_api_stop_softap (void)
 	return 0;
 }
 
-int wifi_api_get_max_sta_aid (void)
+int wifi_api_get_max_num_sta (uint8_t *max_num_sta)
 {
-	return MAX_STA;
+	if (nrc_wifi_softap_get_max_num_sta(vif_id, max_num_sta) != WIFI_SUCCESS)
+		return -1;
+
+	return 0;
 }
 
-int wifi_api_get_sta_info (int aid, char *maddr, int8_t *rssi, uint8_t *snr, uint8_t *mcs)
+int wifi_api_set_max_num_sta (uint8_t max_num_sta)
+{
+	if (nrc_wifi_softap_set_max_num_sta(vif_id, max_num_sta) != WIFI_SUCCESS)
+		return -1;
+
+	return 0;
+}
+
+int wifi_api_get_sta_info (int aid, char *maddr, int8_t *rssi, uint8_t *snr, uint8_t *tx_mcs, uint8_t *rx_mcs)
 {
 	STAINFO *sta_info;
 
-	if (!aid || !maddr || !rssi || !snr || !mcs)
+	if (!aid || !maddr || !rssi || !snr || !tx_mcs || !rx_mcs )
 		return -EINVAL;
 
 	sta_info = get_stainfo_by_aid(vif_id, aid);
@@ -912,8 +1046,9 @@ int wifi_api_get_sta_info (int aid, char *maddr, int8_t *rssi, uint8_t *snr, uin
 #if defined(INCLUDE_STA_SIG_INFO)
 	*rssi = sta_info->m_signal.rssi;
 	*snr = sta_info->m_signal.snr;
-	*mcs = sta_info->m_signal.mcs;
 #endif
+	*tx_mcs = sta_info->m_mcs.last_tx_mcs;
+	*rx_mcs = sta_info->m_mcs.last_rx_mcs;
 
 	return 0;
 }

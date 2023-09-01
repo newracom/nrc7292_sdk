@@ -159,9 +159,7 @@ int atcmd_user_enable (void)
 			return -1;
 	}
 
-#ifdef CONFIG_ATCMD_DEBUG
 	atcmd_info_print(&g_atcmd_group_user);
-#endif
 
 	return 0;
 }

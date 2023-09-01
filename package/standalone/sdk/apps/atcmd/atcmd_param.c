@@ -63,7 +63,7 @@ int atcmd_param_to_int8 (const char *str, int8_t *val)
 	if (_atcmd_param_to_int(str, &_val) != 0)
 		return -1;
 
-	if (_val < CHAR_MIN || _val > CHAR_MAX)
+	if (_val < SCHAR_MIN || _val > SCHAR_MAX)
 		return -1;
 
 	*val = (int8_t)_val;

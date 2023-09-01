@@ -25,12 +25,18 @@
 
 #include <string.h>
 #include <stdbool.h>
+#include "lwip/etharp.h"
+
 #include "util_trace.h"
 
 #include "nrc_iperf.h"
 #include "nrc_iperf_tcp.h"
 
 #include "api_wifi.h"
+
+#if LWIP_BRIDGE
+extern struct netif br_netif;
+#endif
 
 struct udp_client_data {
 	iperf_opt_t *option;
@@ -104,9 +110,42 @@ static void iperf_udp_client_report (iperf_opt_t * option)
 
 	uint8_t snr = 0;
 	int8_t rssi = 0;
+	tWIFI_DEVICE_MODE mode;
 
-	nrc_wifi_get_snr(&snr);
-	nrc_wifi_get_rssi(&rssi);
+	nrc_wifi_get_device_mode(0, &mode);
+
+	if (mode == WIFI_MODE_STATION) {
+		nrc_wifi_get_snr(0, &snr);
+		nrc_wifi_get_rssi(0, &rssi);
+	} else {
+		const ip4_addr_t *ip_addr;
+		struct eth_addr *mac_addr;
+		STA_INFO info;
+
+		if (etharp_find_addr(nrc_netif[0], (const ip4_addr_t *) &option->addr, &mac_addr, &ip_addr) >= 0) {
+			if (nrc_wifi_softap_get_sta_by_addr(0, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			}
+		} else if (etharp_find_addr(nrc_netif[1], (const ip4_addr_t *) &option->addr, &mac_addr, &ip_addr) >= 0) {
+			if (nrc_wifi_softap_get_sta_by_addr(1, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			}
+#if LWIP_BRIDGE
+		} else if (etharp_find_addr(&br_netif, (const ip4_addr_t *) &option->addr, &mac_addr, &ip_addr) >= 0) {
+			if (nrc_wifi_softap_get_sta_by_addr(0, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			} else if (nrc_wifi_softap_get_sta_by_addr(1, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			}
+#endif
+		} else {
+			A("##### [%s] etharp_find_addr failed\n", __func__);
+		}
+	}
 
 	nrc_iperf_spin_lock();
 	A("[iperf UDP Client Report for server %s, snr:%u, rssi:%d]\n", ipaddr_ntoa(&option->addr), snr, rssi);
@@ -196,7 +235,7 @@ uint16_t iperf_udp_client_send_delay(u32_t bandwidth, u32_t data_size)
 	return time_delay;
 }
 
-void iperf_udp_client(void *pvParameters)
+ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_client(void *pvParameters)
 {
 	int sock = -1;
 	int ret;
@@ -211,6 +250,7 @@ void iperf_udp_client(void *pvParameters)
 	iperf_udp_datagram_t *datagram = NULL;
 	iperf_opt_t * option  = pvParameters;
 	int alloc_size = (option->mBufLen < IPERF_DEFAULT_DATA_BUF_LEN) ? IPERF_DEFAULT_DATA_BUF_LEN : option->mBufLen;
+	TaskHandle_t periodic_report_task = NULL;
 
 #if LWIP_IPV6
 	if(IP_IS_V6(&option->addr) && !ip6_addr_isipv4mappedipv6(ip_2_ip6(&option->addr))) {
@@ -286,6 +326,11 @@ void iperf_udp_client(void *pvParameters)
 	delay = iperf_udp_client_send_delay(option->mAppRate,option->mBufLen);
 	vif = wifi_get_vif_id(&option->addr);
 
+	if (option->mInterval > 0) {
+		xTaskCreate(nrc_iperf_periodic_report, "iperf periodic report",
+					1024, (void *) option, LWIP_IPERF_TASK_PRIORITY, &periodic_report_task);
+	}
+
 	while (1)
 	{
 		iperf_get_time(&now);
@@ -321,6 +366,9 @@ void iperf_udp_client(void *pvParameters)
 		}
 	}
 
+	if (periodic_report_task)
+		vTaskDelete(periodic_report_task);
+
 	iperf_udp_client_report(option);
 	if (wpa_driver_get_associate_status(vif)== true)
 		iperf_await_server_fin_packet(option, datagram);
@@ -355,10 +403,14 @@ static struct udp_client_data *udp_new_client(iperf_opt_t *option)
 	udp_c_data->next = udp_client_list;
 	udp_client_list = udp_c_data;
 
+	if (option->mInterval > 0) {
+		xTaskCreate(nrc_iperf_periodic_report, "iperf periodic report",
+					1024, (void *) udp_c_data->option, LWIP_IPERF_TASK_PRIORITY, &udp_c_data->option->server_info.periodic_report_task);
+	}
 	return udp_c_data;
 }
 
-static struct udp_client_data *find_matching_client(iperf_opt_t *option)
+ATTR_NC __attribute__((optimize("O3"))) static struct udp_client_data *find_matching_client(iperf_opt_t *option)
 {
 	struct udp_client_data *client;
 	struct udp_client_data *next_client;
@@ -379,7 +431,7 @@ static struct udp_client_data *find_matching_client(iperf_opt_t *option)
 	return NULL;
 }
 
-static void udp_free_client(struct udp_client_data *client)
+ATTR_NC __attribute__((optimize("O3"))) static void udp_free_client(struct udp_client_data *client)
 {
 	struct udp_client_data *tmp;
 
@@ -394,6 +446,11 @@ static void udp_free_client(struct udp_client_data *client)
 		tmp->next = client->next;
 	}
 	mem_free(client->option);
+
+	if (client->option->server_info.periodic_report_task) {
+		vTaskDelete(client->option->server_info.periodic_report_task);
+	}
+
 	mem_free(client);
 }
 
@@ -405,9 +462,49 @@ static void iperf_udp_server_report (struct udp_client_data *client)
 	uint64_t byte = client->option->server_info.recv_byte;
 	uint32_t bps = (interval)? (byte*8)/interval : 0;
 	struct sockaddr_in *from = (struct sockaddr_in*)&client->option->server_info.clientaddr;
+	uint8_t snr = 0;
+	int8_t rssi = 0;
+	tWIFI_DEVICE_MODE mode;
+
+	nrc_wifi_get_device_mode(0, &mode);
+
+	if (mode == WIFI_MODE_STATION) {
+		nrc_wifi_get_snr(0, &snr);
+		nrc_wifi_get_rssi(0, &rssi);
+	} else {
+		ip4_addr_t client_ip;
+		const ip4_addr_t *ip_addr;
+		struct eth_addr *mac_addr;
+		STA_INFO info;
+
+		client_ip.addr = from->sin_addr.s_addr;
+		if (etharp_find_addr(nrc_netif[0], &client_ip, &mac_addr, &ip_addr) >= 0) {
+			if (nrc_wifi_softap_get_sta_by_addr(0, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			}
+		} else if (etharp_find_addr(nrc_netif[1], &client_ip, &mac_addr, &ip_addr) >= 0) {
+			if (nrc_wifi_softap_get_sta_by_addr(1, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			}
+#if LWIP_BRIDGE
+		} else if (etharp_find_addr(&br_netif, &client_ip, &mac_addr, &ip_addr) >= 0) {
+			if (nrc_wifi_softap_get_sta_by_addr(0, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			} else if (nrc_wifi_softap_get_sta_by_addr(1, mac_addr->addr, &info) == WIFI_SUCCESS) {
+				snr = info.snr;
+				rssi = info.rssi;
+			}
+#endif
+		} else {
+			A("##### [%s] etharp_find_addr failed\n", __func__);
+		}
+	}
 
 	nrc_iperf_spin_lock();
-	A("[iperf UDP Server Report for %s:%d]\n", inet_ntoa(from->sin_addr), ntohs(from->sin_port));
+	A("[iperf UDP Server Report for %s:%d, snr:%u, rssi:%d]\n", inet_ntoa(from->sin_addr), ntohs(from->sin_port), snr, rssi);
 	A("  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec  %6.3f ms  %4ld/%5ld (%.2g%%)",
 	  start_time, stop_time,
 	  byte_to_string(byte), bps_to_string(bps),
@@ -454,9 +551,18 @@ static void iperf_udp_server_report_to_client (iperf_opt_t * option)
 	iperf_time_t total_time;
 	uint64_t total_len;
 	iperf_udp_datagram_t *datagram = NULL;
+	struct sockaddr client_addr;
+
+	memcpy (&client_addr, &(option->server_info.clientaddr), sizeof(struct sockaddr));
+
+	if (client_addr.sa_family != AF_INET) {
+		A("invalid client addr\n");
+		return;
+	}
 
 	datagram = (iperf_udp_datagram_t *)mem_malloc(IPERF_DEFAULT_DATA_BUF_LEN);
 	if (!datagram){
+		A("datagram malloc failed\n");
 		return;
 	}
 	memset(datagram, 0, IPERF_DEFAULT_DATA_BUF_LEN);
@@ -503,7 +609,7 @@ static void iperf_udp_server_report_to_client (iperf_opt_t * option)
 
 	iperf_udp_server_init_payload(datagram);
 	sendto(option->mSock, datagram, IPERF_DEFAULT_UDP_DATAGRAM_SIZE, 0,
-		(struct sockaddr *) &(option->server_info.clientaddr), sizeof(option->server_info.clientaddr));
+		&client_addr, sizeof(struct sockaddr));
 	if(datagram) mem_free(datagram);
 }
 
@@ -530,7 +636,7 @@ static void iperf_udp_server_measure_jitter (int32_t id,
 	*jitter += (diff_transit - prev_jitter) / 16.0;
 }
 
-static void iperf_udp_server_recv (iperf_opt_t * option, char *buf, int len)
+ATTR_NC __attribute__((optimize("O3"))) static void iperf_udp_server_recv (iperf_opt_t * option, char *buf, int len)
 {
 	iperf_time_t now;
 
@@ -570,7 +676,6 @@ static void iperf_udp_server_recv (iperf_opt_t * option, char *buf, int len)
 			if (id < 0) {
 				option->server_info.last_id = id;
 				option->server_info.done = 1;
-				id = -id;
 			} else {
 				option->server_info.datagram_cnt++;
 				option->server_info.datagram_seq++;
@@ -602,7 +707,7 @@ static void iperf_udp_server_recv (iperf_opt_t * option, char *buf, int len)
 
 uint32_t g_delay = 0;
 
-void iperf_udp_server(void *pvParameters)
+ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_server(void *pvParameters)
 {
 	iperf_opt_t * option  = pvParameters;
 	int sock = -1;
@@ -612,7 +717,6 @@ void iperf_udp_server(void *pvParameters)
 	char *buf = NULL;
 	struct sockaddr_storage server;
 	struct timeval timeout, timeout_recv;
-	iperf_time_t elapse_time;
 
 	/* Setup fd_set structure */
 	fd_set fds;
@@ -699,11 +803,19 @@ void iperf_udp_server(void *pvParameters)
 			bytes_received = 0;
 			bytes_received = recvfrom(sock, buf, IPERF_UDP_MAX_RECV_SIZE, 0,
 				(struct sockaddr *) &option->server_info.clientaddr, &sin_size);
+
+			iperf_udp_datagram_t *datagram = (iperf_udp_datagram_t *)buf;
+			int32_t id = ntohl(datagram->id);
+
 			client = find_matching_client(option);
 
 			if (!client) {
-				if ((client = udp_new_client(option)) == NULL) {
-					A("[%s] failed to create new client\n", __func__);
+				if (id == 0) {
+					if ((client = udp_new_client(option)) == NULL) {
+						A("[%s] failed to create new client\n", __func__);
+						break;
+					}
+				} else {
 					break;
 				}
 			}
@@ -712,11 +824,6 @@ void iperf_udp_server(void *pvParameters)
 				client->option->server_info.done = 1;
 			} else {
 				iperf_udp_server_recv(client->option, buf, bytes_received);
-				elapse_time = client->option->server_info.stop_time - client->option->server_info.start_time;
-				if (client->option->server_info.start &&
-					(client->option->server_info.send_time > 0 && elapse_time >= client->option->server_info.send_time)) {
-					client->option->server_info.done = 1;
-				}
 			}
 
 			if (client->option->server_info.done) {
@@ -724,10 +831,13 @@ void iperf_udp_server(void *pvParameters)
 			}
 		}
 
-		if(client->option->server_info.start == 1){
-			iperf_udp_server_report(client);
-			iperf_udp_server_report_to_client(client->option);
-			udp_free_client(client);
+		if (client) {
+			if(client->option->server_info.start == 1) {
+				iperf_udp_server_report_to_client(client->option);
+				iperf_udp_server_report(client);
+
+				udp_free_client(client);
+			}
 		}
 	}
 

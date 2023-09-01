@@ -4,6 +4,32 @@
 *
 *******************************************************************
 
+[2023-08-31]
+Change summary for version 1.5.1:
+
+    Bugfix
+    * Incorrect peer MAC address copy at 4-address enabled W5500 device
+    * Memory leakage under frequent connection/disconnection
+    * Invalid secondary CCA on JP 2/4MHz channels
+    * EU country code configuration failure
+
+    Changes
+    * Add API for setting max station number in SoftAP
+    * Hidden SSID support in SoftAP
+    * Duty cycle 2.8% support only for EU STA
+    * Update KR domain: remove K0 channels
+    * Update SDK APIs: refer to UG-7292-005-Standalone SDK API document
+    * Enhanced RSSI accuracy of system_api_get_rssi()
+    * SoftAP's association grant only if listen interval is less than BSS max idle period
+    * SoftAP's disable/enable sequence support
+    * Extend condition check coverage for broadcast FOTA: chip id, FW version, app version
+    * Add AT+WMAXSTA command (ATCMD)
+    * Add AT+WCTX command for continuous TX (ATCMD)
+
+    Known Issues
+    * The initial connection time for WPA3-SAE/OWE can be quite lengthy (> 15 seconds)
+      due to the substantial computational load required by software for large number operations.
+
 [2023-06-30]
 Change summary for version 1.5:
 

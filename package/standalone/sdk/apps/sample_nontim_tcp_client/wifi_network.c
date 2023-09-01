@@ -17,9 +17,9 @@ static uint16_t nrc_wifi_get_s1g_channel(uint16_t freq)
 
 nrc_err_t connect_to_ap(WIFI_CONFIG *param)
 {
-	int max_tries = 10;
+	const int max_tries = 10;
 	bool result = false;
-	int i = 0;
+	int i = 0, j = 0;
 	SCAN_RESULTS scan_output;
 
 	if (ap_connected) {
@@ -35,14 +35,14 @@ nrc_err_t connect_to_ap(WIFI_CONFIG *param)
 		if (nrc_wifi_scan(0) == WIFI_SUCCESS) {
 			if (nrc_wifi_scan_results(0, &scan_output) == WIFI_SUCCESS) {
 				/* Find the ssid in scan results */
-				for (i = 0; i < scan_output.n_result; i++) {
-					if (strcmp((char*) param->ssid,
-					(char*) scan_output.result[i].ssid) == 0) {
+				for (j = 0; j < scan_output.n_result; j++) {
+					if ((strcmp((char*) param->ssid, (char*) scan_output.result[j].ssid) == 0)
+						&& (scan_output.result[i].security == param->security_mode)) {
 						result = true;
-						nrc_usr_print("[%s] channel frequency = %s\n", __func__, scan_output.result[i].freq);
-						nrc_usr_print("[%s] s1g freq = %d\n", __func__, nrc_wifi_get_s1g_channel(atoi(scan_output.result[i].freq)));
+						nrc_usr_print("[%s] channel frequency = %s\n", __func__, scan_output.result[j].freq);
+						nrc_usr_print("[%s] s1g freq = %d\n", __func__, nrc_wifi_get_s1g_channel(atoi(scan_output.result[j].freq)));
 						/* help connecting AP by setting scan_freq_list to one we found */
-						uint16_t s1g_freq = nrc_wifi_get_s1g_channel(atoi(scan_output.result[i].freq));
+						uint16_t s1g_freq = nrc_wifi_get_s1g_channel(atoi(scan_output.result[j].freq));
 						if (s1g_freq) {
 							param->scan_freq_list[0] = s1g_freq;
 							param->scan_freq_num = 1;

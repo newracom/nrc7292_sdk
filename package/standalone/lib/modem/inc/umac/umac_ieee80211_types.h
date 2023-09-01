@@ -175,7 +175,7 @@
 #define MAX_LEGACY_LISTEN_INTERVAL				65535
 #define MAX_S1G_UNSCALED_INTERVAL				16383
 
-#define USF2SF(usf)	((usf == 0) ? 1 : (usf == 1) ? 10 : (usf == 2) ? 1000: 10000);
+#define USF2SF(usf)	((usf == 0) ? 1 : (usf == 1) ? 10 : (usf == 2) ? 1000: 10000)
 
 typedef enum {
     MAC_STA_TYPE_STA = 0,

@@ -55,7 +55,4 @@ void hal_dl_recovery_post_process();
 void hal_dl_cleanup_dl_ring();
 void hal_dl_discard_all() ;
 bool is_ndp_preq(struct lmac_rx_h_data *rx);
-#if defined(INCLUDE_STA_SIG_INFO)
-void hal_dl_process_signal_info();
-#endif
 #endif /* LMAC_DOWNLINK_H */
