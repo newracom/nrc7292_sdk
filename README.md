@@ -6,6 +6,7 @@
 - Please do not use package/standalone/tools/external_tools/FirmwareFlashTool.exe of v1.3.4 rev08. Use other v1.3.4 revision's one instead.
 
 ### Release roadmap
+- v1.5.1 (2023.08.31)
 - v1.5 (2023.06.30)
 - v1.4 (2023.03.31)
 - v1.3.4_rev09 (2022.10.24)
@@ -24,7 +25,7 @@
 - v1.3.0 (2020.07.19)
 
 ### Latest release
-- [NRC7292_Standalone_SDK_v1.5](https://github.com/newracom/nrc7292_sdk/releases/tag/v1.5)
+- [NRC7292_Standalone_SDK_v1.5.1](https://github.com/newracom/nrc7292_sdk/releases/tag/v1.5.1)
 
 ### Release package contents
 - standalone: NRC7292 standalone SDK package for global regulatory domains
