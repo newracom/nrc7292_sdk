@@ -4,6 +4,13 @@
 *
 *******************************************************************
 
+[2023-09-01]
+Change summary for version 1.5.2:
+
+    Hotfix
+    * Fix the recovery of the listen interval setting upon waking from deep sleep
+    * Remove echo check code from lwip
+
 [2023-08-31]
 Change summary for version 1.5.1:
 

@@ -39,10 +39,6 @@ extern struct netif eth_netif;
 #if LWIP_BRIDGE
 extern struct netif br_netif;
 #endif /* LWIP_BRIDGE */
-/* contec azuma --> */
-uint8_t wifiEchoCheck[1522];
-/* <-- contec azuma */
-
 /**
  * In this function, the hardware should be initialized.
  * Called from wlif_init().
@@ -84,16 +80,10 @@ static err_t low_level_output( struct netif *netif, struct pbuf *p )
 	uint8_t *frames[MAX_FRAME_NUM];
 	uint16_t frame_len[MAX_FRAME_NUM];
 	int i = 0;
-	/* contec azuma --> */
-	uint16_t length = 0;
-	/* <-- contec azuma */
+
 	for( q = p; q != NULL; q = q->next ) {
 		frames[i] = q->payload;
 		frame_len[i] = q->len;
-		/* contec azuma --> */
-		memcpy(wifiEchoCheck + length,q->payload,q->len); //send data save
-		length += q->len;
-		/* <-- contec azuma */
 		i++;
 	}
 	V(TT_NET, "[%s] netif->num = %d, output frames = %d, frame_len = %d...\n", __func__, netif->num, i, frame_len[0]);
@@ -177,12 +167,7 @@ void lwif_input(struct nrc_wpa_if* intf, void *buffer, int data_len)
 		LINK_STATS_INC(link.drop);
 		return;
 	}
-	/* contec azuma --> */
-	if(memcmp(buffer,wifiEchoCheck,data_len) == 0){
-		memset(wifiEchoCheck,0x00,sizeof(wifiEchoCheck));
-		goto pbuf_free;
-	}
-	/* <-- contec azuma */
+
 	/* points to packet payload, which starts with an Ethernet header */
 	ethhdr = p->payload;
 
