@@ -32,7 +32,7 @@
 #if defined(NRC7292)
 #define _HIF_UART_CHANNEL				2
 #define _HIF_UART_CHANNEL_MAX			4
-#elif defined(NRC7393) || defined(NRC7394)
+#elif defined(NRC7394)
 #define _HIF_UART_CHANNEL				1
 #define _HIF_UART_CHANNEL_MAX			2
 #endif
@@ -157,8 +157,7 @@ static int _hif_uart_fifo_create (_hif_info_t *info)
 		g_hif_uart_rx_fifo = _hif_fifo_create(rx_fifo->addr, rx_fifo->size);
 		if (!g_hif_uart_rx_fifo)
 		{
-			_hif_error("_hif_fifo_create() failed, rx_addr=%p rx_size=%d\n",
-			   			rx_fifo->addr, rx_fifo->size);
+			_hif_error("RX: %p %d", rx_fifo->addr, rx_fifo->size);
 
 			return -1;
 		}
@@ -169,17 +168,16 @@ static int _hif_uart_fifo_create (_hif_info_t *info)
 		g_hif_uart_tx_fifo = _hif_fifo_create(tx_fifo->addr, tx_fifo->size);
 		if (!g_hif_uart_tx_fifo)
 		{
-			_hif_error("_hif_fifo_create() failed, tx_addr=%p tx_size=%d\n",
-			   			tx_fifo->addr, tx_fifo->size);
+			_hif_error("TX: %p %d", tx_fifo->addr, tx_fifo->size);
 
 			_hif_uart_fifo_delete();
 			return -1;
 		}
 	}
 
-/*	_hif_debug("UART FIFO: rx=%p, tx=%p\n", g_hif_uart_rx_fifo, g_hif_uart_tx_fifo); */
+/*	_hif_debug("UART FIFO: rx=%p, tx=%p", g_hif_uart_rx_fifo, g_hif_uart_tx_fifo); */
 
-	_hif_info("UART FIFO: rx=%u, tx=%u\n",
+	_hif_info("UART FIFO: rx=%u, tx=%u",
 				g_hif_uart_rx_fifo ? g_hif_uart_rx_fifo->size : 0,
 				g_hif_uart_tx_fifo ? g_hif_uart_tx_fifo->size : 0);
 
@@ -214,7 +212,7 @@ static void _hif_uart_rx_dma_inttc_isr (int channel)
 
 static void _hif_uart_rx_dma_interr_isr (int channel)
 {
-	_hif_info("_hif_uart_rx_dma_interr\n");
+	_hif_info("_hif_uart_rx_dma_interr");
 }
 
 static int _hif_uart_rx_dma_update_fifo (void)
@@ -252,7 +250,7 @@ static int _hif_uart_rx_dma_update_fifo (void)
 
 	if (fifo_size < slot_done_size)
 	{
-		_hif_error("fifo overflow, fifo=%u slot_done=%u\n", fifo_size, slot_done_size);
+		_hif_error("overflow, done=%u fifo=%u", slot_done_size, fifo_size);
 
 		slot_done_size = fifo_size;
 	}
@@ -284,7 +282,7 @@ static int _hif_uart_rx_dma_register (int uart_channel, uint32_t mem_addr, uint3
 	int err;
 	int i;
 
-	_hif_info("UART_RX_DMA: mem_addr=%p mem_size=%u slot_size=%u\n",
+	_hif_info("UART_RX_DMA: mem_addr=%p mem_size=%u slot_size=%u",
 							mem_addr, mem_size, slot_size);
 
 	n_desc = mem_size / slot_size;
@@ -292,7 +290,7 @@ static int _hif_uart_rx_dma_register (int uart_channel, uint32_t mem_addr, uint3
 	uart_dma = _hif_malloc(sizeof(_hif_uart_dma_t) + (sizeof(dma_desc_t) * n_desc));
    	if (!uart_dma)
 	{
-		_hif_error("_hif_malloc() fail\n");
+		_hif_error("malloc()");
 		goto uart_rx_dma_register_fail;
 	}
 
@@ -302,7 +300,7 @@ static int _hif_uart_rx_dma_register (int uart_channel, uint32_t mem_addr, uint3
 	if (_hif_dma_peri_init(&peri, hsuart_peri_id[uart_channel],
 				g_hif_uart_reg_base[uart_channel], false, false) != 0)
 	{
-		_hif_error("_hif_dma_peri_init() fail\n");
+		_hif_error("dma_peri_init()");
 		goto uart_rx_dma_register_fail;
 	}
 
@@ -324,7 +322,7 @@ static int _hif_uart_rx_dma_register (int uart_channel, uint32_t mem_addr, uint3
 	channel = _hif_dma_get_channel(true);
 	if (channel < 0)
 	{
-		_hif_error("_hif_dma_get_channel() fail, err=%d\n", channel);
+		_hif_error("dma_get_channel(), err=%d", channel);
 		goto uart_rx_dma_register_fail;
 	}
 
@@ -332,14 +330,14 @@ static int _hif_uart_rx_dma_register (int uart_channel, uint32_t mem_addr, uint3
 			_hif_uart_rx_dma_inttc_isr, _hif_uart_rx_dma_interr_isr);
 	if (err)
 	{
-		_hif_error("_hif_dma_config_p2m() fail, err=%d\n", err);
+		_hif_error("dma_config_p2m(), err=%d", err);
 		goto uart_rx_dma_register_fail;
 	}
 
 	err = _hif_dma_start(channel, uart_dma->desc);
 	if (err)
 	{
-		_hif_error("_hif_dma_start() fail, err=%d\n", err);
+		_hif_error("dma_start(), err=%d", err);
 		goto uart_rx_dma_register_fail;
 	}
 
@@ -408,7 +406,7 @@ static bool _hif_uart_channel_valid (int channel, bool hfc)
 {
 	if (channel != _HIF_UART_CHANNEL)
 	{
-		_hif_error("invalid channel %d\n", channel);
+		_hif_error("%d", channel);
 		return false;
 	}
 
@@ -559,7 +557,7 @@ int _hif_uart_write (char *buf, int len)
 			{
 				if (_hif_uart_tx_full())
 				{
-/*					_hif_debug("uart_tx_full, cnt=%d\n", tx_cnt); */
+/*					_hif_debug("uart_tx_full, cnt=%d", tx_cnt); */
 					break;
 				}
 
@@ -637,7 +635,7 @@ static void _hif_uart_isr (int vector)
 
 		status = _hif_uart_int_get_status();
 
-/*		_hif_debug("uart_int: 0x%08X\n", status); */
+/*		_hif_debug("uart_int: 0x%08X", status); */
 
 		_hif_uart_int_clear(status & (ICR_RT|ICR_RX|ICR_TX));
 
@@ -669,7 +667,7 @@ static const _hif_uart_pin_t g_hif_uart_pin[_HIF_UART_CHANNEL_MAX] =
 	[2] = {  0,  1,  2,  3 },
 	[3] = {  6,  7, -1, -1 },
 };
-#elif defined(NRC7393) || defined(NRC7394)
+#elif defined(NRC7394)
 static const _hif_uart_pin_t g_hif_uart_pin[_HIF_UART_CHANNEL_MAX] =
 {
 	[0] = {  8,  9, -1, -1 },
@@ -683,7 +681,7 @@ static void _hif_uart_pin_enable (int channel)
 	gpio_io_t gpio;
 	uio_sel_t uio;
 
-#if defined(NRC7393) || defined(NRC7394)
+#if defined(NRC7394)
 	/*
 	 * NOTE: Only 56 pin package is supported.
 	 */
@@ -768,7 +766,7 @@ static int _hif_uart_enable (_hif_uart_t *uart)
 	if (!uart)
 		return -1;
 
-	_hif_info("UART Enable: channel=%d badurate=%d data=%d stop=%d parity=%s fifo=%d,%d hfc=%s\r\n",
+	_hif_info("UART Enable: channel=%d badurate=%d data=%d stop=%d parity=%s fifo=%d,%d hfc=%s",
 			uart->channel, uart->baudrate, uart->data_bits + 5, uart->stop_bits + 1,
 			uart->parity == UART_PB_ODD ? "odd" : (uart->parity == UART_PB_EVEN ? "even" : "none"),
 			_HIF_UART_RX_HW_FIFO_LEVEL, _HIF_UART_TX_HW_FIFO_LEVEL,
@@ -785,7 +783,7 @@ static int _hif_uart_enable (_hif_uart_t *uart)
 		rx_irq = false;
 	}
 
-	_hif_info("UART Enable: rx_irq=%s tx_irq=%s\r\n", rx_irq ? "on" : "off", tx_irq ? "on" : "off");
+	_hif_info("UART Enable: rx_irq=%s tx_irq=%s", rx_irq ? "on" : "off", tx_irq ? "on" : "off");
 
 	nrc_hsuart_int_clr(uart->channel, true, true, true); /* tx_empty, rx_done, rx_timeout */
 	nrc_hsuart_interrupt(uart->channel, tx_irq, rx_irq); /* tx_empty, rx_done & rx_timeout */
@@ -809,7 +807,7 @@ static void _hif_uart_disable (void)
 	{
 		int channel = g_hif_uart.channel;
 
-		_hif_info("UART Disable: channel=%d\r\n", channel);
+		_hif_info("UART Disable: channel=%d", channel);
 
 		nrc_hsuart_interrupt(channel, false, false); 	/* tx_en, rx_rt_en */
 		nrc_hsuart_int_clr(channel, true, true, true); 	/* tx_int, rx_int, rt_int */
@@ -836,7 +834,7 @@ int _hif_uart_open (_hif_info_t *info)
 			{
 				_hif_uart_t *uart = &info->uart;
 
-				_hif_info("UART Open: channel=%d baudrate=%d hfc=%s\n",
+				_hif_info("UART Open: channel=%d baudrate=%d hfc=%s",
 							uart->channel, uart->baudrate,
 							uart->hfc == UART_HFC_ENABLE ? "on" : "off");
 
@@ -855,7 +853,7 @@ int _hif_uart_open (_hif_info_t *info)
 						goto uart_open_fail;
 				}
 
-				_hif_info("UART Open: success\n");
+				_hif_info("UART Open: success");
 
 				return 0;
 			}
@@ -867,7 +865,7 @@ int _hif_uart_open (_hif_info_t *info)
 
 uart_open_fail:
 
-	_hif_info("UART Open: fail\n");
+	_hif_info("UART Open: fail");
 
 	return -1;
 }
@@ -876,7 +874,7 @@ void _hif_uart_close (void)
 {
 	if (_hif_uart_channel_valid(g_hif_uart.channel, g_hif_uart.hfc))
 	{
-		_hif_info("UART Close: channel=%d\n", g_hif_uart.channel);
+		_hif_info("UART Close: channel=%d", g_hif_uart.channel);
 
 	   	_hif_uart_dma_unregister();
 
@@ -895,20 +893,20 @@ int _hif_uart_change (_hif_uart_t *new)
 	if (new)
 	{
 		if (!_hif_uart_channel_valid(new->channel, new->hfc))
-			_hif_info("UART Change: invalid channel=%d\n", new->channel);
+			_hif_info("UART Change: invalid channel=%d", new->channel);
 		else if (!_hif_uart_baudrate_valid(new->baudrate))
-			_hif_info("UART Change: invalid baudrate=%d\n", new->baudrate);
+			_hif_info("UART Change: invalid baudrate=%d", new->baudrate);
 		else
 		{
 			_hif_uart_get_info(&old);
 
-			_hif_info("UART Change: \n");
-			_hif_info(" - channel: %d->%d\n", old.channel, new->channel);
-			_hif_info(" - baudrate: %d->%d\n", old.baudrate, new->baudrate);
-			_hif_info(" - data bits: %d->%d\n", old.data_bits, new->data_bits);
-			_hif_info(" - stop  bits: %d->%d\n", old.stop_bits, new->stop_bits);
-			_hif_info(" - parity: %d->%d\n", old.parity, new->parity);
-			_hif_info(" - hfc: %d->%d\n", old.hfc, new->hfc);
+			_hif_info("UART Change:");
+			_hif_info(" - channel: %d->%d", old.channel, new->channel);
+			_hif_info(" - baudrate: %d->%d", old.baudrate, new->baudrate);
+			_hif_info(" - data bits: %d->%d", old.data_bits, new->data_bits);
+			_hif_info(" - stop  bits: %d->%d", old.stop_bits, new->stop_bits);
+			_hif_info(" - parity: %d->%d", old.parity, new->parity);
+			_hif_info(" - hfc: %d->%d", old.hfc, new->hfc);
 
 			if (old.hfc == UART_HFC_DISABLE)
 				_hif_uart_dma_unregister();
@@ -934,7 +932,7 @@ int _hif_uart_change (_hif_uart_t *new)
 					else
 						_hif_set_type(_HIF_TYPE_UART);
 
-					_hif_info("UART Change: success\n");
+					_hif_info("UART Change: success");
 
 					return 0;
 				}
@@ -947,7 +945,7 @@ int _hif_uart_change (_hif_uart_t *new)
 			if (old.hfc == UART_HFC_DISABLE)
 				_hif_uart_dma_register(old.channel, g_hif_uart_rx_fifo, g_hif_uart_tx_fifo);
 
-			_hif_info("UART Change: fail\n");
+			_hif_info("UART Change: fail");
 
 			return -1;
 		}
@@ -958,29 +956,7 @@ int _hif_uart_change (_hif_uart_t *new)
 
 /*********************************************************************************************/
 
-static int cmd_atcmd_uart_config (cmd_tbl_t *t, int argc, char *argv[])
-{
-	_hif_uart_t uart;
-
-	_hif_uart_get_info(&uart);
-
-	switch (argc)
-	{
-		case 0:
-			A(" - channel: %d\n", uart.channel);
-			A(" - baudrate: %d\n", uart.baudrate);
-			A(" - data bits: %d\n", uart.data_bits);
-			A(" - stop bits: %d\n", uart.stop_bits);
-			A(" - parity: %d\n", uart.parity);
-			A(" - hfc: %d\n", uart.hfc);
-			break;
-
-		default:
-			return CMD_RET_USAGE;
-	}
-
-	return CMD_RET_SUCCESS;
-}
+#if defined(CONFIG_ATCMD_CLI)
 
 static int cmd_atcmd_uart_fifo (cmd_tbl_t *t, int argc, char *argv[])
 {
@@ -991,10 +967,10 @@ static int cmd_atcmd_uart_fifo (cmd_tbl_t *t, int argc, char *argv[])
 	{
 		case 0:
 			if (g_hif_uart_rx_fifo)
-				A(" - RX : %u/%u\n", _hif_fifo_fill_size(g_hif_uart_rx_fifo), _hif_fifo_size(g_hif_uart_rx_fifo));
+				_hif_printf(" - RX : %u/%u\n", _hif_fifo_fill_size(g_hif_uart_rx_fifo), _hif_fifo_size(g_hif_uart_rx_fifo));
 
 			if (g_hif_uart_tx_fifo)
-				A(" - TX : %u %u\n", _hif_fifo_fill_size(g_hif_uart_tx_fifo), _hif_fifo_size(g_hif_uart_tx_fifo));
+				_hif_printf(" - TX : %u %u\n", _hif_fifo_fill_size(g_hif_uart_tx_fifo), _hif_fifo_size(g_hif_uart_tx_fifo));
 			break;
 
 		default:
@@ -1024,7 +1000,7 @@ static int cmd_atcmd_uart_data (cmd_tbl_t *t, int argc, char *argv[])
 			g_cmd_uart_data.rx_isr = 0;
 
 		case 0:
-			A(" tx=%u rx=%u/%u\n", g_cmd_uart_data.tx, g_cmd_uart_data.rx, g_cmd_uart_data.rx_isr);
+			_hif_printf(" tx=%u rx=%u/%u\n", g_cmd_uart_data.tx, g_cmd_uart_data.rx, g_cmd_uart_data.rx_isr);
 			break;
 
 		default:
@@ -1034,24 +1010,53 @@ static int cmd_atcmd_uart_data (cmd_tbl_t *t, int argc, char *argv[])
 	return ret;
 }
 
+#if !defined(CONFIG_ATCMD_CLI_MINIMUM)
+static int cmd_atcmd_uart_config (cmd_tbl_t *t, int argc, char *argv[])
+{
+	_hif_uart_t uart;
+
+	_hif_uart_get_info(&uart);
+
+	switch (argc)
+	{
+		case 0:
+			_hif_printf(" - channel: %d\n", uart.channel);
+			_hif_printf(" - baudrate: %d\n", uart.baudrate);
+			_hif_printf(" - data bits: %d\n", uart.data_bits);
+			_hif_printf(" - stop bits: %d\n", uart.stop_bits);
+			_hif_printf(" - parity: %d\n", uart.parity);
+			_hif_printf(" - hfc: %d\n", uart.hfc);
+			break;
+
+		default:
+			return CMD_RET_USAGE;
+	}
+
+	return CMD_RET_SUCCESS;
+}
+#endif /* #if !defined(CONFIG_ATCMD_CLI_MINIMUM) */
+
 static int cmd_atcmd_uart (cmd_tbl_t *t, int argc, char *argv[])
 {
 	int ret = CMD_RET_USAGE;
 
 	if (argc >= 2)
 	{
-		if (strcmp(argv[1], "config") == 0)
-			ret = cmd_atcmd_uart_config(t, argc - 2, argv + 2);
-		else if (strcmp(argv[1], "fifo") == 0)
+		if (strcmp(argv[1], "fifo") == 0)
 			ret = cmd_atcmd_uart_fifo(t, argc - 2, argv + 2);
 		else if (strcmp(argv[1], "data") == 0)
 			ret = cmd_atcmd_uart_data(t, argc - 2, argv + 2);
+#if !defined(CONFIG_ATCMD_CLI_MINIMUM)
+		else if (strcmp(argv[1], "config") == 0)		
+			ret = cmd_atcmd_uart_config(t, argc - 2, argv + 2);
+#endif		
 		else if (strcmp(argv[1], "help") == 0)
 		{
-			A("atcmd uart config\n");
-			A("atcmd uart fifo\n");
-			A("atcmd uart data [clear]\n");
-
+			_hif_printf("atcmd uart fifo\n");
+			_hif_printf("atcmd uart data [clear]\n");
+#if !defined(CONFIG_ATCMD_CLI_MINIMUM)
+			_hif_printf("atcmd uart config\n");
+#endif
 			return CMD_RET_SUCCESS;
 		}
 	}
@@ -1065,7 +1070,4 @@ SUBCMD_MAND(atcmd,
 		"atcmd_uart",
 		"atcmd uart help");
 
-
-
-
-
+#endif /* #if defined(CONFIG_ATCMD_CLI) */

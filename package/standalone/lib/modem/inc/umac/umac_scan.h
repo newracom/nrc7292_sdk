@@ -22,6 +22,7 @@ typedef struct _scan_info {
 	bool			passive_scan_flag;
 	uint8_t			*ies;
 	uint8_t			ies_len;
+	bool			bg_scan;
 } scan_info;
 
 void	umac_scan_init( void (*cb)(int) );
@@ -35,6 +36,8 @@ int32_t	umac_scan_done(void*);
 void	umac_scan_set_return_channel(uint16_t channel);
 void	umac_scan_set_channel(uint16_t channel);
 bool	umac_scan_check_bg_supported(void);
+void	umac_scan_probe();
+bool	umac_scan_check_ch();
 #if defined(INCLUDE_SCAN_MODE)
 void	umac_scan_change_period(uint32_t multiply);
 #endif

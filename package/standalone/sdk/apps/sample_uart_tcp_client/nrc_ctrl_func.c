@@ -86,7 +86,11 @@ int nrc_ctrl_show_config(char *config, size_t *length)
 		sprintf(bw, "%s","N/A");
 	} else {
 		const RC_RATE *rate;
-		uint8_t rate_index  = lmac_rc_get_rate_index( vif_id , 0 , 0) ;
+#if !defined (INCLUDE_RC_W_RSSI)
+	uint8_t rate_index	= lmac_rc_get_rate_index( vif_id , 0 , 0) ;
+#else
+	uint8_t rate_index	= lmac_rc_get_rate_index( vif_id , 0 , 0, 0, 0) ;
+#endif
 		rate = lmac_rc_get_rate(rate_index);
 		mcs = rate->mcs;
 		sprintf(bw, "%d Mhz (NRC Auto)", 1 << rate->bw );

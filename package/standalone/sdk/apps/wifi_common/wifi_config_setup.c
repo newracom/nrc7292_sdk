@@ -64,7 +64,6 @@ static WIFI_CONFIG* g_wifi_config;
 	wifi_config->channel = NRC_WIFI_CHANNEL;
 	wifi_config->bw = NRC_AP_SET_CHANNEL_BW;
 	wifi_config->bcn_interval =  NRC_WIFI_BCN_INTERVAL;
-	wifi_config->short_bcn_interval =  NRC_WIFI_SHORT_BCN_INTERVAL;
 	wifi_config->ip_mode = NRC_WIFI_IP_MODE;
 	memcpy(wifi_config->static_ip,  NRC_STATIC_IP, sizeof(NRC_STATIC_IP));
 	memcpy(wifi_config->netmask,  NRC_NETMASK, sizeof(NRC_NETMASK));
@@ -87,7 +86,7 @@ static WIFI_CONFIG* g_wifi_config;
 	wifi_config->mcs = NRC_WIFI_MCS_DEFAULT ;
 	wifi_config->gi = NRC_WIFI_GUARD_INTERVAL_DEFAULT;
 	wifi_config->cca_thres = NRC_WIFI_CCA_THRES_DEFAULT;
-	wifi_config->hidden_ssid = NRC_WIFI_HIDDEN_SSID_DEFAULT;
+	wifi_config->ignore_broadcast_ssid = NRC_WIFI_IGNORE_BROADCAST_SSID_DEFAULT;
 	wifi_config->max_num_sta = NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT;
 	wifi_config->listen_interval = NRC_WIFI_LISTEN_INTERVAL_DEFAULT;
 
@@ -145,8 +144,7 @@ nrc_err_t nrc_save_wifi_config(WIFI_CONFIG* wifi_config, int rewrite)
 	nvs_set_str(nvs_handle, NVS_WIFI_PMK_PASSWORD, (char*)wifi_config->pmk_pw);
 	nvs_set_u16(nvs_handle, NVS_WIFI_CHANNEL, (uint16_t)wifi_config->channel);
 	nvs_set_u8(nvs_handle, NVS_WIFI_CHANNEL_BW, (uint8_t)wifi_config->bw);
-	nvs_set_i32(nvs_handle, NVS_WIFI_BCN_INTERVAL, (int32_t)wifi_config->bcn_interval);
-	nvs_set_i32(nvs_handle, NVS_WIFI_SHORT_BCN_INTERVAL, (int32_t)wifi_config->short_bcn_interval);
+	nvs_set_u16(nvs_handle, NVS_WIFI_BCN_INTERVAL, (uint16_t)wifi_config->bcn_interval);
 	nvs_set_u8(nvs_handle, NVS_IP_MODE, (uint8_t)wifi_config->ip_mode);
 	nvs_set_str(nvs_handle, NVS_STATIC_IP, (char*)wifi_config->static_ip);
 	nvs_set_str(nvs_handle, NVS_NETMASK, (char*)wifi_config->netmask);
@@ -168,7 +166,7 @@ nrc_err_t nrc_save_wifi_config(WIFI_CONFIG* wifi_config, int rewrite)
 	nvs_set_u8(nvs_handle, NVS_WIFI_MCS, (uint8_t)wifi_config->mcs);
 	nvs_set_u8(nvs_handle, NVS_WIFI_GI, (uint8_t)wifi_config->gi);
 	nvs_set_i8(nvs_handle, NVS_WIFI_CCA_THRES, (int8_t)wifi_config->cca_thres);
-	nvs_set_u8(nvs_handle, NVS_WIFI_HIDDEN_SSID, (uint8_t)wifi_config->hidden_ssid);
+	nvs_set_u8(nvs_handle, NVS_WIFI_IGNORE_BROADCAST_SSID , (uint8_t)wifi_config->ignore_broadcast_ssid);
 	nvs_set_u8(nvs_handle, NVS_WIFI_SOFTAP_MAX_NUM_STA, (uint8_t)wifi_config->max_num_sta);
 	nvs_set_u16(nvs_handle, NVS_WIFI_LISTEN_INTERVAL, (uint16_t)wifi_config->listen_interval);
 
@@ -250,7 +248,7 @@ void print_settings(WIFI_CONFIG* wifi_config)
 		( wifi_config->rc == 0) ? "OFF" : "ON");
 	nrc_usr_print("mcs %d\n", wifi_config->mcs);
 	nrc_usr_print("cca threshol %d\n", wifi_config->cca_thres);
-	nrc_usr_print("hidden ssid %d\n", wifi_config->hidden_ssid);
+	nrc_usr_print("ssid_type %d\n", wifi_config->ignore_broadcast_ssid);
 	nrc_usr_print("max_num_sta %d\n", wifi_config->max_num_sta);
 	nrc_usr_print("beacon_cnt %d\n", wifi_config->beacon_cnt);
 	nrc_usr_print("-----------------------------------------------\n\n");
@@ -461,8 +459,7 @@ nrc_err_t nrc_wifi_set_config(WIFI_CONFIG* wifi_config)
 
 	nvs_get_u16(nvs_handle,NVS_WIFI_CHANNEL, (uint16_t*)&wifi_config->channel);
 	nvs_get_u8(nvs_handle, NVS_WIFI_CHANNEL_BW, (uint8_t*)&wifi_config->bw);
-	nvs_get_i32(nvs_handle, NVS_WIFI_BCN_INTERVAL, (int32_t*)&wifi_config->bcn_interval);
-	nvs_get_i32(nvs_handle, NVS_WIFI_SHORT_BCN_INTERVAL, (int32_t*)&wifi_config->short_bcn_interval);
+	nvs_get_u16(nvs_handle, NVS_WIFI_BCN_INTERVAL, (uint16_t*)&wifi_config->bcn_interval);
 	nvs_get_u8(nvs_handle, NVS_IP_MODE, (uint8_t*)&wifi_config->ip_mode);
 
 	length = sizeof(wifi_config->netmask);
@@ -493,7 +490,7 @@ nrc_err_t nrc_wifi_set_config(WIFI_CONFIG* wifi_config)
 	nvs_get_u8(nvs_handle, NVS_WIFI_MCS, (uint8_t*)&wifi_config->mcs);
 	nvs_get_u8(nvs_handle, NVS_WIFI_GI, (uint8_t*)&wifi_config->gi);
 	nvs_get_i8(nvs_handle, NVS_WIFI_CCA_THRES, (int8_t*)&wifi_config->cca_thres);
-	nvs_get_u8(nvs_handle, NVS_WIFI_HIDDEN_SSID, (uint8_t*)&wifi_config->hidden_ssid);
+	nvs_get_u8(nvs_handle, NVS_WIFI_IGNORE_BROADCAST_SSID, (uint8_t*)&wifi_config->ignore_broadcast_ssid);
 	nvs_get_u8(nvs_handle, NVS_WIFI_SOFTAP_MAX_NUM_STA, (uint8_t*)&wifi_config->max_num_sta);
 	nvs_get_u16(nvs_handle, NVS_WIFI_LISTEN_INTERVAL, (uint16_t*)&wifi_config->listen_interval);
 
@@ -553,14 +550,13 @@ nrc_err_t nrc_erase_all_wifi_nvs(void)
 	nvs_erase_key(nvs_handle, NVS_WIFI_CONN_TIMEOUT);
 	nvs_erase_key(nvs_handle, NVS_WIFI_DISCONN_TIMEOUT);
 	nvs_erase_key(nvs_handle, NVS_WIFI_BCN_INTERVAL);
-	nvs_erase_key(nvs_handle, NVS_WIFI_SHORT_BCN_INTERVAL);
 	nvs_erase_key(nvs_handle, NVS_DEVICE_MODE);
 	nvs_erase_key(nvs_handle, NVS_NETWORK_MODE);
 	nvs_erase_key(nvs_handle, NVS_WIFI_RATE_CONTROL);
 	nvs_erase_key(nvs_handle, NVS_WIFI_MCS);
 	nvs_erase_key(nvs_handle, NVS_WIFI_GI);
 	nvs_erase_key(nvs_handle, NVS_WIFI_CCA_THRES);
-	nvs_erase_key(nvs_handle, NVS_WIFI_HIDDEN_SSID);
+	nvs_erase_key(nvs_handle, NVS_WIFI_IGNORE_BROADCAST_SSID);
 
 	if (nvs_handle)
 		nvs_close(nvs_handle);

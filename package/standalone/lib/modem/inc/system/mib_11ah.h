@@ -2,6 +2,10 @@
 #define __MIB_11AH_H__
 
 // features
+#if !defined(dot11S1GTravelingPilotOptionActivated)
+#define dot11S1GTravelingPilotOptionActivated 		1
+#endif /* dot11S1GTravelingPilotOptionActivated */
+
 #if !defined(dot11PV1MACHeaderOptionImplemented)
 #define dot11PV1MACHeaderOptionImplemented 		0
 #endif /* dot11PV1MACHeaderOptionImplemented */
@@ -45,7 +49,7 @@
 #endif /* dot11S1GLongOptionActivated */
 
 #if !defined(dot11S1GChannelWidthOptionImplemented)
-#define dot11S1GChannelWidthOptionImplemented 	1
+#define dot11S1GChannelWidthOptionImplemented 	1 //(0:1/2MHz Support, 1:1/2/4MHz Support)
 #endif /* dot11S1GChannelWidthOptionImplemented */
 
 #if !defined(dot11ShortGIOptionIn1MActivated)

@@ -27,12 +27,10 @@
 #include "hif.h"
 
 
-#define _hif_dma_printf(fmt, ...)	_hif_log(fmt, ##__VA_ARGS__)
-
-#define _hif_dma_trace()			_hif_dma_printf("%s::%d\n", __func__, __LINE__)
-#define _hif_dma_debug(fmt, ...)	_hif_dma_printf(fmt, ##__VA_ARGS__)
-#define _hif_dma_info(fmt, ...)		_hif_dma_printf(fmt, ##__VA_ARGS__)
-#define _hif_dma_error(fmt, ...)	_hif_dma_printf("%s: " fmt, __func__, ##__VA_ARGS__)
+#define _hif_dma_info		_hif_info
+#define _hif_dma_error		_hif_error
+#define _hif_dma_debug		_hif_debug
+#define _hif_dma_trace		_hif_trace
 
 /**********************************************************************************************/
 
@@ -152,60 +150,60 @@ static void _hif_dma_common_regs_print (void)
 {
 	volatile rDMAC_t *dmac = g_dma_regs;
 
-	_hif_dma_info("[ DMAC Common Registers ]\n");
-	_hif_dma_info(" - IntStatus: 0x%02X\n", dmac->IntStatus);
-	_hif_dma_info(" - IntTCStatus: 0x%02X\n", dmac->IntTCStatus);
-	_hif_dma_info(" - IntTCClear: 0x%02X\n", dmac->IntTCClear);
-	_hif_dma_info(" - IntErrorStatus: 0x%02X\n", dmac->IntErrorStatus);
-	_hif_dma_info(" - IntErrClr: 0x%02X\n", dmac->IntErrClr);
-	_hif_dma_info(" - RawIntTCStatus: 0x%02X\n", dmac->RawIntTCStatus);
-	_hif_dma_info(" - RawIntErrorStatus: 0x%02X\n", dmac->RawIntErrorStatus);
-	_hif_dma_info(" - Enabledchannels: 0x%02X\n", dmac->EnabledChannels);
-	_hif_dma_info(" - SoftBReq: 0x%04X\n", dmac->SoftBReq);
-	_hif_dma_info(" - SoftSReq: 0x%04X\n", dmac->SoftSReq);
-	_hif_dma_info(" - SoftLBReq: 0x%04X\n", dmac->SoftLBReq);
-	_hif_dma_info(" - SoftLSReq: 0x%04X\n", dmac->SoftLSReq);
-	_hif_dma_info(" - Configuration\n");
-	_hif_dma_info(" -- DMAC_Enable: %u\n", dmac->Config.Enable);
-	_hif_dma_info(" -- AHB_M1_Endian: %u\n", dmac->Config.AHBM1_Endian);
-	_hif_dma_info(" -- AHB_M2_Endian: %u\n", dmac->Config.AHBM2_Endian);
-	_hif_dma_info(" - SyncLogic: 0x%04X\n", dmac->Sync);
+	_hif_dma_info("[ DMAC Common Registers ]");
+	_hif_dma_info(" - IntStatus: 0x%02X", dmac->IntStatus);
+	_hif_dma_info(" - IntTCStatus: 0x%02X", dmac->IntTCStatus);
+	_hif_dma_info(" - IntTCClear: 0x%02X", dmac->IntTCClear);
+	_hif_dma_info(" - IntErrorStatus: 0x%02X", dmac->IntErrorStatus);
+	_hif_dma_info(" - IntErrClr: 0x%02X", dmac->IntErrClr);
+	_hif_dma_info(" - RawIntTCStatus: 0x%02X", dmac->RawIntTCStatus);
+	_hif_dma_info(" - RawIntErrorStatus: 0x%02X", dmac->RawIntErrorStatus);
+	_hif_dma_info(" - Enabledchannels: 0x%02X", dmac->EnabledChannels);
+	_hif_dma_info(" - SoftBReq: 0x%04X", dmac->SoftBReq);
+	_hif_dma_info(" - SoftSReq: 0x%04X", dmac->SoftSReq);
+	_hif_dma_info(" - SoftLBReq: 0x%04X", dmac->SoftLBReq);
+	_hif_dma_info(" - SoftLSReq: 0x%04X", dmac->SoftLSReq);
+	_hif_dma_info(" - Configuration");
+	_hif_dma_info(" -- DMAC_Enable: %u", dmac->Config.Enable);
+	_hif_dma_info(" -- AHB_M1_Endian: %u", dmac->Config.AHBM1_Endian);
+	_hif_dma_info(" -- AHB_M2_Endian: %u", dmac->Config.AHBM2_Endian);
+	_hif_dma_info(" - SyncLogic: 0x%04X", dmac->Sync);
 }
 
 static void _hif_dma_channel_regs_print (int channel)
 {
 	volatile rDMACC_t *dmacc = &g_dma_regs->Channel[channel];
 
-	_hif_dma_info("[ DMAC Channel Registers : ch%d ]\n", channel);
-	_hif_dma_info(" - SrcAddr: 0x%X\n", dmacc->SrcAddr);
-	_hif_dma_info(" - DestAddr: 0x%X\n", dmacc->DestAddr);
-	_hif_dma_info(" - LLI\n");
-	_hif_dma_info(" -- AHBM: %u\n", dmacc->LLI.AHBM);
-	_hif_dma_info(" -- Next: 0x%X(0x%X)\n", dmacc->LLI.Next, dmacc->LLI.Next << 2);
-	_hif_dma_info(" - Control\n");
-	_hif_dma_info(" -- XferSize: %u\n", dmacc->Control.XferSize);
-	_hif_dma_info(" -- SBSize: %u\n", dmacc->Control.SBSize);
-	_hif_dma_info(" -- DBSize: %u\n", dmacc->Control.DBSize);
-	_hif_dma_info(" -- SWidth: %u\n", dmacc->Control.SWidth);
-	_hif_dma_info(" -- DWidth: %u\n", dmacc->Control.DWidth);
-	_hif_dma_info(" -- SAHBM: %u\n", dmacc->Control.SAHBM);
-	_hif_dma_info(" -- DAHBM: %u\n", dmacc->Control.DAHBM);
-	_hif_dma_info(" -- SAInc: %u\n", dmacc->Control.SAInc);
-	_hif_dma_info(" -- DAInc: %u\n", dmacc->Control.DAInc);
-	_hif_dma_info(" -- Privileged: %u\n", dmacc->Control.Privileged);
-	_hif_dma_info(" -- Bufferable: %u\n", dmacc->Control.Bufferable);
-	_hif_dma_info(" -- Cacheable: %u\n", dmacc->Control.Cacheable);
-	_hif_dma_info(" -- IntTC: %u\n", dmacc->Control.IntTC);
-	_hif_dma_info(" - Configuration\n");
-	_hif_dma_info(" -- Enable: %u\n", dmacc->Config.Enable);
-	_hif_dma_info(" -- SrcPeri: %u\n", dmacc->Config.SrcPeri);
-	_hif_dma_info(" -- DestPeri: %u\n", dmacc->Config.DestPeri);
-	_hif_dma_info(" -- FlowCntrl: %u\n", dmacc->Config.FlowCntrl);
-	_hif_dma_info(" -- IntErr: %u\n", dmacc->Config.IntErr);
-	_hif_dma_info(" -- IntTC: %u\n", dmacc->Config.IntTC);
-	_hif_dma_info(" -- Lock: %u\n", dmacc->Config.Lock);
-	_hif_dma_info(" -- Active: %u\n", dmacc->Config.Active);
-	_hif_dma_info(" -- Halt: %u\n", dmacc->Config.Halt);
+	_hif_dma_info("[ DMAC Channel Registers : ch%d ]", channel);
+	_hif_dma_info(" - SrcAddr: 0x%X", dmacc->SrcAddr);
+	_hif_dma_info(" - DestAddr: 0x%X", dmacc->DestAddr);
+	_hif_dma_info(" - LLI");
+	_hif_dma_info(" -- AHBM: %u", dmacc->LLI.AHBM);
+	_hif_dma_info(" -- Next: 0x%X(0x%X)", dmacc->LLI.Next, dmacc->LLI.Next << 2);
+	_hif_dma_info(" - Control");
+	_hif_dma_info(" -- XferSize: %u", dmacc->Control.XferSize);
+	_hif_dma_info(" -- SBSize: %u", dmacc->Control.SBSize);
+	_hif_dma_info(" -- DBSize: %u", dmacc->Control.DBSize);
+	_hif_dma_info(" -- SWidth: %u", dmacc->Control.SWidth);
+	_hif_dma_info(" -- DWidth: %u", dmacc->Control.DWidth);
+	_hif_dma_info(" -- SAHBM: %u", dmacc->Control.SAHBM);
+	_hif_dma_info(" -- DAHBM: %u", dmacc->Control.DAHBM);
+	_hif_dma_info(" -- SAInc: %u", dmacc->Control.SAInc);
+	_hif_dma_info(" -- DAInc: %u", dmacc->Control.DAInc);
+	_hif_dma_info(" -- Privileged: %u", dmacc->Control.Privileged);
+	_hif_dma_info(" -- Bufferable: %u", dmacc->Control.Bufferable);
+	_hif_dma_info(" -- Cacheable: %u", dmacc->Control.Cacheable);
+	_hif_dma_info(" -- IntTC: %u", dmacc->Control.IntTC);
+	_hif_dma_info(" - Configuration");
+	_hif_dma_info(" -- Enable: %u", dmacc->Config.Enable);
+	_hif_dma_info(" -- SrcPeri: %u", dmacc->Config.SrcPeri);
+	_hif_dma_info(" -- DestPeri: %u", dmacc->Config.DestPeri);
+	_hif_dma_info(" -- FlowCntrl: %u", dmacc->Config.FlowCntrl);
+	_hif_dma_info(" -- IntErr: %u", dmacc->Config.IntErr);
+	_hif_dma_info(" -- IntTC: %u", dmacc->Config.IntTC);
+	_hif_dma_info(" -- Lock: %u", dmacc->Config.Lock);
+	_hif_dma_info(" -- Active: %u", dmacc->Config.Active);
+	_hif_dma_info(" -- Halt: %u", dmacc->Config.Halt);
 }
 
 static void _hif_dma_regs_print (void)
@@ -236,7 +234,7 @@ static void _hif_dma_inttc_isr (int vector)
 		if (!status)
 			return;
 
-/*		_hif_dma_debug("inttc_isr: 0x%X\n", status); */
+/*		_hif_dma_debug("inttc_isr: 0x%X", status); */
 
 		/* 0: highest priority */
 		for (channel = 0 ; channel < HIF_DMA_CHANNEL_MAX ; channel++)
@@ -265,7 +263,7 @@ static void _hif_dma_interr_isr (int vector)
 		if (!status)
 			return;
 
-/*		_hif_dma_debug("interr_isr: 0x%X\n", status); */
+/*		_hif_dma_debug("interr_isr: 0x%X", status); */
 
 		/* 0: highest priority */
 		for (channel = 0 ; channel < HIF_DMA_CHANNEL_MAX ; channel++)
@@ -365,7 +363,7 @@ static int _hif_dma_config (int channel,
 		{
 			if (dest_peri && dest_peri->FlowCtrl)
 			{
-				_hif_dma_error("%s: src_peri->FlowCtrl && dest_peri->FlowCtrl\n", __func__);
+				_hif_dma_error("src_peri->FlowCtrl && dest_peri->FlowCtrl");
 				return HIF_DMA_EINVAL;
 			}
 
@@ -405,7 +403,7 @@ static int _hif_dma_config (int channel,
 	if (interr_isr)
 		g_dmac_interr_isr[channel] = interr_isr;
 
-	_hif_dma_info("DMA_CONFIG: channel=%d type=%s\n", channel,
+	_hif_dma_info("DMA_CONFIG: channel=%d type=%s", channel,
 				str_transfer_type[dmacc_config->FlowCntrl]);
 
 	return 0;
@@ -426,7 +424,7 @@ void _hif_dma_enable (void)
 		dmac->Config.AHBM2_Endian = 0; // little endian
 		dmac->Sync = 0; // disable
 
-		_hif_dma_info("DMA_ENABLE\n");
+		_hif_dma_info("DMA_ENABLE");
 	}
 }
 
@@ -448,7 +446,7 @@ void _hif_dma_disable (void)
 
 		_hif_dma_interrupt_disable();
 
-		_hif_dma_info("DMA_DISABLE\n");
+		_hif_dma_info("DMA_DISABLE");
 	}
 }
 
@@ -539,7 +537,7 @@ int _hif_dma_start (int channel, dma_desc_t *desc)
 
 	memcpy((void *)dmacc, (void *)desc, sizeof(dma_desc_t));
 
-	_hif_dma_info("DMA_START: channel=%d\n", channel);
+	_hif_dma_info("DMA_START: channel=%d", channel);
 /*	_hif_dma_channel_regs_print(channel); */
 
 	dmacc->Config.Enable = 1;
@@ -575,7 +573,7 @@ int _hif_dma_stop (int channel)
 
 	}
 
-	_hif_dma_info("DMA_STOP: channel=%d\n", channel);
+	_hif_dma_info("DMA_STOP: channel=%d", channel);
 
 	return 0;
 }
@@ -637,24 +635,24 @@ void _hif_dma_desc_print (dma_desc_t *desc)
 
 	for (i = 0 ; desc ; i++, desc = desc->Next == _desc ? NULL : desc->Next)
 	{
-		_hif_dma_info("[ DMA Descriptor %d : 0x%X ]\n", i, desc);
-		_hif_dma_info(" - SrcAddr: 0x%X\n", desc->SrcAddr);
-		_hif_dma_info(" - DestAddr: 0x%X\n", desc->DestAddr);
-		_hif_dma_info(" - NextDesc: 0x%X\n", desc->Next);
-		_hif_dma_info(" - XferSize: %.f-byte\n", desc->XferSize * pow(2, desc->SWidth));
-		_hif_dma_info(" - SBSize: %.f-byte\n", desc->SBSize ? pow(2, desc->SBSize + 1) : 1);
-		_hif_dma_info(" - DBSize: %.f-byte\n", desc->DBSize ? pow(2, desc->SBSize + 1) : 1);
-		_hif_dma_info(" - SWidth: %.f-bit\n", 8 * pow(2, desc->SWidth));
-		_hif_dma_info(" - DWidth: %.f-bit\n", 8 * pow(2, desc->DWidth));
-		_hif_dma_info(" - SAHBM: %u\n", desc->SAHBM);
-		_hif_dma_info(" - DAHBM: %u\n", desc->DAHBM);
-		_hif_dma_info(" - SAInc: %s\n", str_onoff[desc->SAInc]);
-		_hif_dma_info(" - DAInc: %s\n", str_onoff[desc->DAInc]);
-		_hif_dma_info(" - Privileged: %s\n", str_onoff[desc->Privileged]);
-		_hif_dma_info(" - Bufferable: %s\n", str_onoff[desc->Bufferable]);
-		_hif_dma_info(" - Cacheable: %s\n", str_onoff[desc->Cacheable]);
-		_hif_dma_info(" - IntTC: %s\n", str_onoff[desc->IntTC]);
-		_hif_dma_info("\r\n");
+		_hif_dma_info("[ DMA Descriptor %d : 0x%X ]", i, desc);
+		_hif_dma_info(" - SrcAddr: 0x%X", desc->SrcAddr);
+		_hif_dma_info(" - DestAddr: 0x%X", desc->DestAddr);
+		_hif_dma_info(" - NextDesc: 0x%X", desc->Next);
+		_hif_dma_info(" - XferSize: %.f-byte", desc->XferSize * pow(2, desc->SWidth));
+		_hif_dma_info(" - SBSize: %.f-byte", desc->SBSize ? pow(2, desc->SBSize + 1) : 1);
+		_hif_dma_info(" - DBSize: %.f-byte", desc->DBSize ? pow(2, desc->SBSize + 1) : 1);
+		_hif_dma_info(" - SWidth: %.f-bit", 8 * pow(2, desc->SWidth));
+		_hif_dma_info(" - DWidth: %.f-bit", 8 * pow(2, desc->DWidth));
+		_hif_dma_info(" - SAHBM: %u", desc->SAHBM);
+		_hif_dma_info(" - DAHBM: %u", desc->DAHBM);
+		_hif_dma_info(" - SAInc: %s", str_onoff[desc->SAInc]);
+		_hif_dma_info(" - DAInc: %s", str_onoff[desc->DAInc]);
+		_hif_dma_info(" - Privileged: %s", str_onoff[desc->Privileged]);
+		_hif_dma_info(" - Bufferable: %s", str_onoff[desc->Bufferable]);
+		_hif_dma_info(" - Cacheable: %s", str_onoff[desc->Cacheable]);
+		_hif_dma_info(" - IntTC: %s", str_onoff[desc->IntTC]);
+		_hif_dma_info("");
 	}
 }
 
@@ -693,7 +691,7 @@ int _hif_dma_desc_link (dma_desc_t *desc, dma_desc_t *next)
 
 	if ((uint32_t)next & 0x3)
 	{
-		_hif_dma_error("next=0x%X\n", next);
+		_hif_dma_error("next=0x%X", next);
 		return HIF_DMA_EINVAL;
 	}
 

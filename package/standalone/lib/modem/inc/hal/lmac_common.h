@@ -84,6 +84,8 @@ typedef struct _CCA_RESULT_4M
 #define lmac_get_country(x)			get_country()
 #define lmac_set_rate_control(x, y)		set_rate_ctrl_en(x, y)
 #define lmac_get_rate_control(x)		get_rate_ctrl_en(x)
+#define lmac_set_rc_mode(x, y)			set_rate_ctrl_mode(x, y)
+#define lmac_get_rc_mode(x)				get_rate_ctrl_mode(x)
 #define lmac_set_format(x, y)			set_format(x, y)
 #define lmac_set_preamble_type(x, y)		set_preamble_type(x, y)
 #define lmac_get_short_gi(x)			get_short_gi(x)
@@ -133,12 +135,10 @@ void        lmac_set_tbtt_callback(void (*tbtt_callback)(int8_t) );
 void        lmac_set_beacon_interval(uint8_t vif_id, uint16_t beacon_interval);
 uint16_t    lmac_get_beacon_interval();
 uint32_t	lmac_get_next_tbtt(int vif_id, uint32_t sbi_us);
-
 void        lmac_set_credit_callback(void (*credit_callback)(uint8_t ac, uint8_t value, bool inc) );
 void        lmac_isr(int vector);
 void        lmac_uplink_request_sysbuf(struct _SYS_BUF* buf);
 int8_t      lmac_get_vif_id(GenericMacHeader* gmh);
-
 void        lmac_key_counter_reset();
 void        lmac_set_mac_address(int vif_id , uint8_t* addr);
 void        lmac_set_dev_mac(int hw_index, uint8_t *mac_addr);
@@ -194,39 +194,33 @@ void        lmac_set_agg_manual(int ac, bool manaul);
 #endif
 bool        lmac_set_short_gi(int vif_id, uint8_t short_gi, bool gi_auto_flag);
 void        lmac_enable_1m(bool enable, bool enable_dup);
-void        lmac_set_rts(int vif_id, uint8_t mode, uint16_t threshold, int ndp);
+bool        lmac_set_rts(int vif_id, uint8_t mode, uint16_t threshold, int rid);
+bool        lmac_set_cts(int ndp);
 int8_t      lmac_get_ap_vif_id();
 int8_t      lmac_get_sta_vif_id();
 int8_t      lmac_get_mesh_vif_id();
 #if defined (INCLUDE_IBSS)
 int8_t      lmac_get_ibss_vif_id();
-
 #endif
-
 void        lmac_set_cfo_cal_en(bool en);
-
 void		lmac_inc_bcmc_cnt(uint8_t bcmc_cnt);
 uint8_t		lmac_get_bcmc_cnt(void);
-
 void        lmac_uplink_request(LMAC_TXBUF *buf);
 void        lmac_uplink_request2(LMAC_TXBUF *buf, int txque, bool reschedule);
 void        lmac_uplink_request_non_filtered (LMAC_TXBUF *buf);
-
+void        lmac_downlink_request(int vif_id, SYS_BUF *packet);
 void        lmac_contention_result_isr();
 void        lmac_tx_done_isr();
 void        lmac_rx_done_isr();
 void        lmac_tsf_isr(uint8_t );
 void        lmac_tbtt_isr(int vif_id);
 void        lmac_ps_qosnull_txdone_isr();
-
+uint8_t		lmac_qm_state();
 bool        lmac_qm_transit(uint8_t, uint16_t);
 bool        lmac_process_tx_report(uint8_t);	/// Processing tx result from hardware module
-
 void        lmac_ampdu_init_info(uint8_t vif_id);
 void        lmac_ampdu_set_info(uint8_t vif_id, bool ctrl_1m_prem_sup);
-
 void        lmac_free_txbuffer(LMAC_TXBUF* buffer, uint8_t ac);
-
 /// internal utility
 void        lmac_check_legacy_tim(uint8_t *ie, int8_t vif_id);
 void        lmac_qm_show_statistics();
@@ -235,7 +229,6 @@ void        lmac_qm_configure();
 void        lmac_qm_schedule(uint8_t, uint8_t);
 void        downlink_init();
 bool        lmac_rx_post_process(struct _SYS_BUF*, void (*dl_cb)(int vif_id, struct _SYS_BUF *));
-
 void        discard(struct _SYS_BUF* buffer);
 uint16_t    bd_set_datalen(LMAC_TXBUF *, uint16_t, bool);
 int         set_buffer_descriptor(LMAC_TXBUF *);
@@ -243,15 +236,12 @@ int         set_tx_vector(LMAC_TXBUF *, uint8_t, bool, struct frame_tx_info*);
 uint32_t    get_valid_dl_desc_num();
 void        fill_descriptor_all(struct _SYS_BUF*);
 void        fill_descriptor(struct _SYS_BUF*);
-
 void        lmac_set_sniffer_mode(bool v);
 void        lmac_set_sniffer_mode_beacon_display(bool v);
-
 void        lmac_print_semaphore();
 bool        lmac_take_modem_semaphore(uint8_t type);
 void        lmac_give_modem_semaphore(uint8_t type);
 void        lmac_sys_background_task();
-
 int         lmac_get_country_code_index(void);
 void        lmac_uplink_request_ndp_sysbuf(struct _SYS_BUF* buf);
 uint8_t     s1g_get_bw(TXVECTOR *vector);
@@ -290,23 +280,19 @@ bool        lmac_get_rf_kill();
 void        lmac_set_rf_kill(bool kill);
 bool        lmac_get_bd_use();
 void        lmac_set_bd_use(bool bd_on);
-
 void lmac_auto_tx_gain_enable(bool enable);
 #if defined(INCLUDE_BD_SUPPORT)
-void lmac_tx_power_init(uint8_t* index);
+void lmac_tx_power_init(uint8_t ch_index, uint8_t* data);
 #else
 void lmac_tx_power_init();
 #endif /* defined(INCLUDE_BD_SUPPORT) */
-
 #if !defined(NRC7292)
 void lmac_set_rx_buffer_lookup(bool v);
 #endif /* !defined(NRC7292) */
 /* To test lookup interrupt, define LOOK_UP_INT_TEST */
 //#define LOOK_UP_INT_TEST
-
 void lmac_task_handle_data(void *param);
 void lmac_task_send_queue(LMacEvent evt, uint8_t sub_evt);
-
 /* LBT-related function */
 bool lmac_support_lbt (void);
 void lmac_lbt_init(uint16_t cs_duration, uint32_t pause_time, uint32_t tx_resume_time);
@@ -321,12 +307,10 @@ void lmac_lbt_set_resume_time(uint32_t resume_time);
 uint32_t lmac_lbt_get_resume_time();
 void lmac_lbt_backup_aifsn(uint8_t ac, uint8_t aifsn);
 bool lmac_check_tx_pause_flag();
-
 #if defined(INCLUDE_LEGACY_ACK)
 void lmac_set_ack_configure(uint8_t type);
 #endif
 void lmac_set_sw_reset();
-
 void udelay(uint32_t delay);
 void mdelay(uint32_t delay);
 #endif /* HAL_LMAC_COMMON_H */

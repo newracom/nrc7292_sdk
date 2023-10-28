@@ -20,6 +20,31 @@
 #include "system_new_printf.h"
 #endif /* defined(NEW_V_SNPRINTF_SUPPORT) */
 
+#if 0 /* this is redefined when building standalone with lwip */
+#if defined(_BYTE_ORDER) && defined(_BIG_ENDIAN) && \
+    defined(_LITTLE_ENDIAN) 
+
+# if _BYTE_ORDER == _BIG_ENDIAN /* See arm-none-eabi/include/machine/_endian.h */
+/* The host byte order is the same as network byte order,
+   so these functions are all just identity.  */
+# define ntohl(x)   (x)
+# define ntohs(x)   (x)
+# define htonl(x)   (x)
+# define htons(x)   (x)
+# else
+#  if _BYTE_ORDER == _LITTLE_ENDIAN
+#   define ntohl(x) swap_uint32(x)
+#   define ntohs(x) swap_uint16(x)
+#   define htonl(x) swap_uint32(x)
+#   define htons(x) swap_uint16(x)
+#  endif
+# endif
+#else
+#error "please include stdio.h or sys/types.h for endian.h"
+#endif
+#endif
+
+
 void system_task_init();
 void background_task_init();
 

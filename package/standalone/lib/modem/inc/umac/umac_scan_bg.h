@@ -9,6 +9,9 @@ void		on_qm_idle();
 void		umac_scan_bg_init(uint8_t vif_id, void (*cb)());
 void		umac_scan_bg_deinit();
 void		umac_scan_bg_start(uint8_t vif_id);
+void		umac_scan_bg_return();
+bool		umac_scan_bg_is_enable_return_ch();
+bool		umac_scan_bg_check_buf();
 void		umac_scan_bg_done(uint8_t vif_id);
 // for test
 bool		umac_scan_bg_check();

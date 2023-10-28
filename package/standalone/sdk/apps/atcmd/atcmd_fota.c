@@ -28,8 +28,8 @@
 #include "atcmd.h"
 #include "atcmd_fota.h"
 
-#define _atcmd_fota_debug(fmt, ...)		/* _atcmd_debug("FOTA: " fmt "\n",##__VA_ARGS__) */
-#define _atcmd_fota_log(fmt, ...)		_atcmd_info("FOTA: " fmt "\n", ##__VA_ARGS__)
+#define _atcmd_fota_debug(fmt, ...)		/* _atcmd_debug("FOTA: " fmt, ##__VA_ARGS__) */
+#define _atcmd_fota_log(fmt, ...)		_atcmd_info("FOTA: " fmt, ##__VA_ARGS__)
 
 /**********************************************************************************************/
 
@@ -544,7 +544,7 @@ static int _atcmd_fota_fw_check_callback (char *data, int len, int total)
 		fota_info = _atcmd_malloc(total);
 		if (!fota_info)
 		{
-			_atcmd_error("malloc() failed\n");
+			_atcmd_error("malloc()");
 			return -1;
 		}
 	}

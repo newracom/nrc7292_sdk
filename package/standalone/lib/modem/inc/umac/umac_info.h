@@ -4,6 +4,9 @@
 #include "system.h"
 #include "umac_ieee80211_types.h"
 #include "lmac_common.h"
+#if defined(INCLUDE_MULTI_STA_RC)
+#include "lmac_rate_control.h"
+#endif
 #if defined(INCLUDE_DEFRAG)
 #include "util_sysbuf_queue.h"
 #endif
@@ -70,10 +73,10 @@ typedef struct _AMPDU_INFO {
 } __attribute__((packed)) AMPDU_INFO;
 
 /* BSS Max Idle Info */
-typedef struct _BSS_IDLE_INFO {
-	bool idle_period_option;
-	uint16_t max_idle_period;
-} __attribute__((packed)) BSS_IDLE_INFO;
+// typedef struct _BSS_IDLE_INFO {
+// 	bool idle_period_option;
+// 	uint16_t max_idle_period;
+// } __attribute__((packed)) BSS_IDLE_INFO;
 
 /* S1G Capa Info */
 typedef struct _S1G_CAPA {
@@ -90,7 +93,7 @@ typedef struct _S1G_CAPA {
 	uint8_t traveling_pilot_support:1;
 	uint8_t maximum_mpdu_length:1;
 	uint8_t maximum_ampdu_length_exp: 2;
-	uint8_t reserved: 2;
+	uint8_t supported_ch_width: 2;
 	uint8_t color:3;
 	uint8_t minimum_mpdu_start_spacing: 3;
 	uint8_t reserved2: 2;
@@ -182,6 +185,7 @@ typedef struct _DEFRAG_INFO {
 }__attribute__((packed)) DEFRAG_INFO;
 #endif/* INCLUDE_DEFRAG */
 
+
 typedef struct _MCS_INFO {
 	uint8_t last_tx_mcs:4;
 	uint8_t last_rx_mcs:4;
@@ -193,7 +197,6 @@ typedef struct _M_SIG_INFO{
 	//int8_t snr_avg;
 	//int8_t snr_last;
 }__attribute__((packed)) M_SIG_INFO;
-
 
 /**************************************************************
 	APINFO (Common)
@@ -213,6 +216,10 @@ typedef struct _APINFO{
 	SECURITY_INFO m_secrurity;
 	KEY_INFO m_key;
 	M_SIG_INFO msig;
+#if defined(INCLUDE_MULTI_STA_RC)
+	//PER_NODE m_rc_node;
+	//PER_NODE *m_rc_node_p;
+#endif
 } __attribute__((packed)) APINFO;
 
 /**************************************************************
@@ -224,7 +231,7 @@ typedef struct _STAINFO {
 	STA_STATE m_state;
 	STA_BASIC_INFO m_binfo;
 	AMPDU_INFO m_ampdu[MAX_AC];
-	BSS_IDLE_INFO m_bssidle;
+	// BSS_IDLE_INFO m_bssidle;
 	S1G_CAPA m_s1g;
 	SN_INFO m_sn;
 	KEY_INFO m_key;
@@ -241,6 +248,13 @@ typedef struct _STAINFO {
 	DEFRAG_INFO m_defrags;
 #endif
 	MCS_INFO m_mcs;
+#if defined(INCLUDE_MULTI_STA_RC)
+#ifndef DYN_NODE_ALLOC
+	PER_NODE m_rc_node;
+#endif
+	PER_NODE *m_rc_node_p;
+#endif
+	uint8_t tx_retry_limit_cnt;
 } __attribute__((packed)) STAINFO;
 
 /**************************************************************
@@ -342,4 +356,13 @@ void init_bssid_sta_aid_db(void);
 uint16_t alloc_ibss_sta_aid(uint8_t * addr);
 void dealloc_ibss_sta_aid(uint16_t aid, uint8_t * addr);
 #endif /* INCLUDE_IBSS */
+
+
+#if defined(INCLUDE_MULTI_STA_RC)
+PER_NODE *get_rc_node_from_stainfo_by_aid(uint8_t vif_id, uint16_t aid);
+int umac_rc_peer_init (int8_t vif_id, STAINFO *sta);
+void umac_rc_peer_deinit (STAINFO *sta);
+#endif /* INCLUDE_MULTI_STA_RC */
+uint8_t get_rc_mcs_from_stainfo_by_aid (uint8_t vif_id, uint16_t aid);
+
 #endif

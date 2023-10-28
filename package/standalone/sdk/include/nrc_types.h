@@ -225,6 +225,13 @@ typedef enum {
 	WIFI_GI_SHORT,
 } tWIFI_GI;
 
+/** @brief Wi-Fi ignore broadcast SSID */
+typedef enum {
+	WIFI_IGNORE_BROADCAST_SSID_FULL,
+	WIFI_IGNORE_BROADCAST_SSID_EMPTY,
+	WIFI_IGNORE_BROADCAST_SSID_CLEAR,
+} tWIFI_IGNORE_BROADCAST_SSID;
+
 /** @brief scan item */
 typedef union {
 	char *items[5];

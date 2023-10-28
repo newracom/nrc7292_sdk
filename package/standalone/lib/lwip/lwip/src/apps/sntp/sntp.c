@@ -277,6 +277,11 @@ sntp_format_time(s32_t sec)
   ut = (u32_t)((u32_t)sec + DIFF_SEC_1970_2036);
   return ctime(&ut);
 }
+
+const char *SNTP_FORMAT_TIME (s32_t sec)
+{
+	return sntp_format_time(sec);
+}
 #endif /* LWIP_DEBUG && !sntp_format_time */
 
 /**

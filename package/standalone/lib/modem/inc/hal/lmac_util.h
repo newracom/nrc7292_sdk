@@ -1,6 +1,25 @@
 #ifndef HAL_LMAC_UTIL_H
 #define HAL_LMAC_UTIL_H
 
+#if defined(INCLUDE_RXGAIN_CONTROL)
+typedef struct _RXGAIN_CTRL {
+	bool g_auto_rxgain;	//(1:enable 1:disable)
+	int initial_rx_gain;	//
+	int g_rssi_tr_adjust;	//rssi threshold to adjust rxgain
+	int g_rssi_tr_restore;	//rssi threshold to restore rxgain
+	uint32_t g_adjust_rxgain;	//rxgain to be adjusted
+	bool g_autorxgain_print;	//for debug print
+} RXGAIN_CTRL;
+
+void lmac_rxgain_ctrl_init();
+uint32_t lmac_rxgain_ctrl_enable(bool enable);
+bool lmac_rxgain_ctrl_set(int adjust_rssi, int restore_rssi, uint32_t target_rxgain);
+void lmac_rxgain_ctrl_set_debug(bool enable);
+int lmac_rxgain_ctrl_operation(uint8_t vif_id, int rssi_avg);
+void lmac_rxgain_ctrl_restore_intial_rxgain();
+void lmac_rxgain_ctrl_show();
+#endif /* INCLUDE_RXGAIN_CONTROL */
+
 uint32_t lmac_bytes_to_bufend(struct _SYS_BUF* sys_buf, uint8_t *ptr);
 void    lmac_init_null_frame();
 void    lmac_send_null_frame(void(*callback)());
@@ -27,6 +46,9 @@ DEFRAG_ENTRY *lmac_defrag_add(DEFRAG_INFO *cache, unsigned int frag_n, uint16_t 
 DEFRAG_ENTRY *lmac_defrag_find_entry(DEFRAG_INFO *cache, 	unsigned int frag_n, unsigned int sn, uint8_t rx_queue, struct lmac_rx_h_data * rx);
 void lmac_sysbuf_queue_purge(struct sysbuf_queue *hque);
 #endif /* INCLUDE_DEFRAG */
+#if defined(CSPI)
+void lmac_send_ps_pretend(uint8_t vif_id, GenericMacHeader *mqh);
+#endif
 
 uint32_t util_tsf_diff(uint32_t start_tsf, uint32_t end_tsf);
 uint8_t hex_to_int(char c);

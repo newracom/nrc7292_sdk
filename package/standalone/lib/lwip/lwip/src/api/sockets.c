@@ -1414,7 +1414,7 @@ lwip_send(int s, const void *data, size_t size, int flags)
   sock_set_errno(sock, err_to_errno(err));
   done_socket(sock);
   /* casting 'written' to ssize_t is OK here since the netconn API limits it to SSIZE_MAX */
-  return (err == ERR_OK ? (ssize_t)written : -1);
+  return (err == ERR_OK ? (ssize_t)written : err);
 }
 
 ssize_t
@@ -3350,6 +3350,10 @@ lwip_setsockopt_impl(int s, int level, int optname, const void *optval, socklen_
           LWIP_SOCKOPT_CHECK_OPTLEN_CONN_PCB(sock, optlen, int);
           if (*(const int *)optval) {
             ip_set_option(sock->conn->pcb.ip, optname);
+#if defined(LWIP_TCP_KEEPALIVE_TICK_UPDATE) && (LWIP_TCP_KEEPALIVE_TICK_UPDATE == 1)
+			if (optname == SOF_KEEPALIVE)
+				sock->conn->pcb.tcp->tmr = tcp_ticks;
+#endif
           } else {
             ip_reset_option(sock->conn->pcb.ip, optname);
           }

@@ -107,7 +107,9 @@ struct ret_s1ginfo {
 	uint8_t 	beacon_bypass_support: 1;
 	uint8_t 	reserved: 1;
 	uint8_t		rx_s1gmcs_map: 8;
+#if defined(INCLUDE_TWT_SUPPORT)
 	uint32_t	twt_service_period;
+#endif
 	uint32_t	twt_wake_interval;
 	int		cca_threshold;
 } __attribute__ ((packed));
@@ -129,7 +131,7 @@ struct ret_keyinfo {
 struct ret_usrinfo {
 	uint32_t	txpwr:8;		//tx power (dBm)
 	uint32_t	rxgain:8;		//rx gain (dBm)
-	uint32_t	gi:8;			//guard interval (0:long, 1:short)
+	uint32_t	gi:8;			//guard interval (0:long, 1:short, 2:capa(auto))
 	uint32_t	ucode_wake_src:4;	//ucode wake interval source (0:DTIM/1:TBTT/2:LI/3:USR)
 	uint32_t	ucode_wake_by_group:1;	//ucode wake by DTIM BC/MC (0:disable, 1:enable)
 	uint32_t	txpwr_type:2;		//tx power type (0:auto, 1:limit, 2:fixed)
@@ -148,6 +150,9 @@ struct ret_chinfo {
 	uint8_t		ch_index;
 	uint8_t		oper;
 	uint8_t		cca;
+#endif
+#if defined(INCLUDE_UCODE_TX)
+	uint8_t		mcs10_tx_pwr; /* Tx in uCode use this */
 #endif
 } __attribute__ ((packed));
 #define RET_CHINFO_SIZE sizeof(struct ret_chinfo)
@@ -254,6 +259,9 @@ struct ret_ucodeinfo {
 	/* To calculate the deepsleep interval */
 	uint32_t	last_beacon_tsf_lower;	// last received beacon timestamp tsf lower
 	uint32_t	last_beacon_tsf_upper;	// last received beacon timestamp tsf upper
+#if defined(INCLUDE_UCODE_TX)
+	uint32_t	qos_null_tx_time;		// [31~12] = tsf_upper[10:0], [11:0] = tsf_lower[31:20], 
+#endif
 	uint16_t	ucode_beacon_timer_expire_cont;
 	uint16_t	ucode_beacon_timer_expire_accum;
 	struct 		ucode_stats	 stats;	//Ucode Statistics
@@ -270,7 +278,8 @@ struct ret_drvinfo {
 	uint8_t brd_rev:2;
 	uint8_t bitmap_encoding:1;
 	uint8_t reverse_scrambler:1;
-	uint8_t reserved:2;
+	uint8_t supported_ch_width:1; //supported CH width (0:1/2MHz, 1:1/2/4Mhz)
+	uint8_t reserved:1;
 	uint32_t vendor_oui;
 } __attribute__ ((packed));
 #define RET_DRV_INFO_SIZE sizeof(struct ret_drvinfo)
@@ -320,6 +329,20 @@ struct ret_wowlaninfo {
 } __attribute__ ((packed));
 #define RET_WOWLAN_INFO_SIZE sizeof(struct ret_wowlaninfo)
 #endif /* INCLUDE_WOWLAN_PATTERN */
+
+#if defined (INCLUDE_TCP_KEEPALIVE)
+struct ret_keepaliveinfo {
+	uint32_t seqnum;
+	uint32_t acknum;
+	uint8_t src_ip[4];
+	uint8_t dest_ip[4];
+	uint16_t src_port;
+	uint16_t dest_port;
+	uint16_t winsize;  /* need ?, CKLEE_TODO */
+	uint32_t last_tsf;
+	uint32_t period_sec;
+};
+#endif
 
 #define RET_USERSPACE_SIZE 32
 #define RET_RECOVERED_SIZE 1
@@ -380,6 +403,13 @@ struct ret_airtimeinfo {
 #error "define wowlan pattern size, if ret size is enough, set 2 or set 1"
 #endif
 
+#if defined (INCLUDE_RC_W_RSSI)
+struct ret_rc_einfo {
+	uint8_t pf:2;    //  profile#
+	uint8_t ewma:3;  //  ewma                       : 1~5 => 10% 20% ... 50%
+	uint8_t intval:3; // statistics update interval : 1~8 => 100ms 200ms...800ms
+} __attribute__ ((packed));
+#endif
 
 /* Retention Memory Total_1KB(1024B)
  * from 0x200B_BC00 to 0x200C_0000)
@@ -420,6 +450,9 @@ struct retention_info {
 	struct ret_wowlanptns	wowlan_patterns[WOWLAN_MAX_PATTERNS];	//wowlan patterns (56B * WOWLAN_MAX_PATTERNS)
 	struct ret_wowlaninfo	wowlan_info;		//wowlan info (2B)
 #endif
+#if defined (INCLUDE_TCP_KEEPALIVE)
+	struct ret_keepaliveinfo keepalive_info;	//tcp keepalive info (28B)
+#endif
 #if defined(INCLUDE_MEASURE_AIRTIME) || defined(INCLUDE_MEASURE_AIRTIME_NONESL)
 	struct ret_airtimeinfo	airtime_info;			//airtime info (116B)
 #endif
@@ -430,6 +463,9 @@ struct retention_info {
 	uint32_t sleep_gpio_dir_mask;
 	uint32_t sleep_gpio_out_mask;
 	uint32_t sleep_gpio_pullup_mask;
+#if defined (INCLUDE_RC_W_RSSI)
+	struct ret_rc_einfo rc_einfo;  // rate control info(1B)
+#endif
 #if defined (INCLUDE_AVOID_FRAG_ATTACK_TEST)
 	uint8_t 			prev_ptk[RET_PMK_SIZE];	//Previous PTK (32B)
 #endif
@@ -461,6 +497,9 @@ struct retention_info {
 	uint8_t				reserved:2;		//reserved 3 bits
 	bool				recovered;		//recovery status(1B) (true:recovered, false:not recovered)
 	bool				sleep_alone;		//sleep without connection(1B) (true:alone false:with AP)
+	uint8_t				rc_mode:2;		// rate control(1B) for STA
+	uint8_t				rc_default_mcs:4;
+	uint8_t				rc_reserved:2;
 
 } __attribute__ ((packed));
 #define RET_TOTAL_SIZE 				sizeof(struct retention_info)

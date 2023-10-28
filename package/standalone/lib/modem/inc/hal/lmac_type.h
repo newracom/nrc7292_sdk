@@ -129,12 +129,16 @@ enum {
 	FRAG_MID,
 };
 
+
 enum {
-	RTS_OFF = 0,
-	RTS_ON,
-	RTS_DEFAULT,
-	RTS_NDP,
-	RTS_LEGACY,
+	RTS_OFF = 0, //RTS is not used
+	RTS_ON, //RTS is used regardless of RTS threshold
+	RTS_DEFAULT, //RTS is used only if MPDU len > RTS threshold
+};
+
+enum {
+	CTS_LEGACY = 0,
+	CTS_NDP,
 };
 
 enum {

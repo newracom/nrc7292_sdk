@@ -130,12 +130,9 @@
 #define NVS_WIFI_DISCONN_TIMEOUT  "disconn_timeout"
 
 /*WIFI beacon interval */
-/* (type i32) */
+/* CLI : nvs set_i32 wifi_bcn <15-65535> */
+/* (type u16) */
 #define NVS_WIFI_BCN_INTERVAL "wifi_bcn"
-
-/*WIFI short beacon interval */
-/* (type i32) */
-#define NVS_WIFI_SHORT_BCN_INTERVAL "wifi_short_bcn"
 
 /* Device mode, the value should be either AP (1) or STA (0) */
 /* If not set, default mode will be AP */
@@ -170,10 +167,18 @@
 /* (type i8) */
 #define NVS_WIFI_CCA_THRES "wifi_cca_thres"
 
-/* Wi-Fi hidden sside mode, uint8_t value 0 for disable or 1 for enable, uint8_t value */
-/* CLI : nvs set_u8 hidden_ssid <0-1> */
+/* Wi-Fi ignore_broadcast_ssid - Hide SSID in AP mode */
+/* This setting controls the behavior of the Access Point (AP) regarding SSID broadcast. */
+/* When enabled, the AP will send empty SSID in beacons and ignore probe request frames */
+/* that do not specify the full SSID, thus requiring stations to know the SSID. */
+/* - 0: Probe requests for broadcast SSID are not ignored. It sends the SSID in beacons. (default) */
+/* - 1: Send an empty (length=0) SSID in beacons and ignore probe requests for broadcast SSID. */
+/* - 2: Clear SSID (ASCII 0), but keep the original length. (this may be required */
+/*		with some clients that do not support empty SSID) and ignore probe */
+/*	   requests for broadcast SSID */
+/* CLI : nvs set_u8 ssid_type <0-2> */
 /* (type u8) */
-#define NVS_WIFI_HIDDEN_SSID "hidden_ssid"
+#define NVS_WIFI_IGNORE_BROADCAST_SSID "ssid_type"
 
 /* Maximum number of stations allowed in softAP (upto 10) */
 /* CLI : nvs set_u8 max_num_sta <1-10> */

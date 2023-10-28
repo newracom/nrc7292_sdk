@@ -29,6 +29,7 @@
 #include "ping/ping.h"
 #include "ping/ping_task.h"
 #include "util_trace.h"
+#include "util_string.h"
 
 #include "includes.h"
 #include "nrc_lwip.h"
@@ -150,7 +151,13 @@ int  ping_run(int argc, char *argv[])
 				break;
 		}else if(strcmp(str, "-i") == 0){
 			str = argv[++i];
-			ping_conn->interval = atoi(str)* PING_DELAY_UNIT;
+			if (isFloat(str)) {
+				float floatValue = atof(str);
+				ping_conn->interval = (int)(floatValue * PING_DELAY_UNIT );
+			} else {
+				int intValue = atoi(str);
+				ping_conn->interval = intValue * PING_DELAY_UNIT;
+			}
 		}else if(strcmp(str, "-c") == 0){
 			str = argv[++i];
 			ping_conn->target_count = atoi(str);

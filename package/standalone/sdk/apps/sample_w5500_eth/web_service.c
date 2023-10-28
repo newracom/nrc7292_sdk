@@ -157,8 +157,8 @@ subst_wifi_values(char* html, WIFI_CONFIG* wifi_config)
 				case WIFI_DHCPSERVER_SUBST:
 					snprintf(val, sizeof(val) - 1, "%d", wifi_config->dhcp_server);
 					break;
-				case WIFI_SHORT_BCN_SUBST:
-					snprintf(val, sizeof(val) - 1, "%d", wifi_config->short_bcn_interval);
+				case WIFI_BEACON_INTERVAL_SUBST:
+					snprintf(val, sizeof(val) - 1, "%d", wifi_config->bcn_interval);
 					break;
 				case WIFI_TXPOWER_SUBST:
 					snprintf(val, sizeof(val) - 1, "%d", wifi_config->tx_power);
@@ -343,7 +343,7 @@ update_settings_handler(httpd_req_t* req)
 
 			if (httpd_query_key_value(html_buffer, "bcn_interval", (char*)tmp, sizeof(tmp)) == ESP_OK) {
 				nrc_usr_print("[%s] Found URL query parameter => bcn_interval=%s\n", __func__, tmp);
-				wifi_config->short_bcn_interval = atoi(tmp);
+				wifi_config->bcn_interval= atoi(tmp);
 			}
 
 			if (httpd_query_key_value(html_buffer, "txpower", (char*)tmp, sizeof(tmp)) == ESP_OK) {

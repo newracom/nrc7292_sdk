@@ -119,8 +119,10 @@ void UpdateCHTableByCC(const char* country_code);
 void CheckNUpdateCHTableByVif(int vif_id);
 
 #if defined(INCLUDE_BD_SUPPORT)
+void initCurrentTXPwrInfo(void);
 void setChannelTXPwrInfoValid(bool valid);
 bool getChannelTXPwrInfoValid();
+CH_TXPWR_INFO * getCurrentTXPwrInfo(void);
 CH_TXPWR_INFO * getChannelTXPwrInfo(uint16_t ch);
 void getChannelMask(uint32_t *l, uint32_t *h);
 void setChannelMask(uint32_t l, uint32_t h);

@@ -24,8 +24,43 @@
  */
 
 
-#include "nrc_sdk.h"
 #include "hif.h"
+
+/**********************************************************************************************/
+
+#if 0
+int hif_log (const char *fmt, ...)
+{
+	char buf[128];
+	va_list ap;
+	int len;
+	int ret;
+
+	len = snprintf(buf, sizeof(buf), "[ATHIF] ");
+
+	va_start(ap, fmt);
+	ret = vsnprintf(buf + len, sizeof(buf) - len, fmt, ap);
+	va_end(ap);
+
+	if (ret >= 0)
+	{
+		len += ret;
+
+		if (len < sizeof(buf))
+		{
+			_hif_printf("%s\n", buf);
+
+			return 0;
+		}
+
+		errno = ENOBUFS;
+	}
+		
+	_hif_printf("%s: %s\n", __func__, strerror(errno));
+
+	return -1;
+}
+#endif
 
 /********************************************************************************************/
 
@@ -171,7 +206,7 @@ int _hif_rx_suspend (int time)
 	{
 		if (time <= 0)
 		{
-			_hif_error("invalid time (%d)\n", time);
+			_hif_error("time=%d", time);
 			return -1;
 		}
 
@@ -227,7 +262,7 @@ int _hif_open (_hif_info_t *info)
 	if (!info)
 		return -1;
 
-/*	_hif_debug("Open: type=%d\n", info->type); */
+/*	_hif_debug("Open: type=%d", info->type); */
 
 	if (!_hif_valid_type(info->type))
 		return -1;
@@ -260,7 +295,7 @@ int _hif_open (_hif_info_t *info)
 
 	_hif_set_type(info->type);
 
-/*	_hif_debug("Open: success\n"); */
+/*	_hif_debug("Open: success"); */
 
 	return 0;
 }
@@ -283,7 +318,7 @@ void _hif_close (void)
 	if (_hif_get_type() == _HIF_TYPE_NONE)
 		return;
 
-/*	_hif_debug("Close\n"); */
+/*	_hif_debug("Close"); */
 
 	_hif_rx_task_delete();
 

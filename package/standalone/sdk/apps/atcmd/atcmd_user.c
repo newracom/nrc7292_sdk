@@ -45,7 +45,7 @@ static struct
 
 static int _atcmd_user_test_run (int argc, char *argv[])
 {
-	_atcmd_info("%s\n", __func__);
+	_atcmd_info("%s", __func__);
 
 	return ATCMD_SUCCESS;
 }

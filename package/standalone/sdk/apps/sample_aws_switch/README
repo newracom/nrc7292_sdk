@@ -1,0 +1,44 @@
+NRC EVK LED Control with Amazon IoT Cloud
+This sample demonstrates how to remotely control LEDs on NRC EVKs (Evaluation Kits) using Amazon IoT Cloud.
+
+Firmware
+The sample_aws_switch firmware allows you to control both the red and green LEDs when remote commands are received.
+
+Building the Firmware
+For NRC7292
+make select target=nrc7292.sdk.release APP_NAME=sample_aws_switch
+make
+
+For NRC7394
+make select target=nrc7394.sdk.release APP_NAME=sample_aws_switch
+make
+
+Running the Firmware
+Follow SDK document for help installing and running the firmware
+
+Once the device is paired with the access point (AP), it will connect to the predefined AWS IoT Cloud.
+We recommend updating the server URL and SSL credentials as needed.
+
+When the MQTT connection is established with AWS IoT, the firmware will subscribe to the "nrc_switch/control" topic and publish the initial state to the "nrc_switch_status" topic.
+
+You can use the shell scripts provided in the ./host subdirectory to listen to events sent by the device and control the LEDs.
+
+subscribe.sh: Subscribe to the "nrc_switch/status" topic and print messages sent from the device.
+switch_control.sh: Control the LEDs on the NRC EVK.
+
+Before running the scripts, ensure that the mosquitto-clients package is installed on your client computer. You can install it on Ubuntu using the following command:
+sudo apt install mosquitto-clients
+
+Running the Scripts
+To subscribe to events, run:
+
+./subscribe.sh
+
+To control the LEDs, you can use the following commands:
+./switch_control.sh red {on/off}
+./switch_control.sh green {on/off}
+./switch_control.sh red {on/off} green {on/off}
+./switch_control.sh on   # Turn both LEDs on
+./switch_control.sh off  # Turn both LEDs off
+
+With these scripts, you can remotely control the LEDs on your NRC EVK using the AWS IoT Cloud.

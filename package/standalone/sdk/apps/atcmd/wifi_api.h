@@ -32,7 +32,7 @@ enum TX_POWER_TYPE
 	TX_POWER_AUTO = 0,
 	TX_POWER_LIMIT,
 	TX_POWER_FIXED,
-	
+
 	TX_POWER_TYPE_MAX
 };
 
@@ -90,6 +90,8 @@ extern int16_t wifi_api_get_s1g_freq (uint16_t non_s1g_freq);
 extern int wifi_api_get_supported_channels (const char *country, wifi_channels_t *channels);
 
 extern int wifi_api_get_macaddr (char *macaddr);
+extern int wifi_api_get_macaddr0 (char *macaddr);
+extern int wifi_api_get_macaddr1 (char *macaddr);
 
 extern int wifi_api_get_country (char *country);
 extern int wifi_api_set_country (char *country);
@@ -138,7 +140,7 @@ extern int wifi_api_set_security (char *security, char *password);
 extern int wifi_api_add_network (void);
 extern int wifi_api_remove_network (void);
 
-extern int wifi_api_start_scan (uint32_t timeout);
+extern int wifi_api_start_scan (char *ssid, uint32_t timeout);
 extern int wifi_api_get_scan_results (SCAN_RESULTS *results);
 extern int wifi_api_get_scan_freq (uint16_t freq[], uint8_t *n_freq);
 extern int wifi_api_set_scan_freq (uint16_t freq[], uint8_t n_freq);
@@ -162,15 +164,18 @@ extern int wifi_api_start_deep_sleep (uint32_t timeout, uint8_t gpio);
 extern bool wifi_api_wakeup_done (void);
 
 #ifdef CONFIG_ATCMD_SOFTAP
-extern int wifi_api_start_softap (int freq, int bw, char *ssid, char *security, char *password, uint32_t timeout);
+extern int wifi_api_start_softap (int freq, int bw,
+								char *ssid, char *security, char *password,
+								int ssid_type, uint32_t timeout);
 extern int wifi_api_stop_softap (void);
 
 extern int wifi_api_get_max_num_sta (uint8_t *max_num_sta);
 extern int wifi_api_set_max_num_sta (uint8_t max_num_sta);
 
-extern int wifi_api_get_sta_info (int aid, char *maddr, int8_t *rssi, uint8_t *snr, uint8_t *tx_mcs, uint8_t *rx_mcs);
+extern int wifi_api_get_sta_info (int aid, char *maddr, int8_t *rssi, uint8_t *snr,
+								uint8_t *tx_mcs, uint8_t *rx_mcs);
 
-extern int wifi_api_set_bss_max_idle (int period, int retry_cnt);
+extern int wifi_api_set_bss_max_idle (uint16_t period, uint8_t retry_cnt);
 
 extern int wifi_api_start_dhcp_server (void);
 extern int wifi_api_stop_dhcp_server (void);

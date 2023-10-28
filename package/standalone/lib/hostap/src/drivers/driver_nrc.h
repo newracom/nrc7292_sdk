@@ -197,6 +197,14 @@ struct nrc_wpa_route {
   	uint32_t 				ts;
 	uint8_t 				addr[6];
 };
+
+struct nrc_max_idle {
+	uint16_t period;		// usf
+	uint32_t timeout_time;	// sf second
+
+	uint8_t timeout_retry;
+};
+
 struct nrc_wpa_sta {
 	struct nrc_wpa_key		key;
 	uint8_t 				addr[6];
@@ -209,6 +217,7 @@ struct nrc_wpa_sta {
 	uint8_t 				state;
 	bool					qos;
 	uint16_t 				last_mgmt_stype;
+	struct nrc_max_idle		max_idle;
 	enum block_ack_state 	block_ack[MAX_TID];
 #if defined (INCLUDE_AMPDU_REORDER) || defined (INCLUDE_EARLY_FREE_SYSRXBUF) || defined (INCLUDE_AMPDU_AUTO_TX)
 	struct sta_ampdu_mlme   ampdu_mlme;
@@ -226,7 +235,6 @@ struct nrc_wpa_bss {
 	uint16_t 				beacon_int;
 	struct os_time 			last_beacon_update;
 	bool 					authorized_1x;
-	uint16_t				max_idle;
 	struct os_time 			last_tx_time;
 	bool					qos;
 };
@@ -248,6 +256,7 @@ struct nrc_wpa_if {
 	struct nrc_wpa	*global;
 	struct nrc_wpa_sta *ap_sta[NRC_WPA_SOFTAP_MAX_STA];
 	int num_ap_sta;
+	uint32_t bss_max_idle;
 	uint8_t	num_route_list;
 	int key_mgmt ;
 };
@@ -306,13 +315,6 @@ struct nrc_wpa_log_event {
 
 #if defined(INCLUDE_BD_SUPPORT_TARGET_VERSION)
 #define NRC_DRIVER_BD_MAX_CH_LIST		45
-struct wpa_bd_ch_table {
-	uint16_t    s1g_freq;
-	uint16_t    nons1g_freq;
-	uint8_t     s1g_freq_index;
-	uint16_t    nons1g_freq_index;
-};
-
 struct wpa_bd_supp_param {
 	uint8_t num_ch;
 	uint8_t s1g_ch_index[NRC_DRIVER_BD_MAX_CH_LIST];
@@ -362,18 +364,13 @@ int nrc_send_deauthenticate(struct nrc_wpa_if *intf, const uint8_t *a1,
 int nrc_get_sec_hdr_len(struct nrc_wpa_key *key);
 void nrc_start_keep_alive(struct nrc_wpa_if* intf);
 void run_wim_set_bssid(int vif_id, uint8_t* bssid);
-#if defined(SOFT_AP_BSS_MAX_IDLE)
-bool softap_bss_max_idle_is_on(void);
-void softap_bss_max_idle_period_update(int period);
-uint32_t softap_get_bss_max_idle_period(void);
-void softap_bss_max_idle_retry_update(int retry);
-uint8_t softap_get_bss_max_idle_retry(void);
-void refresh_bss_max_idle_by_maddr(uint8_t vif_id, uint8_t* addr);
+int nrc_usf_to_interval(uint16_t usf);
+uint16_t nrc_interval_to_usf(int interval);
+void refresh_bss_max_idle(struct nrc_wpa_sta* sta);
 int softap_bss_max_idle_start_timer(void);
 void softap_bss_max_idle_stop_timer(void);
-void softap_bss_max_idle_add_sta(uint16_t aid);
-void softap_bss_max_idle_remove_sta(uint16_t aid);
-#endif /* defined(SOFT_AP_BSS_MAX_IDLE) */
+void softap_bss_max_idle_add_sta(struct nrc_wpa_if* intf, const u8 *addr);
+void softap_bss_max_idle_remove_sta(struct nrc_wpa_if* intf, const u8 *addr);
 // Helper functions
 static inline bool is_wep(uint8_t cipher)
 {

@@ -4,6 +4,7 @@
 #include "lwip/sockets.h"
 #include "lwip/dns.h"
 #include "lwip/mem.h"
+#include "lwip/apps/sntp.h"
 #include "netif/wlif.h"
 #if LWIP_IPV6
 #include "lwip/nd6.h"
@@ -15,8 +16,13 @@
 #if LWIP_DNS && LWIP_DHCPS
 #include "captdns.h"
 #endif
+#include "drv_rtc.h"
 
 #include "standalone.h"
+
+#ifdef INCLUDE_WIREGUARD
+extern struct netif wg_netif;
+#endif
 
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
 #include "nrc_eth_if.h"
@@ -273,6 +279,38 @@ bool ifconfig_display(WIFI_INTERFACE if_index)
 	return true;
 }
 
+#ifdef INCLUDE_WIREGUARD
+bool ifconfig_display_wg(struct netif *netif)
+{
+	if(netif == NULL){
+		return false;
+	}
+
+	A("wg\t");
+
+
+	A("HWaddr ");
+	A(MAC_STR,MAC_VALUE(netif->hwaddr) );
+	A("   MTU:%d\n", netif->mtu);
+#if LWIP_IPV4
+	A("\tinet:");
+	ip_addr_debug_print_val(LWIP_DBG_ON, (netif->ip_addr));
+	A("\tnetmask:");
+	ip_addr_debug_print_val(LWIP_DBG_ON, (netif->netmask));
+	A("\tgateway:");
+	ip_addr_debug_print_val(LWIP_DBG_ON, (netif->gw));
+	A("\n");
+#endif /* LWIP_IPV4 */
+#if LWIP_IPV6
+	for (int i = 0; i < LWIP_IPV6_NUM_ADDRESSES; i++) {
+		A(" 		  inet6: %s/0x%"X8_F"\n", ip6addr_ntoa(netif_ip6_addr(netif, i)),
+			netif_ip6_addr_state(netif, i));
+	}
+#endif
+	A("\n");
+	return true;
+}
+#endif
 
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
 bool support_ethernet_accesspoint(void)
@@ -295,6 +333,9 @@ static void ifconfig_display_all()
 	for(i = 0; i < MAX_IF; i++) {
 		ifconfig_display(i);
 	}
+#ifdef INCLUDE_WIREGUARD
+	ifconfig_display_wg(&wg_netif);
+#endif
 }
 
 bool wifi_ifconfig(int argc, char *argv[])
@@ -922,3 +963,58 @@ bool delete_wifi_bridge_interface(void)
 	return true;
 }
 #endif /* LWIP_BRIDGE */
+
+u64_t rtc_offset = 0;
+
+void set_rtc_utc_offset(u32_t t, u32_t us)
+{
+	rtc_offset = t-(drv_rtc_get_us()/1000000);
+	A("[%s] rtc offset : %lld\n", __func__, rtc_offset);
+}
+
+u64_t get_rtc_utc_offset(void)
+{
+	A("[%s] rtc offset : %lld\n", __func__, rtc_offset);
+	return (rtc_offset);
+}
+
+u64_t get_utc_time(void){
+	u64_t time;
+	u64_t rtc_offset_value = get_rtc_utc_offset();
+	if(rtc_offset_value){
+		time = (drv_rtc_get_us()/1000000)+ rtc_offset_value;
+	} else {
+		time = 0;
+	}
+	return time;
+}
+
+/*
+ * initialize_sntp() should be called after establishing a successful WiFi connection
+ * and configuring DHCP to ensure accurate time synchronization.
+ */
+bool initialize_sntp(void)
+{
+	bool ret = false;
+	u64_t current_time = 0;
+	int retry = 0;
+	const int retry_count = 10;
+
+	sntp_setoperatingmode(SNTP_OPMODE_POLL);
+#if SNTP_SERVER_DNS
+	sntp_setservername(0, "pool.ntp.org");
+#endif
+	sntp_init();
+
+	while(++retry < retry_count) {
+		current_time = get_utc_time() ;
+		if(current_time != 0 ){
+			ret = true;
+			break;
+		}
+		A("Waiting for system time to be set... (%d/%d)", retry, retry_count);
+		vTaskDelay(pdMS_TO_TICKS(100));
+	}
+	return ret;
+}
+

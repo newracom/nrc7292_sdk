@@ -19,6 +19,8 @@
 #define SF_CORE_DUMP_2MB		0xF6000
 #define SF_CORE_DUMP_4MB		0x3F3000
 #define SF_FW_INFO			system_sfc_get_fw_info_address()
+#define SF_FW_2MB		0x10000
+#define SF_FW_4MB		0x10000
 #define SF_FW_INFO_2MB		0xF5000
 #define SF_FW_INFO_4MB		0x3FE000
 #define SF_USER_CONFIG_1		system_sfc_get_user_config1_address()
@@ -27,6 +29,8 @@
 #define SF_FW			0x10000
 
 extern uint32_t sf_size;
+
+#define SF_SECTOR_SIZE            4096
 
 #define SF_SLOT_DATA_OFFSET 12
 #define SF_SLOT_CRC_OFFSET 8
@@ -83,6 +87,13 @@ bool 		hal_sf_update_slot(uint32_t address, uint8_t *data, size_t size);
 bool 		hal_sf_read_slot_info(uint32_t address, sf_slot_t *data);
 bool 		hal_sf_read_slot_data(uint32_t address, size_t size, uint8_t *buffer);
 bool 		hal_sf_get_flash_sector_data(uint32_t address, uint8_t *buffer, size_t size);
+bool 		hal_sf_write_common(uint32_t mem_map_entry, uint32_t user_data_offset, uint8_t* data, uint32_t size);
+bool 		hal_sf_read_common(uint32_t mem_map_entry, uint8_t* data, uint32_t user_data_offset, uint32_t size);
+uint32_t    hal_sf_get_user_data_area_size(void);
+bool		hal_sf_write_user_data(uint32_t user_data_offset, uint8_t* data, uint32_t size);
+bool		hal_sf_read_user_data(uint8_t* data, uint32_t user_data_offset, uint32_t size);
+bool		hal_sf_write_device_info(uint8_t* data, uint16_t size);
+bool		hal_sf_read_device_info(uint8_t* data, uint16_t size);
 
 /* ----------------------------------
  * W25XX JEDEC ID
@@ -102,6 +113,7 @@ bool 		hal_sf_get_flash_sector_data(uint32_t address, uint8_t *buffer, size_t si
 #define GD25LQ40C_JEDEC_ID (0xC86013)
 #define GD25WQ16E_JEDEC_ID (0xC86515)
 #define GD25WQ32E_JEDEC_ID (0xC86516)
+#define GD25WQ128E_JEDEC_ID (0xC86518)
 #define GD25Q16CE2GR_JEDEC_ID (0xC84015)
 #define MX25V8035F_JEDEC_ID (0xC22314)
 #define MX25V1635F_JEDEC_ID (0xC22315)
@@ -120,6 +132,7 @@ bool 		hal_sf_get_flash_sector_data(uint32_t address, uint8_t *buffer, size_t si
 #define GT25Q16A_JEDEC_ID (0xC46015)
 #define GT25Q32A_JEDEC_ID (0xC46016)
 #define FM25W16A_JEDEC_ID (0xA12815)
+#define FM25W32A_JEDEC_ID (0xA12816)
 
 /* ----------------------------------
  * W26XX JEDEC ID

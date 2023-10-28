@@ -159,9 +159,9 @@ typedef struct queuemanager {
 #if defined(INCLUDE_MODEM_RECOVERY)
 	uint16_t m_last_sn;
 #endif
-#if defined(CONFIG_BITMAP_ENCODING)
+#if defined (INCLUDE_SW_OFFLOAD_NDP_CTRL)
 	NDPBA_INFO_T m_ndpba_info;
-#endif /* defined(CONFIG_BITMAP_ENCODING) */
+#endif /* defined(INCLUDE_SW_OFFLOAD_NDP_CTRL) */
 
 } QUEUEMANAGER;
 
@@ -183,6 +183,9 @@ void lmac_qm_flush_pending_queue(uint8_t ac, bool mode);
 void lmac_qm_staggered_free(uint8_t ac);
 bool lmac_qm_append_pend_queue(uint8_t ac);
 void lmac_qm_restore_queue(uint8_t ac);
+#if defined(CSPI)
+void lmac_qm_remove_sta(uint8_t *addr);
+#endif
 void lmac_qm_buffer_to_free(uint8_t ac, LMAC_TXBUF *buffer);
 void lmac_qm_buffer_to_free_all(uint8_t ac, uint8_t qtype);
 void lmac_qm_flush_buffer();

@@ -35,6 +35,7 @@
 #include "wifi_connect_common.h"
 #include "api_system.h"
 #include "nvs.h"
+#include "cJSON.h"
 
 #define WIRELESS_BRIDGE_FW_VERSION "1.0.0"
 #define WEB_SERVER_DEFAULT_IP "192.168.50.1"
@@ -60,6 +61,76 @@ typedef struct {
 
 user_factory_t user_factory_info;
 #define USER_FACTORY_SIZE 512
+
+#define USE_USER_FACTORY_JSON_DATA_FORMAT 1
+#if USE_USER_FACTORY_JSON_DATA_FORMAT
+int get_json_str_value(cJSON *cjson, char *key, char **value)
+{
+	cJSON *cjson_obj = NULL;
+
+	cjson_obj = cJSON_GetObjectItem(cjson, key);
+	if (cjson_obj && cjson_obj->valuestring) {
+		*value = strdup(cjson_obj->valuestring);
+		return 1;
+	} else {
+		nrc_usr_print("[%s] %s not found in json\n", __func__, key);
+		return 0;
+	}
+}
+
+void parse_user_factory(char *input, user_factory_t* data)
+{
+    cJSON *cjson = NULL;
+    cjson = cJSON_Parse(input);
+
+    if (cjson) {
+        cJSON *model_json = cJSON_GetObjectItem(cjson, "model");
+        if (model_json && model_json->valuestring) {
+            strncpy((char*)data->model_name, model_json->valuestring, sizeof(data->model_name));
+            data->model_name[sizeof(data->model_name) - 1] = '\0';
+            nrc_usr_print("[%s] model : %s\n", __func__, data->model_name);
+        } else {
+            nrc_usr_print("[%s] Error: Missing or invalid 'model' field\n", __func__);
+            goto exit;
+        }
+
+        cJSON *sn_json = cJSON_GetObjectItem(cjson, "sn");
+        if (sn_json && sn_json->valuestring) {
+            strncpy((char*)data->serial_number, sn_json->valuestring, sizeof(data->serial_number));
+            data->serial_number[sizeof(data->serial_number) - 1] = '\0';
+            nrc_usr_print("[%s] sn : %s\n", __func__, data->serial_number);
+        } else {
+            nrc_usr_print("[%s] Error: Missing or invalid 'sn' field\n", __func__);
+            goto exit;
+        }
+
+        cJSON *eth_mac_json = cJSON_GetObjectItem(cjson, "eth_mac");
+        if (eth_mac_json && eth_mac_json->valuestring) {
+            int num_matched = sscanf(eth_mac_json->valuestring, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+                                      &data->eth_mac[0], &data->eth_mac[1], &data->eth_mac[2],
+                                      &data->eth_mac[3], &data->eth_mac[4], &data->eth_mac[5]);
+            if (num_matched != 6) {
+                nrc_usr_print("[%s] Error: Invalid 'eth_mac' format\n", __func__);
+                goto exit;
+            }
+            nrc_usr_print("[%s] eth_mac : %02x:%02x:%02x:%02x:%02x:%02x\n", __func__,
+                          data->eth_mac[0], data->eth_mac[1], data->eth_mac[2],
+                          data->eth_mac[3], data->eth_mac[4], data->eth_mac[5]);
+        } else {
+            nrc_usr_print("[%s] Error: Missing or invalid 'eth_mac' field\n", __func__);
+            goto exit;
+        }
+    } else {
+        nrc_usr_print("[%s] JSON parse error\n", __func__);
+    }
+
+exit:
+    if (cjson) {
+        cJSON_Delete(cjson);
+    }
+}
+#endif /* USE_USER_FACTORY_JSON_DATA_FORMAT */
+
 static nrc_err_t get_user_factory_data(user_factory_t* data)
 {
 	nrc_err_t ret = NRC_FAIL;
@@ -67,7 +138,11 @@ static nrc_err_t get_user_factory_data(user_factory_t* data)
 	char data_fcatory[USER_FACTORY_SIZE]={0,};
 	ret = nrc_get_user_factory(data_fcatory, USER_FACTORY_SIZE);
 	if(ret == NRC_SUCCESS){
+#if USE_USER_FACTORY_JSON_DATA_FORMAT
+		parse_user_factory(data_fcatory, data);
+#else
 		memcpy(data, data_fcatory, sizeof(user_factory_t));
+#endif
 		A("[%s] model_name : %s\n", __func__, data->model_name);
 		A("[%s] serial_number : %s\n", __func__, data->serial_number);
 		A("[%s] eth_mac : %02x:%02x:%02x:%02x:%02x:%02x\n", __func__,
@@ -197,7 +272,7 @@ void user_init(void)
 
 	run_http_server(&wifi_config);
 
-	nrc_wifi_set_use_4address(true);
+	nrc_wifi_set_use_4address(false);
 
 	nrc_wifi_set_config(&wifi_config);
 

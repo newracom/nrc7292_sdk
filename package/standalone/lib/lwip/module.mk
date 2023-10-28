@@ -11,6 +11,7 @@ LWIP_APPS		= $(LWIP_LIB_SRC)/apps
 LWIP_IPV4		= $(LWIP_CORE)/ipv4
 LWIP_IPV6		= $(LWIP_CORE)/ipv6
 SNMP_APP		= $(LWIP_APPS)/snmp
+SNTP_APP		= $(LWIP_APPS)/sntp
 
 LWIP_COMPAT		= $(LWIP_INC)/compat
 LWIP_POSIX		= $(LWIP_COMPAT)/posix
@@ -47,6 +48,7 @@ INCLUDE += -I$(LWIP_PORT_NETIF_INC)
 INCLUDE += -I$(LWIP_PORT_NAT_INC)
 INCLUDE += -I$(LWIP_POSIX)
 INCLUDE += -I$(SNMP_APP)
+INCLUDE += -I$(SNTP_APP)
 
 VPATH	+= $(LWIP_CORE)
 VPATH	+= $(LWIP_NETIF)
@@ -62,6 +64,7 @@ VPATH	+= $(LWIP_IPERF)
 VPATH	+= $(LWIP_DHCPS)
 VPATH	+= $(LWIP_PORT_NAT)
 VPATH	+= $(SNMP_APP)
+VPATH	+= $(SNTP_APP)
 
 DEFINE	+= -DNRC_LWIP
 
@@ -172,6 +175,9 @@ CSRCS += \
 	$(CORE6FILES)
 endif
 
+# SNTP client
+LWIP_SNTP_CSRCS = sntp.c \
+
 # SNMPv3 agent
 LWIP_SNMP_CSRCS = \
 	snmp_asn1.c \
@@ -197,7 +203,8 @@ LWIP_SNMP_CSRCS = \
 	snmp_traps.c \
 
 LWIP_APP+= \
-	$(LWIP_SNMP_CSRCS)
+	$(LWIP_SNMP_CSRCS) \
+	$(LWIP_SNTP_CSRCS) \
 
 # add files to CSRCS list
 CSRCS += \

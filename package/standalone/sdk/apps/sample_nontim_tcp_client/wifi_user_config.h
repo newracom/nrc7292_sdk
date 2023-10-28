@@ -14,4 +14,6 @@
  * particular use case or application.
 */
 
+#define NRC_WIFI_LISTEN_INTERVAL_DEFAULT 1000
+
 #endif // __WIFI_USER_CONFIG_H__ //

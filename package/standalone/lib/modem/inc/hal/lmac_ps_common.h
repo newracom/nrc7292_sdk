@@ -238,7 +238,7 @@ void lmac_ps_set_ba_state(uint8_t tid, bool add, uint8_t ba_state);
 void lmac_ps_set_txpwr(uint8_t tx_pwr, uint8_t type);
 void lmac_ps_set_rxgain(uint8_t rx_gain);
 void lmac_ps_set_sgi(uint8_t sgi);
-void lmac_ps_set_bss_maxidle(uint8_t option, uint16_t period);
+void lmac_ps_set_bss_maxidle(uint8_t option, uint16_t usf_period);
 void lmac_ps_set_security(uint8_t security);
 void lmac_ps_set_akm(uint8_t akm);
 void lmac_ps_set_pmk(uint8_t *pmk, uint32_t pmk_len);
@@ -262,6 +262,8 @@ void lmac_ps_set_target_wake(uint8_t wake);
 void lmac_ps_set_statype(uint8_t sta_type);
 void lmac_ps_set_aid(uint16_t aid);
 void lmac_ps_set_channel(uint16_t freq);
+void lmac_ps_set_rc_mode (uint8_t mode);
+void lmac_ps_set_rc_default_mcs (uint8_t mcs);
 #if defined(INCLUDE_LEGACY_ACK)
 void lmac_ps_set_legacy_ack(uint8_t enable);
 #endif /* INCLUDE_LEGACY_ACK */
@@ -274,22 +276,31 @@ void lmac_ps_set_prev_ptk(uint8_t *ptk, uint32_t ptk_len);
 #if defined(INCLUDE_DUTYCYCLE)
 void lmac_ps_set_duty_info(uint32_t window, uint32_t token, uint16_t margin, uint16_t beacon_margin);
 #endif /* defined(INCLUDE_DUTYCYCLE) */
+#if defined(INCLUDE_TCP_KEEPALIVE)
+void lmac_ps_set_keepalive_data (uint32_t seqnum, uint32_t acknum, uint8_t *src_ip, uint16_t src_port,
+									uint16_t winsize, uint32_t last_tsf);
+void lmac_ps_set_keepalive_config (uint8_t *dest_ip, uint16_t dest_port, uint32_t period_sec);
+#endif
 void lmac_ps_set_short_bcn_interval(uint16_t short_bcn_interval);
 void lmac_ps_set_bcn_interval(uint16_t bcn_interval);
 void lmac_ps_set_1m_prim_loc(uint8_t prim_loc);
 void lmac_ps_set_rc_status(uint8_t maxtp, uint8_t tp2, uint8_t maxp, uint8_t lowest, uint8_t probe);
+void lmac_ps_set_support_ch_width(uint8_t width);
 
 /* Dynamic PS API */
 void lmac_dyn_ps_init();
 uint32_t lmac_dyn_ps_get_timeout(uint8_t vif_id);
 int lmac_dyn_ps_set_timeout(uint8_t vif_id, uint32_t dps_timeout_ms);
 void lmac_dyn_ps_check_timeout(uint8_t vif_id);
-void lmac_dyn_ps_set_last_rx_tsf(uint32_t tsf);
+void lmac_dyn_ps_set_last_rx_tsf();
 uint32_t lmac_dyn_ps_get_last_rx_tsf();
-void lmac_dyn_ps_set_last_bcmc_rx_tsf(uint32_t tsf);
+uint32_t lmac_dyn_ps_get_last_rx_diff();
+void lmac_dyn_ps_set_last_bcmc_rx_tsf();
 uint32_t lmac_dyn_ps_get_last_bcmc_rx_tsf();
-void lmac_dyn_ps_set_last_tx_tsf(uint32_t tsf);
+uint32_t lmac_dyn_ps_get_last_bcmc_rx_diff();
+void lmac_dyn_ps_set_last_tx_tsf();
 uint32_t lmac_dyn_ps_get_last_tx_tsf();
+uint32_t lmac_dyn_ps_get_last_tx_diff();
 
 extern lmac_ps_info g_lmac_ps_info;
 

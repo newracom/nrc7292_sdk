@@ -4,6 +4,44 @@
 *
 *******************************************************************
 
+[2023-10-27]
+Change summary for version 1.6:
+
+    New features
+    * RSSI-based rate adaptation (v1.6)
+
+    Bugfix
+    * AT-CMD lwIP keepalive issue: TCP client socket would close when TCP keep-alive was enabled
+    * Power Save issue : Inaccurate Dynamic PS timer for Power Save
+    * Power Save issue : PS STA cannot wake up from deep sleep
+    * SoftAP NDP CTS issue : data transmission failure when NDP CTS is enabled on SoftAP
+    * Connection Issue : (STA) Aperiodic failure to connect NRC 4M BW AP (version 1.2.x ~ 1.3.x)
+    * Reset Issue : (STA) Aperiodic WDT (Watchdong Timer) reset and recovery while transmitting frames
+
+    Changes
+    * Update SDK APIs
+      o Update SDK APIs: refer to UG-7292-005-Standalone SDK API document
+    * Update AT-CMD
+      o Update AT commands: refer to UG-7292-006-AT_Command document
+    * Update samples
+      o sample_aws_switch: Control GPIO for on/off functionality
+      o sample_sntp: Retrieve NTP (Network Time Protocol) data
+      o sample_user_factory: Read data from the user factory area in the serial flash
+      o sample_w5500_eth: Change the default address mode to 3 address
+    * Update iperf: enable support for LWIP_IPERF while disabling LWIP_PING when using the modem library
+    * Set the default listen interval to 0 for wifi_config
+    * 1/2MHz STA support at 4MHz SoftAP
+    * Add auto guard interval control
+    * Add auto RX gain control
+    * Add serial flash support: FM25W32A
+    * Update to filter RX data that was sent from local
+      o Filter the packet forwarded back from AP to Station that sent packet
+    * Update NRCTools binaries
+
+    Known Issues
+    * The initial connection time for WPA3-SAE/OWE can be quite lengthy (> 15 seconds)
+      due to the substantial computational load required by software for large number operations.
+
 [2023-09-01]
 Change summary for version 1.5.2:
 

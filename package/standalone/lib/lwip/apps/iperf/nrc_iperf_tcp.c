@@ -142,6 +142,7 @@ void iperf_tcp_client(void *pvParameters)
 	int tosval;
 	uint8_t vif = 0;
 	iperf_time_t start_time, stop_time, now;
+	struct timeval tv;
 	struct sockaddr_storage to;
 	int count = 0;
 
@@ -212,6 +213,17 @@ void iperf_tcp_client(void *pvParameters)
 		goto exit;
 	}
 
+	tv.tv_sec = 5;
+	tv.tv_usec = 0;
+	ret = setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (const char *)&tv, sizeof(tv));
+	if (ret < 0) {
+		A("Set socket SO_SNDTIMEO option failed!\n");
+	}
+	ret = setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof(tv));
+	if (ret < 0) {
+		A("Set socket SO_RCVTIMEO option failed!\n");
+	}
+
 	memset(datagram, 0, IPERF_DEFAULT_DATA_BUF_LEN);
 	iperf_tcp_client_init_datagram(option, datagram);
 
@@ -236,20 +248,24 @@ void iperf_tcp_client(void *pvParameters)
 			option->client_info.end_time = now;
 			break;
 		}
-		nrc_iperf_spin_lock();
+
 		ret = send(sock, datagram, option->mBufLen, 0);
-		nrc_iperf_spin_unlock();
 		if (ret > 0) {
 			option->client_info.datagram_cnt++;
 		}
 
-		if (ret < 0) {	//disconnected
+		if (ret == ERR_TIMEOUT || ret == ERR_WOULDBLOCK) {
+			taskYIELD();
+		} else if (ret < 0) {	//disconnected
 			option->mForceStop = 1;
 		}
 
 		iperf_get_time(&now);
 
 		if (option->mForceStop || (now >= stop_time)){
+			if (option->mForceStop) {
+				A("iperf stopped due to send error.\n");
+			}
 			option->client_info.end_time = now;
 			break;
 		}

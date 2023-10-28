@@ -154,7 +154,7 @@ sys_init(void)
 u32_t
 sys_now(void)
 {
-  return xTaskGetTickCount() * portTICK_PERIOD_MS;
+  return (u32_t) system_get_time();
 }
 #endif
 

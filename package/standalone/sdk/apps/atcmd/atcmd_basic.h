@@ -32,6 +32,11 @@ extern void atcmd_basic_disable (void);
 
 extern bool atcmd_gpio_pin_valid (int pin);
 
+extern void atcmd_firmware_write (char *buf, int len);
+extern void atcmd_firmware_download_event_idle (uint32_t len, uint32_t cnt);
+extern void atcmd_firmware_download_event_drop (uint32_t len);
+extern void atcmd_firmware_download_event_done (uint32_t len);
+
 /**********************************************************************************************/
 #endif /* #ifndef __NRC_ATCMD_BASIC_H__ */
 

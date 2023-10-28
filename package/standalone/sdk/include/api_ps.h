@@ -68,6 +68,7 @@ nrc_err_t nrc_ps_deep_sleep(uint64_t sleep_ms);
  * Additionally, this API will not override the sleep duration specified by the sleep_ms parameter.
  *
  * @param sleep_ms: duration for deep sleep. The unit is ms. (>= 1000ms)
+ *                  Listen interval should be greater than sleep duration
  *
  * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
@@ -83,6 +84,7 @@ nrc_err_t nrc_ps_sleep_alone(uint64_t sleep_ms);
  * @param idle_timout_ms: wait time before entering the modem sleep. The unit is ms.  (0 <= time < 10000ms)
  *
  * @param sleep_ms: duration for deep sleep. The unit is ms. (0(not use) or time >= 1000ms)
+ *                  Listen interval should be greater than sleep duration
  *
  * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  *

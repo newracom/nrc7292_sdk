@@ -123,6 +123,7 @@ enum WIM_CMD_ID {
 	WIM_CMD_SET_IE,
 	WIM_CMD_SET_SAE,
 	WIM_CMD_SHELL_RAW,
+	WIM_CMD_RESET_HIF_TX,
 	WIM_CMD_MAX,
 };
 
@@ -202,7 +203,7 @@ enum WIM_TLV_ID {
 	WIM_TLV_SLEEP_DURATION,
 	WIM_TLV_CCA_1M,
 	WIM_TLV_S1G_CHANNEL,
-	WIM_TLV_RTS_THREASHOLD,
+	WIM_TLV_RTS_THRESHOLD,
 	WIM_TLV_FRAME_INJECTION, //60
 	WIM_TLV_IE_PARAM,
 	WIM_TLV_NDP_PREQ,
@@ -214,7 +215,7 @@ enum WIM_TLV_ID {
 	WIM_TLV_FOTA_CHUNK,
 	WIM_TLV_FOTA_FINISH,
 	WIM_TLV_FOTA_INFO,  //70
-	WIM_TLV_SOFTAP_BSS_MAX_IDLE,
+	WIM_TLV_BSS_MAX_IDLE,
 	WIM_TLV_SET_TXPOWER,
 	WIM_TLV_LEGACY_ACK,
 	WIM_TLV_BEACON_BYPASS,
@@ -222,6 +223,8 @@ enum WIM_TLV_ID {
 	WIM_TLV_PROBE_REQ_VENDOR_IE,
 	WIM_TLV_PROBE_RSP_VENDOR_IE,
 	WIM_TLV_ASSOC_REQ_VENDOR_IE,
+	WIM_TLV_RC_MODE,
+	WIM_TLV_DEFAULT_MCS, //80
 	WIM_TLV_MAX,
 };
 
@@ -737,6 +740,7 @@ struct wim_drv_info_param {
 	uint32_t bitmap_encoding	:1;
 	uint32_t reverse_scrambler	:1;
 	uint32_t kern_ver			:12;
+	uint32_t supported_ch_width	:2;
 	uint32_t reserved			:14;
 	uint32_t vendor_oui;
 	uint32_t deepsleep_gpio_dir;

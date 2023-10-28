@@ -33,9 +33,6 @@
 # else
 # define ATCMD_CPU_TYPE		"CM0"
 # endif
-#elif defined(NRC7393)
-#define ATCMD_CHIP_NAME		"NRC7393"
-#define ATCMD_CPU_TYPE		"CM3"
 #elif defined(NRC7394)
 #define ATCMD_CHIP_NAME		"NRC7394"
 #define ATCMD_CPU_TYPE		"CM3"
@@ -52,7 +49,7 @@
 
 static void nrc_atcmd_build_info (void)
 {
-	_atcmd_info("ATCMD_BUILD: %s,%s,%s (%s, %s)\n",
+	_atcmd_info("BUILD: %s,%s,%s (%s, %s)",
 					ATCMD_CHIP_NAME,
 					ATCMD_CPU_TYPE,
 					ATCMD_IP_VER,
@@ -64,11 +61,11 @@ static void nrc_atcmd_build_info (void)
 static void nrc_atcmd_version_info (void)
 {
 #if defined(SDK_VER_DESCRIPTION)
-	_atcmd_info("ATCMD_VERSION: %d.%d.%d (SDK-%d.%d.%d-%s)\n",
+	_atcmd_info("VERSION: %d.%d.%d (SDK-%d.%d.%d-%s)",
 					ATCMD_VER_MAJOR, ATCMD_VER_MINOR, ATCMD_VER_REVISION,
 					SDK_VER_MAJOR, SDK_VER_MINOR, SDK_VER_REVISION, SDK_VER_DESCRIPTION);
 #else
-	_atcmd_info("ATCMD_VERSION: %d.%d.%d (SDK-%d.%d.%d)\n",
+	_atcmd_info("VERSION: %d.%d.%d (SDK-%d.%d.%d)",
 					ATCMD_VER_MAJOR, ATCMD_VER_MINOR, ATCMD_VER_REVISION,
 					SDK_VER_MAJOR, SDK_VER_MINOR, SDK_VER_REVISION);
 #endif
@@ -142,7 +139,11 @@ static int nrc_atcmd_enable_hspi (bool *console_enable)
 	uint32_t sw_id = ((VERSION_MAJOR & 0xff) << 16) |
 					 ((VERSION_MINOR & 0xff) << 8) |
 					 (VERSION_REVISION & 0xff);
-	uint32_t bd_id = 0x7292A002;
+#if defined(NRC7292)
+	uint32_t bd_id = 0x07020902;
+#elif defined(NRC7394)
+	uint32_t bd_id = 0x07030904;
+#endif
 
 	*console_enable = true;
 	nrc_uart_console_enable(true);
@@ -164,7 +165,7 @@ static int nrc_atcmd_enable_uart (bool *console_enable)
 #if defined(NRC7292)
 	const uint32_t console = NRC_UART_CH3;
 	uint32_t channel = NRC_UART_CH2;
-#elif defined(NRC7393) || defined(NRC7394)
+#elif defined(NRC7394)
 	const uint32_t console = NRC_UART_CH0;
 	uint32_t channel = NRC_UART_CH1;
 #endif
@@ -213,12 +214,15 @@ void user_init (void)
 		nrc_atcmd_disable();
 
 		if (console_enable)
-			_atcmd_info("Exit AT Command for NRC Halow\n");
+			_atcmd_info("Exit AT Command");
 	}
 }
 
 /**********************************************************************************************/
 
+#if defined(CONFIG_ATCMD_CLI)
+
+#if !defined(CONFIG_ATCMD_CLI_MINIMUM)
 static int cmd_atcmd_info (cmd_tbl_t *t, int argc, char *argv[])
 {
 	int ret = CMD_RET_SUCCESS;
@@ -242,9 +246,12 @@ SUBCMD_MAND(atcmd,
 		cmd_atcmd_info,
 		"build and version info",
 		"atcmd info");
+#endif /* #if !defined(CONFIG_ATCMD_CLI_MINIMUM) */
+
 
 CMD_MAND(atcmd,
     NULL,
     "AT Command",
     "atcmd <subcmd> [options]");
 
+#endif /* #if defined(CONFIG_ATCMD_CLI) */

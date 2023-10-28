@@ -69,18 +69,6 @@
 
 /**********************************************************************************************/
 
-#define _hif_malloc						pvPortMalloc
-#define _hif_free						vPortFree
-#define _hif_printf						hal_uart_printf
-
-#define _hif_log(fmt, ...)				_hif_printf("[ATHIF] " fmt, ##__VA_ARGS__)
-#define _hif_info(fmt, ...)				_hif_log(fmt, ##__VA_ARGS__)
-#define _hif_error(fmt, ...)			_hif_log("%s: " fmt, __func__, ##__VA_ARGS__)
-#define _hif_debug(fmt, ...)			_hif_log(fmt, ##__VA_ARGS__)
-#define _hif_trace()					_hif_log("%s::%d\r\n", __func__, __LINE__)
-
-/**********************************************************************************************/
-
 enum _HIF_TYPE
 {
 	_HIF_TYPE_NONE = -1,
@@ -191,6 +179,32 @@ extern int _hif_write (char *buf, int len);
 extern int _hif_rx_suspend (int time);
 extern void _hif_rx_resume (void);
 extern void _hif_rx_resume_isr (void);
+
+/**********************************************************************************************/
+
+#define _hif_malloc		pvPortMalloc
+#define _hif_free		vPortFree
+#define _hif_printf		hal_uart_printf
+
+#if 0
+
+extern int hif_log (const char *fmt, ...);
+
+#define _hif_info(fmt, ...)		hif_log(fmt, ##__VA_ARGS__)
+#define _hif_error(fmt, ...)	hif_log("(%s,%d) " fmt, __func__, __LINE__, ##__VA_ARGS__)
+#define _hif_debug(fmt, ...)	hif_log(fmt, ##__VA_ARGS__)
+#define _hif_trace()			hif_log("(%s,%d)", __func__, __LINE__)
+
+#else
+
+extern int atcmd_log (const char *fmt, ...);
+
+#define _hif_info(fmt, ...)		atcmd_log(fmt, ##__VA_ARGS__)
+#define _hif_error(fmt, ...)	atcmd_log("(%s,%d) " fmt, __func__, __LINE__, ##__VA_ARGS__)
+#define _hif_debug(fmt, ...)	atcmd_log(fmt, ##__VA_ARGS__)
+#define _hif_trace()			atcmd_log("(%s,%d)", __func__, __LINE__)
+
+#endif
 
 /**********************************************************************************************/
 #endif /* #ifndef __NRC_HIF_H__ */

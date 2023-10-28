@@ -225,3 +225,12 @@ ifeq ($(CONFIG_PSRAM), y)
 	PSRAM_BASE = $(LIB_PATH)/psram
 	include $(PSRAM_BASE)/module.mk
 endif
+
+#// --------------------------------------------------
+#// LIB
+#// wireguard https://github.com/smartalock/wireguard-lwip
+#// --------------------------------------------------
+ifeq ($(CONFIG_WIREGUARD), y)
+	WIREGUARD_BASE = $(LIB_PATH)/wireguard-lwip
+	include $(WIREGUARD_BASE)/module.mk
+endif

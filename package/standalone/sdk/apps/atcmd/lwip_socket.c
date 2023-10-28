@@ -43,7 +43,7 @@ static int __lwip_socket_error (const char *func, const int line, int _errno_)
 			break;
 
 		default:
-			_lwip_socket_log("%s::%d, %s (%d)\n", func, line, strerror(_errno_), _errno_);
+			_lwip_socket_log("%s::%d, %s (%d)", func, line, strerror(_errno_), _errno_);
 	}
 
 	errno = _errno_;
@@ -148,7 +148,7 @@ static int _lwip_socket_get_info (int fd, ip_addr_t *ipaddr, uint16_t *port, boo
 #endif
 	else
 	{
-		_lwip_socket_log("SOCK_GET_INFO: invalid addrlen (%d)\n", addrlen);
+		_lwip_socket_log("SOCK_GET_INFO: invalid addrlen (%d)", addrlen);
 		return -1;
 	}
 
@@ -209,7 +209,7 @@ static int _lwip_socket_get_reuse_addr (int fd, bool *enabled)
 	if (enabled)
 		*enabled = !!reuse_addr;
 
-	_lwip_socket_log("reuse_addr_get: %d, %s\n", fd, !!reuse_addr ? "on" : "off");
+	_lwip_socket_log("reuse_addr_get: %d, %s", fd, !!reuse_addr ? "on" : "off");
 
 	return 0;
 }
@@ -224,7 +224,7 @@ static int _lwip_socket_set_reuse_addr (int fd, bool enable)
 	if (ret < 0)
 		return _lwip_socket_error(errno);
 
-	_lwip_socket_log("reuse_addr_set: %d, %s\n", fd, enable ? "on" : "off");
+	_lwip_socket_log("reuse_addr_set: %d, %s", fd, enable ? "on" : "off");
 
 	return 0;
 }
@@ -259,7 +259,7 @@ int _lwip_socket_tcp_get_keepalive (int fd, int *keepalive, int *keepidle, int *
 	if (ret < 0)
 		return _lwip_socket_error(errno);
 
-/*	_lwip_socket_log("tcp_keepalive_get: fd=%d keepalive=%d keepidle=%d keepcnt=%d keepintvl=%d\n",
+/*	_lwip_socket_log("tcp_keepalive_get: fd=%d keepalive=%d keepidle=%d keepcnt=%d keepintvl=%d",
 						fd, _keepalive, _keepidle, _keepcnt, _keepintvl); */
 
 	if (keepalive) *keepalive = _keepalive;
@@ -290,7 +290,7 @@ int _lwip_socket_tcp_set_keepalive (int fd, int keepalive, int keepidle, int kee
 	if (ret < 0)
 		return _lwip_socket_error(errno);
 
-/* 	_lwip_socket_log("tcp_keepalive_set: fd=%d keepalive=%d keepidle=%d keepcnt=%d keepintvl=%d\n",
+/* 	_lwip_socket_log("tcp_keepalive_set: fd=%d keepalive=%d keepidle=%d keepcnt=%d keepintvl=%d",
 						fd, keepalive, keepidle, keepcnt, keepintvl); */
 
 	return 0;
@@ -309,7 +309,7 @@ int _lwip_socket_tcp_get_nodelay (int fd, bool *enabled)
 	if (enabled)
 		*enabled = !!tcp_nodelay;
 
-/*	_lwip_socket_log("tcp_nodelay_get: %d, %s\n", fd, !!tcp_nodelay ? "on" : "off"); */
+/*	_lwip_socket_log("tcp_nodelay_get: %d, %s", fd, !!tcp_nodelay ? "on" : "off"); */
 
 	return 0;
 }
@@ -324,7 +324,7 @@ int _lwip_socket_tcp_set_nodelay (int fd, bool enable)
 	if (ret < 0)
 		return _lwip_socket_error(errno);
 
-/*	_lwip_socket_log("tcp_nodelay_set: %d, %s\n", fd, enable ? "on" : "off"); */
+/*	_lwip_socket_log("tcp_nodelay_set: %d, %s", fd, enable ? "on" : "off"); */
 
 	return 0;
 }
@@ -518,7 +518,7 @@ static bool _lwip_socket_fds_mutex_take (lwip_socket_info_t *info)
 
 	return true;
 }
-#define LWIP_SOCKET_FDS_LOCK(info)	ASSERT(_lwip_socket_fds_mutex_take(info))
+#define LWIP_SOCKET_FDS_LOCK(info)		ASSERT(_lwip_socket_fds_mutex_take(info))
 
 static bool _lwip_socket_fds_mutex_give (lwip_socket_info_t *info)
 {
@@ -573,7 +573,7 @@ static int _lwip_socket_fds_get (lwip_socket_info_t *info, fd_set *read, fd_set 
 
 static int _lwip_socket_fds_set (lwip_socket_info_t *info, int fd, bool listen)
 {
-	_lwip_socket_fds_debug("SOCK_FDS_SET: fd=%d listen=%d\n", fd, listen);
+	_lwip_socket_fds_debug("SOCK_FDS_SET: fd=%d listen=%d", fd, listen);
 
 	LWIP_SOCKET_FDS_LOCK(info);
 
@@ -590,7 +590,7 @@ static int _lwip_socket_fds_set (lwip_socket_info_t *info, int fd, bool listen)
 
 static int _lwip_socket_fds_clear (lwip_socket_info_t *info, int fd)
 {
-	_lwip_socket_fds_debug("SOCK_FDS_CLR: fd=%d\n", fd);
+	_lwip_socket_fds_debug("SOCK_FDS_CLR: fd=%d", fd);
 
 	LWIP_SOCKET_FDS_LOCK(info);
 
@@ -625,7 +625,7 @@ static void _lwip_socket_task (void *arg)
 		if (nfds <= 0)
 		{
 /*			if (info->log.task)
-				_lwip_socket_log("SOCK_TASK: no fds\n"); */
+				_lwip_socket_log("SOCK_TASK: no fds"); */
 
 			_delay_ms(10);
 			continue;
@@ -633,7 +633,7 @@ static void _lwip_socket_task (void *arg)
 
 		if (info->log.task)
 		{
-			_lwip_socket_log("SOCK_TASK: get, %d 0x%X 0x%X\n",
+			_lwip_socket_log("SOCK_TASK: get, %d 0x%X 0x%X",
 					nfds, fds_read.__fds_bits[0], fds_write.__fds_bits[0]);
 		}
 
@@ -654,13 +654,13 @@ static void _lwip_socket_task (void *arg)
 
 			case 0:
 				if (info->log.task)
-					_lwip_socket_log("SOCK_TASK: timeout, %uus\n", info->timeout.task);
+					_lwip_socket_log("SOCK_TASK: timeout, %uus", info->timeout.task);
 				break;
 
 			default:
 				if (info->log.task)
 				{
-					_lwip_socket_log("SOCK_TASK: set, %d 0x%X 0x%X\n",
+					_lwip_socket_log("SOCK_TASK: set, %d 0x%X 0x%X",
 							nfds, fds_read.__fds_bits[0], fds_write.__fds_bits[0]);
 				}
 		}
@@ -673,7 +673,7 @@ static void _lwip_socket_task (void *arg)
 
 				if (FD_ISSET(fd, &info->fds.listen))
 				{
-					_lwip_socket_fds_debug("SOCK_FDS_LISTEN: fd=%d\n", fd);
+					_lwip_socket_fds_debug("SOCK_FDS_LISTEN: fd=%d", fd);
 
 					if (info->cb.tcp_connect)
 					{
@@ -693,7 +693,7 @@ static void _lwip_socket_task (void *arg)
 				}
 				else
 				{
-					_lwip_socket_fds_debug("SOCK_FDS_READ: fd=%d\n", fd);
+					_lwip_socket_fds_debug("SOCK_FDS_READ: fd=%d", fd);
 
 					if (info->cb.recv_ready)
 						info->cb.recv_ready(fd);
@@ -704,7 +704,7 @@ static void _lwip_socket_task (void *arg)
 			{
 				ret--;
 
-				_lwip_socket_fds_debug("SOCK_FDS_WRITE: fd=%d\n", fd);
+				_lwip_socket_fds_debug("SOCK_FDS_WRITE: fd=%d", fd);
 
 				if (info->cb.send_ready)
 					info->cb.send_ready(fd);
@@ -714,7 +714,7 @@ static void _lwip_socket_task (void *arg)
 		}
 
 		if (ret > 0)
-			_lwip_socket_log("SOCK_TASK: ret=%d\n", ret);
+			_lwip_socket_log("SOCK_TASK: ret=%d", ret);
 	}
 }
 
@@ -933,9 +933,7 @@ int _lwip_socket_send_request (int fd)
 
 	if (info && info->send_done_event)
 	{
-		if (FD_ISSET(fd, &info->fds.write))
-			_atcmd_error("already set fd, fd=%d\n", fd);
-		else
+		if (!FD_ISSET(fd, &info->fds.write))
 		{
 			const int timeout = 1000; /* msec */
 			const int retry_max = 10;
@@ -943,7 +941,7 @@ int _lwip_socket_send_request (int fd)
 			EventBits_t event;
 
 			if (info->log.send)
-				_lwip_socket_log("_lwip_socket_send: request, evt=0x%X\n", xEventGroupGetBits(info->send_done_event));
+				_lwip_socket_log("_lwip_socket_send: request, evt=0x%X", xEventGroupGetBits(info->send_done_event));
 
 			LWIP_SOCKET_FDS_LOCK(info);
 
@@ -960,9 +958,9 @@ int _lwip_socket_send_request (int fd)
 				if (event & (1 << fd))
 				   return 0;
 				else if (event)
-					_lwip_socket_log("%s: invalid, 0x%X\n", __func__, event);
+					_lwip_socket_log("%s: invalid, 0x%X", __func__, event);
 				else
-					_lwip_socket_log("%s: timeout, %dms\n", __func__, timeout);
+					_lwip_socket_log("%s: timeout, %dms", __func__, timeout);
 			}
 
 			return _lwip_socket_error(ETIMEDOUT);
@@ -981,7 +979,7 @@ int _lwip_socket_send_done (int fd)
 	if (info && info->send_done_event)
 	{
 		if (info->log.send)
-			_lwip_socket_log("_lwip_socket_send: done, evt=0x%X\n", xEventGroupGetBits(info->send_done_event));
+			_lwip_socket_log("_lwip_socket_send: done, evt=0x%X", xEventGroupGetBits(info->send_done_event));
 
 		LWIP_SOCKET_FDS_LOCK(info);
 
@@ -1099,7 +1097,7 @@ int _lwip_socket_recv_request (int fd)
 	if (info)
 	{
 		if (info->log.recv)
-			_lwip_socket_log("_lwip_socket_recv: request\n");
+			_lwip_socket_log("_lwip_socket_recv: request");
 
 		LWIP_SOCKET_FDS_LOCK(info);
 
@@ -1120,7 +1118,7 @@ int _lwip_socket_recv_done (int fd)
 	if (info)
 	{
 		if (info->log.recv)
-			_lwip_socket_log("_lwip_socket_recv: done\n");
+			_lwip_socket_log("_lwip_socket_recv: done");
 
 		LWIP_SOCKET_FDS_LOCK(info);
 
@@ -1245,33 +1243,33 @@ int _lwip_socket_addr_info_1 (const char *host, char *addr, int addrlen)
 			case NO_DATA:
 			case NO_RECOVERY:
 			case TRY_AGAIN:
-				_lwip_socket_log("%s: %s\n", __func__, str_h_errno[h_errno - HOST_NOT_FOUND]);
+				_lwip_socket_log("%s: %s", __func__, str_h_errno[h_errno - HOST_NOT_FOUND]);
 				break;
 
 			default:
-				_lwip_socket_log("%s: unknown error\n", __func__);
+				_lwip_socket_log("%s: unknown error", __func__);
 		}
 
 		return _lwip_socket_error(EPERM);
 	}
 
 #if LOG_AI_HOSTENT == 1
-	_lwip_socket_log("%s:\n", __func__);
-	_lwip_socket_log(" - h_name: %s\n", hostent->h_name);
-	_lwip_socket_log(" - h_addrtype: %d\n", hostent->h_addrtype);
-	_lwip_socket_log(" - h_addr: %s\n", inet_ntoa(*(struct in_addr *)hostent->h_addr));
+	_lwip_socket_log("%s:", __func__);
+	_lwip_socket_log(" - h_name: %s", hostent->h_name);
+	_lwip_socket_log(" - h_addrtype: %d", hostent->h_addrtype);
+	_lwip_socket_log(" - h_addr: %s", inet_ntoa(*(struct in_addr *)hostent->h_addr));
 #elif LOG_AI_HOSTENT == 2
 	{
 		int i;
 
-		_lwip_socket_log("%s:\n", __func__);
-		_lwip_socket_log(" - h_name: %s\n", hostent->h_name);
+		_lwip_socket_log("%s:", __func__);
+		_lwip_socket_log(" - h_name: %s", hostent->h_name);
 		for (i = 0 ; hostent->h_aliases[i] ; i++)
-			_lwip_socket_log(" - h_aliases[%d]: %s\n", i, hostent->h_aliases[i]);
-		_lwip_socket_log(" - h_addrtype: %d\n", hostent->h_addrtype);
-		_lwip_socket_log(" - h_length: %d\n", hostent->h_length);
+			_lwip_socket_log(" - h_aliases[%d]: %s", i, hostent->h_aliases[i]);
+		_lwip_socket_log(" - h_addrtype: %d", hostent->h_addrtype);
+		_lwip_socket_log(" - h_length: %d", hostent->h_length);
 		for (i = 0 ; hostent->h_addr_list[i] ; i++)
-			_lwip_socket_log(" - h_addr_list[%d]: %s\n", i, inet_ntoa(*(struct in_addr *)hostent->h_addr_list[i]));
+			_lwip_socket_log(" - h_addr_list[%d]: %s", i, inet_ntoa(*(struct in_addr *)hostent->h_addr_list[i]));
 	}
 #endif
 
@@ -1315,12 +1313,12 @@ int _lwip_socket_addr_info_2 (const char *host, const char *port, char *addr, in
 	}
 #endif
 
-	_lwip_socket_log("%s::%d\n", __func__, __LINE__);
+	_lwip_socket_log("%s::%d", __func__, __LINE__);
 
 	ecode = getaddrinfo(host, port, hints, &res);
 	if (ecode != 0)
 	{
-		_lwip_socket_log("%s::%d, %s (%d)\n", __func__, __LINE__, gai_strerror(ecode), ecode);
+		_lwip_socket_log("%s::%d, %s (%d)", __func__, __LINE__, gai_strerror(ecode), ecode);
 
 		switch (ecode)
 		{
@@ -1337,24 +1335,24 @@ int _lwip_socket_addr_info_2 (const char *host, const char *port, char *addr, in
 	}
 
 #if LOG_AI_RESULT == 1
-	_lwip_socket_log("%s:\n", __func__);
-	_lwip_socket_log(" - ai_family: %d\n", res->ai_family);
-	_lwip_socket_log(" - ai_addr\n");
-	_lwip_socket_log("   - ip: %s\n", inet_ntoa(((struct sockaddr_in *)res->ai_addr)->sin_addr));
-	_lwip_socket_log("   - port: %u\n", ntohs(((struct sockaddr_in *)res->ai_addr)->sin_port));
-	_lwip_socket_log(" - ai_canonname: %s\n", res->ai_canonname);
+	_lwip_socket_log("%s:", __func__);
+	_lwip_socket_log(" - ai_family: %d", res->ai_family);
+	_lwip_socket_log(" - ai_addr");
+	_lwip_socket_log("   - ip: %s", inet_ntoa(((struct sockaddr_in *)res->ai_addr)->sin_addr));
+	_lwip_socket_log("   - port: %u", ntohs(((struct sockaddr_in *)res->ai_addr)->sin_port));
+	_lwip_socket_log(" - ai_canonname: %s", res->ai_canonname);
 #elif LOG_AI_RESULT == 2
-	_lwip_socket_log("%s:\n", __func__);
-	_lwip_socket_log(" - ai_flags: 0x%X\n", res->ai_flags);
-	_lwip_socket_log(" - ai_family: %d\n", res->ai_family);
-	_lwip_socket_log(" - ai_socktype: %d\n", res->ai_socktype);
-	_lwip_socket_log(" - ai_protocol: %d\n", res->ai_protocol);
-	_lwip_socket_log(" - ai_addrlen: %d\n", res->ai_addrlen);
-	_lwip_socket_log(" - ai_addr: %p\n", res->ai_addr);
-	_lwip_socket_log("   - ip: %s\n", inet_ntoa(((struct sockaddr_in *)res->ai_addr)->sin_addr));
-	_lwip_socket_log("   - port: %u\n", ntohs(((struct sockaddr_in *)res->ai_addr)->sin_port));
-	_lwip_socket_log(" - ai_canonname: %s\n", res->ai_canonname);
-	_lwip_socket_log(" - ai_next: %p\n", res->ai_next);
+	_lwip_socket_log("%s:", __func__);
+	_lwip_socket_log(" - ai_flags: 0x%X", res->ai_flags);
+	_lwip_socket_log(" - ai_family: %d", res->ai_family);
+	_lwip_socket_log(" - ai_socktype: %d", res->ai_socktype);
+	_lwip_socket_log(" - ai_protocol: %d", res->ai_protocol);
+	_lwip_socket_log(" - ai_addrlen: %d", res->ai_addrlen);
+	_lwip_socket_log(" - ai_addr: %p", res->ai_addr);
+	_lwip_socket_log("   - ip: %s", inet_ntoa(((struct sockaddr_in *)res->ai_addr)->sin_addr));
+	_lwip_socket_log("   - port: %u", ntohs(((struct sockaddr_in *)res->ai_addr)->sin_port));
+	_lwip_socket_log(" - ai_canonname: %s", res->ai_canonname);
+	_lwip_socket_log(" - ai_next: %p", res->ai_next);
 #endif
 
 	if (!inet_ntop(res->ai_family, &((struct sockaddr_in *)res->ai_addr)->sin_addr, addr, addrlen))
@@ -1372,6 +1370,8 @@ int _lwip_socket_addr_info_2 (const char *host, const char *port, char *addr, in
 
 /**********************************************************************************************/
 
+#if defined(CONFIG_ATCMD_CLI)
+
 static int cmd_atcmd_lwip_log (cmd_tbl_t *t, int argc, char *argv[])
 {
 	lwip_socket_info_t *info = g_lwip_socket_info;
@@ -1382,9 +1382,9 @@ static int cmd_atcmd_lwip_log (cmd_tbl_t *t, int argc, char *argv[])
 	switch (argc)
 	{
 		case 0:
-			A("task: %d\n", info->log.task);
-			A("send: %d\n", info->log.send);
-			A("recv: %d\n", info->log.recv);
+			_atcmd_printf("task: %d\n", info->log.task);
+			_atcmd_printf("send: %d\n", info->log.send);
+			_atcmd_printf("recv: %d\n", info->log.recv);
 			break;
 
 		case 2:
@@ -1425,6 +1425,50 @@ static int cmd_atcmd_lwip_log (cmd_tbl_t *t, int argc, char *argv[])
 	return CMD_RET_SUCCESS;
 }
 
+static int cmd_atcmd_addrinfo (cmd_tbl_t *t, int argc, char *argv[])
+{
+	lwip_socket_info_t *info = g_lwip_socket_info;
+
+	if (!info)
+		return CMD_RET_FAILURE;
+
+	switch (argc)
+	{
+		case 0:
+			_atcmd_printf(" - name: %s\n", info->addrinfo.name);
+			_atcmd_printf(" - addr: %s\n", info->addrinfo.addr);
+			break;
+
+		case 2:
+		{
+			char *name = argv[0];
+			char *addr = argv[1];
+
+			if (strlen(name) < sizeof(info->addrinfo.name))
+			{
+				if (strlen(addr) < sizeof(info->addrinfo.addr))
+				{
+					if (ip4addr_aton(addr, NULL))
+					{
+						strcpy(info->addrinfo.name, name);
+						strcpy(info->addrinfo.addr, addr);
+
+						_atcmd_printf(" - name: %s\n", info->addrinfo.name);
+						_atcmd_printf(" - addr: %s\n", info->addrinfo.addr);
+						break;
+					}
+				}
+			}
+		}
+
+		default:
+			return CMD_RET_USAGE;
+	}
+
+	return CMD_RET_SUCCESS;
+}
+
+#if !defined(CONFIG_ATCMD_CLI_MINIMUM)
 static int cmd_atcmd_lwip_fds (cmd_tbl_t *t, int argc, char *argv[])
 {
 	lwip_socket_info_t *info = g_lwip_socket_info;
@@ -1435,9 +1479,9 @@ static int cmd_atcmd_lwip_fds (cmd_tbl_t *t, int argc, char *argv[])
 	switch (argc)
 	{
 		case 0:
-			A("read: %X\n", info->fds.read.__fds_bits[0]);
-			A("write: %X\n", info->fds.write.__fds_bits[0]);
-			A("listen: %X\n", info->fds.listen.__fds_bits[0]);
+			_atcmd_printf("read: %X\n", info->fds.read.__fds_bits[0]);
+			_atcmd_printf("write: %X\n", info->fds.write.__fds_bits[0]);
+			_atcmd_printf("listen: %X\n", info->fds.listen.__fds_bits[0]);
 			break;
 
 		default:
@@ -1457,7 +1501,7 @@ static int cmd_atcmd_lwip_timeout (cmd_tbl_t *t, int argc, char *argv[])
 	switch (argc)
 	{
 		case 0:
-			A("task: %u\n", info->timeout.task);
+			_atcmd_printf("task: %u\n", info->timeout.task);
 			break;
 
 		case 1:
@@ -1477,49 +1521,7 @@ static int cmd_atcmd_lwip_timeout (cmd_tbl_t *t, int argc, char *argv[])
 
 	return CMD_RET_SUCCESS;
 }
-
-static int cmd_atcmd_addrinfo (cmd_tbl_t *t, int argc, char *argv[])
-{
-	lwip_socket_info_t *info = g_lwip_socket_info;
-
-	if (!info)
-		return CMD_RET_FAILURE;
-
-	switch (argc)
-	{
-		case 0:
-			A(" - name: %s\n", info->addrinfo.name);
-			A(" - addr: %s\n", info->addrinfo.addr);
-			break;
-
-		case 2:
-		{
-			char *name = argv[0];
-			char *addr = argv[1];
-
-			if (strlen(name) < sizeof(info->addrinfo.name))
-			{
-				if (strlen(addr) < sizeof(info->addrinfo.addr))
-				{
-					if (ip4addr_aton(addr, NULL))
-					{
-						strcpy(info->addrinfo.name, name);
-						strcpy(info->addrinfo.addr, addr);
-
-						A(" - name: %s\n", info->addrinfo.name);
-						A(" - addr: %s\n", info->addrinfo.addr);
-						break;
-					}
-				}
-			}
-		}
-
-		default:
-			return CMD_RET_USAGE;
-	}
-
-	return CMD_RET_SUCCESS;
-}
+#endif /* #if !defined(CONFIG_ATCMD_CLI_MINIMUM) */
 
 static int cmd_atcmd_lwip (cmd_tbl_t *t, int argc, char *argv[])
 {
@@ -1529,19 +1531,22 @@ static int cmd_atcmd_lwip (cmd_tbl_t *t, int argc, char *argv[])
 	{
 		if (strcmp(argv[1], "log") == 0)
 			ret = cmd_atcmd_lwip_log(t, argc - 2, argv + 2);
+		else if (strcmp(argv[1], "addrinfo") == 0)
+			ret = cmd_atcmd_lwip_log(t, argc - 2, argv + 2);
+#if !defined(CONFIG_ATCMD_CLI_MINIMUM)
 		else if (strcmp(argv[1], "fds") == 0)
 			ret = cmd_atcmd_lwip_log(t, argc - 2, argv + 2);
 		else if (strcmp(argv[1], "timeout") == 0)
 			ret = cmd_atcmd_lwip_timeout(t, argc - 2, argv + 2);
-		else if (strcmp(argv[1], "addrinfo") == 0)
-			ret = cmd_atcmd_lwip_log(t, argc - 2, argv + 2);
+#endif		
 		else if (strcmp(argv[1], "help") == 0)
 		{
-			A("atcmd lwip log {task|send|recv} {0|1}\n");
-			A("atcmd lwip fds\n");
-			A("atcmd lwip timeout <usec>\n");
-			A("atcmd lwip addrinfo <name> <addr>\n");
-
+			_atcmd_printf("atcmd lwip log {task|send|recv} {0|1}\n");
+			_atcmd_printf("atcmd lwip addrinfo <name> <addr>\n");
+#if !defined(CONFIG_ATCMD_CLI_MINIMUM)
+			_atcmd_printf("atcmd lwip fds\n");
+			_atcmd_printf("atcmd lwip timeout <usec>\n");
+#endif
 			return CMD_RET_SUCCESS;
 		}
 	}
@@ -1554,3 +1559,5 @@ SUBCMD_MAND(atcmd,
 		cmd_atcmd_lwip,
 		"lwip_socket",
 		"atcmd lwip help");
+
+#endif /* #if defined(CONFIG_ATCMD_CLI) */

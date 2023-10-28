@@ -364,13 +364,11 @@ static void nrc_iperf_list_print(void)
 {
 	struct iperf_task *cur, *next;
 
-	nrc_iperf_spin_lock();
 	list_for_each_entry_safe(cur, next, &iperf_head, list) {
 		A("%s ", (cur->option->mUDP == 1) ?  "UDP" : "TCP");
 		A("%s :", (cur->option->mThreadMode == kMode_Server) ?  "Server" : "Client");
 		A("%s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&cur->option->addr)));
 	}
-	nrc_iperf_spin_unlock();
 }
 
 int nrc_iperf_task_list_add(iperf_opt_t* option)

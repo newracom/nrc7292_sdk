@@ -131,7 +131,7 @@
 #if defined (INCLUDE_NEW_TASK_ARCH) && defined (INCLUDE_STANDALONE)
 #define configTIMER_TASK_PRIORITY		( configMAX_PRIORITIES - 3 )
 #else
-#define configTIMER_TASK_PRIORITY		( 3 )
+#define configTIMER_TASK_PRIORITY		( 30 )
 #endif
 #define configTIMER_QUEUE_LENGTH		5
 #define configTIMER_TASK_STACK_DEPTH	( 1024 )

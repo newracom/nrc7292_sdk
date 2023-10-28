@@ -184,32 +184,32 @@ static void _hif_hspi_print_regs (void)
 {
 	int i;
 
-	_hif_info("\n");
+	_hif_info("");
 
-	_hif_info("[ HSPI SYS Registers ]\n");
-	_hif_info(" - device_ready : 0x%08X\n", g_hspi_sys_reg->device_ready);
-	_hif_info(" - device_sleep : 0x%08X\n", g_hspi_sys_reg->device_sleep);
-	_hif_info(" - device_message[0] : 0x%08X\n", g_hspi_sys_reg->device_message[0]);
-	_hif_info(" - device_message[1] : 0x%08X\n", g_hspi_sys_reg->device_message[1]);
-	_hif_info(" - device_message[2] : 0x%08X\n", g_hspi_sys_reg->device_message[2]);
-	_hif_info(" - device_message[3] : 0x%08X\n", g_hspi_sys_reg->device_message[3]);
-	_hif_info(" - chip_id : 0x%08X\n", g_hspi_sys_reg->chip_id);
-	_hif_info(" - modem_id : 0x%08X\n", g_hspi_sys_reg->modem_id);
-	_hif_info(" - sw_id : 0x%08X\n", g_hspi_sys_reg->sw_id);
-	_hif_info(" - board_id : 0x%08X\n", g_hspi_sys_reg->board_id);
+	_hif_info("[ HSPI SYS Registers ]");
+	_hif_info(" - device_ready : 0x%08X", g_hspi_sys_reg->device_ready);
+	_hif_info(" - device_sleep : 0x%08X", g_hspi_sys_reg->device_sleep);
+	_hif_info(" - device_message[0] : 0x%08X", g_hspi_sys_reg->device_message[0]);
+	_hif_info(" - device_message[1] : 0x%08X", g_hspi_sys_reg->device_message[1]);
+	_hif_info(" - device_message[2] : 0x%08X", g_hspi_sys_reg->device_message[2]);
+	_hif_info(" - device_message[3] : 0x%08X", g_hspi_sys_reg->device_message[3]);
+	_hif_info(" - chip_id : 0x%08X", g_hspi_sys_reg->chip_id);
+	_hif_info(" - modem_id : 0x%08X", g_hspi_sys_reg->modem_id);
+	_hif_info(" - sw_id : 0x%08X", g_hspi_sys_reg->sw_id);
+	_hif_info(" - board_id : 0x%08X", g_hspi_sys_reg->board_id);
 
 	for (i = 0 ; i < 2 ; i++)
 	{
-		_hif_info("[ HSPI %cXQ Registers ]\n", i == 0 ? 'T' : 'R');
-		_hif_info(" - reset	: %u\n", g_hspi_que_reg[i]->reset);
-		_hif_info(" - que_mode : 0x%08X\n", g_hspi_que_reg[i]->que_mode.val);
-		_hif_info(" - irq_mode : 0x%08X\n", g_hspi_que_reg[i]->irq_mode.val);
-		_hif_info(" - set[0]   : 0x%08X\n", g_hspi_que_reg[i]->set.val[0]);
-		_hif_info(" - set[1]   : 0x%08X\n", g_hspi_que_reg[i]->set.val[1]);
-		_hif_info(" - status   : 0x%08X\n", g_hspi_que_reg[i]->status);
+		_hif_info("[ HSPI %cXQ Registers ]", i == 0 ? 'T' : 'R');
+		_hif_info(" - reset	: %u", g_hspi_que_reg[i]->reset);
+		_hif_info(" - que_mode : 0x%08X", g_hspi_que_reg[i]->que_mode.val);
+		_hif_info(" - irq_mode : 0x%08X", g_hspi_que_reg[i]->irq_mode.val);
+		_hif_info(" - set[0]   : 0x%08X", g_hspi_que_reg[i]->set.val[0]);
+		_hif_info(" - set[1]   : 0x%08X", g_hspi_que_reg[i]->set.val[1]);
+		_hif_info(" - status   : 0x%08X", g_hspi_que_reg[i]->status);
 	}
 
-	_hif_info("\n");
+	_hif_info("");
 }
 
 /**********************************************************************************************/
@@ -323,7 +323,7 @@ static int _hif_hspi_queue_update (int idx, char *addr)
 
 	if (!addr || (uint32_t)addr & 0x3)
 	{
-		_hif_error("invalid slot address %p\n", addr);
+		_hif_error("addr=%p", addr);
 		return -1;
 	}
 
@@ -351,8 +351,8 @@ static int _hif_hspi_queue_update (int idx, char *addr)
 
 	if (slot_offset % slot_size)
 	{
-		_hif_error("invalid %s slot address %p, base=%p offset=0x%X size=\n",
-						addr, slot_base, slot_offset, slot_size);
+		_hif_error("addr=%p (offset=%u size=%u)",
+						addr, slot_offset, slot_size);
 		return -1;
 	}
 
@@ -399,7 +399,7 @@ static void _hif_hspi_queue_status_print (int idx)
 	const char *que_name[_HSPI_QUE_NUM] = { "txq", "rxq" };
 	volatile _hspi_que_reg_t *reg = g_hspi_que_reg[idx];
 
-	_hif_info("%s_status: val(0x%08X), count(%u/%u), error(%u)\n", que_name[idx],
+	_hif_info("%s_status: val(0x%08X), count(%u/%u), error(%u)", que_name[idx],
 			reg->status.val, reg->status.count, reg->status.total, reg->status.error);
 }
 
@@ -441,7 +441,7 @@ static int __hif_hspi_read (char *buf, int len)
 		}
 		else if (ret != _HSPI_SLOT_HDR_SIZE)
 		{
-			_hif_error("header read error, len=%d ret=%d\n", _HSPI_SLOT_HDR_SIZE, ret);
+			_hif_error("slot_hdr: %d/%d", ret, _HSPI_SLOT_HDR_SIZE);
 			break;
 		}
 
@@ -449,17 +449,18 @@ static int __hif_hspi_read (char *buf, int len)
 		{
 			hdr.len = 0;
 
-			_hif_error("invalid header, addr=%p start=%s(0x%02X, 0x%02X) len=%u\n",
+			_hif_error("slot: addr=%p start=%02X,%02X len=%u",
 							_hif_fifo_pop_addr(g_hif_hspi_rx_fifo, 0) - _HSPI_SLOT_HDR_SIZE,
-							hdr.start, hdr.start[0], hdr.start[1], hdr.len);
+							hdr.start[0], hdr.start[1], 
+							hdr.len);
 		}
 		else
 		{
-			_hspi_read_info("slot: seq=%u len=%u\n", hdr.seq, hdr.len);
+			_hspi_read_info("seq=%u len=%u\n", hdr.seq, hdr.len);
 
 			if (hdr.seq != seq)
 			{
-				_hif_error("slot_seq: %u -> %u\n", seq, hdr.seq);
+				_hif_error("slot_seq: %u -> %u", seq, hdr.seq);
 
 				seq = hdr.seq;
 			}
@@ -471,7 +472,7 @@ static int __hif_hspi_read (char *buf, int len)
 		ret = _hif_fifo_read(g_hif_hspi_rx_fifo, hdr.len > 0 ? buf + i : NULL, _HSPI_RX_SLOT_DATA_LEN_MAX);
 		if (ret != _HSPI_RX_SLOT_DATA_LEN_MAX)
 		{
-			_hif_error("data read error, len=%d ret=%d\n", _HSPI_RX_SLOT_DATA_LEN_MAX, ret);
+			_hif_error("slot_data: %d/%d", ret, _HSPI_RX_SLOT_DATA_LEN_MAX);
 			break;
 		}
 	}
@@ -552,7 +553,7 @@ int __hif_hspi_write (char *buf, int len)
 		_hif_fifo_write(g_hif_hspi_tx_fifo, NULL, _HSPI_TX_SLOT_DATA_LEN_MAX - hdr.len);
 
 	if (i != len)
-		_hif_error("len=%d/%d\n", i, len);
+		_hif_error("slot_data: %d/%d", i, len);
 
 	return i;
 }
@@ -614,7 +615,7 @@ int _hif_hspi_write (char *buf, int len)
 
 /**********************************************************************************************/
 
-#if defined(NRC7393) || defined(NRC7394)
+#if defined(NRC7394)
 
 #if 1 /* Need to define in hal/nrc739x/hal_gpio.h */
 #define UIO_SEL_HSPI	UIO_SEL_SPI2
@@ -783,7 +784,7 @@ static void _hif_hspi_pin_disable (void)
 	_hif_hspi_pin_info("GPIO_DIR: 0x%08X\n", gpio.word);
 }
 
-#endif /* #if defined(NRC7393) || defined(NRC7394) */
+#endif /* #if defined(NRC7394) */
 
 static void _hif_hspi_fifo_delete (void)
 {
@@ -813,15 +814,15 @@ static int _hif_hspi_fifo_create (_hif_info_t *info)
 
 	if (!g_hif_hspi_rx_fifo || !g_hif_hspi_tx_fifo)
 	{
-		_hif_error("_hif_fifo_create() failed, rx=%p(%d) tx=%p(%d)\n",
-			   			g_hif_hspi_rx_fifo, rx_fifo->size,
+		_hif_error("rx=%p(%d) tx=%p(%d)",	g_hif_hspi_rx_fifo, rx_fifo->size,
 						g_hif_hspi_tx_fifo, tx_fifo->size);
 
 		_hif_hspi_fifo_delete();
+
 		return -1;
 	}
 
-	_hif_info("HSPI_FIFO: rx=(%p, %u), tx=(%p, %u)\n",
+	_hif_info("HSPI_FIFO: rx=(%p, %u), tx=(%p, %u)",
 				g_hif_hspi_rx_fifo ? g_hif_hspi_rx_fifo->buffer : 0,
 				g_hif_hspi_rx_fifo ? g_hif_hspi_rx_fifo->size : 0,
 				g_hif_hspi_tx_fifo ? g_hif_hspi_tx_fifo->buffer : 0,
@@ -862,16 +863,16 @@ static int _hif_hspi_slot_setup (uint32_t rx_fifo_size, uint32_t tx_fifo_size)
 	for (i = 0 ; i < 4 ; i++)
 		msg.val[i] = _hif_hspi_get_message(i);
 
-	_hif_info("HSPI_MSG_REG:\n");
-	_hif_info(" - msg[0]: 0x%08X, %c%c%c%c (ID0)\n",
+	_hif_info("HSPI_MSG:");
+	_hif_info(" - msg[0]: 0x%08X, %c%c%c%c",
 					msg.val[0], msg.id[0], msg.id[1], msg.id[2], msg.id[3]);
-	_hif_info(" - msg[1]: 0x%08X, %c%c%c%c (ID1)\n",
+	_hif_info(" - msg[1]: 0x%08X, %c%c%c%c",
 					msg.val[1], msg.id[4], msg.id[5], msg.id[6], msg.id[7]);
-	_hif_info(" - msg[2]: 0x%08X, slot_num=%u, slot_size=%u (TXQ)\n",
+	_hif_info(" - msg[2]: 0x%08X, slot = %u x %uB (TXQ)",
 					msg.val[2], msg.slot[_HSPI_TXQ].num, msg.slot[_HSPI_TXQ].size);
-	_hif_info(" - msg[3]: 0x%08X, slot_num=%u slot_size=%u (RXQ)\n",
+	_hif_info(" - msg[3]: 0x%08X, slot = %u x %uB (RXQ)",
 					msg.val[3], msg.slot[_HSPI_RXQ].num, msg.slot[_HSPI_RXQ].size);
-	_hif_info("\n");
+	_hif_info("");
 
 	return 0;
 }
@@ -887,7 +888,7 @@ int _hif_hspi_open (_hif_info_t *info)
 	if (!info || info->type != _HIF_TYPE_HSPI)
 	   return -1;
 
-	_hif_info("HSPI_OPEN: sw_id=0x%08X bd_id=0x%08X\n",
+	_hif_info("HSPI_OPEN: sw_id=0x%08X bd_id=0x%08X",
 				info->hspi.sw_id, info->hspi.bd_id);
 
 	if (_hif_hspi_fifo_create(info) != 0)
@@ -914,13 +915,13 @@ int _hif_hspi_open (_hif_info_t *info)
 		}
 	}
 
-#if defined(NRC7393) || defined(NRC7394)
+#if defined(NRC7394)
 	_hif_hspi_pin_enable();
 #endif
 
 /*	_hif_hspi_print_regs(); */
 
-/*	_hif_info("HSPI_OPEN: success\n"); */
+/*	_hif_info("HSPI_OPEN: success"); */
 
 	return 0;
 }
@@ -930,7 +931,7 @@ void _hif_hspi_close (void)
 	int evid[_HSPI_QUE_NUM] = { EV_TXQUE, EV_RXQUE };
 	int i;
 
-	_hif_info("HSPI_CLOSE\n");
+	_hif_info("HSPI_CLOSE");
 
 	for (i = _HSPI_TXQ ; i <= _HSPI_RXQ ; i++)
 	{
@@ -947,7 +948,7 @@ void _hif_hspi_close (void)
 
 	_hif_hspi_fifo_delete();
 
-#if defined(NRC7393) || defined(NRC7394)
+#if defined(NRC7394)
 	_hif_hspi_pin_disable();
 #endif
 }

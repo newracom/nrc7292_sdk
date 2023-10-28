@@ -1330,6 +1330,22 @@ tcp_slowtmr_start:
     if (ip_get_option(pcb, SOF_KEEPALIVE) &&
         ((pcb->state == ESTABLISHED) ||
          (pcb->state == CLOSE_WAIT))) {
+#if defined(LWIP_TCP_KEEPALIVE_TICK_UPDATE) && (LWIP_TCP_KEEPALIVE_TICK_UPDATE == 1)
+      if ((u32_t)(tcp_ticks - pcb->tmr) ==
+                 (pcb->keep_idle + pcb->keep_cnt_sent * TCP_KEEP_INTVL(pcb))
+                 / TCP_SLOW_INTERVAL) {
+        err = tcp_keepalive(pcb);
+        if (err == ERR_OK) {
+          pcb->keep_cnt_sent++;
+        }
+      } else if ((u32_t)(tcp_ticks - pcb->tmr) >
+          (pcb->keep_idle + TCP_KEEP_DUR(pcb)) / TCP_SLOW_INTERVAL) {
+        A("tcp_slowtmr: KEEPALIVE timeout. Aborting connection to %s\n", ipaddr_ntoa(&pcb->remote_ip));
+
+        ++pcb_remove;
+        ++pcb_reset;
+	  }
+#else
       if ((u32_t)(tcp_ticks - pcb->tmr) >
           (pcb->keep_idle + TCP_KEEP_DUR(pcb)) / TCP_SLOW_INTERVAL) {
         LWIP_DEBUGF(TCP_DEBUG, ("tcp_slowtmr: KEEPALIVE timeout. Aborting connection to "));
@@ -1346,6 +1362,7 @@ tcp_slowtmr_start:
           pcb->keep_cnt_sent++;
         }
       }
+#endif
     }
 
     /* If this PCB has queued out of sequence data, but has been

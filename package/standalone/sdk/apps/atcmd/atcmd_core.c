@@ -27,85 +27,66 @@
 #include "atcmd.h"
 
 
-extern void atcmd_firmware_write (char *buf, int len);
-extern void atcmd_firmware_download_event_idle (uint32_t len, uint32_t cnt);
-extern void atcmd_firmware_download_event_drop (uint32_t len, uint32_t cnt);
-extern void atcmd_firmware_download_event_done (uint32_t len);
-
 /**********************************************************************************************/
 
-#if 0
-static struct
+int atcmd_log (const char *fmt, ...)
 {
-	int val;
-	const char *str;
-} g_atcmd_errors[] =
-{
-	{ 0,			"OK"			},
-	{ EPERM,		"EPERM"			},	// 1
-	{ EBADF,		"EBADF"			},	// 9
-	{ EAGAIN,		"EAGAIN"		},	// 11
-	{ EBUSY,		"EBUSY"			},	// 16
-	{ EINVAL,		"EINVAL"		},	// 22
-	{ ENOSPC,		"ENOSPC"		}, 	// 28
-	{ ENOTSOCK,		"ENOTSOCK"		}, 	// 88
-	{ EPROTOTYPE,	"EPROTOTYPE"	},	// 91
-	{ EADDRINUSE,	"EADDRINUSE"	}, 	// 98
-	{ ECONNABORTED, "ECONNABORTED" 	},	// 103
-	{ ECONNRESET, 	"ECONNRESET" 	},	// 104
-	{ ENOTCONN, 	"ENOTCONN" 		},	// 107
-	{ ETIMEDOUT, 	"ETIMEDOUT"		},	// 110
-	{ ECONNREFUSED,	"ECONNREFUSED"	},	// 111
-	{ EHOSTDOWN, 	"EHOSTDOWN" 	},	// 112
-	{ EHOSTUNREACH,	"EHOSTUNREACH"	},	// 113
-	{ EINPROGRESS, 	"EINPROGRESS" 	},	// 115
+	char buf[128];
+	va_list ap;
+	int len;
+	int ret;
 
-	{ -1, "UNKNOWN" }
-};
+	len = snprintf(buf, sizeof(buf), "[ATCMD] ");
 
-const char *atcmd_strerror (int err)
-{
-	int i;
+	va_start(ap, fmt);
+	ret = vsnprintf(buf + len, sizeof(buf) - len, fmt, ap);
+	va_end(ap);
 
-	if (err < 0)
-		err *= -1;
-
-	for (i = 0 ; g_atcmd_errors[i].val >= 0 ; i++)
+	if (ret >= 0)
 	{
-		if (g_atcmd_errors[i].val == err)
-			break;
-	}
+		len += ret;
 
-	return g_atcmd_errors[i].str;
+		if (len < sizeof(buf))
+		{
+			_atcmd_printf("%s\n", buf);
+
+			return 0;
+		}
+
+		errno = ENOBUFS;
+	}
+		
+	_atcmd_printf("%s: %s\n", __func__, strerror(errno));
+
+	return -1;
 }
-#endif
 
 /*******************************************************************************************/
 
 static uint32_t g_atcmd_config = 0;
 static const char *str_atcmd_config[ATCMD_CFG_NUM] =
 {
-	"ATCMD_CFG_ECHO",
-	"ATCMD_CFG_LINEFEED",
-	"ATCMD_CFG_PROMPT",
+	"ECHO",
+	"LINEFEED",
+	"PROMPT",
 #ifdef CONFIG_ATCMD_LOWERCASE
-	"ATCMD_CFG_LOWERCASE",
+	"LOWERCASE",
 #endif
 #ifdef CONFIG_ATCMD_HISTORY
-	"ATCMD_CFG_HISTORY",
+	"HISTORY",
 #endif
 };
 
 static void atcmd_config_enable (enum ATCMD_CFG cfg)
 {
-	_atcmd_info("%s_ON\n", str_atcmd_config[cfg]);
+	_atcmd_info("%s_ON", str_atcmd_config[cfg]);
 
 	g_atcmd_config |= (1 << cfg);
 }
 
 static void atcmd_config_disable (enum ATCMD_CFG cfg)
 {
-	_atcmd_info("%s_OFF\n", str_atcmd_config[cfg]);
+	_atcmd_info("%s_OFF", str_atcmd_config[cfg]);
 
 	g_atcmd_config &= ~(1 << cfg);
 }
@@ -115,18 +96,18 @@ static bool atcmd_config_status (enum ATCMD_CFG cfg)
 	return !!(g_atcmd_config & (1 << cfg));
 }
 
-static void atcmd_config_print (void)
+/* static void atcmd_config_print (void)
 {
 	int cfg;
 
-	_atcmd_info("[ ATCMD Configurations ]\n");
+	_atcmd_info("[ ATCMD Configurations ]");
 
 	for (cfg = ATCMD_CFG_MIN ; cfg <= ATCMD_CFG_MAX ; cfg++)
 	{
-		_atcmd_info(" - %s: %s\n", str_atcmd_config[cfg],
+		_atcmd_info(" - %s: %s", str_atcmd_config[cfg],
 				atcmd_config_status(cfg) ? "ON" : "OFF");
 	}
-}
+} */
 
 #define ATCMD_ECHO_ENABLE()				atcmd_config_enable(ATCMD_CFG_ECHO)
 #define ATCMD_ECHO_DISABLE()			atcmd_config_disable(ATCMD_CFG_ECHO)
@@ -167,11 +148,15 @@ static void atcmd_config_print (void)
 
 static bool g_atcmd_prompt_enter = false;
 
+#ifdef CONFIG_ATCMD_PROMPT
 static void atcmd_prompt_print (void)
 {
 	if (ATCMD_PROMPT_IS_ENABLED())
 		atcmd_transmit(ATCMD_PROMPT, 1 + ATCMD_PROMPT_LEN);
 }
+#else
+#define atcmd_prompt_print()
+#endif
 
 static void atcmd_prompt_reset (int cmd_len)
 {
@@ -256,7 +241,7 @@ static int atcmd_history_enable (void)
 	}
 	else
 	{
-		_atcmd_error("malloc() failed\n");
+		_atcmd_error("malloc()");
 
 		return -1;
 	}
@@ -309,7 +294,7 @@ static int atcmd_history_push (char *cmd, int cnt)
 
 		if (cmd && cnt)
 		{
-/*			_atcmd_debug("push: %d/%d, idx=%d, cnt=%d, cmd=%s\n",
+/*			_atcmd_debug("push: %d/%d, idx=%d, cnt=%d, cmd=%s",
 					 *push_cnt, ATCMD_HISTORY_MAX, *push_idx, cnt, cmd); */
 
 			buf = &push_buf[*push_idx];
@@ -373,7 +358,7 @@ static int atcmd_history_pop (char **cmd, int **cnt, int key)
 					*cmd = NULL;
 					*cnt = NULL;
 
-/*				_atcmd_debug("pop: %d/%d, idx=%d\n",
+/*				_atcmd_debug("pop: %d/%d, idx=%d",
 							 *pop_cnt, *push_cnt, *pop_idx); */
 					return 0;
 				}
@@ -396,7 +381,7 @@ static int atcmd_history_pop (char **cmd, int **cnt, int key)
 		*cnt = &pop_buf[*pop_idx].cnt;
 		*cmd = pop_buf[*pop_idx].cmd;
 
-/*		_atcmd_debug("pop: %d/%d, idx=%d, cnt=%d, cmd=%s\n",
+/*		_atcmd_debug("pop: %d/%d, idx=%d, cnt=%d, cmd=%s",
 					*pop_cnt, *push_cnt, *pop_idx, **cnt, *cmd); */
 	}
 
@@ -472,27 +457,20 @@ static bool atcmd_data_mode_is_enabled (void)
 static int _atcmd_data_mode_enable (atcmd_socket_t *socket, int32_t len, uint32_t timeout,
 									char *exit_cmd, bool done_event, bool binary)
 {
-	if (g_atcmd_data_mode.enable)
-	{
-		_atcmd_error("enable=%d\n", g_atcmd_data_mode.enable);
-		return -1;
-	}
-
 	if (socket && socket->id < 0)
 		return -1;
 
 	if (timeout == 0)
 		return -1;
 
-	if (binary)
+	if (g_atcmd_data_mode.enable)
 	{
-		_atcmd_data_mode_debug("enable, id=%d len=%d timeout=%u exit_cmd=%s binary=%d\n",
-							socket ? socket->id : -1, len, timeout, exit_cmd ? exit_cmd : "", binary);
+		_atcmd_info("data_mode: already enabled");
+		return -1;
 	}
-	else
-	{
-		_atcmd_data_mode_debug("enable, id=%d len=%d timeout=%u\n", socket ? socket->id : -1, len, timeout);
-	}
+
+	_atcmd_data_mode_debug("enable, id=%d len=%d timeout=%u exit_cmd=%s done_event=%d binary=%d\n",
+				socket ? socket->id : -1, len, timeout, exit_cmd ? exit_cmd : "", done_event, binary);
 
 	g_atcmd_data_mode.enable = true;
 	g_atcmd_data_mode.idle = false;
@@ -531,19 +509,12 @@ static int atcmd_data_mode_disable (void)
 {
 	if (!g_atcmd_data_mode.enable)
 	{
-		_atcmd_error("enable=%d\n", g_atcmd_data_mode.enable);
+		_atcmd_info("already disabled");
 		return -1;
 	}
 
-	if (g_atcmd_data_mode.binary)
-	{
-		_atcmd_data_mode_debug("disable, id=%d binary=%d\n",
-								g_atcmd_data_mode.socket.id, g_atcmd_data_mode.binary);
-	}
-	else
-	{
-		_atcmd_data_mode_debug("disable, id=%d\n", g_atcmd_data_mode.socket.id);
-	}
+	_atcmd_data_mode_debug("disable, id=%d binary=%d\n", 
+			g_atcmd_data_mode.socket.id, g_atcmd_data_mode.binary);
 
 	g_atcmd_data_mode.enable = false;
 	g_atcmd_data_mode.idle = true;
@@ -795,15 +766,15 @@ void atcmd_group_print (void)
 	atcmd_group_t *group;
 	atcmd_list_t *list;
 
-	_atcmd_info("Group List\n");
-	_atcmd_info(" - Head (%p): next=%p prev=%p\n", &g_atcmd_group_head,
+	_atcmd_info("Group List");
+	_atcmd_info(" - Head (%p): next=%p prev=%p", &g_atcmd_group_head,
 							g_atcmd_group_head.next, g_atcmd_group_head.prev);
 
 	for (list = g_atcmd_group_head.prev ; list ; list = list->prev)
 	{
 		group = (atcmd_group_t *)list;
 
-		_atcmd_info(" - %s (%p): id=%d prefix=%s prefix_size=%d next=%p prev=%p\n",
+		_atcmd_info(" - %s (%p): id=%d prefix=%s prefix_size=%d next=%p prev=%p",
 						group->name, group, group->id,
 						group->cmd_prefix, group->cmd_prefix_size,
 						group->list.next, group->list.prev);
@@ -861,8 +832,8 @@ void atcmd_info_print (atcmd_group_t *group)
 		atcmd_info_t *info;
 		atcmd_list_t *list;
 
-		_atcmd_info("Command List: %s (%p)\n", group->name, group);
-		_atcmd_info(" - Head (%p): next=%p prev=%p\n",
+		_atcmd_info("Command List: %s (%p)", group->name, group);
+		_atcmd_info(" - Head (%p): next=%p prev=%p",
 						&group->cmd_list_head,
 						group->cmd_list_head.next, group->cmd_list_head.prev);
 
@@ -870,7 +841,7 @@ void atcmd_info_print (atcmd_group_t *group)
 		{
 			info = (atcmd_info_t *)list;
 
-			_atcmd_info(" - %s (%p): id=%d next=%p prev=%p\n",
+			_atcmd_info(" - %s (%p): id=%d next=%p prev=%p",
 							info->cmd, info, info->id,
 							info->list.next, info->list.prev);
 		}
@@ -934,10 +905,10 @@ static void atcmd_parse_print (enum ATCMD_TYPE type, int argc, char **argv)
 	if (type == ATCMD_TYPE_NONE || !argc || !argv)
 		return;
 
-	_atcmd_info("%s_%s: %d\r\n", argv[0], str_type[type], argc);
+	_atcmd_info("%s_%s: %d", argv[0], str_type[type], argc);
 
 	for (i = 1 ; i < argc ; i++)
-		_atcmd_info(" - opt%d : %s\r\n", i - 1, argv[i]);
+		_atcmd_info(" - opt%d : %s", i - 1, argv[i]);
 }
 
 static enum ATCMD_HANDLER atcmd_parse (char *cmd, int *argc, char **argv)
@@ -953,7 +924,7 @@ static enum ATCMD_HANDLER atcmd_parse (char *cmd, int *argc, char **argv)
 
 		do
 		{
-/*			_atcmd_debug("%d.%d: %c\r\n", i, cmd - argv[0], *cmd); */
+/*			_atcmd_debug("%d.%d: %c", i, cmd - argv[0], *cmd); */
 
 			switch (*cmd)
 			{
@@ -1050,7 +1021,7 @@ static int atcmd_handler (char *cmd)
 
 	type = atcmd_parse(&cmd[3], &argc, argv);
 
-/*	_atcmd_debug("handler: %d\n", type); */
+/*	_atcmd_debug("handler: %d", type); */
 
 	if (type != ATCMD_HANDLER_NONE && argc > 0)
 	{
@@ -1061,7 +1032,7 @@ static int atcmd_handler (char *cmd)
 		{
 			group = (atcmd_group_t *)list;
 
-/*			_atcmd_debug("Group %s: id=%d prefix=%s prefix_size=%d next=%p prev=%p\n",
+/*			_atcmd_debug("Group %s: id=%d prefix=%s prefix_size=%d next=%p prev=%p",
 							group->name, group->id,
 							group->cmd_prefix, group->cmd_prefix_size,
 							group->list.next, group->list.prev); */
@@ -1075,7 +1046,7 @@ static int atcmd_handler (char *cmd)
 				{
 					atcmd = (atcmd_info_t *)list;
 
-/*					_atcmd_debug("Command %s: id=%d next=%p prev=%p\n",
+/*					_atcmd_debug("Command %s: id=%d next=%p prev=%p",
 									atcmd->cmd, atcmd->id,
 									atcmd->list.next, atcmd->list.prev); */
 
@@ -1097,7 +1068,7 @@ static int atcmd_handler (char *cmd)
 						}
 
 						if (ret != ATCMD_SUCCESS)
-							_atcmd_info("cmd=%s ret=%d\n", argv[0], ret);
+							_atcmd_info("cmd=%s ret=%d", argv[0], ret);
 
 						return ret;
 					}
@@ -1111,7 +1082,7 @@ static int atcmd_handler (char *cmd)
 		}
 	}
 
-	_atcmd_info("invalid, %s\n", cmd);
+	_atcmd_info("invalid, %s", cmd);
 
 	ATCMD_MSG_RETURN(NULL, ATCMD_ERROR_INVAL);
 
@@ -1251,7 +1222,7 @@ static void atcmd_process_command (char *cmd, int len)
 			}
 			else if (atcmd_compare_command(cmd, "ATZ", 3) == 0)
 			{
-				_atcmd_info("System Reset\n");
+				_atcmd_info("System Reset");
 				_delay_ms(1);
 				util_fota_reboot_firmware();
 			}
@@ -1293,7 +1264,7 @@ static void atcmd_process_command (char *cmd, int len)
 		default:
 			if (len < 2 || len > ATCMD_MSG_LEN_MAX)
 			{
-				_atcmd_info("no command\n");
+				_atcmd_info("no command");
 				return;
 			}
 
@@ -1309,7 +1280,7 @@ static void atcmd_process_command (char *cmd, int len)
 	if (ret)
 	{
 		cmd[len] = '\0';
-		_atcmd_info("cmd=%s len=%d ret=%d\n", cmd, len, ret);
+		_atcmd_info("cmd=%s len=%d ret=%d", cmd, len, ret);
 	}
 
 	ATCMD_MSG_RETURN(NULL, ret); /* success or invalid */
@@ -1339,7 +1310,7 @@ int atcmd_receive_command (char *buf, int len)
 		atcmd_buf = _atcmd_malloc(sizeof(atcmd_buf_t));
 		if (!atcmd_buf)
 		{
-			_atcmd_error("malloc() failed\n");
+			_atcmd_error("malloc()");
 			return 0;
 		}
 
@@ -1354,7 +1325,7 @@ int atcmd_receive_command (char *buf, int len)
 	{
 		cmd[*cnt] = buf[i];
 
-/*		_atcmd_debug("rx.%d: %c (0x%02X)\n", *cnt, cmd[*cnt], cmd[*cnt]); */
+/*		_atcmd_debug("rx.%d: %c (0x%02X)", *cnt, cmd[*cnt], cmd[*cnt]); */
 
 		key_code = atcmd_key_code(cmd[*cnt]);
 
@@ -1527,7 +1498,7 @@ static int atcmd_receive_data (char *buf, int len)
 			str_exit_cmd = g_atcmd_data_mode.exit_cmd;
 		else
 		{
-			_atcmd_error("no data mode exit command\n");
+			_atcmd_error("no exit_cmd");
 
 			str_exit_cmd = "AT\r\n";
 		}
@@ -1551,10 +1522,10 @@ static int atcmd_receive_data (char *buf, int len)
 					if (g_atcmd_data_mode.cnt > 0)
 					{
 						if (g_atcmd_data_mode.binary)
-							_atcmd_info("BINDL: timeout, %d\n", g_atcmd_data_mode.cnt);
+							_atcmd_info("BINDL: timeout, %d", g_atcmd_data_mode.cnt);
 						else
 						{
-							_atcmd_info("SEND: timeout, %d\n", g_atcmd_data_mode.cnt);
+							_atcmd_info("SEND: timeout, %d", g_atcmd_data_mode.cnt);
 
 							g_atcmd_data_mode.send_done += _atcmd_receive_data(_buf, g_atcmd_data_mode.cnt);
 						}
@@ -1566,11 +1537,10 @@ static int atcmd_receive_data (char *buf, int len)
 				if (g_atcmd_data_mode.binary)
 				{
 					uint32_t send_len = g_atcmd_data_mode.send_len;
-					uint32_t cnt = g_atcmd_data_mode.cnt;
 
 					atcmd_data_mode_disable();
 
-					atcmd_firmware_download_event_drop(send_len, cnt);
+					atcmd_firmware_download_event_drop(send_len);
 				}
 				else
 				{
@@ -1590,7 +1560,7 @@ static int atcmd_receive_data (char *buf, int len)
 		if (i == len)
 			return len;
 
-		_atcmd_info("SEND: continue\n");
+		_atcmd_info("SEND: continue");
 	}
 
 	if (g_atcmd_data_mode.send_len > 0)
@@ -1693,7 +1663,7 @@ static bool atcmd_tx_mutex_take (void)
 		take = !!xSemaphoreTake(g_atcmd_tx_mutex, pdMS_TO_TICKS(time_ms));
 
 	if (!take)
-		_atcmd_error("timeout=%d\n", time_ms);
+		_atcmd_error("timeout, %dms", time_ms);
 
 	return take;
 }
@@ -1707,7 +1677,7 @@ static bool atcmd_tx_mutex_give (void)
 		give = !!xSemaphoreGive(g_atcmd_tx_mutex);
 
 	if (!give)
-		_atcmd_error("error\n");
+		_atcmd_error("fail");
 
 	return give;
 }
@@ -1717,7 +1687,7 @@ int atcmd_transmit_return (char *cmd, int ret)
 {
 	int len = 0;
 
-/*	_atcmd_debug("%s: ret=%d\r\n", cmd, ret); */
+/*	_atcmd_debug("%s: ret=%d", cmd, ret); */
 
 	if (ret == ATCMD_SUCCESS)
 	{
@@ -1769,7 +1739,7 @@ int atcmd_enable (_hif_info_t *info)
 	hif_rx_buf = _atcmd_malloc(ATCMD_RXBUF_SIZE);
 	if (!hif_rx_buf)
 	{
-		_atcmd_error("malloc() failed\n");
+		_atcmd_error("malloc()");
 		return -1;
 	}
 #endif
@@ -1780,12 +1750,10 @@ int atcmd_enable (_hif_info_t *info)
 	if (atcmd_data_mode_task_create() != 0)
 		return -1;
 
-	_atcmd_info("ATCMD_TASK_PRIORITY: %d (%d)\n", ATCMD_TASK_PRIORITY, ATCMD_DATA_MODE_TASK_PRIORITY);
-	_atcmd_info("ATCMD_MSG_LEN_MIN: %d\n", ATCMD_MSG_LEN_MIN);
-	_atcmd_info("ATCMD_MSG_LEN_MAX: %d\n", ATCMD_MSG_LEN_MAX);
-	_atcmd_info("ATCMD_DATA_LEN_MAX: %d\n", ATCMD_DATA_LEN_MAX);
-	_atcmd_info("ATCMD_TXBUF_SIZE: %d\n", ATCMD_TXBUF_SIZE);
-	_atcmd_info("ATCMD_RXBUF_SIZE: %d\n", ATCMD_RXBUF_SIZE);
+	_atcmd_info("TASK_PRIORITY: %d (%d)", ATCMD_TASK_PRIORITY, ATCMD_DATA_MODE_TASK_PRIORITY);
+	_atcmd_info("MSG_LEN: min=%d max=%d", ATCMD_MSG_LEN_MIN, ATCMD_MSG_LEN_MAX);
+	_atcmd_info("DATA_LEN: max=%d", ATCMD_DATA_LEN_MAX);
+	_atcmd_info("BUFFER_SIZE: tx=%d rx=%d", ATCMD_TXBUF_SIZE, ATCMD_RXBUF_SIZE);
 
 	ATCMD_PROMPT_DISABLE();
 	ATCMD_ECHO_DISABLE();
@@ -1834,6 +1802,9 @@ void atcmd_disable (void)
 
 /**********************************************************************************************/
 
+#if defined(CONFIG_ATCMD_CLI)
+
+#if !defined(CONFIG_ATCMD_CLI_MINIMUM)
 static int cmd_atcmd_list (cmd_tbl_t *t, int argc, char *argv[])
 {
 	int ret = CMD_RET_SUCCESS;
@@ -1851,7 +1822,7 @@ static int cmd_atcmd_list (cmd_tbl_t *t, int argc, char *argv[])
 			{
 				group = (atcmd_group_t *)list_group;
 
-				_atcmd_info("[ %s (%d, %s) ]\n", group->name, group->id, group->cmd_prefix);
+				_atcmd_info("[ %s (%d, %s) ]", group->name, group->id, group->cmd_prefix);
 
 				for (list_info = group->cmd_list_head.prev ; list_info->prev ; list_info = list_info->prev);
 
@@ -1859,14 +1830,14 @@ static int cmd_atcmd_list (cmd_tbl_t *t, int argc, char *argv[])
 				{
 					info = (atcmd_info_t *)list_info;
 
-					_atcmd_info("  - %-12s : %3d, %c%c%c\n",
+					_atcmd_info("  - %-12s : %3d, %c%c%c",
 									info->cmd, info->id,
 									info->handler[ATCMD_HANDLER_RUN] ? 'R' : ' ',
 									info->handler[ATCMD_HANDLER_GET] ? 'G' : ' ',
 									info->handler[ATCMD_HANDLER_SET] ? 'S' : ' ');
 				}
 
-				_atcmd_info("\n");
+				_atcmd_info("");
 			}
 
 			break;
@@ -1884,4 +1855,6 @@ SUBCMD_MAND(atcmd,
 		cmd_atcmd_list,
 		"command list info",
 		"atcmd list");
+#endif /* #if !defined(CONFIG_ATCMD_CLI_MINIMUM) */
 
+#endif /* #if defined(CONFIG_ATCMD_CLI) */

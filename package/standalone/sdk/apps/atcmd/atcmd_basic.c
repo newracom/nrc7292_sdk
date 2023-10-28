@@ -25,7 +25,6 @@
 
 
 #include "atcmd.h"
-#include "api_ps.h"
 
 /**********************************************************************************************/
 
@@ -120,7 +119,7 @@ static int _atcmd_basic_heap_get (int argc, char *argv[])
 			size_t cur_size = xPortGetFreeHeapSize();
 			size_t min_size = xPortGetMinimumEverFreeHeapSize();
 
-			_atcmd_info("heap_size: %d, %d\n", cur_size, min_size);
+			_atcmd_info("heap_size: %d, %d", cur_size, min_size);
 
 			ATCMD_MSG_INFO("HEAP", "%d,%d", cur_size, min_size);
 			break;
@@ -220,7 +219,7 @@ static int _atcmd_basic_uart_set (int argc, char *argv[])
 				default: return ATCMD_ERROR_INVAL;
 			}
 
-			_atcmd_info("UART-PT %s\n", g_atcmd_uart_passthrough_support ? "ON" : "OFF");
+			_atcmd_info("UART-PT %s", g_atcmd_uart_passthrough_support ? "ON" : "OFF");
 			break;
 		}
 
@@ -295,7 +294,7 @@ static bool _atcmd_gpio_pin_valid (int pin)
 		[1] = (1 << GPIO_08) | (1 << GPIO_09) | (1 << GPIO_10) | (1 << GPIO_11) | \
 			  (1 << GPIO_12) | (1 << GPIO_13) | (1 << GPIO_14) | (1 << GPIO_15) | \
 			  (1 << GPIO_16) | (1 << GPIO_17)
-#elif defined(NRC7393)||defined(NRC7394)
+#elif defined(NRC7394)
 		[0] = (1 << GPIO_10) | (1 << GPIO_11) | (1 << GPIO_12) | (1 << GPIO_13) | \
 			  (1 << GPIO_14) | (1 << GPIO_20) | (1 << GPIO_25),
 
@@ -319,7 +318,7 @@ static bool _atcmd_gpio_pin_valid (int pin)
 			break;
 
 		default:
-			_atcmd_error("invalid hif type (%d)\n", hif_type);
+			_atcmd_error("invalid hif type (%d)", hif_type);
 			return false;
 	}
 
@@ -341,7 +340,7 @@ static void _atcmd_gpio_get_config (NRC_GPIO_CONFIG *config)
 		uio_sel_t uio;
 		int i;
 
-		_atcmd_info("GPIO_GET: ALT bit%d is 1\n", config->gpio_pin);
+		_atcmd_info("GPIO_GET: ALT bit%d is 1", config->gpio_pin);
 
 		config->gpio_alt = GPIO_NORMAL_OP;
 
@@ -352,7 +351,7 @@ static void _atcmd_gpio_get_config (NRC_GPIO_CONFIG *config)
 			if (uio.word == 0)
 				continue;
 
-			_atcmd_info(" - UIO_SEL%02d : %03u, %03u, %03u, %03u\n",
+			_atcmd_info(" - UIO_SEL%02d : %03u, %03u, %03u, %03u",
 				i, uio.bit.sel7_0, uio.bit.sel15_8, uio.bit.sel23_16, uio.bit.sel31_24);
 		}
 	}
@@ -383,7 +382,7 @@ static void _atcmd_gpio_get_config (NRC_GPIO_CONFIG *config)
 		config->gpio_mode = GPIO_PULL_DOWN;
 	}
 }
-#elif defined(NRC7393) || defined(NRC7394)
+#elif defined(NRC7394)
 static void _atcmd_gpio_get_config (NRC_GPIO_CONFIG *config)
 {
 	gpio_io_t reg;
@@ -398,7 +397,7 @@ static void _atcmd_gpio_get_config (NRC_GPIO_CONFIG *config)
 		uio_sel_t uio;
 		int i;
 
-		_atcmd_info("GPIO_GET: ALT0 bit%d is 1\n", config->gpio_pin);
+		_atcmd_info("GPIO_GET: ALT0 bit%d is 1", config->gpio_pin);
 		config->gpio_alt = GPIO_NORMAL_OP;
 
 		for (i = 0 ; i <= 15 ; i++)
@@ -408,7 +407,7 @@ static void _atcmd_gpio_get_config (NRC_GPIO_CONFIG *config)
 			if (uio.word == 0)
 				continue;
 
-			_atcmd_info(" - UIO_SEL%02d : %03u, %03u, %03u, %03u\n",
+			_atcmd_info(" - UIO_SEL%02d : %03u, %03u, %03u, %03u",
 				i, uio.bit.sel7_0, uio.bit.sel15_8, uio.bit.sel23_16, uio.bit.sel31_24);
 		}
 	}
@@ -417,7 +416,7 @@ static void _atcmd_gpio_get_config (NRC_GPIO_CONFIG *config)
 
 	if (reg.word & (1 << config->gpio_pin))
 	{
-		_atcmd_info("GPIO_GET: ALT1 bit%d is 1\n", config->gpio_pin);
+		_atcmd_info("GPIO_GET: ALT1 bit%d is 1", config->gpio_pin);
 		config->gpio_alt = GPIO_NORMAL_OP;
 	}
 
@@ -425,7 +424,7 @@ static void _atcmd_gpio_get_config (NRC_GPIO_CONFIG *config)
 
 	if (reg.word & (1 << config->gpio_pin))
 	{
-		_atcmd_info("GPIO_GET: ALT2 bit%d is 1\n", config->gpio_pin);
+		_atcmd_info("GPIO_GET: ALT2 bit%d is 1", config->gpio_pin);
 		config->gpio_alt = GPIO_NORMAL_OP;
 	}
 
@@ -433,7 +432,7 @@ static void _atcmd_gpio_get_config (NRC_GPIO_CONFIG *config)
 
 	if (reg.word & (1 << config->gpio_pin))
 	{
-		_atcmd_info("GPIO_GET: ALT3 bit%d is 1\n", config->gpio_pin);
+		_atcmd_info("GPIO_GET: ALT3 bit%d is 1", config->gpio_pin);
 		config->gpio_alt = GPIO_NORMAL_OP;
 	}
 
@@ -441,7 +440,7 @@ static void _atcmd_gpio_get_config (NRC_GPIO_CONFIG *config)
 
 	if (reg.word & (1 << config->gpio_pin))
 	{
-		_atcmd_info("GPIO_GET: ALT4 bit%d is 1\n", config->gpio_pin);
+		_atcmd_info("GPIO_GET: ALT4 bit%d is 1", config->gpio_pin);
 		config->gpio_alt = GPIO_NORMAL_OP;
 	}
 
@@ -466,7 +465,7 @@ static void _atcmd_gpio_get_config (NRC_GPIO_CONFIG *config)
 static void _atcmd_gpio_set_config (NRC_GPIO_CONFIG *config)
 {
 	if (nrc_gpio_config(config) != NRC_SUCCESS)
-		_atcmd_error("nrc_gpio_config() failed\n");
+		_atcmd_error("nrc_gpio_config()");
 }
 
 static void _atcmd_gpio_init (NRC_GPIO_DIR dir, NRC_GPIO_MODE mode)
@@ -485,7 +484,7 @@ static void _atcmd_gpio_init (NRC_GPIO_DIR dir, NRC_GPIO_MODE mode)
 
 		config.gpio_pin = i;
 
-		_atcmd_info("gpio_init: %02d %s %s\n",
+		_atcmd_info("gpio_init: %02d %s %s",
 					config.gpio_pin,
 					(config.gpio_dir == GPIO_INPUT) ? "input" : "output",
 					(config.gpio_mode == GPIO_PULL_UP) ? "pullup" : "pulldown");
@@ -560,10 +559,13 @@ static int _atcmd_basic_gpio_config_set (int argc, char *argv[])
 	switch (argc)
 	{
 		case 0:
-			ATCMD_MSG_HELP("AT+GPIOCONF=<number>,<direction>,<pull-up>");
+			ATCMD_MSG_HELP("AT+GPIOCONF=<number>,<direction>[,<pull-up>]");
 			break;
 
 		case 3:
+			param_pullup = argv[2];
+
+		case 2:
 		{
 			NRC_GPIO_CONFIG config =
 			{
@@ -572,7 +574,6 @@ static int _atcmd_basic_gpio_config_set (int argc, char *argv[])
 			int pin = atoi(argv[0]);
 
 			param_dir = argv[1];
-			param_pullup = argv[2];
 
 			if (pin != -1 && !_atcmd_gpio_pin_valid(pin))
 				return ATCMD_ERROR_INVAL;
@@ -586,11 +587,16 @@ static int _atcmd_basic_gpio_config_set (int argc, char *argv[])
 				default: return ATCMD_ERROR_INVAL;
 			}
 
-			switch (atoi(param_pullup))
+			if (!param_pullup)
+				config.gpio_mode = GPIO_FLOATING;
+			else
 			{
-				case 0: config.gpio_mode = GPIO_PULL_DOWN; break;
-				case 1: config.gpio_mode = GPIO_PULL_UP; break;
-				default: return ATCMD_ERROR_INVAL;
+				switch (atoi(param_pullup))
+				{
+					case 0: config.gpio_mode = GPIO_PULL_DOWN; break;
+					case 1: config.gpio_mode = GPIO_PULL_UP; break;
+					default: return ATCMD_ERROR_INVAL;
+				}
 			}
 
 			if (pin == -1)
@@ -733,7 +739,7 @@ static void _atcmd_adc_enable (void)
 {
 	if (!g_atcmd_adc_enable)
 	{
-		_atcmd_info("ADC: enable\n");
+		_atcmd_info("ADC: enable");
 
 		g_atcmd_adc_enable = true;
 		nrc_adc_enable();
@@ -744,7 +750,7 @@ static void _atcmd_adc_disable (void)
 {
 	if (g_atcmd_adc_enable)
 	{
-		_atcmd_info("ADC: disable\n");
+		_atcmd_info("ADC: disable");
 
 		g_atcmd_adc_enable = false;
 		nrc_adc_disable();
@@ -894,9 +900,9 @@ void atcmd_firmware_download_event_idle (uint32_t len, uint32_t cnt)
 	ATCMD_MSG_EVENT("BEVENT", "\"FWBINDL_IDLE\",%u,%u,%u", g_firmware_update.download, len, cnt);
 }
 
-void atcmd_firmware_download_event_drop (uint32_t len, uint32_t cnt)
+void atcmd_firmware_download_event_drop (uint32_t len)
 {
-	ATCMD_MSG_EVENT("BEVENT", "\"FWBINDL_DROP\",%u,%u,%u", g_firmware_update.download, len, cnt);
+	ATCMD_MSG_EVENT("BEVENT", "\"FWBINDL_DROP\",%u,%u", g_firmware_update.download, len);
 }
 
 void atcmd_firmware_download_event_done (uint32_t len)
@@ -916,13 +922,13 @@ static int _atcmd_basic_firmware_update_run (int argc, char *argv[])
 	if (size == 0 || size > max_size || crc32 == 0)
 		return ATCMD_ERROR_INVAL;
 
-	_atcmd_info("fw_update_run: size=%u crc=0x%X\n", size, crc32);
+	_atcmd_info("fw_update_run: size=%u crc=0x%X", size, crc32);
 
 	_crc32 = util_fota_cal_crc((uint8_t *)util_fota_fw_addr(), size);
 
 	if (_crc32 != crc32)
 	{
-		_atcmd_info("fw_update_run: crc mismatch, crc=0x%X\n", _crc32);
+		_atcmd_info("fw_update_run: crc mismatch, crc=0x%X", _crc32);
 		return ATCMD_ERROR_FAIL;
 	}
 
@@ -941,7 +947,7 @@ static int _atcmd_basic_firmware_update_get (int argc, char *argv[])
 			uint32_t size = g_firmware_update.size;
 			uint32_t crc32 = g_firmware_update.crc32;
 
-			_atcmd_info("fw_update_get: size=%u crc=0x%X\n", size, crc32);
+			_atcmd_info("fw_update_get: size=%u crc=0x%X", size, crc32);
 
 			ATCMD_MSG_INFO("FWUPDATE", "%u,0x%X", size, crc32);
 			break;
@@ -985,7 +991,7 @@ static int _atcmd_basic_firmware_update_set (int argc, char *argv[])
 					size = g_firmware_update.size;
 					crc32 = g_firmware_update.crc32;
 
-					_atcmd_info("fw_update_busy: size=%u crc=0x%X\n", size, crc32);
+					_atcmd_info("fw_update_busy: size=%u crc=0x%X", size, crc32);
 
 					return ATCMD_ERROR_BUSY;
 				}
@@ -995,7 +1001,7 @@ static int _atcmd_basic_firmware_update_set (int argc, char *argv[])
 			return ATCMD_ERROR_INVAL;
 	}
 
-	_atcmd_info("fw_update_set: size=%u crc=0x%X\n", size, crc32);
+	_atcmd_info("fw_update_set: size=%u crc=0x%X", size, crc32);
 
 	g_firmware_update.size = size;
 	g_firmware_update.crc32 = crc32;
@@ -1037,7 +1043,7 @@ static int _atcmd_basic_firmware_download_get (int argc, char *argv[])
 			uint32_t size = g_firmware_update.size;
 			uint32_t download = g_firmware_update.download;
 
-			_atcmd_info("fw_download_get: size=%u download=%u\n", size, download);
+			_atcmd_info("fw_download_get: size=%u download=%u", size, download);
 
 			ATCMD_MSG_INFO("FWBINDL", "%u,%u", size, download);
 			break;
@@ -1079,7 +1085,7 @@ static int _atcmd_basic_firmware_download_set (int argc, char *argv[])
 				if (timeout_msec == 0)
 					timeout_msec = 1000;
 
-				_atcmd_info("fw_download_set: offset=%u length=%u timeout=%u\n", offset, length, timeout_msec);
+				_atcmd_info("fw_download_set: offset=%u length=%u timeout=%u", offset, length, timeout_msec);
 
 				if (atcmd_firmware_download_enable(length, timeout_msec) != 0)
 					return ATCMD_ERROR_FAIL;
@@ -1087,7 +1093,7 @@ static int _atcmd_basic_firmware_download_set (int argc, char *argv[])
 				break;
 			}
 
-			_atcmd_info("fw_download_set: offset mismatch (%u -> %u)\n", g_firmware_update.download, offset);
+			_atcmd_info("fw_download_set: offset mismatch (%u -> %u)", g_firmware_update.download, offset);
 		}
 
 		default:
@@ -1177,7 +1183,7 @@ uint32_t _atcmd_timeout_value (const char *cmd)
 
 	if (!timeout[i].cmd)
 	{
-		_atcmd_error("no command\n");
+		_atcmd_error("no cmd");
 		return 0;
 	}
 

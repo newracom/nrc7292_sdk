@@ -32,7 +32,7 @@
 
 #define _lwip_socket_malloc				_atcmd_malloc
 #define _lwip_socket_mfree				_atcmd_free
-#define _lwip_socket_log(fmt, ...)		_atcmd_log(fmt, ##__VA_ARGS__)
+#define _lwip_socket_log(fmt, ...)		_atcmd_info(fmt, ##__VA_ARGS__)
 
 /**********************************************************************************************/
 

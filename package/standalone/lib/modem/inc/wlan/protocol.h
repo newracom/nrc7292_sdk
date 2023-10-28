@@ -1,5 +1,6 @@
 #ifndef __PROTOCOL_H__
 #define __PROTOCOL_H__
+#include <sys/types.h>
 
 #define MAC2STR(a) (a)[0], (a)[1], (a)[2], (a)[3], (a)[4], (a)[5]
 #define MACSTR "%02x:%02x:%02x:%02x:%02x:%02x"
@@ -394,6 +395,61 @@ typedef struct _UDPField {
 	uint16_t   cs;
 } UDPField;
 
+#if defined(_BYTE_ORDER) && defined(_BIG_ENDIAN) && \
+    defined(_LITTLE_ENDIAN)
+#else
+//#error "please include stdio.h or sys/types.h for endian.h"
+#endif
+
+typedef struct _TCPField {
+	uint16_t   src;
+	uint16_t   dest;
+	uint32_t   seqnum;
+	uint32_t   acknum;
+#if _BYTE_ORDER == _BIG_ENDIAN
+	uint16_t   offset	: 4;
+	uint16_t   reserved : 3;
+	uint16_t   ns		: 1;
+	uint16_t   cwr		: 1;
+	uint16_t   ece		: 1;
+	uint16_t   urg		: 1;
+	uint16_t   ack		: 1;
+	uint16_t   psh		: 1;
+	uint16_t   rst		: 1;
+	uint16_t   syn		: 1;
+	uint16_t   fin		: 1;
+#elif _BYTE_ORDER == _LITTLE_ENDIAN
+	uint16_t   ns		: 1;
+	uint16_t   reserved : 3;
+	uint16_t   offset	: 4;
+
+	uint16_t   fin		: 1;
+	uint16_t   syn		: 1;
+	uint16_t   rst		: 1;
+	uint16_t   psh		: 1;
+	uint16_t   ack		: 1;
+	uint16_t   urg		: 1;
+	uint16_t   ece		: 1;
+	uint16_t   cwr		: 1;
+#else
+	uint16_t   ns		: 1;
+	uint16_t   reserved : 3;
+	uint16_t   offset	: 4;
+
+	uint16_t   fin		: 1;
+	uint16_t   syn		: 1;
+	uint16_t   rst		: 1;
+	uint16_t   psh		: 1;
+	uint16_t   ack		: 1;
+	uint16_t   urg		: 1;
+	uint16_t   ece		: 1;
+	uint16_t   cwr		: 1;
+#endif
+	uint16_t   winsize;
+	uint16_t   chksum;
+	uint16_t   urgent;
+} TCPField;
+
 #define MESH_FLAGS_AE_A4    0x1
 #define MESH_FLAGS_AE_A5_A6 0x2
 #define MESH_FLAGS_AE       0x3
@@ -432,6 +488,7 @@ bool ieee80211_is_beacon(GenericMacHeader* gmh);
 bool ieee80211_is_auth(GenericMacHeader* gmh);
 bool ieee80211_is_deauth(GenericMacHeader* gmh);
 bool ieee80211_is_disasoc(GenericMacHeader* gmh);
+bool ieee80211_is_assoc_req(GenericMacHeader* gmh);
 bool ieee80211_is_assoc_resp(GenericMacHeader* gmh);
 bool lmac_check_action_frame(GenericMacHeader* gmh);
 bool ieee80211_is_protected(GenericMacHeader* gmh);

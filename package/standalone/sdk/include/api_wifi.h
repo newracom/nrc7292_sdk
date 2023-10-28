@@ -66,7 +66,7 @@ tWIFI_STATUS nrc_wifi_get_mac_address (int vif_id, char *addr);
 /**********************************************
  * @fn int nrc_wifi_get_tx_power (int vif_id, uint8_t *txpower)
  *
- * @brief Get TX Power
+ * @brief Get the transmit power level (in dBm) after a successful connection.
  *
  * @param vif_id: Network interface index
  *
@@ -80,7 +80,7 @@ tWIFI_STATUS nrc_wifi_get_tx_power (int vif_id, uint8_t *txpower);
 /**********************************************
  * @fn tWIFI_STATUS nrc_wifi_set_tx_power (uint8_t txpower, uint8_t type)
  *
- * @brief Set TX Power
+ * @brief Set the transmit power level (in dBm) and type
  *
  * @param txpower: TX Power (in dBm) (1~30)
  *
@@ -158,30 +158,51 @@ bool nrc_wifi_get_rate_control(int vif_id);
  ***********************************************/
 tWIFI_STATUS nrc_wifi_set_rate_control (int vif_id, bool enable);
 
+
 /**********************************************
- * @fn  tWIFI_STATUS nrc_wifi_get_mcs (int vif_id, uint8_t *mcs)
+ * @fn  tWIFI_STATUS nrc_wifi_get_mcs_info(int vif_id, uint8_t *tx_mcs, uint8_t *rx_mcs)
+ *
+ * @brief Retrieve the Modulation and Coding Scheme(MCS) information
+ *
+ * @param vif_id: Network interface index.
+ *
+ * @param tx_mcs: Pointer to store the MCS for transmission(TX).
+ *                RC_OFF : manually configured MCS for transmission (TX)
+ *                RC_ON  : the latest MCS set by Rate Control(RC) for transmission
+ *                         and updated by tx data frames
+ *
+ * @param rx_mcs: Pointer to store the MCS for reception(RX).
+ *                the latest MCS for reception(RX) and updated by rx data frames
+ *
+ * @return If successful, it returns WIFI_SUCCESS. Otherwise, an error code (tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_mcs_info(int vif_id, uint8_t *tx_mcs, uint8_t *rx_mcs);
+
+
+/**********************************************
+ * @fn  tWIFI_STATUS nrc_wifi_get_mcs(int vif_id, uint8_t *mcs)
  *
  * @brief Get MCS (RC_OFF : get manual MCS set by nrc_wifi_set_mcs, RC_ON : get latest MCS set by RC)
  *
  * @param vif_id: Network interface index
  *
- * @param MCS : Modulation Coding Scheme output
+ * @param mcs: Pointer to store the MCS for transmission (TX).
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-tWIFI_STATUS nrc_wifi_get_mcs (int vif_id, uint8_t *mcs);
+tWIFI_STATUS nrc_wifi_get_mcs(int vif_id, uint8_t *mcs);
 
 
 /**********************************************
- * @fn  tWIFI_STATUS nrc_wifi_set_mcs (uint8_t mcs)
+ * @fn  tWIFI_STATUS nrc_wifi_set_mcs(uint8_t mcs)
  *
  * @brief Set MCS, which is applied when rate control is disabled
  *
- * @param MCS : Modulation Coding Scheme (0 ~ 10)
+ * @param mcs: Modulation Coding Scheme (0~7, 10)
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-tWIFI_STATUS nrc_wifi_set_mcs (uint8_t mcs);
+tWIFI_STATUS nrc_wifi_set_mcs(uint8_t mcs);
 
 
 /**********************************************
@@ -447,30 +468,33 @@ tWIFI_STATUS nrc_wifi_set_bssid (int vif_id, char *bssid);
 
 
 /**********************************************
- * @fn bool nrc_wifi_softap_get_hidden_ssid(int vif_id)
+ * @fn tWIFI_STATUS nrc_wifi_softap_get_ignore_broadcast_ssid(int vif_id, int *ignore_broadcast_ssid)
  *
- * @brief Get hidden SSID status
- *
- * @param vif_id: Network interface index
- *
- * @return If enabled, then true. Otherwise, false is returned.
- ***********************************************/
-bool nrc_wifi_softap_get_hidden_ssid(int vif_id);
-
-/**********************************************
- * @fn tWIFI_STATUS nrc_wifi_softap_set_hidden_ssid(int vif_id, bool enable)
- *
- * @brief Set hidden SSID enable
+ * @brief Get ignore_broadcast_ssid - Hide SSID in AP mode
  *
  * @param vif_id: Network interface index
  *
- * @param enable: hidden SSID enable
- * 0: hidden SSID not in use
- * 1: send empty (length=0) SSID in beacon and ignore probe request for broadcast SSID
+ * @param ignore_broadcast_ssid: ignore broadcast SSID type
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-tWIFI_STATUS nrc_wifi_softap_set_hidden_ssid(int vif_id, bool enable);
+tWIFI_STATUS nrc_wifi_softap_get_ignore_broadcast_ssid(int vif_id, int *ignore_broadcast_ssid);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_softap_set_ignore_broadcast_ssid(int vif_id, int ignore_broadcast_ssid)
+ *
+ * @brief Set ignore_broadcast_ssid - Hide SSID in AP mode
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param ignore_broadcast_ssid: ignore broadcast SSID type
+ *   0: send full SSID in beacon
+ *   1: send empty SSID (length=0) in beacon and ignore probe request for broadcast SSID
+ *   2: send clear SSID (ASCII 0), but keep the original length and ignore probe reqeust for broadcast SSID
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_softap_set_ignore_broadcast_ssid(int vif_id, int ignore_broadcast_ssid);
 
 /**********************************************
  * @fn tWIFI_STATUS nrc_wifi_set_security (int vif_id, int mode, char *password)
@@ -662,7 +686,7 @@ tWIFI_STATUS nrc_wifi_abort_scan (int vif_id);
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-tWIFI_STATUS nrc_wifi_connect (int vif_id, uint32_t timeout);
+tWIFI_STATUS nrc_wifi_connect(int vif_id, uint32_t timeout);
 
 
 /**********************************************
@@ -908,6 +932,34 @@ tWIFI_STATUS nrc_wifi_softap_get_sta_by_addr(int vif_id, uint8_t *addr, STA_INFO
  * @return number of STA associated
  ***********************************************/
 uint16_t nrc_wifi_softap_get_sta_num(int vif_id);
+
+
+/**********************************************
+ * @fn    tWIFI_STATUS nrc_wifi_softap_get_beacon_interval(int vif_id, uint16_t *beacon_interval)
+ *
+ * @brief Get beacon interval for softAP(default: 100)
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param beacon_interval: beacon interval(TU). (1TU=1024us) (range range 15..65535)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_softap_get_beacon_interval(int vif_id, uint16_t *beacon_interval);
+
+
+/**********************************************
+ * @fn     tWIFI_STATUS nrc_wifi_softap_set_beacon_interval(int vif_id, uint16_t beacon_interval)
+ *
+ * @brief Set beacon interval for softAP(default: 100)
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param beacon_interval: beacon interval(TU). (1TU=1024us) (range range 15..65535)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_softap_set_beacon_interval(int vif_id, uint16_t beacon_interval);
 
 
 /**********************************************

@@ -63,7 +63,7 @@ void umac_init_op_ch_info(uint8_t vif_id);
 void umac_deinit_op_ch_info(uint8_t vif_id);
 void umac_clear_all_op_ch_info(uint8_t vif_id);
 bool umac_add_op_ch_info(uint8_t vif_id, uint8_t *bssid, s1g_operation_information *op_info);
-op_ch_info *umac_get_op_ch_info(uint8_t *bssid);
+op_ch_info *umac_get_op_ch_info(uint8_t *bssid, int prim_loc);
 #if defined (MATCH_OP_BW_PREQ_PRSP)
 bool umac_add_op_bw_info(uint8_t vif_id, uint8_t *peer_addr, uint8_t bw);
 int umac_get_op_bw_info(uint8_t vif_id, uint8_t *peer_addr);
@@ -194,11 +194,6 @@ uint16_t	umac_s1g_get_frame_short_beacon_interval();
 void		umac_s1g_update_short_bi(SYS_BUF *buf, int8_t vif_id, bool is_tx, bool short_beacon);
 
 uint32_t	get_assoc_resp_status_code(uint8_t*);
-
-
-#if defined(SOFT_AP_BSS_MAX_IDLE)
-bool umac_s1g_set_softap_ie_bss_max_idle(int period);
-#endif /* defined(SOFT_AP_BSS_MAX_IDLE) */
 
 // IE Structure Verification
 bool validate_frame_ie_structure_mul(struct byte_stream *bs, struct _SYS_BUF *buf, bool is_tx, uint16_t offset, const char *msg);

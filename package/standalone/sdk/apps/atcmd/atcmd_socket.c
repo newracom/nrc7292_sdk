@@ -120,27 +120,27 @@ static void _atcmd_socket_print (atcmd_socket_t *socket)
 	if (!socket || socket->id < 0)
 		return;
 
-	_atcmd_info("[ Socket Info ]\n");
-	_atcmd_info(" - id : %d\n", socket->id);
+	_atcmd_info("[ Socket Info ]");
+	_atcmd_info(" - id : %d", socket->id);
 
 	switch (socket->protocol)
 	{
 		case ATCMD_SOCKET_PROTO_UDP:
 		case ATCMD_SOCKET_PROTO_TCP:
-			_atcmd_info(" - protocol : %s\n", str_proto_lwr[socket->protocol]);
+			_atcmd_info(" - protocol : %s", str_proto_lwr[socket->protocol]);
 			break;
 
 		default:
-			_atcmd_info(" - protocol : unknown\n");
+			_atcmd_info(" - protocol : unknown");
 	}
 
-	_atcmd_info(" - local_port : %d\n", socket->local_port);
+	_atcmd_info(" - local_port : %d", socket->local_port);
 
 	if (socket->remote_port > 0)
 	{
-		_atcmd_info(" - remote\n");
-		_atcmd_info(" -- port : %d\n", socket->remote_port);
-		_atcmd_info(" -- address : %s\n", ipaddr_ntoa(&socket->remote_addr));
+		_atcmd_info(" - remote");
+		_atcmd_info(" -- port : %d", socket->remote_port);
+		_atcmd_info(" -- address : %s", ipaddr_ntoa(&socket->remote_addr));
 	}
 }
 
@@ -186,7 +186,7 @@ static atcmd_socket_t *_atcmd_socket_search (int id,
 		if (local_port > 0 && local_port != socket->local_port)
 			continue;
 
-/*		_atcmd_debug("%s: id=%d proto=%d port=%d remote=%d,%s\n", __func__,
+/*		_atcmd_debug("%s: id=%d proto=%d port=%d remote=%d,%s", __func__,
 						socket->id, socket->protocol, socket->local_port,
 						socket->remote_port, socket->remote_addr); */
 
@@ -216,7 +216,7 @@ static int _atcmd_socket_event_handler (int type, int id, ...)
 			uint32_t remote_port = va_arg(ap, uint32_t) & 0xffff;
 			uint32_t local_port = va_arg(ap, uint32_t) & 0xffff;
 
-			_atcmd_info("SEVENT: CONNECT, id=%d remote=%s,%u local=%u\n",
+			_atcmd_info("SEVENT: CONNECT, id=%d remote=%s,%u local=%u",
 						id, ipaddr_ntoa(remote_addr), remote_port, local_port);
 			ATCMD_MSG_SEVENT("\"CONNECT\",%d,\"%s\",%u,%u",
 						id, ipaddr_ntoa(remote_addr), remote_port, local_port);
@@ -227,7 +227,7 @@ static int _atcmd_socket_event_handler (int type, int id, ...)
 		{
 			int err = va_arg(ap, int);
 
-			_atcmd_info("SEVENT: CLOSE, id=%d err=%d (%s)\n", id, -err, strerror(-err));
+			_atcmd_info("SEVENT: CLOSE, id=%d err=%d (%s)", id, -err, strerror(-err));
 			ATCMD_MSG_SEVENT("\"CLOSE\",%d,%d,\"%s\"", id, -err, strerror(-err));
 			break;
 		}
@@ -237,7 +237,7 @@ static int _atcmd_socket_event_handler (int type, int id, ...)
 			uint32_t done = va_arg(ap, uint32_t);
 
 			if (g_cmd_socket_log.send_done)
-				_atcmd_info("SEVENT: SEND_DONE, id=%d done=%u\n", id, done);
+				_atcmd_info("SEVENT: SEND_DONE, id=%d done=%u", id, done);
 
 			ATCMD_MSG_SEVENT("\"SEND_DONE\",%d,%u", id, done);
 			break;
@@ -250,7 +250,7 @@ static int _atcmd_socket_event_handler (int type, int id, ...)
 			uint32_t wait = va_arg(ap, uint32_t);
 			uint32_t time = va_arg(ap, uint32_t);
 
-			_atcmd_info("SEVENT: SEND_IDLE, id=%d done=%u drop=%u wait=%u time=%u\n", id, done, drop, wait, time);
+			_atcmd_info("SEVENT: SEND_IDLE, id=%d done=%u drop=%u wait=%u time=%u", id, done, drop, wait, time);
 			ATCMD_MSG_SEVENT("\"SEND_IDLE\",%d,%u,%u,%u", id, done, drop, wait);
 			break;
 		}
@@ -259,7 +259,7 @@ static int _atcmd_socket_event_handler (int type, int id, ...)
 		{
 			uint32_t drop = va_arg(ap, uint32_t);
 
-			_atcmd_info("SEVENT: SEND_DROP, id=%d drop=%u\n", id, drop);
+			_atcmd_info("SEVENT: SEND_DROP, id=%d drop=%u", id, drop);
 			ATCMD_MSG_SEVENT("\"SEND_DROP\",%d,%u", id, drop);
 			break;
 		}
@@ -269,7 +269,7 @@ static int _atcmd_socket_event_handler (int type, int id, ...)
 			uint32_t done = va_arg(ap, uint32_t);
 			uint32_t drop = va_arg(ap, uint32_t);
 
-			_atcmd_info("SEVENT: SEND_EXIT, id=%d done=%u drop=%u\n", id, done, drop);
+			_atcmd_info("SEVENT: SEND_EXIT, id=%d done=%u drop=%u", id, done, drop);
 			ATCMD_MSG_SEVENT("\"SEND_EXIT\",%d,%u,%u", id, done, drop);
 			break;
 		}
@@ -278,7 +278,7 @@ static int _atcmd_socket_event_handler (int type, int id, ...)
 		{
 			int err = va_arg(ap, int);
 
-			_atcmd_info("SEVENT: SEND_ERROR, id=%d err=%d (%s)\n", id, -err, strerror(-err));
+			_atcmd_info("SEVENT: SEND_ERROR, id=%d err=%d (%s)", id, -err, strerror(-err));
 			ATCMD_MSG_SEVENT("\"SEND_ERROR\",%d,%d,\"%s\"", id, -err, strerror(-err));
 			break;
 		}
@@ -287,7 +287,7 @@ static int _atcmd_socket_event_handler (int type, int id, ...)
 		{
 			int len = va_arg(ap, int);
 
-			_atcmd_info("SEVENT: RECV_READY, id=%d len=%d\n", id, len);
+			_atcmd_info("SEVENT: RECV_READY, id=%d len=%d", id, len);
 			ATCMD_MSG_SEVENT("\"RECV_READY\",%d,%d", id, len);
 			break;
 		}
@@ -296,13 +296,13 @@ static int _atcmd_socket_event_handler (int type, int id, ...)
 		{
 			int err = va_arg(ap, int);
 
-			_atcmd_info("SEVENT: RECV_ERROR, id=%d err=%d (%s)\n", id, -err, strerror(-err));
+			_atcmd_info("SEVENT: RECV_ERROR, id=%d err=%d (%s)", id, -err, strerror(-err));
 			ATCMD_MSG_SEVENT("\"RECV_ERROR\",%d,%d,\"%s\"", id, -err, strerror(-err));
 			break;
 		}
 
 		default:
-			_atcmd_info("SEVENT: invalid type (%d)\n", type);
+			_atcmd_info("SEVENT: invalid type (%d)", type);
 			ret = -1;
 	}
 
@@ -340,7 +340,7 @@ static int _atcmd_socket_send_request (atcmd_socket_t *socket, char *data, int l
 	int ret = -EBUSY;
 
 	if (g_atcmd_socket_event_send.socket)
-		_atcmd_error("busy, id=%d\n", g_atcmd_socket_event_send.socket->id);
+		_atcmd_error("busy, id=%d", g_atcmd_socket_event_send.socket->id);
 	else
 	{
 		g_atcmd_socket_event_send.socket = socket;
@@ -413,7 +413,7 @@ static int __atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len
 					continue;
 				}
 
-				_atcmd_info("%s_send: id=%d len=%d/%d retry=%d\n",
+				_atcmd_info("%s_send: id=%d len=%d/%d retry=%d",
 						str_proto_lwr[socket->protocol], socket->id, i, len, retry);
 
 			default:
@@ -425,7 +425,7 @@ static int __atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len
 		
 /*	if (retry > 0 && retry < retry_max)
 	{
-		_atcmd_debug("%s_send: %d %d %d\n",
+		_atcmd_debug("%s_send: %d %d %d",
 					str_proto_lwr[socket->protocol], socket->id, i, retry);
 	} */
 
@@ -436,7 +436,7 @@ static int __atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len
 
 		if (g_cmd_socket_log.send)
 		{
-			_atcmd_info("%s_send: id=%d len=%d (%u, %u)\n",
+			_atcmd_info("%s_send: id=%d len=%d (%u, %u)",
 						str_proto_lwr[socket->protocol], socket->id, 
 						len, g_cmd_socket_send.cnt, g_cmd_socket_send.len);
 		}
@@ -524,12 +524,12 @@ socket_send_data_fail:
 
 		if (_str_proto_lwr)
 		{
-			_atcmd_info("%s_send: id=%d len=%d/%d err=%d,%s\n",
+			_atcmd_info("%s_send: id=%d len=%d/%d err=%d,%s",
 					_str_proto_lwr, socket->id, ret, len, err, strerror(err));
 		}
 		else
 		{
-			_atcmd_info("socket_send: id=%d err=%d,%s\n", socket->id, err, strerror(err));
+			_atcmd_info("socket_send: id=%d err=%d,%s", socket->id, err, strerror(err));
 		}
 	}
 
@@ -539,13 +539,13 @@ socket_send_data_fail:
 static void _atcmd_socket_send_handler (int id)
 {
 	if (!g_atcmd_socket_event_send.socket)
-		_atcmd_error("no send request, id=%d\n", id);
+		_atcmd_error("no request, id=%d", id);
 	else
 	{
 		atcmd_socket_t *socket = g_atcmd_socket_event_send.socket;
 
 		if (id != socket->id)
-			_atcmd_error("invalid id, request=%d ready=%d\n", socket->id, id);
+			_atcmd_error("mismatch id, %d -> %d", socket->id, id);
 		else
 		{
 			char *data = g_atcmd_socket_event_send.data;
@@ -604,22 +604,18 @@ static int __atcmd_socket_recv_handler (int id, int len, bool passive)
 	atcmd_socket_t *socket;
 	int ret = 0;
 
-	if (!rxd)
-	{
-		_atcmd_error("no rx buffer\n");
-		return -ENOMEM;
-	}
+	ASSERT(rxd);
 
 	socket = _atcmd_socket_search_id(id);
 	if (!socket)
 	{
-		_atcmd_error("invalid socket id\n");
+		_atcmd_error("invalid, id=%d", id);
 		return -EINVAL;
 	}
 
 	if (len < 0)
 	{
-		_atcmd_error("invalild length\n");
+		_atcmd_error("invalild, len=%d", len);
 		return -EINVAL;
 	}
 
@@ -641,7 +637,7 @@ static int __atcmd_socket_recv_handler (int id, int len, bool passive)
 			break;
 
 		default:
-			_atcmd_error("invalid socket protocol\n");
+			_atcmd_error("invalid, protocol=%d", socket->protocol);
 			ret = -EPROTOTYPE;
 	}
 
@@ -651,7 +647,7 @@ static int __atcmd_socket_recv_handler (int id, int len, bool passive)
 		g_cmd_socket_recv.len += ret;
 
 		if (g_cmd_socket_log.recv)
-			_atcmd_info("%s_recv: id=%d len=%d (%u, %u)\n",
+			_atcmd_info("%s_recv: id=%d len=%d (%u, %u)",
 					str_proto_lwr[socket->protocol], id, ret, g_cmd_socket_recv.cnt, g_cmd_socket_recv.len);
 
 		rxd->len.data = ret;
@@ -688,13 +684,13 @@ static int __atcmd_socket_recv_handler (int id, int len, bool passive)
 
 static void _atcmd_socket_recv_handler (int id)
 {
-/*	_atcmd_debug("recv_handler: %d, passive=%d event=%d ready=0x%02X \n", id,
+/*	_atcmd_debug("recv_handler: %d, passive=%d event=%d ready=0x%02X", id,
 					g_atcmd_socket_recv_config.passive,
 					g_atcmd_socket_recv_config.ready_event,
 					g_atcmd_socket_recv_config.ready); */
 
 	if (id < 0 || id >= ATCMD_SOCKET_NUM_MAX)
-		_atcmd_error("invalid id (%d)\n", id);
+		_atcmd_error("invalid, id=%d", id);
 	else
 	{
 		int len = _lwip_socket_recv_len(id);
@@ -707,7 +703,7 @@ static void _atcmd_socket_recv_handler (int id)
 		{
 			if (g_atcmd_socket_recv_config.passive)
 			{
-/*				_atcmd_debug("recv_ready: %d, %d\n", id, len); */
+/*				_atcmd_debug("recv_ready: %d, %d", id, len); */
 
 				if (len > 0)
 				{
@@ -745,7 +741,7 @@ static void _atcmd_socket_tcp_connect_handler (int id, ip_addr_t *remote_addr, u
 	uint16_t local_port;
 	int i;
 
-	_atcmd_info("tcp_connect: id=%d remote=%s,%u\n",
+	_atcmd_info("tcp_connect: id=%d remote=%s,%u",
 				id, remote_addr ? ipaddr_ntoa(remote_addr) : "0.0.0.0", remote_port);
 
 	if (id < 0 || !remote_addr || !remote_port)
@@ -772,7 +768,7 @@ static void _atcmd_socket_tcp_connect_handler (int id, ip_addr_t *remote_addr, u
 		}
 	}
 
-	_atcmd_info("tcp_connect: id=%d socket_full\n", id);
+	_atcmd_info("tcp_connect: id=%d socket_full", id);
 }
 
 static int _atcmd_socket_init (void)
@@ -782,10 +778,7 @@ static int _atcmd_socket_init (void)
 
 	memset(&cb, 0, sizeof(lwip_socket_cb_t));
 
-	if (g_atcmd_socket_send_config.event_send)
-		_atcmd_info("ATCMD_SOCKET_EVENT_SEND\n");
-	else
-		_atcmd_info("ATCMD_SOCKET_DIRECT_SEND\n");
+	_atcmd_info("%s_SOCKET_SEND", g_atcmd_socket_send_config.event_send ? "EVENT" : "DIRECT");
 
 	cb.send_ready = _atcmd_socket_send_handler;
 	cb.recv_ready = _atcmd_socket_recv_handler;
@@ -834,7 +827,7 @@ static int _atcmd_socket_open (atcmd_socket_t *socket, bool ipv6, bool reuse_add
 
 		if (socket->local_port == g_atcmd_socket[i].local_port)
 		{
-			_atcmd_info("%s_%s: existing socket\n", str_proto_lwr[socket->protocol], (ipv6 ? "open6" : "open"));
+			_atcmd_info("%s_%s: existing socket", str_proto_lwr[socket->protocol], (ipv6 ? "open6" : "open"));
 			_atcmd_socket_print(&g_atcmd_socket[i]);
 
 			return -EINVAL;
@@ -849,7 +842,7 @@ static int _atcmd_socket_open (atcmd_socket_t *socket, bool ipv6, bool reuse_add
 
 	if (i >= ATCMD_SOCKET_NUM_MAX)
 	{
-		_atcmd_error("socket full\n");
+		_atcmd_error("socket full");
 
 		return -EPERM;
 	}
@@ -885,7 +878,7 @@ static int _atcmd_socket_open (atcmd_socket_t *socket, bool ipv6, bool reuse_add
 
 		socket->id = id;
 
-		_atcmd_info("%s_%s: id=%d port=%u remote=%u,%s err=%d,%s\n",
+		_atcmd_info("%s_%s: id=%d port=%u remote=%u,%s err=%d,%s",
 					str_proto_lwr[socket->protocol], (ipv6 ? "open6" : "open"),
 					socket->id, socket->local_port,
 					socket->remote_port, ipaddr_ntoa(&socket->remote_addr),
@@ -921,7 +914,7 @@ static int _atcmd_socket_close (int id, int err)
 		{
 			ret = _lwip_socket_close(socket->id);
 
-			_atcmd_info("%s_close: id=%d port=%d err=%d,%s\n",
+			_atcmd_info("%s_close: id=%d port=%d err=%d,%s",
 					str_proto_lwr[socket->protocol], socket->id, socket->local_port,
 					ret, strerror(ret));
 
@@ -934,7 +927,7 @@ static int _atcmd_socket_close (int id, int err)
 			{
 				g_atcmd_socket_recv_config.ready &= ~(1 << socket->id);
 
-				_atcmd_debug("passive_recv: %d, event=%d ready=0x%02X \n", socket->id,
+				_atcmd_debug("passive_recv: %d, event=%d ready=0x%02X", socket->id,
 									g_atcmd_socket_recv_config.ready_event,
 									g_atcmd_socket_recv_config.ready);
 			}
@@ -992,12 +985,12 @@ static int __atcmd_socket_open_set (int argc, char *argv[], enum ATCMD_SOCKET_PR
 
 				if (!ipv6 && IP_GET_TYPE(&socket.remote_addr) != IPADDR_TYPE_V4)
 				{
-					_atcmd_info("invalid address: ipv4\n");
+					_atcmd_info("invalid address: ipv4");
 					return -EINVAL;
 				}
 				else if (ipv6 && IP_GET_TYPE(&socket.remote_addr) != IPADDR_TYPE_V6)
 				{
-					_atcmd_info("invalid address: ipv6\n");
+					_atcmd_info("invalid address: ipv6");
 					return -EINVAL;
 				}
 
@@ -1047,7 +1040,7 @@ static int __atcmd_socket_open_set (int argc, char *argv[], enum ATCMD_SOCKET_PR
 
 	ret = _atcmd_socket_open(&socket, ipv6, reuse_addr);
 	if (ret < 0)
-		_atcmd_info("socket_open: ipv6=%d reuse_addr=%d ret=%d\n", ipv6, reuse_addr, ret);
+		_atcmd_info("socket_open: ipv6=%d reuse_addr=%d ret=%d", ipv6, reuse_addr, ret);
 
 	return ret;
 }
@@ -1399,7 +1392,7 @@ static int _atcmd_socket_send_set (int argc, char *argv[])
 				if (timeout_msec == 0)
 					timeout_msec = 1000;
 
-/*				_atcmd_debug("ssend: id=%d remote=%s,%d len=%d done_event=%d timeout_msec=%u\n",
+/*				_atcmd_debug("ssend: id=%d remote=%s,%d len=%d done_event=%d timeout_msec=%u",
 								socket->id, ipaddr_ntoa(&socket->remote_addr), socket->remote_port,
 								len, done_event, timeout_msec); */
 
@@ -1441,6 +1434,22 @@ static int _atcmd_socket_recv_get (int argc, char *argv[])
 
 	switch (argc)
 	{
+		case 1:
+		{
+			int id = atoi(argv[1]);
+			int len;
+
+			if (id < 0 || _atcmd_socket_search_id(id) == NULL)
+				return ATCMD_ERROR_INVAL;
+
+			len = _lwip_socket_recv_len(id);
+			if (len < 0)
+				return ATCMD_ERROR_FAIL;
+
+			ATCMD_MSG_INFO("SRECV", "%d,%d", id, len);
+			break;
+		}
+
 		case 0:
 		{
 			atcmd_socket_t *socket;
@@ -1510,7 +1519,7 @@ static int _atcmd_socket_recv_set (int argc, char *argv[])
 
 					ret = __atcmd_socket_recv_handler(id, len, true);
 
-					_atcmd_debug("SRECV: id=%d len=%d ret=%d\n", id, len, ret);
+					_atcmd_info("SRECV: id=%d len=%d ret=%d", id, len, ret);
 
 					if (g_atcmd_socket_recv_config.ready & (1 << id))
 					{
@@ -1831,7 +1840,7 @@ static int _atcmd_socket_tcp_keepalive_get (int argc, char *argv[])
 
 				_lwip_socket_tcp_get_keepalive(socket->id, &keepalive, &keepidle, &keepcnt, &keepintvl);
 
-				_atcmd_info("tcp_keepalive_get: id=%d keepalive=%d keepidle=%d keepcnt=%d keepintvl=%d\n",
+				_atcmd_info("tcp_keepalive_get: id=%d keepalive=%d keepidle=%d keepcnt=%d keepintvl=%d",
 							socket->id, keepalive, keepidle, keepcnt, keepintvl);
 
 				ATCMD_MSG_INFO("STCPKEEPALIVE", "%d,%d,%d,%d,%d", socket->id, keepalive, keepidle, keepcnt, keepintvl);
@@ -1853,7 +1862,7 @@ static int _atcmd_socket_tcp_keepalive_get (int argc, char *argv[])
 					if (_lwip_socket_tcp_get_keepalive(id, &keepalive, &keepidle, &keepcnt, &keepintvl) != 0)
 						return ATCMD_ERROR_FAIL;
 
-					_atcmd_info("tcp_keepalive_get: id=%d keepalive=%d keepidle=%d keepcnt=%d keepintvl=%d\n",
+					_atcmd_info("tcp_keepalive_get: id=%d keepalive=%d keepidle=%d keepcnt=%d keepintvl=%d",
 								socket->id, keepalive, keepidle, keepcnt, keepintvl);
 
 					ATCMD_MSG_INFO("STCPKEEPALIVE", "%d,%d,%d,%d,%d", socket->id, keepalive, keepidle, keepcnt, keepintvl);
@@ -1916,7 +1925,7 @@ static int _atcmd_socket_tcp_keepalive_set (int argc, char *argv[])
 					if (param_keepintvl >= 0)
 						keepintvl = param_keepintvl;
 
-					_atcmd_info("tcp_keepalive_set: id=%d keepalive=%d keepidle=%d keepcnt=%d keepintvl=%d\n",
+					_atcmd_info("tcp_keepalive_set: id=%d keepalive=%d keepidle=%d keepcnt=%d keepintvl=%d",
 								id, keepalive, keepidle, keepcnt, keepintvl);
 
 					if (_lwip_socket_tcp_set_keepalive(id, keepalive, keepidle, keepcnt, keepintvl) != 0)
@@ -1974,13 +1983,13 @@ static int _atcmd_socket_tcp_nodelay_get (int argc, char *argv[])
 
 				if (_lwip_socket_tcp_get_nodelay(socket->id, &enabled) == 0)
 				{
-					_atcmd_info("tcp_nodelay_get: id=%d nodelay=%d\n", socket->id, enabled);
+					_atcmd_info("tcp_nodelay_get: id=%d nodelay=%d", socket->id, enabled);
 
 					ATCMD_MSG_INFO("STCPNODELAY", "%d,%d", socket->id, enabled ? 1 : 0);
 				}
 				else
 				{
-					_atcmd_info("tcp_nodelay_get: id=%d ?\n", socket->id);
+					_atcmd_info("tcp_nodelay_get: id=%d ?", socket->id);
 
 					ATCMD_MSG_INFO("STCPNODELAY", "%d,?", socket->id);
 				}
@@ -2002,7 +2011,7 @@ static int _atcmd_socket_tcp_nodelay_get (int argc, char *argv[])
 					if (_lwip_socket_tcp_get_nodelay(socket->id, &enabled) != 0)
 						return ATCMD_ERROR_FAIL;
 
-					_atcmd_info("tcp_nodelay_get: id=%d nodelay=%d\n", socket->id, enabled);
+					_atcmd_info("tcp_nodelay_get: id=%d nodelay=%d", socket->id, enabled);
 
 					ATCMD_MSG_INFO("STCPNODELAY", "%d,%d", id, enabled ? 1 : 0);
 					break;
@@ -2039,7 +2048,7 @@ static int _atcmd_socket_tcp_nodelay_set (int argc, char *argv[])
 
 					if (enable == 0 || enable == 1)
 					{
-						_atcmd_info("tcp_nodelay_set: id=%d nodelay=%d\n", socket->id, enable);
+						_atcmd_info("tcp_nodelay_set: id=%d nodelay=%d", socket->id, enable);
 
 						if (_lwip_socket_tcp_set_nodelay(socket->id, !!enable) != 0)
 							return ATCMD_ERROR_FAIL;
@@ -2129,6 +2138,8 @@ static atcmd_info_t g_atcmd_socket_timeout =
 
 /**********************************************************************************************/
 
+#if defined(CONFIG_ATCMD_SOCKET_INTERNAL)
+
 static int _atcmd_socket_send_mode_get (int argc, char *argv[])
 {
 	switch (argc)
@@ -2162,7 +2173,7 @@ static int _atcmd_socket_send_mode_set (int argc, char *argv[])
 
 			if (mode == 0 || mode == 1)
 			{
-				_atcmd_info("send_mode : %s\n", mode ? "event" : "direct");
+				_atcmd_info("send_mode : %s", mode ? "event" : "direct");
 
 				g_atcmd_socket_send_config.event_send = mode;
 				break;
@@ -2191,7 +2202,11 @@ static atcmd_info_t g_atcmd_socket_send_mode =
 	.handler[ATCMD_HANDLER_SET] = _atcmd_socket_send_mode_set,
 };
 
+#endif /* #if defined(CONFIG_ATCMD_SOCKET_INTERNAL) */
+
 /**********************************************************************************************/
+
+#if defined(CONFIG_ATCMD_SOCKET_INTERNAL)
 
 static int _atcmd_socket_send_done_get (int argc, char *argv[])
 {
@@ -2213,6 +2228,10 @@ static int _atcmd_socket_send_done_set (int argc, char *argv[])
 	switch (argc)
 	{
 		case 0:
+			/*
+			 * 0 : disable
+			 * 1 : enable
+			 */
 			ATCMD_MSG_HELP("AT+SSENDDONE={0|1}");
 			break;
 
@@ -2249,7 +2268,11 @@ static atcmd_info_t g_atcmd_socket_send_done =
 	.handler[ATCMD_HANDLER_SET] = _atcmd_socket_send_done_set,
 };
 
+#endif /* #if defined(CONFIG_ATCMD_SOCKET_INTERNAL) */
+
 /**********************************************************************************************/
+
+#if defined(CONFIG_ATCMD_SOCKET_INTERNAL)
 
 static int _atcmd_socket_send_exit_get (int argc, char *argv[])
 {
@@ -2334,6 +2357,8 @@ static atcmd_info_t g_atcmd_socket_send_exit =
 	.handler[ATCMD_HANDLER_SET] = _atcmd_socket_send_exit_set,
 };
 
+#endif /* #if defined(CONFIG_ATCMD_SOCKET_INTERNAL) */
+
 /**********************************************************************************************/
 
 static atcmd_group_t g_atcmd_group_socket =
@@ -2372,9 +2397,11 @@ static atcmd_info_t *g_atcmd_info_socket[] =
 	/*
 	 * Command for internal
 	 */
+#if defined(CONFIG_ATCMD_SOCKET_INTERNAL)
 	&g_atcmd_socket_send_mode,
 	&g_atcmd_socket_send_done,
 	&g_atcmd_socket_send_exit,
+#endif
 
 	NULL
 };
@@ -2394,7 +2421,7 @@ int atcmd_socket_enable (void)
 
 	if (!g_atcmd_socket || !g_atcmd_socket_rxd)
 	{
-		_atcmd_error("malloc() failed\n");
+		_atcmd_error("malloc()");
 
 		if (g_atcmd_socket)
 			_atcmd_free(g_atcmd_socket);
@@ -2466,14 +2493,16 @@ int atcmd_socket_event_send_exit (int id, uint32_t done, uint32_t drop)
 
 /**********************************************************************************************/
 
+#if defined(CONFIG_ATCMD_CLI)
+
 static int cmd_atcmd_socket_log (cmd_tbl_t *t, int argc, char *argv[])
 {
 	switch (argc)
 	{
 		case 0:
-			A("recv: %d\n", g_cmd_socket_log.recv);
-			A("send: %d\n", g_cmd_socket_log.send);
-			A("send_done: %d\n", g_cmd_socket_log.send_done);
+			_atcmd_printf("recv: %d\n", g_cmd_socket_log.recv);
+			_atcmd_printf("send: %d\n", g_cmd_socket_log.send);
+			_atcmd_printf("send_done: %d\n", g_cmd_socket_log.send_done);
 			break;
 
 		case 2:
@@ -2537,13 +2566,13 @@ static int cmd_atcmd_socket_data (cmd_tbl_t *t, int argc, char *argv[])
 		case 0:
 			for (i = 0 ; i < 2 ; i++)
 			{
-				A(" - %s: cnt=%u len=%u\n", (i == 0) ? "send" : "recv",
+				_atcmd_printf(" - %s: cnt=%u len=%u\n", (i == 0) ? "send" : "recv",
 					g_cmd_socket.data[i].cnt, g_cmd_socket.data[i].len);
 			}
 
 			if (g_atcmd_socket_recv_config.passive)
 			{
-				A(" -- passive: event=%d, ready=0x%02X\n",
+				_atcmd_printf(" -- passive: event=%d, ready=0x%02X\n",
 					g_atcmd_socket_recv_config.ready_event, g_atcmd_socket_recv_config.ready);
 			}
 			break;
@@ -2567,8 +2596,8 @@ static int cmd_atcmd_socket (cmd_tbl_t *t, int argc, char *argv[])
 			ret = cmd_atcmd_socket_data(t, argc - 2, argv + 2);
 		else if (strcmp(argv[1], "help") == 0)
 		{
-			A("atcmd socket log {all|recv|send|send_done} {0|1}\n");
-			A("atcmd socket data [{clear}]\n");
+			_atcmd_printf("atcmd socket log {all|recv|send|send_done} {0|1}\n");
+			_atcmd_printf("atcmd socket data [{clear}]\n");
 
 			return CMD_RET_SUCCESS;
 		}
@@ -2582,3 +2611,5 @@ SUBCMD_MAND(atcmd,
 		cmd_atcmd_socket,
 		"atcmd_socket",
 		"atcmd socket help");
+
+#endif /* #if defined(CONFIG_ATCMD_CLI) */

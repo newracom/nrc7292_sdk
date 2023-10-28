@@ -29,7 +29,7 @@
 
 #include "build_ver.h"
 #include "nrc_sdk.h"
-#include "hif.h"
+
 
 #define SDK_VER_MAJOR			(VERSION_MAJOR)
 #define SDK_VER_MINOR			(VERSION_MINOR)
@@ -39,14 +39,21 @@
 #endif
 
 #define ATCMD_VER_MAJOR			(1)
-#define ATCMD_VER_MINOR			(23)
-#define ATCMD_VER_REVISION		(6)
+#define ATCMD_VER_MINOR			(25)
+#define ATCMD_VER_REVISION		(0)
 
 /**********************************************************************************************/
 
 #if defined(CONFIG_SAE) && defined(CONFIG_OWE)
 #define CONFIG_ATCMD_WPA3
 /* #define CONFIG_ATCMD_SOFTAP_WPA3 */
+#endif
+
+#ifndef CONFIG_ATCMD_CLI
+/* #define CONFIG_ATCMD_CLI */
+#ifndef CONFIG_ATCMD_CLI_MINIMUM
+/* #define CONFIG_ATCMD_CLI_MINIMUM */
+#endif
 #endif
 
 #ifndef CONFIG_ATCMD_IPV6
@@ -61,6 +68,7 @@
 /* #define CONFIG_ATCMD_TRXBUF_STATIC */
 /* #define CONFIG_ATCMD_LOWERCASE */
 /* #define CONFIG_ATCMD_HISTORY */
+/* #define CONFIG_ATCMD_PROMPT */
 #define CONFIG_ATCMD_SOFTAP
 
 #if CONFIG_ATCMD_TASK_PRIORITY == 0
@@ -69,20 +77,6 @@
 #endif
 
 #define CONFIG_ATCMD_DATA_LEN_MAX		(4 * 1024)
-
-/**********************************************************************************************/
-
-#define _atcmd_malloc					pvPortMalloc
-#define _atcmd_free						vPortFree
-#define _atcmd_printf					hal_uart_printf
-
-#define _atcmd_log(fmt, ...)			_atcmd_printf("[ATCMD] " fmt, ##__VA_ARGS__)
-
-#define _atcmd_debug(fmt, ...)			_atcmd_log(fmt, ##__VA_ARGS__)
-#define _atcmd_trace()					_atcmd_log("%s::%d\r\n", __func__, __LINE__)
-
-#define _atcmd_info(fmt, ...)			_atcmd_log(fmt, ##__VA_ARGS__)
-#define _atcmd_error(fmt, ...)			_atcmd_log("%s,%d: " fmt, __func__, __LINE__, ##__VA_ARGS__)
 
 /**********************************************************************************************/
 
@@ -203,6 +197,8 @@ enum ATCMD_ID
 /* 	ATCMD_GROUP_WIFI
  *************************/
 	ATCMD_WIFI_MACADDR = 100,
+	ATCMD_WIFI_MACADDR0,
+	ATCMD_WIFI_MACADDR1,
 	ATCMD_WIFI_COUNTRY,
 	ATCMD_WIFI_TXPOWER,
 	ATCMD_WIFI_RXSIGNAL,
@@ -215,6 +211,7 @@ enum ATCMD_ID
 	ATCMD_WIFI_BEACON_INTERVAL,
 	ATCMD_WIFI_LISTEN_INTERVAL,
 	ATCMD_WIFI_SCAN,
+	ATCMD_WIFI_SCAN_SSID,
 	ATCMD_WIFI_CONNECT,
 	ATCMD_WIFI_DISCONNECT,
 	ATCMD_WIFI_DHCP,
@@ -229,17 +226,21 @@ enum ATCMD_ID
 	ATCMD_WIFI_FOTA,
 	ATCMD_WIFI_DEEP_SLEEP,
 	ATCMD_WIFI_SOFTAP,
+	ATCMD_WIFI_SOFTAP_SSID,
 	ATCMD_WIFI_BSS_MAX_IDLE,
 	ATCMD_WIFI_STA_INFO,
 	ATCMD_WIFI_MAX_STA,
 	ATCMD_WIFI_TIMEOUT,
 
+	ATCMD_WIFI_CONTINUOUS_TX,
+
 	/* Command for internal */
+#if defined(CONFIG_ATCMD_WIFI_INTERNAL)
 	ATCMD_WIFI_RF_CAL,
 	ATCMD_WIFI_LBT,
 	ATCMD_WIFI_MIC_SCAN,
 	ATCMD_WIFI_BMT,
-	ATCMD_WIFI_CONTINUOUS_TX,
+#endif	
 
 /* 	ATCMD_GROUP_SOCKET
  *************************/
@@ -260,9 +261,11 @@ enum ATCMD_ID
 	ATCMD_SOCKET_TIMEOUT,
 
 	/* Command for internal */
+#if defined(CONFIG_ATCMD_SOCKET_INTERNAL)
 	ATCMD_SOCKET_SEND_MODE,
 	ATCMD_SOCKET_SEND_DONE,
 	ATCMD_SOCKET_SEND_EXIT,
+#endif	
 
 /* 	ATCMD_GROUP_USER
  *************************/
@@ -364,6 +367,8 @@ extern int atcmd_msg_vsnprint (int type, char *buf, int len, const char *fmt, va
 
 /**********************************************************************************************/
 
+#include "hif.h"
+
 #include "atcmd_basic.h"
 #include "atcmd_wifi.h"
 #include "atcmd_socket.h"
@@ -411,6 +416,19 @@ extern void atcmd_disable (void);
 
 extern int atcmd_user_register (const char *cmd, int id, atcmd_handler_t handler[]);
 extern int atcmd_user_unregister (int id);
+
+/**********************************************************************************************/
+
+#define _atcmd_malloc		pvPortMalloc
+#define _atcmd_free			vPortFree
+#define _atcmd_printf		hal_uart_printf
+
+extern int atcmd_log (const char *fmt, ...);
+
+#define _atcmd_info(fmt, ...)		atcmd_log(fmt, ##__VA_ARGS__)
+#define _atcmd_error(fmt, ...)		atcmd_log("(%s,%d) " fmt, __func__, __LINE__, ##__VA_ARGS__)
+#define _atcmd_debug(fmt, ...)		atcmd_log(fmt, ##__VA_ARGS__)
+#define _atcmd_trace()				atcmd_log("%s,%d", __func__, __LINE__)
 
 /**********************************************************************************************/
 #endif /* #ifndef __NRC_ATCMD_H__ */

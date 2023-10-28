@@ -40,6 +40,7 @@ extern "C" {
 #define GT25Q16A_JEDEC_ID (0xC46015)
 #define GT25Q32A_JEDEC_ID (0xC46016)
 #define FM25W16A_JEDEC_ID (0xA12815)
+#define FM25W32A_JEDEC_ID (0xA12816)
 
 /* ----------------------------------
  * W26XX JEDEC ID
@@ -78,6 +79,7 @@ enum sf_burst_len_e {
 
 uint32_t nrc_sf_get_size(void);
 static uint32_t half_addr_sf = 0;
+static bool mem_map_valid = 0;
 typedef struct {
 	uint32_t MAP_VERSION;
 	uint32_t FW;
@@ -177,6 +179,8 @@ enum sf_reg_override_ctrl {
 #define SF_SLOT_CRC_OFFSET 8
 #define SF_SLOT_MAX_LEN 4084 /* 4KB - size of Header */
 
+#define SF_SECTOR_SIZE            4096
+
 #define SYSCONFIG_SECTOR_SIZE               4096
 #define SYSCONFIG_PRE_USER_FACTORY_SIZE      256
 #define SYSCONFIG_USER_FACTORY_SIZE          512
@@ -274,6 +278,15 @@ bool nrc_sf_userconfig_erase(uint32_t address);
 bool nrc_sf_userconfig_read(uint32_t address, uint8_t *data, size_t size);
 bool nrc_sf_userconfig_write(uint32_t address, uint8_t *data, size_t size);
 uint16_t nrc_sf_get_hw_version(void);
+enum sf_migration_res_e {
+	SF_MIGRATION_RES_OK = 0,
+	SF_MIGRATION_RES_ALREADY = 1,
+	SF_MIGRATION_RES_ORG_FAIL = 2,
+	SF_MIGRATION_RES_INVALID_SIZE = 3,
+	SF_MIGRATION_RES_ERROR = 4
+};
+uint8_t nrc_sf_migration_1m_to_2m(void);
+uint8_t nrc_sf_migration_2m_to_1m(void);
 bool nrc_sf_update_hw_version(uint16_t version);
 bool nrc_sf_update_memory_map(sf_mem_map_t *mem_map);
 bool nrc_sf_set_etag_id(uint16_t etag_id);
@@ -286,10 +299,14 @@ bool nrc_sf_get_auth_ctrl(sf_auth_ctrl_t  *auth_ctrl);
 bool nrc_sf_update_user_factory(char* data, uint16_t len);
 bool nrc_sf_get_user_factory(char* data, uint16_t buf_len);
 
-#if defined(NRC7292)
-bool nrc_sf_set_device_info(uint8_t* data, uint16_t len);
-bool nrc_sf_get_device_info(uint8_t* data, uint16_t buf_len);
-#endif
+bool nrc_sf_write_common(uint32_t mem_map_entry, uint32_t user_data_offset, uint8_t* data, uint32_t size);
+bool nrc_sf_read_common(uint32_t mem_map_entry, uint8_t* data, uint32_t user_data_offset, uint32_t size);
+uint32_t nrc_sf_get_user_data_area_size(void);
+bool nrc_sf_write_user_data(uint32_t user_data_offset, uint8_t* data, uint32_t size);
+bool nrc_sf_read_user_data(uint8_t* data, uint32_t user_data_offset, uint32_t size);
+bool nrc_sf_write_device_info(uint8_t* data, uint16_t size);
+bool nrc_sf_read_device_info(uint8_t* data, uint16_t size);
+
 
 #define NRC_SF_VERIFY_SLOT_OKAY           0
 #define NRC_SF_VERIFY_SLOT_MIN_SIZE_FAIL  1

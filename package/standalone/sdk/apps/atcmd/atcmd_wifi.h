@@ -69,7 +69,8 @@
 #define ATCMD_WIFI_INIT_PING_COUNT		5
 #define ATCMD_WIFI_INIT_PING_SIZE		64
 
-#define ATCMD_WIFI_BSS_MAX_IDLE_PERIOD		0
+#define ATCMD_WIFI_BSS_MAX_IDLE_PERIOD_MIN	1
+#define ATCMD_WIFI_BSS_MAX_IDLE_PERIOD_MAX	65535
 #define ATCMD_WIFI_BSS_MAX_IDLE_RETRY_MIN	3
 #define ATCMD_WIFI_BSS_MAX_IDLE_RETRY_MAX	100
 
@@ -186,10 +187,15 @@ typedef struct
 
 	struct
 	{
-		int period;
-		int retry;
+		uint16_t period;
+		uint8_t retry;
 	} bss_max_idle;
 
+#define ATCMD_WIFI_SSID_FULL	WIFI_IGNORE_BROADCAST_SSID_FULL
+#define ATCMD_WIFI_SSID_EMPTY	WIFI_IGNORE_BROADCAST_SSID_EMPTY
+#define ATCMD_WIFI_SSID_CLEAR	WIFI_IGNORE_BROADCAST_SSID_CLEAR
+
+	int ssid_type;
 	atcmd_wifi_ssid_t ssid;
 	atcmd_wifi_security_t security;
 	atcmd_wifi_password_t password;

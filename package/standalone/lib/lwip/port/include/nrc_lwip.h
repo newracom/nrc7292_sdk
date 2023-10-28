@@ -128,6 +128,9 @@ int start_dhcps_on_if(struct netif *net_if, int updated_lease_time);
 void reset_ip_address(int vif);
 int reset_wifi_ap_mode(int vif);
 
+u64_t get_utc_time(void);
+bool initialize_sntp(void);
+
 #if LWIP_IPV6
 void wifi_nd6_restart_netif( int vif );
 #endif

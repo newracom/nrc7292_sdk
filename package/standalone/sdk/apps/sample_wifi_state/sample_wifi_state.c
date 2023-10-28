@@ -105,6 +105,9 @@ nrc_err_t run_sample_wifi_state(WIFI_CONFIG *param)
 	while(1) {
 		if (wifi_connect(param)== WIFI_SUCCESS) {
 			nrc_usr_print ("[%s] connect to %s successfully !! \n", __func__, param->ssid);
+			uint8_t	txpower = 0;
+			nrc_wifi_get_tx_power(0, &txpower);
+			nrc_usr_print("[%s] TX Power (%d dBm)\n", __func__, txpower);
 			break;
 		} else{
 			nrc_usr_print ("[%s] Fail for connection %s\n", __func__, param->ssid);

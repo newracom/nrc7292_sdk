@@ -366,19 +366,12 @@
 
 
 /**
- * Beacon interval time for Wi-Fi. The default value is 1000ms.
+ * Beacon interval in TU(Time Unit, 1TU = 1024us).
+ * The default value is 100TU. (range 15..65535)
  */
 #ifndef NRC_WIFI_BCN_INTERVAL
-#define NRC_WIFI_BCN_INTERVAL 1000
+#define NRC_WIFI_BCN_INTERVAL 100
 #endif /* NRC_WIFI_BCN_INTERVAL */
-
-
-/**
- * Short beacon interval time for Wi-Fi. The default value is 100ms.
- */
-#ifndef NRC_WIFI_SHORT_BCN_INTERVAL
-#define NRC_WIFI_SHORT_BCN_INTERVAL 100
-#endif /* NRC_WIFI_SHORT_BCN_INTERVAL */
 
 
 /**
@@ -431,14 +424,21 @@
 #endif /* NRC_WIFI_GUARD_INTERVAL_DEFAULT*/
 
 /**
- * Wi-Fi hidden SSID (Service Set Identifier)
- * A hidden SSID is a wireless network where the network name is not broadcasted
- * to devices scanning for Wi-Fi networks.
- * The hidden SSID is disable(0) or enable(1) for Wi-Fi. The default value is disable(0)
+ * Wi-Fi ignore_broadcast_ssid - Hide SSID in AP mode
+ *
+ * This setting controls the behavior of the Access Point (AP) regarding SSID broadcast.
+ * When enabled, the AP will send empty SSID in beacons and ignore probe request frames
+ * that do not specify the full SSID, thus requiring stations to know the SSID.
+ *
+ * - 0: Probe requests for broadcast SSID are not ignored. It sends the SSID in beacons. (default)
+ * - 1: Send an empty (length=0) SSID in beacons and ignore probe requests for broadcast SSID.
+ * - 2: Clear SSID (ASCII 0), but keep the original length. (this may be required
+ *       with some clients that do not support empty SSID) and ignore probe
+ *      requests for broadcast SSID
  */
-#ifndef NRC_WIFI_HIDDEN_SSID_DEFAULT
-#define NRC_WIFI_HIDDEN_SSID_DEFAULT 0
-#endif /* NRC_WIFI_HIDDEN_SSID_DEFAULT */
+#ifndef NRC_WIFI_IGNORE_BROADCAST_SSID_DEFAULT
+#define NRC_WIFI_IGNORE_BROADCAST_SSID_DEFAULT 0
+#endif /* NRC_WIFI_IGNORE_BROADCAST_SSID_DEFAULT */
 
 /**
  * Maximum number of stations allowed in softAP (upto 10)
@@ -450,9 +450,11 @@
 /**
  * Wi-Fi isten Interval
  * Listen Interval Time (us) = listen_interval * beacon_interval * 1TU (1024 us)
+ * This value should be configured when enabling the power-saving operation
+ * and listen interval time must be larger than sleep duratioon
  */
 #ifndef NRC_WIFI_LISTEN_INTERVAL_DEFAULT
-#define NRC_WIFI_LISTEN_INTERVAL_DEFAULT 1000
+#define NRC_WIFI_LISTEN_INTERVAL_DEFAULT 0
 #endif /* NRC_WIFI_LISTEN_INTERVAL_DEFAULT*/
 
 

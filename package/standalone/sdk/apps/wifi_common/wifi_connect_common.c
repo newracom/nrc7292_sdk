@@ -282,11 +282,6 @@ tWIFI_STATUS wifi_init_with_vif(int vif, WIFI_CONFIG *param)
 		nrc_usr_print("[%s] Fail set TX Power\n", __func__);
 		return WIFI_FAIL;
 	}
-	txpower = 0;
-	nrc_wifi_get_tx_power(vif, &txpower);
-#if !defined(INCLUDE_MEASURE_AIRTIME)
-	nrc_usr_print("[%s] TX Power (%d dBm)\n", __func__, txpower);
-#endif /* !defined(INCLUDE_MEASURE_AIRTIME)	*/
 
 	if (nrc_wifi_add_network(vif) < 0) {
 		nrc_usr_print("[%s] Fail to init \n", __func__);
@@ -343,11 +338,6 @@ tWIFI_STATUS wifi_connect_with_vif(int vif, WIFI_CONFIG *param)
 			return WIFI_FAIL;
 		}
 	}
-
-#if defined(INCLUDE_ESL_PARAM)
-	system_modem_api_ps_set_ret_short_beacon_interval(param->short_bcn_interval);
-	system_modem_api_ps_set_ret_beacon_interval(param->bcn_interval);
-#endif
 
 	/* Set Non-S1G channel */
 	if(param->channel != 0) {
@@ -430,13 +420,18 @@ tWIFI_STATUS wifi_start_softap_with_vif(int vif, WIFI_CONFIG *param)
 		return WIFI_FAIL;
 	}
 
-	if(nrc_wifi_softap_set_hidden_ssid(vif, param->hidden_ssid) != WIFI_SUCCESS) {
+	if(nrc_wifi_softap_set_ignore_broadcast_ssid(vif, param->ignore_broadcast_ssid) != WIFI_SUCCESS) {
 		nrc_usr_print("[%s] Fail to set hidden ssid\n", __func__);
 		return WIFI_FAIL;
 	}
 
 	if(nrc_wifi_softap_set_max_num_sta(vif,  param->max_num_sta) != WIFI_SUCCESS) {
 		nrc_usr_print("[%s] Fail to set max_num_sta\n", __func__);
+		return WIFI_FAIL;
+	}
+
+	if(nrc_wifi_softap_set_beacon_interval(vif,  param->bcn_interval) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail to set bcn_interval %d\n", __func__, param->bcn_interval);
 		return WIFI_FAIL;
 	}
 

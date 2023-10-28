@@ -39,7 +39,9 @@ typedef enum  {
 	NRC_UART_INT_MAX
 } NRC_UART_INT_TYPE;
 
-/** @brief UART channel	*/
+/* (Note) The following UART channels are not available for user use in EVK */
+/* UART3 is dedicated for console in NRC7292 EVK  */
+/* UART0 is dedicated for console in NRC7394 EVK  */
 typedef enum  {
 	NRC_UART_CH0 = 0,	/**< Channel 0	*/
 	NRC_UART_CH1 = 1,	/**< Channel 1	*/

@@ -122,8 +122,6 @@ __RCSID("$NetBSD: ping6.c,v 1.73 2010/09/20 11:49:48 ahoka Exp $");
 
 #if LWIP_PING
 
-extern struct netif *nrc_netif;
-
 struct tv32 {
 	u_int32_t tv32_sec;
 	u_int32_t tv32_usec;
@@ -425,7 +423,11 @@ ping6_main(void *arg)
 	hints.ai_socktype = SOCK_RAW;
 	hints.ai_protocol = IPPROTO_ICMPV6;
 
-	ret_ga = getaddrinfo(ip6addr_ntoa(netif_ip6_addr(&nrc_netif[if_index], 0)), NULL, &hints, &src_info);
+	if (ip6_addr_islinklocal(&ping_info->addr.u_addr.ip6)) {
+		ret_ga = getaddrinfo(ip6addr_ntoa(netif_ip6_addr(netif_default, 0)), NULL, &hints, &src_info);
+	} else {
+		ret_ga = getaddrinfo(ip6addr_ntoa(netif_ip6_addr(netif_default, 1)), NULL, &hints, &src_info);
+	}
 	if (ret_ga) {
 		ping_mutex_lock();
 		LWIP_DEBUGF( PING6_DEBUG,("[%s] Error invalid source address\n", __func__));

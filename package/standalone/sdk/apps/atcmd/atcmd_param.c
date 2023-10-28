@@ -51,7 +51,7 @@ static int _atcmd_param_to_int (const char *str, long int *val)
 
 	*val = ret;
 
-/*	_atcmd_debug("%s: %ld\n", __func__, *val); */
+/*	_atcmd_debug("%s: %ld", __func__, *val); */
 
 	return 0;
 }
@@ -68,7 +68,7 @@ int atcmd_param_to_int8 (const char *str, int8_t *val)
 
 	*val = (int8_t)_val;
 
-/*	_atcmd_debug("%s: %d\n", __func__, *val); */
+/*	_atcmd_debug("%s: %d", __func__, *val); */
 
 	return 0;
 }
@@ -85,7 +85,7 @@ int atcmd_param_to_int16 (const char *str, int16_t *val)
 
 	*val = (int16_t)_val;
 
-/*	_atcmd_debug("%s: %d\n", __func__, *val); */
+/*	_atcmd_debug("%s: %d", __func__, *val); */
 
 	return 0;
 }
@@ -102,7 +102,7 @@ int atcmd_param_to_int32 (const char *str, int32_t *val)
 
 	*val = (int32_t)_val;
 
-/*	_atcmd_debug("%s: %ld\n", __func__, *val); */
+/*	_atcmd_debug("%s: %ld", __func__, *val); */
 
 	return 0;
 }
@@ -136,7 +136,7 @@ static int _atcmd_param_to_uint (const char *str, unsigned long int *val)
 
 	*val = ret;
 
-/*	_atcmd_debug("%s: %lu\n", __func__, *val); */
+/*	_atcmd_debug("%s: %lu", __func__, *val); */
 
 	return 0;
 }
@@ -153,7 +153,7 @@ int atcmd_param_to_uint8 (const char *str, uint8_t *val)
 
 	*val = (uint8_t)_val;
 
-/* 	_atcmd_debug("%s: %u\n", __func__, *val); */
+/* 	_atcmd_debug("%s: %u", __func__, *val); */
 
 	return 0;
 }
@@ -170,7 +170,7 @@ int atcmd_param_to_uint16 (const char *str, uint16_t *val)
 
 	*val = (uint16_t)_val;
 
-/*	_atcmd_debug("%s: %u\n", __func__, *val); */
+/*	_atcmd_debug("%s: %u", __func__, *val); */
 
 	return 0;
 }
@@ -187,7 +187,7 @@ int atcmd_param_to_uint32 (const char *str, uint32_t *val)
 
 	*val = (uint32_t)_val;
 
-/*	_atcmd_debug("%s: %lu\n", __func__, *val); */
+/*	_atcmd_debug("%s: %lu", __func__, *val); */
 
 	return 0;
 }
@@ -218,7 +218,7 @@ int atcmd_param_to_float (const char *param, float *val)
 
 	*val = ret;
 
-/*	_atcmd_debug("%s: %f\n", __func__, *val); */
+/*	_atcmd_debug("%s: %f", __func__, *val); */
 
 	return 0;
 

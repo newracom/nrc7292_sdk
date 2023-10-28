@@ -98,12 +98,12 @@ static void _wifi_api_event_handler (int vif, tWIFI_EVENT_ID id, int data_len, v
 	};
 
 	if (id < 0 || id >= WIFI_EVT_MAX)
-		_atcmd_info("wifi_event: %d (invalid)\n", id);
+		_atcmd_info("wifi_event: %d (invalid)", id);
 	else if (!g_wifi_event_cb[id])
-		_atcmd_info("wifi_event: %d, %s (unused)\n", id, str_event[id]);
+		_atcmd_info("wifi_event: %d, %s (unused)", id, str_event[id]);
 	else
 	{
-		_atcmd_info("wifi_event: %s, data=%p,%d\n", str_event[id], data, data_len);
+		_atcmd_info("wifi_event: %s, data=%p,%d", str_event[id], data, data_len);
 
 		g_wifi_event_cb[id](vif, data, data_len);
 	}
@@ -217,7 +217,7 @@ int wifi_api_get_supported_channels (const char *country, wifi_channels_t *chann
 	if (strlen(country) != 2 || !channels)
 		return -1;
 
-/*	_atcmd_debug("%s: %s\n", __func__, channels->country_code); */
+/*	_atcmd_debug("%s: %s", __func__, channels->country_code); */
 
 	for (i = 0 ; g_wifi_country_list[i].cc_index < COUNTRY_CODE_MAX ; i++)
 	{
@@ -229,7 +229,7 @@ int wifi_api_get_supported_channels (const char *country, wifi_channels_t *chann
 
 			for (j = 0 ; channel_table[j].s1g_freq != 0 ; j++)
 			{
-/*				_atcmd_debug("%s: %d %u %u %u\n", __func__, j,
+/*				_atcmd_debug("%s: %d %u %u %u", __func__, j,
 							channel_table[j].chan_spacing,
 							channel_table[j].s1g_freq,
 							channel_table[j].nons1g_freq); */
@@ -264,7 +264,7 @@ int wifi_api_get_supported_channels (const char *country, wifi_channels_t *chann
 						channels->channel[channels->n_channel].nons1g_freq = nons1g_freq;
 						channels->n_channel++;
 
-/*						_atcmd_debug("%s: %d %u %u %u\n", __func__,
+/*						_atcmd_debug("%s: %d %u %u %u", __func__,
 									channels->n_channel - 1,
 									channels->channel[channels->n_channel - 1].bw,
 									channels->channel[channels->n_channel - 1].scan,
@@ -286,6 +286,34 @@ int wifi_api_get_macaddr (char *macaddr)
 		return -EINVAL;
 
 	if (nrc_wifi_get_mac_address(vif_id, macaddr) != WIFI_SUCCESS)
+		return -1;
+
+	if (strlen(macaddr) != ATCMD_WIFI_MACADDR_LEN)
+		return -1;
+
+	return 0;
+}
+
+int wifi_api_get_macaddr0 (char *macaddr)
+{
+	if (!macaddr)
+		return -EINVAL;
+
+	if (nrc_wifi_get_mac_address(0, macaddr) != WIFI_SUCCESS)
+		return -1;
+
+	if (strlen(macaddr) != ATCMD_WIFI_MACADDR_LEN)
+		return -1;
+
+	return 0;
+}
+
+int wifi_api_get_macaddr1 (char *macaddr)
+{
+	if (!macaddr)
+		return -EINVAL;
+
+	if (nrc_wifi_get_mac_address(1, macaddr) != WIFI_SUCCESS)
 		return -1;
 
 	if (strlen(macaddr) != ATCMD_WIFI_MACADDR_LEN)
@@ -351,11 +379,11 @@ int wifi_api_set_tx_power (enum TX_POWER_TYPE type, uint8_t power)
 		case TX_POWER_AUTO:
 			_type = WIFI_TXPOWER_AUTO;
 			break;
-		
+
 		case TX_POWER_LIMIT:
 			_type = WIFI_TXPOWER_LIMIT;
 			break;
-		
+
 		case TX_POWER_FIXED:
 			_type = WIFI_TXPOWER_FIXED;
 			break;
@@ -390,7 +418,7 @@ int wifi_api_get_mcs (uint8_t *index)
 	if (!index)
 		return -EINVAL;
 
-	*index = system_modem_api_get_mcs(vif_id);
+	*index = system_modem_api_get_tx_mcs(vif_id);
 
 	return 0;
 }
@@ -686,9 +714,9 @@ int wifi_api_remove_network (void)
 	return 0;
 }
 
-int wifi_api_start_scan (uint32_t timeout)
+int wifi_api_start_scan (char *ssid, uint32_t timeout)
 {
-	if (nrc_wifi_scan_timeout(vif_id, timeout, NULL) != WIFI_SUCCESS)
+	if (nrc_wifi_scan_timeout(vif_id, timeout, ssid) != WIFI_SUCCESS)
 		return -1;
 
 	return 0;
@@ -867,7 +895,7 @@ int wifi_api_start_dhcp_client (uint32_t timeout_msec)
 	set_dhcp_status(false);
 
 	if (wifi_api_set_ip_address(str_ip4addr_any, str_ip4addr_any, str_ip4addr_any) != 0)
-		_atcmd_error("failed to reset ip address\n");
+		_atcmd_error("failed to reset ip address");
 
 	if (dhcp_run(vif_id) < 0)
 		return DHCP_FAIL;
@@ -901,7 +929,7 @@ int wifi_api_start_deep_sleep (uint32_t timeout, uint8_t gpio)
 
 		if (nrc_ps_set_gpio_wakeup_pin(debounce, gpio) != NRC_SUCCESS)
 		{
-			_atcmd_error("failed to set wakeup pin\n");
+			_atcmd_error("failed to set wakeup pin");
 			return -1;
 		}
 
@@ -910,7 +938,7 @@ int wifi_api_start_deep_sleep (uint32_t timeout, uint8_t gpio)
 
 	if (nrc_ps_set_wakeup_source(wakeup_source) != NRC_SUCCESS)
 	{
-		_atcmd_error("failed to set wakeup source\n");
+		_atcmd_error("failed to set wakeup source");
 		return -1;
 	}
 
@@ -925,7 +953,7 @@ int wifi_api_start_deep_sleep (uint32_t timeout, uint8_t gpio)
 
 	if (err != NRC_SUCCESS)
 	{
-		_atcmd_error("failed to start deep sleep\n");
+		_atcmd_error("failed to start deep sleep");
 		return -1;
 	}
 
@@ -949,11 +977,11 @@ bool wifi_api_wakeup_done (void)
 
 int wifi_api_start_softap (int bw, int freq, char *ssid,
 							char *security, char *password,
-							uint32_t timeout)
+							int ssid_type, uint32_t timeout)
 {
 	tWIFI_SECURITY sec_mode = WIFI_SEC_MAX;
 
-	if (freq <= 0 || !ssid || !security)
+	if (freq <= 0 || !ssid || !security || (ssid_type < 0 || ssid_type > 2))
 		return -EINVAL;
 
 	if (bw != WIFI_1M && bw != WIFI_2M && bw != WIFI_4M)
@@ -977,7 +1005,7 @@ int wifi_api_start_softap (int bw, int freq, char *ssid,
 
 		bw = wifi_bw[bw_index];
 
-		_atcmd_info("%s: bandwidth=%d s1g_freq=%d\n", __func__, bw, freq);
+		_atcmd_info("%s: bandwidth=%d s1g_freq=%d", __func__, bw, freq);
 	}
 
 	if (strcmp(security, "open") == 0)
@@ -996,6 +1024,14 @@ int wifi_api_start_softap (int bw, int freq, char *ssid,
 		if (sec_mode == WIFI_SEC_MAX || !password)
 			return -1;
 	}
+
+	if (nrc_wifi_softap_set_ignore_broadcast_ssid(vif_id, ssid_type) != WIFI_SUCCESS)
+		return -1;
+
+/*	ssid_type = -1;
+	if (nrc_wifi_softap_get_ssid_type(vif_id, &ssid_type) != WIFI_SUCCESS)
+		return -1;
+	_atcmd_debug("%s: ssid_type=%d", __func__, ssid_type); */
 
 	if (nrc_wifi_softap_set_conf(vif_id, ssid, freq, bw, sec_mode, password) != WIFI_SUCCESS)
 		return -1;
@@ -1053,9 +1089,9 @@ int wifi_api_get_sta_info (int aid, char *maddr, int8_t *rssi, uint8_t *snr, uin
 	return 0;
 }
 
-int wifi_api_set_bss_max_idle (int period, int retry_cnt)
+int wifi_api_set_bss_max_idle (uint16_t period, uint8_t retry_cnt)
 {
-	if (period < 0 || retry_cnt < 0)
+	if (retry_cnt == 0)
 		return -EINVAL;
 
 	if (nrc_wifi_softap_set_bss_max_idle(vif_id, period, retry_cnt) != WIFI_SUCCESS)

@@ -48,8 +48,7 @@ typedef struct  {
 	uint8_t scan_freq_num;
 	uint16_t channel;
 	uint8_t bw;
-	int bcn_interval;
-	int short_bcn_interval;
+	uint16_t bcn_interval;
 	uint8_t ip_mode;
 	char static_ip[MAX_STATIC_IP_LENGTH+1];
 	char netmask[MAX_STATIC_IP_LENGTH+1];
@@ -72,7 +71,7 @@ typedef struct  {
 	uint8_t mcs;
 	uint8_t gi;
 	int8_t cca_thres;
-	uint8_t hidden_ssid;
+	uint8_t ignore_broadcast_ssid;
 	uint8_t max_num_sta;
 	uint16_t listen_interval;
 }WIFI_CONFIG;
