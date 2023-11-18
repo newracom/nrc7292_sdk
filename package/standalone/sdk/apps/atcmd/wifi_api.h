@@ -164,7 +164,7 @@ extern int wifi_api_start_deep_sleep (uint32_t timeout, uint8_t gpio);
 extern bool wifi_api_wakeup_done (void);
 
 #ifdef CONFIG_ATCMD_SOFTAP
-extern int wifi_api_start_softap (int freq, int bw,
+extern int wifi_api_start_softap (int bw, int freq,
 								char *ssid, char *security, char *password,
 								int ssid_type, uint32_t timeout);
 extern int wifi_api_stop_softap (void);
