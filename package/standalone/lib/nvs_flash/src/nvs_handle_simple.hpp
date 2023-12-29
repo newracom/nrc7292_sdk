@@ -14,6 +14,7 @@
 #ifndef NVS_HANDLE_SIMPLE_HPP_
 #define NVS_HANDLE_SIMPLE_HPP_
 
+#include <cstddef>
 #include "intrusive_list.h"
 #include "nvs_storage.hpp"
 #include "nvs_platform.hpp"
