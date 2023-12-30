@@ -634,15 +634,15 @@ static void _lwip_socket_task (void *arg)
 		if (info->log.task)
 		{
 			_lwip_socket_log("SOCK_TASK: get, %d 0x%X 0x%X",
-					nfds, fds_read.__fds_bits[0], fds_write.__fds_bits[0]);
+					nfds, fds_read.fds_bits[0], fds_write.fds_bits[0]);
 		}
 
 		timeout.tv_sec = info->timeout.task / 1000000;
 		timeout.tv_usec = info->timeout.task % 1000000;
 
 		ret = select(nfds,
-					(fds_read.__fds_bits[0]) ? &fds_read : NULL,
-					(fds_write.__fds_bits[0]) ? &fds_write : NULL,
+					(fds_read.fds_bits[0]) ? &fds_read : NULL,
+					(fds_write.fds_bits[0]) ? &fds_write : NULL,
 					NULL,
 					&timeout);
 
@@ -661,7 +661,7 @@ static void _lwip_socket_task (void *arg)
 				if (info->log.task)
 				{
 					_lwip_socket_log("SOCK_TASK: set, %d 0x%X 0x%X",
-							nfds, fds_read.__fds_bits[0], fds_write.__fds_bits[0]);
+							nfds, fds_read.fds_bits[0], fds_write.fds_bits[0]);
 				}
 		}
 
@@ -1479,9 +1479,9 @@ static int cmd_atcmd_lwip_fds (cmd_tbl_t *t, int argc, char *argv[])
 	switch (argc)
 	{
 		case 0:
-			_atcmd_printf("read: %X\n", info->fds.read.__fds_bits[0]);
-			_atcmd_printf("write: %X\n", info->fds.write.__fds_bits[0]);
-			_atcmd_printf("listen: %X\n", info->fds.listen.__fds_bits[0]);
+			_atcmd_printf("read: %X\n", info->fds.read.fds_bits[0]);
+			_atcmd_printf("write: %X\n", info->fds.write.fds_bits[0]);
+			_atcmd_printf("listen: %X\n", info->fds.listen.fds_bits[0]);
 			break;
 
 		default:
