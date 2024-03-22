@@ -25,8 +25,9 @@
 
 
 #include "atcmd.h"
-
-
+#if !defined(NRC7292)
+#include "nrc_sflash.h"
+#endif
 /**********************************************************************************************/
 
 extern uint32_t _atcmd_timeout_value (const char *cmd);
@@ -276,12 +277,17 @@ static void _atcmd_wifi_event_disconnect (int vif, void *data, int len)
 {
 	atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
 
-	if (!softap->active)
+/*	if (!softap->active) */
 	{
 		atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
 		bool event = true;
 
-		if (connect->disconnecting)
+/*		_atcmd_debug("%s: %d %d %d", __func__,
+				connect->connected, connect->connecting, connect->disconnecting); */
+
+		if (connect->connecting)
+			event = false;
+		else if (connect->disconnecting)
 		{
 			if (!_atcmd_wifi_event_polling(ATCMD_WIFI_EVT_DISCONNECT))
 				event = false;
@@ -289,9 +295,12 @@ static void _atcmd_wifi_event_disconnect (int vif, void *data, int len)
 				_atcmd_wifi_event_polled(ATCMD_WIFI_EVT_DISCONNECT);
 		}
 
-		connect->connected = false;
-		connect->connecting = false;
-		connect->disconnecting = false;
+		if (connect->connected || connect->disconnecting)
+		{
+			connect->connected = false;
+			connect->connecting = false;
+			connect->disconnecting = false;
+		}
 
 		if (event)
 		{
@@ -2063,7 +2072,7 @@ static int _atcmd_wifi_connect_run (int argc, char *argv[])
 		return ATCMD_ERROR_BUSY;
 	}
 
-	_atcmd_info("wifi_connect: %s %s %s", connect->ssid, connect->bssid, connect->security);
+	_atcmd_info("wifi_connect: %s %s %s %u", connect->ssid, connect->bssid, connect->security, timeout_msec);
 
 	if (strlen(connect->ssid) > 0 && wifi_api_set_ssid(connect->ssid) != 0)
 		goto wifi_connect_fail;
@@ -2089,8 +2098,17 @@ static int _atcmd_wifi_connect_run (int argc, char *argv[])
 		_atcmd_wifi_event_polled(ATCMD_WIFI_EVT_CONNECT_SUCCESS);
 	}
 
-	if(wifi_api_connect(timeout_msec) != 0)
-		goto wifi_connect_fail;
+	switch (wifi_api_connect(timeout_msec))
+	{
+		case 0:
+			break;
+
+		case 1:
+			connection_timeout = true;
+
+		default:
+			goto wifi_connect_fail;
+	}
 
 	if (connect->connecting)
 	{
@@ -4989,7 +5007,7 @@ static atcmd_info_t *g_atcmd_wifi[] =
 static int _atcmd_wifi_init_info (atcmd_wifi_info_t *info)
 {
 	atcmd_wifi_country_t country;
-	bool cal_use;
+	bool cal_use = false;
 
 	memset(info, 0, sizeof(atcmd_wifi_info_t));
 
@@ -4997,23 +5015,58 @@ static int _atcmd_wifi_init_info (atcmd_wifi_info_t *info)
 	if (!info->lock)
 		return -1;
 
+	info->event = 0;
+	strcpy(info->country, "");
+
+#if defined(NRC7292)
 	if (wifi_api_get_rf_cal(&cal_use, country) != 0)
-	{
 		cal_use = false;
-		memset(country, 0, sizeof(atcmd_wifi_country_t));
-	}
 
 	_atcmd_info("RF_CAL_INFO: cal_use=%d country=%s", cal_use, country);
+#else
+	cal_use = (RF_CAL_DATA.header.segment_valid) == 1 ? true : false;
+	if (cal_use)
+	{
+		int id = RF_CAL_DATA.header.id;
 
-	info->event = 0;
+		memcpy(country, RF_CAL_DATA.header.country_code, 2);
+		country[2] = '\0';
+
+		_atcmd_info("RF_CAL_INFO: cal_use=%d country=%s id=%d", cal_use, country, id);
+
+		if (strcmp(country, "KR") == 0)
+		{
+			switch (id)
+			{
+				case 1:
+					_atcmd_debug("RF_CAL_INFO: KR -> K1");
+					strcpy(country, "K1");
+					break;
+
+				case 2:
+					_atcmd_debug("RF_CAL_INFO: KR -> K2");
+					strcpy(country, "K2");
+					break;
+			}
+		}
+	}
+#endif
 
 	if (cal_use && strlen(country) == 2)
 		strcpy(info->country, country);
 	else
-		memcpy(info->country, lmac_get_country(0), 2);
+	{
+		int vif_id = 0;
 
-	if (!_atcmd_wifi_country_valid(info->country))
-		strcpy(info->country, ATCMD_WIFI_INIT_COUNTRY);
+		memcpy(info->country, lmac_get_country(vif_id), 2);
+		info->country[2] = '\0';
+
+/*		if (_atcmd_wifi_country_valid(info->country)) */
+			_atcmd_info("LMAC_COUNTRY : %s", info->country);
+	}
+
+/*	if (!_atcmd_wifi_country_valid(info->country))
+		strcpy(info->country, ATCMD_WIFI_INIT_COUNTRY); */
 
 	info->txpower.type = ATCMD_WIFI_INIT_TXPOWER_TYPE;
 	info->txpower.val = ATCMD_WIFI_TXPOWER_MAX;
@@ -5095,22 +5148,32 @@ static int _atcmd_wifi_init (void)
 
 		if (wifi_api_register_event_callback(event_cb) == 0)
 		{
-			if (wifi_api_set_country(g_atcmd_wifi_info->country) == 0)
+			if (!_atcmd_wifi_country_valid(g_atcmd_wifi_info->country))
 			{
-				if (wifi_api_set_tx_power(g_atcmd_wifi_info->txpower.type,
-										g_atcmd_wifi_info->txpower.val) == 0)
-				{
-					if (wifi_api_get_supported_channels(g_atcmd_wifi_info->country,
-											&g_atcmd_wifi_info->supported_channels) == 0)
-					{
-						_atcmd_wifi_channels_print(&g_atcmd_wifi_info->supported_channels, false, false,
-											"wifi_init: %s %d", g_atcmd_wifi_info->country,
-											g_atcmd_wifi_info->supported_channels.n_channel);
-					}
-
-					return 0;
-				}
+				_atcmd_info("wifi_init: no country");
+				return 0;
 			}
+
+			if (wifi_api_set_country(g_atcmd_wifi_info->country) != 0)
+			{
+				_atcmd_info("wifi_init: failed to set country");
+				return 0;
+			}
+
+			if (wifi_api_get_supported_channels(g_atcmd_wifi_info->country,
+						&g_atcmd_wifi_info->supported_channels) != 0)
+				_atcmd_info("wifi_init: failed to get supported channels");
+			else
+			{
+				_atcmd_wifi_channels_print(&g_atcmd_wifi_info->supported_channels, false, false,
+						"wifi_init: %s %d", g_atcmd_wifi_info->country,
+						g_atcmd_wifi_info->supported_channels.n_channel);
+			}
+
+			if (wifi_api_set_tx_power(g_atcmd_wifi_info->txpower.type, g_atcmd_wifi_info->txpower.val) != 0)
+				_atcmd_info("wifi_init: failed to set tx power");
+
+			return 0;
 		}
 	}
 

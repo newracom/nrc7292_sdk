@@ -4,6 +4,19 @@
 *
 *******************************************************************
 
+[2024-03-22]
+Change summary for version 1.6.1:
+
+    Hotfix
+    * Enhanced RSSI-based rate adaptation
+      o Hotfix for slow rate adaptation in specific RF environments
+
+    Changes
+    * Update raspi-atcmd-cli tool
+    * Update AT-CMD
+      o Set country code from RF CAL data
+      o Enable UDP broadcasting
+
 [2023-10-27]
 Change summary for version 1.6:
 

@@ -345,11 +345,7 @@ static int iperf_socket_close (iperf_socket_t *socket)
 		};
 
 		if (i >= timeout)
-		{
 			iperf_error("send busy\n");
-
-			return -1;
-		}
 
 		if (nrc_atcmd_send_cmd("AT") != ATCMD_RET_OK)
 		   return -1;
@@ -785,28 +781,40 @@ static void iperf_udp_server_recv (iperf_socket_t *socket, char *buf, int len)
 
 		if (id == 0)
 		{
+			int32_t port = ntohl(datagram->client_header.mPort);
 			int32_t amount = ntohl(datagram->client_header.mAmount);
 
 /*			iperf_client_header_print (&datagram->client_header, true); */
 
 			memcpy(&info->client, socket, sizeof(iperf_socket_t));
 
-			if (amount >= 0)
+			if (port == 5001)
 			{
-				info->send_byte = amount;
-				info->send_time = UINT32_MAX;
+				if (amount >= 0)
+				{
+					info->send_byte = amount;
+					info->send_time = UINT32_MAX;
 
-				iperf_log(" Connected with client: %s port %u byte %u (%s)\n",
+					iperf_log(" Connected with client: %s port %u byte %u (%s)\n",
 							info->client.remote_addr, info->client.remote_port,
 							info->send_byte, byte_to_string(info->send_byte));
+				}
+				else
+				{
+					info->send_time = -amount / 100; /* sec */
+					info->send_byte = UINT32_MAX;
+
+					iperf_log(" Connected with client: %s port %u time %u\n",
+							info->client.remote_addr, info->client.remote_port, info->send_time);
+				}
 			}
 			else
 			{
-				info->send_time = -amount / 100; /* sec */
 				info->send_byte = UINT32_MAX;
-
-				iperf_log(" Connected with client: %s port %u time %u\n",
-							info->client.remote_addr, info->client.remote_port, info->send_time);
+				info->send_time = UINT32_MAX;
+					
+				iperf_log(" Connected with client: %s port %u\n",
+							info->client.remote_addr, info->client.remote_port);
 			}
 
 			info->start_time = rx_time;
@@ -1078,7 +1086,10 @@ static int iperf_udp_client_run (iperf_socket_t *socket, iperf_opt_t *option)
 	}
 
 	if (i >= 10)
+	{
 		iperf_log("Report from server: timeout\n");
+		info->done = true;
+	}
 
 	free((char *)datagram);
 	datagram = NULL;
@@ -1130,15 +1141,18 @@ static void iperf_udp_client_event_callback (enum ATCMD_EVENT event, int argc, c
 	switch (event)
 	{
 		case ATCMD_SEVENT_SEND_IDLE:
-			if (argc != 4)
-				break;
+/*			iperf_debug("SEVENT_SEND_IDLE: argc=%d\n", argc); */
 
-			if (!info->done)
-				break;
+			if (argc == 4)
+			{
+				if (!info->done)
+					break;
 
-			g_iperf_socket_send_idle = true;
+				g_iperf_socket_send_idle = true;
 
-/*			iperf_debug("sevent_send_idle: id=%d\n", atoi(argv[0])); */
+/*				iperf_debug("SEVENT_SEND_IDLE: id=%s done=%s drop=%s wait=%s\n", 
+								argv[0], argv[1], argv[2], argv[3]); */
+			}
 			break;
 
 		default:
@@ -1259,28 +1273,40 @@ static void iperf_tcp_server_recv (iperf_socket_t *socket, char *buf, int len)
 
 		if (info->recv_byte == 0)
 		{
+			int32_t port = ntohl(datagram->client_header.mPort);
 			int32_t amount = ntohl(datagram->client_header.mAmount);
 
 /*			iperf_client_header_print (&datagram->client_header, true); */
 
 			memcpy(&info->client, socket, sizeof(iperf_socket_t));
 
-			if (amount >= 0)
+			if (port == 5001)
 			{
-				info->send_byte = amount;
-				info->send_time = UINT32_MAX;
+				if (amount >= 0)
+				{
+					info->send_byte = amount;
+					info->send_time = UINT32_MAX;
 
-				iperf_log(" Connected with client: %s port %u byte %u (%s)\n",
+					iperf_log(" Connected with client: %s port %u byte %u (%s)\n",
 							info->client.remote_addr, info->client.remote_port,
 							info->send_byte, byte_to_string(info->send_byte));
+				}
+				else
+				{
+					info->send_time = -amount / 100; /* sec */
+					info->send_byte = UINT32_MAX;
+
+					iperf_log(" Connected with client: %s port %u time %d\n",
+							info->client.remote_addr, info->client.remote_port, (int)info->send_time);
+				}
 			}
 			else
 			{
-				info->send_time = -amount / 100; /* sec */
 				info->send_byte = UINT32_MAX;
-
-				iperf_log(" Connected with client: %s port %u time %d\n",
-								info->client.remote_addr, info->client.remote_port, (int)info->send_time);
+				info->send_time = UINT32_MAX;
+					
+				iperf_log(" Connected with client: %s port %u\n",
+							info->client.remote_addr, info->client.remote_port);
 			}
 
 			info->start_time = rx_time;
@@ -1322,56 +1348,63 @@ static void iperf_tcp_server_event_callback (enum ATCMD_EVENT event, int argc, c
 	iperf_tcp_server_info_t *info = &g_iperf_tcp_server_info;
 	iperf_time_t time;
 	int id;
-	int err;
 
 	iperf_get_time(&time);
 
 	switch (event)
 	{
 		case ATCMD_SEVENT_CONNECT:
-			if (argc != 1 && argc != 4)
+/*			iperf_debug("SEVENT_CONNECT: argc=%d\n", argc); */
+
+			if (argc == 1 || argc == 4)
 			{
-				iperf_debug("SEVENT_CONNECT: argc=%d\n", argc);
-				break;
+				info->client.id = atoi(argv[0]);
+
+/*				if (argc == 1)
+					iperf_debug("SEVENT_CONNECT: id=%d\n", info->client.id); 
+				else
+					iperf_debug("SEVENT_CONNECT: id=%d remote_addr=%s remote_port=%s local_port=%s\n", 
+							info->client.id, argv[1], argv[2], argv[3]); */
 			}
-
-			info->client.id = atoi(argv[0]);
-
-/*			iperf_log(" Connected with client: id=%d\n", info->client.id); */
 			break;
 
 		case ATCMD_SEVENT_CLOSE:
-			if (argc != 1)
-				break;
+/*			iperf_debug("SEVENT_CLOSE: argc=%d\n", argc); */
 
-			id = atoi(argv[0]);
-
-/*			iperf_debug("sevent_close: id=%d\n", id); */
-
-			if (id == info->client.id)
+			if (argc == 1 ||  argc == 3)
 			{
-/*				iperf_debug("SEVENT_CLOSE: id=%d\n", id); */
+				id = atoi(argv[0]);
 
-				info->done = true;
-				info->stop_time = time;
+				if (id == info->client.id)
+				{
+					info->done = true;
+					info->stop_time = time;
+				}
+				
+/*				if (argc == 1)
+					iperf_debug("SEVENT_CLOSE: id=%d\n", id); 
+				else
+					iperf_debug("SEVENT_CLOSE: id=%d err=%s %s\n", id, argv[1], argv[2]); */
 			}
 			break;
 
 		case ATCMD_SEVENT_RECV_ERROR:
-			if (argc != 2)
-				break;
+/*			iperf_debug("SEVENT_RECV_ERROR: argc=%d\n", argc); */
 
-			id = atoi(argv[0]);
-			err = atoi(argv[1]);
-
-/*			iperf_debug("sevent_recv_error: id=%d err=%d\n", id, err); */
-
-			if (id == info->client.id)
+			if (argc == 2 || argc == 3)
 			{
-				iperf_log("SEVENT_RECV_ERROR: id=%d err=%d\n", id, err);
+				id = atoi(argv[0]);
 
-				info->done = true;
-				info->stop_time = time;
+				if (id == info->client.id)
+				{
+					info->done = true;
+					info->stop_time = time;
+				}
+				
+/*				if (argc == 2)
+					iperf_debug("SEVENT_RECV_ERROR: id=%d err=%s\n", id, argv[1]);
+				else
+					iperf_debug("SEVENT_RECV_ERROR: id=%d err=%s %s\n", id, argv[1], argv[2]); */
 			}
 			break;
 
@@ -1551,15 +1584,18 @@ static void iperf_tcp_client_event_callback (enum ATCMD_EVENT event, int argc, c
 	switch (event)
 	{
 		case ATCMD_SEVENT_SEND_IDLE:
-			if (argc != 4)
-				break;
+/*			iperf_debug("SEVENT_SEND_IDLE: argc=%d\n", argc); */
 
-			if (!info->done)
-				break;
+			if (argc == 4)
+			{
+				if (!info->done)
+					break;
 
-			g_iperf_socket_send_idle = true;
+				g_iperf_socket_send_idle = true;
 
-/*			iperf_debug("sevent_send_idle: id=%d\n", atoi(argv[0])); */
+/*				iperf_debug("SEVENT_SEND_IDLE: id=%s done=%s drop=%s wait=%s\n", 
+								argv[0], argv[1], argv[2], argv[3]); */
+			}
 			break;
 
 		default:

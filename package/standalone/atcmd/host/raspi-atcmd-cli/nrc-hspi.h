@@ -292,7 +292,7 @@ typedef struct
 
 typedef struct
 {
-	int active;
+	bool active;
 
 	struct
 	{

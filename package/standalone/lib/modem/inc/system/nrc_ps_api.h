@@ -293,15 +293,20 @@ struct ret_dutyinfo {
 } __attribute__ ((packed));
 #define RET_DUTY_INFO_SIZE sizeof(struct ret_dutyinfo)
 
-// 5B
+// 4B
+// 5B in case of defined(INCLUDE_DUTYCYCLE)
 struct ret_rcinfo {
-	uint8_t maxtp;
-	uint8_t tp2;
-	uint8_t maxp;
-#if 0 /* no need */
-	uint8_t lowest;
+		uint16_t maxtp:4;		/* 4bits for 0 ~ 15 */
+		uint16_t tp2:4;
+		uint16_t maxp:4;
+		uint16_t probe:4;
+		uint8_t ewma:3;			/* ewma                       : 1~5 => 10% 20% ... 50%    */
+		uint8_t intval:3;		/* statistics update interval : 1~7 => 100ms 200ms...700ms */
+		uint8_t probe_intval;	/* probe inerval              : 1~255 => 10ms 20ms ... 2550ms  */
+#if defined(INCLUDE_DUTYCYCLE)
+		uint8_t org_intval:3;		/* original statistics update interval : 1~7 => 100ms 200ms...700ms */
+		uint8_t org_probe_intval:5;	/* original probe inerval			  : 1~31 => 10ms 20ms ... 310ms  */
 #endif
-	uint8_t probe;
 } __attribute__ ((packed));
 #define RET_RC_INFO_SIZE sizeof(struct ret_rcinfo)
 
@@ -403,14 +408,6 @@ struct ret_airtimeinfo {
 #error "define wowlan pattern size, if ret size is enough, set 2 or set 1"
 #endif
 
-#if defined (INCLUDE_RC_W_RSSI)
-struct ret_rc_einfo {
-	uint8_t pf:2;    //  profile#
-	uint8_t ewma:3;  //  ewma                       : 1~5 => 10% 20% ... 50%
-	uint8_t intval:3; // statistics update interval : 1~8 => 100ms 200ms...800ms
-} __attribute__ ((packed));
-#endif
-
 /* Retention Memory Total_1KB(1024B)
  * from 0x200B_BC00 to 0x200C_0000)
  * Last 16 Bytes for uCode Header
@@ -463,9 +460,6 @@ struct retention_info {
 	uint32_t sleep_gpio_dir_mask;
 	uint32_t sleep_gpio_out_mask;
 	uint32_t sleep_gpio_pullup_mask;
-#if defined (INCLUDE_RC_W_RSSI)
-	struct ret_rc_einfo rc_einfo;  // rate control info(1B)
-#endif
 #if defined (INCLUDE_AVOID_FRAG_ATTACK_TEST)
 	uint8_t 			prev_ptk[RET_PMK_SIZE];	//Previous PTK (32B)
 #endif

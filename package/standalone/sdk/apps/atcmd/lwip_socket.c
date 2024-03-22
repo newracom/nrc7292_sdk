@@ -329,6 +329,38 @@ int _lwip_socket_tcp_set_nodelay (int fd, bool enable)
 	return 0;
 }
 
+int _lwip_socket_udp_get_broadcast (int fd, bool *enabled)
+{
+	int broadcast;
+	socklen_t len = sizeof(int);
+	int ret;
+
+	ret = getsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcast, &len);
+	if (ret < 0)
+		return _lwip_socket_error(errno);
+
+	*enabled = !!broadcast;
+
+/*	_lwip_socket_log("udp_broadcast_get: %d, %s", fd, !!broadcast ? "on" : "off"); */
+
+	return 0;
+}
+
+int _lwip_socket_udp_set_broadcast (int fd, bool enable)
+{
+	int broadcast = enable ? 1 : 0;
+	socklen_t len = sizeof(int);
+	int ret;
+
+	ret = setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcast, len);
+	if (ret < 0)
+		return _lwip_socket_error(errno);
+
+/*	_lwip_socket_log("udp_broadcast_set: %d, %s", fd, enable ? "on" : "off"); */
+
+	return 0;
+}
+
 /**********************************************************************************************/
 
 static int _lwip_socket_bind (int fd, uint16_t port, bool ipv6)
@@ -831,6 +863,18 @@ static int _lwip_socket_open (int type, int *fd,
 					return _lwip_socket_error(errno);
 
 				ret = _lwip_socket_bind(*fd, local_port, ipv6);
+				if (ret == 0)
+				{
+					ret = _lwip_socket_udp_set_broadcast(*fd, true);
+					if (ret == 0)
+					{
+						bool broadcast;
+
+						ret = _lwip_socket_udp_get_broadcast(*fd, &broadcast);
+						if (ret == 0)
+							_lwip_socket_log("SOCK_OPEN: id=%d, UDP Broadcasting %s", *fd, broadcast ? "On" :"Off");
+					}
+				}
 				break;
 
 			case SOCK_STREAM:

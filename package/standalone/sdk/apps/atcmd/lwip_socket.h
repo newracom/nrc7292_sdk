@@ -114,6 +114,8 @@ extern int _lwip_socket_tcp_set_keepalive (int fd, int keepalive, int keepidle, 
 
 extern int _lwip_socket_tcp_get_nodelay (int fd, bool *enabled);
 extern int _lwip_socket_tcp_set_nodelay (int fd, bool enable);
+extern int _lwip_socket_udp_get_broadcast (int fd, bool *enabled);
+extern int _lwip_socket_udp_set_broadcast (int fd, bool enable);
 
 extern int _lwip_socket_init (lwip_socket_cb_t *cb);
 extern int _lwip_socket_deinit (void);

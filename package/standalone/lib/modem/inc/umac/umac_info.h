@@ -314,8 +314,11 @@ uint16_t get_aid_by_addr(int8_t vif_id, uint8_t* addr);
 /*(AP/MESH ONLY) Get stainfo with sta index */
 STAINFO * get_stainfo_by_index(int8_t vif_id, uint16_t sta_idx);
 
-/* (AP/MESH ONLY) Get number of asociated STA*/
+/* (AP/MESH ONLY) Get number of allocated STA*/
 uint16_t get_num_sta(int8_t vif_id);
+
+/* (AP/MESH ONLY) Get number of associated STA*/
+uint16_t get_num_assoc_sta(int8_t vif_id);
 
 /* (AP/MESH ONLY) Get number of stainfo of STA asociated with start/end idx */
 uint16_t get_num_stainfo(int8_t vif_id, uint16_t *start_idx, uint16_t *end_idx);
@@ -348,6 +351,7 @@ static inline APINFO * get_apinfo_by_vifid(int8_t vif_id) {return NULL;};
 static inline uint16_t get_aid_by_stainfo_index(int8_t vif_id, uint16_t sta_idx) {return 0;};
 static inline STAINFO* get_stainfo_by_index(int8_t vif_id, uint16_t sta_idx){return NULL;};
 static inline uint16_t get_num_sta(int8_t vif_id) {return 0;};
+static inline uint16_t get_num_assoc_sta(int8_t vif_id) {return 0;};
 static inline uint16_t get_num_stainfo(int8_t vif_id, uint16_t *start_idx, uint16_t *end_idx) {return 0;};
 #endif /* defined(INCLUDE_UMAC) */
 

@@ -84,13 +84,9 @@ int nrc_ctrl_show_config(char *config, size_t *length)
 	if (!get_rate_ctrl_en(vif_id)) {
 		mcs = get_mcs();
 		sprintf(bw, "%s","N/A");
-	} else if (lmac_get_rc_mode(vif_id) == RC_MODE_1) {
+	} else if (lmac_get_rc_mode(vif_id) == RC_MODE_1 && lmac_is_sta(vif_id)) {
 		const RC_RATE *rate;
-#if !defined (INCLUDE_RC_W_RSSI)
-		uint8_t rate_index	= lmac_rc_get_rate_index( vif_id , 0 , 0) ;
-#else
-		uint8_t rate_index	= lmac_rc_get_rate_index( vif_id , 0 , 0, 0, 0) ;
-#endif
+		uint8_t rate_index	= lmac_rc_get_rate_index(vif_id, 0, 0, 0) ;
 		rate = lmac_rc_get_rate(rate_index);
 		mcs = rate->mcs;
 		sprintf(bw, "%d Mhz (NRC Auto)", 1 << rate->bw );
@@ -130,13 +126,16 @@ int nrc_ctrl_show_config(char *config, size_t *length)
 		sprintf(config + strlen(config), "  - MCS : %d\n", mcs);
 	} else {
 		sprintf(config + strlen(config), "  - Mode : %s\n", lmac_rc_get_mode_str(vif_id));
-		if (lmac_is_ap(vif_id) || lmac_is_mesh(vif_id)) {
-			sprintf(config + strlen(config), "  - Use 'show rc' for each STA on AP\n");
+		if (lmac_is_ap(vif_id) || lmac_is_mesh(vif_id)
+#if defined(INCLUDE_IBSS)
+			|| lmac_is_ibss(vif_id)
+#endif
+			) {
+			sprintf(config + strlen(config), "  - Use 'show rc' for each STA\n");
 		} else {
 			sprintf(config + strlen(config), "  - MCS : %d , bw = %s\n" , mcs , bw);
 		}
 	}
-
 	sprintf(config + strlen(config), " Guard Interval: %s\n", short_gi);
 	sprintf(config + strlen(config), " Security      : %s\n", security);
 	if(get_cipher_en(vif_id)) {

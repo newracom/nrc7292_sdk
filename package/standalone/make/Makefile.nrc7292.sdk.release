@@ -68,9 +68,6 @@ ifeq ($(CONFIG_NEW_TASK_ARCH),y)
 CONFIG_WDT=y
 endif
 
-#Support rate control with RSSI
-CONFIG_RC_W_RSSI=y
-
 # CLI Support (y: Support n: Not Support)
 CONFIG_CLI=y
 ifeq ($(CONFIG_CLI),y)

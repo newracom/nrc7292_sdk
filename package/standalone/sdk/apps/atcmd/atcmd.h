@@ -64,7 +64,7 @@
 /* #define CONFIG_ATCMD_USER */
 #endif
 
-/* #define CONFIG_ATCMD_PREFIX_CHECK */
+#define CONFIG_ATCMD_PREFIX_CHECK 
 /* #define CONFIG_ATCMD_TRXBUF_STATIC */
 /* #define CONFIG_ATCMD_LOWERCASE */
 /* #define CONFIG_ATCMD_HISTORY */

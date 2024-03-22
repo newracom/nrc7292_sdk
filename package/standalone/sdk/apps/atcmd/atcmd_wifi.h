@@ -56,7 +56,7 @@
 /*
  * Default Settings
  */
-#define ATCMD_WIFI_INIT_COUNTRY			"US"
+/* #define ATCMD_WIFI_INIT_COUNTRY			"US" */
 
 #define ATCMD_WIFI_INIT_TXPOWER_TYPE	TX_POWER_AUTO
 

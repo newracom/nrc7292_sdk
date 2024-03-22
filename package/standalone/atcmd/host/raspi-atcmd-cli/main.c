@@ -58,7 +58,7 @@ static int raspi_get_time (double *time) /* usec */
 
 static void raspi_cli_version (void)
 {
-	const char *version = "1.3.3";
+	const char *version = "1.3.4";
 
 	printf("raspi-atcmd-cli version %s\n", version);
  	printf("Copyright (c) 2019-2023  <NEWRACOM LTD>\n");
@@ -284,15 +284,30 @@ static int raspi_cli_option (int argc, char *argv[], raspi_cli_opt_t *opt)
 /**********************************************************************************************/
 
 static pthread_t g_raspi_cli_thread;
+static pthread_mutex_t g_raspi_cli_recv_mutex;
+
+static void raspi_cli_recv_lock (void)
+{
+	pthread_mutex_lock(&g_raspi_cli_recv_mutex);
+}
+
+static void raspi_cli_recv_unlock (void)
+{
+	pthread_mutex_unlock(&g_raspi_cli_recv_mutex);
+}
 
 static void *raspi_cli_recv_thread (void *arg)
 {
 	char buf[128 * 1024];
 	int ret;
 
+    pthread_mutex_init(&g_raspi_cli_recv_mutex, NULL);
+
 	while (1)
 	{
+		raspi_cli_recv_lock();
 		ret = raspi_hif_read(buf, sizeof(buf));
+		raspi_cli_recv_unlock();
 
 		if (ret > 0)
 		{
@@ -302,7 +317,7 @@ static void *raspi_cli_recv_thread (void *arg)
 		else if (ret < 0 && ret != -EAGAIN)
 		{
 			log_error("raspi_hif_read(), %s\n", strerror(-ret));
-			exit(0);
+			sleep(1);
 		}
 
 		ret = raspi_eirq_poll(-1);
@@ -438,7 +453,7 @@ static int raspi_cli_run_script (raspi_cli_hif_t *hif, char *script, bool atcmd_
 	memset(&loop, 0, sizeof(loop));
 
 	for (i = 0 ; i < sizeof(data) ; i++)
-		data[i] = i & 0xff;
+		data[i] = '0' + (i % 10);
 
 	for (prev_cmd_len = cmd_line = 0 ; !feof(fp); cmd_line++)
 	{
@@ -504,8 +519,14 @@ static int raspi_cli_run_script (raspi_cli_hif_t *hif, char *script, bool atcmd_
 			continue;
 		else if (memcmp(cmd, "AT", 2) == 0)
 		{
-			if (nrc_atcmd_send_cmd(cmd) < 0 && atcmd_error_exit)
+			if (strcmp(cmd, "ATZ") == 0)
+				raspi_cli_recv_lock();
+
+			if (nrc_atcmd_send_cmd(cmd) == ATCMD_RET_ERROR && atcmd_error_exit)
 				goto error_exit;
+
+			if (strcmp(cmd, "ATZ") == 0)
+				raspi_cli_recv_unlock();
 		}
 		else if (memcmp(cmd, "UART ", 5) == 0) /* UART <baudrate> */
 		{
@@ -823,7 +844,10 @@ static void raspi_cli_run_loop (raspi_cli_hif_t *hif)
 		{
 			tx_mode = ATCMD_TX_NONE;
 
-			if (nrc_atcmd_send_cmd(buf) == 0)
+			if (strcmp(buf, "ATZ") == 0)
+				raspi_cli_recv_lock();
+
+			if (nrc_atcmd_send_cmd(buf) == ATCMD_RET_OK)
 			{
 				if (memcmp(buf, "AT+SSEND=", 9) == 0)
 				{
@@ -865,6 +889,9 @@ static void raspi_cli_run_loop (raspi_cli_hif_t *hif)
 					}
 				}
 			}
+			
+			if (strcmp(buf, "ATZ") == 0)
+				raspi_cli_recv_unlock();
 
 			continue;
 		}

@@ -170,14 +170,6 @@ ifeq ($(CONFIG_SUPPORT_IBSS),y)
 DEFINE += -DINCLUDE_IBSS
 endif # CONFIG_SUPPORT_IBSS
 
-#Support rate control with RSSI
-ifeq ($(CONFIG_RC_W_RSSI),y)
-DEFINE += -DINCLUDE_RC_W_RSSI
-#When STA reconnects to an AP, reinitialize statistic table
-#DEFINE += -DINCLUDE_REINIT_STBL
-endif # CONFIG_RC_W_RSSI
-
-
 ifeq ($(CONFIG_CN_TEST_CH),y)
 DEFINE += -DINCLUDE_CN_TEST_CH
 endif # CONFIG_CN_TEST_CH

@@ -6,6 +6,7 @@
 - Please do not use package/standalone/tools/external_tools/FirmwareFlashTool.exe of v1.3.4 rev08. Use other v1.3.4 revision's one instead.
 
 ### Release roadmap
+- v1.6.1 (2024.03.22): Hotfix
 - v1.6 (2023.10.27)
 - v1.5.2 (2023.09.01): Hotfix
 - v1.5.1 (2023.08.31)

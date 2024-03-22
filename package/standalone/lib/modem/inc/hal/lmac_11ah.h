@@ -695,6 +695,7 @@ uint16_t compute_ndp_partial_aid(uint16_t aid, uint8_t *bssid);
 uint16_t compute_symbol(uint16_t psdu_bytes, uint8_t bw, uint8_t mcs);
 uint16_t compute_duration(uint16_t psdu_bytes, uint8_t bw, uint8_t mcs, uint8_t n_frame, uint8_t n_sifs, uint8_t short_gi, uint32_t pre_symbol_len, uint8_t n_mpdu);
 void nrc7292_rxinfo_back_war(struct _SYS_BUF *current, int8_t *rssi);
+bool drop_from_seq_err_check(struct _SYS_BUF *current);
 void lmac_s1g_hook_cb(int32_t res, void *param);
 
 #endif /* LMAC_11AH_H */

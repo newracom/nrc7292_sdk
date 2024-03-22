@@ -257,6 +257,10 @@ void        set_sig_aggregation(TXVECTOR* vector, bool agg);
 void        set_sig_short_gi(TXVECTOR* vector, uint8_t gi);
 void        set_sig_mcs(TXVECTOR* vector, uint8_t mcs);
 void        set_sig_doppler(TXVECTOR* vector , uint8_t doppler);
+bool        get_sig_rx_aggregation(LMAC_RXHDR *rxhdr);
+uint8_t		get_sig_rx_mcs (LMAC_RXHDR *rxhdr);
+uint8_t 	get_sig_rx_response_ind (LMAC_RXHDR *rxhdr);
+bool 		get_sig_rx_ndp_ind (LMAC_RXHDR *rxhdr);
 void        lmac_set_bpn_register(uint8_t bpn);
 void        lmac_show_test_config_modem_recovery();
 #if defined(NRC7292)

@@ -919,6 +919,8 @@ int _hif_hspi_open (_hif_info_t *info)
 	_hif_hspi_pin_enable();
 #endif
 
+	_hif_hspi_ready();
+
 /*	_hif_hspi_print_regs(); */
 
 /*	_hif_info("HSPI_OPEN: success"); */

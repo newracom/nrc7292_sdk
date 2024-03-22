@@ -139,7 +139,7 @@ static void nrc_atcmd_wait_return (char *cmd)
 	int ret = 0;
 
 	if (strcmp(cmd, "ATZ\r\n") == 0)
-		timeout = 3;
+		timeout = 5;
 	else if (strlen(cmd) > 8 && memcmp(cmd, "AT+UART=", 8) == 0)
 		timeout = 1;
 	else if (strlen(cmd) > 14 && memcmp(cmd, "AT+WDEEPSLEEP=", 14) == 0)

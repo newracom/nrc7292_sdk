@@ -15,15 +15,15 @@ SRCS := \
 	nrc-iperf.c \
 	main.c
 
-CFLAGS = -pthread -Wall -Wno-unused-function
-LFLAGS = -lpthread -lz
+CFLAGS += -pthread -Wall -Wno-unused-function
+LDFLAGS += -lpthread -lz
 
 #########################################################
 
 all: $(APP)
 
 $(APP): $(SRCS)
-	$(CC) -g -o $@ $^ $(CFLAGS) $(LFLAGS)
+	$(CC) -g -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
 clean:
 	@rm -vf $(APP)

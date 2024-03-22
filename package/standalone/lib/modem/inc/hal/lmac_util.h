@@ -73,3 +73,6 @@ void get_auth_ctrl_param();
 
 /* Sync to AP about PM */
 bool lmac_notify_pm_to_ap (void);
+int8_t ewma_val(int8_t old, int8_t new, int8_t weight);
+
+

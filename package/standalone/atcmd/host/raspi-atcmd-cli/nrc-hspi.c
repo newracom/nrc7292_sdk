@@ -39,7 +39,7 @@
 
 static hspi_info_t g_hspi_info =
 {
-	.active = 0,
+	.active = false,
 };
 
 #define HSPI_QUEUE_STATUS()					&g_hspi_info.queue.status
@@ -56,9 +56,9 @@ static hspi_info_t g_hspi_info =
 
 #define SPI_TRANSFER(tx, rx, len)			g_hspi_info.ops.spi_transfer(tx, rx, len)
 
-static int HSPI_ACTIVE (void)
+static bool HSPI_ACTIVE (void)
 {
-	if (g_hspi_info.active == 0)
+	if (!g_hspi_info.active)
 		_hspi_log("hspi is not opened.\n");
 
 	return g_hspi_info.active;
@@ -817,7 +817,7 @@ static int hspi_open (hspi_ops_t *ops, enum HSPI_EIRQ_MODE mode)
 	memset(&g_hspi_info, 0, sizeof(hspi_info_t));
 	memcpy(&g_hspi_info.ops, ops, sizeof(hspi_ops_t));
 
-	g_hspi_info.active = ~0;
+	g_hspi_info.active = true;
 
 	if (hspi_ready(&g_hspi_info) != 0 || hspi_status_update() != 0)
 	{
