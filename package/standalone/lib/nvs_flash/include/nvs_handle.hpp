@@ -4,6 +4,7 @@
 #include <string>
 #include <memory>
 #include <type_traits>
+#include <cstddef>
 
 #include "nvs.h"
 
