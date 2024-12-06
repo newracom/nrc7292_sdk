@@ -12,6 +12,7 @@
 > If users plan to use this software package with other devices that incorporate the NRC7292 chip, they should utilize the board data file supplied by the device's vendor.
 
 ### Release roadmap
+- v1.6.2 (2024.12.06): Hotfix
 - v1.6.1 (2024.03.22): Hotfix
 - v1.6 (2023.10.27)
 - v1.5.2 (2023.09.01): Hotfix
@@ -34,7 +35,7 @@
 - v1.3.0 (2020.07.19)
 
 ### Latest release
-- [NRC7292_Standalone_SDK_v1.6](https://github.com/newracom/nrc7292_sdk/releases/tag/v1.6)
+- [NRC7292_Standalone_SDK_v1.6.2](https://github.com/newracom/nrc7292_sdk/releases/tag/v1.6.2)
 
 ### Release package contents
 - standalone: NRC7292 standalone SDK package for global regulatory domains

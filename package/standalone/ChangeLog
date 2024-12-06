@@ -4,6 +4,12 @@
 *
 *******************************************************************
 
+[2024-12-04]
+Change summary for version 1.6.2:
+
+    Hotfix
+    * Bugfix for corner cases related to 1MHz primary channel location
+
 [2024-03-22]
 Change summary for version 1.6.1:
 

@@ -293,8 +293,7 @@ struct ret_dutyinfo {
 } __attribute__ ((packed));
 #define RET_DUTY_INFO_SIZE sizeof(struct ret_dutyinfo)
 
-// 4B
-// 5B in case of defined(INCLUDE_DUTYCYCLE)
+// 5B
 struct ret_rcinfo {
 		uint16_t maxtp:4;		/* 4bits for 0 ~ 15 */
 		uint16_t tp2:4;
@@ -303,10 +302,10 @@ struct ret_rcinfo {
 		uint8_t ewma:3;			/* ewma                       : 1~5 => 10% 20% ... 50%    */
 		uint8_t intval:3;		/* statistics update interval : 1~7 => 100ms 200ms...700ms */
 		uint8_t probe_intval;	/* probe inerval              : 1~255 => 10ms 20ms ... 2550ms  */
-#if defined(INCLUDE_DUTYCYCLE)
+//#if defined(INCLUDE_DUTYCYCLE)
 		uint8_t org_intval:3;		/* original statistics update interval : 1~7 => 100ms 200ms...700ms */
 		uint8_t org_probe_intval:5;	/* original probe inerval			  : 1~31 => 10ms 20ms ... 310ms  */
-#endif
+//#endif
 } __attribute__ ((packed));
 #define RET_RC_INFO_SIZE sizeof(struct ret_rcinfo)
 

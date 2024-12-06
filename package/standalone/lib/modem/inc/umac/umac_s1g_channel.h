@@ -69,7 +69,7 @@ uint8_t GetNumOfChannel(uint8_t ccid);
 uint8_t GetS1GChannelNumber(uint8_t index);
 uint32_t GetS1GCenterFreq(uint8_t index);
 uint8_t CheckChannelIndex(uint8_t index);
-uint8_t GetChannelIndexByS1GFreq(uint16_t s1g_freq);
+uint8_t GetChannelIndexByS1GFreq(uint16_t s1g_freq, uint8_t bw);
 uint8_t GetChannelSpacingByS1GFreq(uint16_t s1g_freq);
 uint16_t GetS1GFreqByChannelIndex(uint8_t index);
 uint16_t GetStartS1GFreqByChspacing(uint8_t spacing);
