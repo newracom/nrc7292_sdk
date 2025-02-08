@@ -1257,6 +1257,15 @@ Queue_t * const pxQueue = ( Queue_t * ) xQueue;
 	}
 	#endif
 
+#ifdef NRC_FREERTOS
+#if ( ( INCLUDE_xTaskGetSchedulerState == 1 ) || ( configUSE_TIMERS == 1 ) )
+	if ( xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED )
+	{
+		/* Cannot block if the interrupt is masked */
+		configASSERT( !( xPortIsMaskedInterrupt() && ( xTicksToWait != 0 ) ) );
+	}
+#endif /* ( ( INCLUDE_xTaskGetSchedulerState == 1 ) || ( configUSE_TIMERS == 1 ) ) */
+#endif
 
 	/* This function relaxes the coding standard somewhat to allow return
 	statements within the function itself.  This is done in the interest
@@ -1403,6 +1412,15 @@ Queue_t * const pxQueue = ( Queue_t * ) xQueue;
 	}
 	#endif
 
+#ifdef NRC_FREERTOS
+#if ( ( INCLUDE_xTaskGetSchedulerState == 1 ) || ( configUSE_TIMERS == 1 ) )
+	if ( xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED )
+	{
+		/* Cannot block if the interrupt is masked */
+		configASSERT( !( xPortIsMaskedInterrupt() && ( xTicksToWait != 0 ) ) );
+	}
+#endif /* ( ( INCLUDE_xTaskGetSchedulerState == 1 ) || ( configUSE_TIMERS == 1 ) ) */
+#endif
 
 	/* This function relaxes the coding standard somewhat to allow return
 	statements within the function itself.  This is done in the interest
@@ -1619,6 +1637,15 @@ Queue_t * const pxQueue = ( Queue_t * ) xQueue;
 	}
 	#endif
 
+#ifdef NRC_FREERTOS
+#if ( ( INCLUDE_xTaskGetSchedulerState == 1 ) || ( configUSE_TIMERS == 1 ) )
+	if ( xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED )
+	{
+		/* Cannot block if the interrupt is masked */
+		configASSERT( !( xPortIsMaskedInterrupt() && ( xTicksToWait != 0 ) ) );
+	}
+#endif /* ( ( INCLUDE_xTaskGetSchedulerState == 1 ) || ( configUSE_TIMERS == 1 ) ) */
+#endif
 
 	/* This function relaxes the coding standard somewhat to allow return
 	statements within the function itself.  This is done in the interest

@@ -31,6 +31,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <string.h>
 
 #include <time.h>
@@ -40,18 +41,13 @@
 #include <pthread.h>
 #include <sys/time.h>
 
+
 #define log_printf(fmt, ...)	printf(" " fmt, ##__VA_ARGS__)
 
 #define log_trace()				log_printf("%s::%d\n", __func__, __LINE__)
 #define log_debug(fmt, ...)		log_printf(fmt, ##__VA_ARGS__)
 #define log_info(fmt, ...)		log_printf(fmt, ##__VA_ARGS__)
 #define log_error(fmt, ...)		log_printf("%s::%d: " fmt, __func__, __LINE__, ##__VA_ARGS__)
-
-typedef enum
-{
-	false = 0,
-	true = 1
-} bool;
 
 #define STR_IP4ADDR_LEN_MIN		7
 #define STR_IP4ADDR_LEN_MAX		15

@@ -53,6 +53,8 @@ void nrc7291_rxvect_rotate_war(struct lmac_rx_h_data *rx);
 
 void hal_dl_recovery_post_process();
 void hal_dl_cleanup_dl_ring();
-void hal_dl_discard_all() ;
+void hal_dl_discard_all();
+bool is_ndp(struct lmac_rx_h_data *rx);
 bool is_ndp_preq(struct lmac_rx_h_data *rx);
+bool is_ndp_paging(struct lmac_rx_h_data *rx);
 #endif /* LMAC_DOWNLINK_H */

@@ -75,6 +75,7 @@ extern int ip4_input_nat(struct pbuf *p, struct netif *inp);
 
 #ifdef CONFIG_IPV6
 #define LWIP_IPV6                   1
+#define LWIP_IPV6_DHCP6             1
 #else
 #define LWIP_IPV6                   0
 #endif
@@ -88,10 +89,10 @@ extern int ip4_input_nat(struct pbuf *p, struct netif *inp);
 #define DNS_MAX_NAME_LENGTH 128
 
 #define LWIP_HAVE_LOOPIF				0
-#define TCP_LISTEN_BACKLOG				10
+#define TCP_LISTEN_BACKLOG				1
 #define LWIP_SO_RCVTIMEO		   		1
 #define LWIP_SO_RCVBUF			 		1
-#define LWIP_SO_SNDRCVTIMEO_NONSTANDARD 1
+#define LWIP_SO_SNDRCVTIMEO_NONSTANDARD 0
 #define LWIP_SO_SNDTIMEO                1
 #define LWIP_TCP_KEEPALIVE              1
 
@@ -217,7 +218,7 @@ a lot of data that needs to be copied, this should be set high. */
 #define MEMP_NUM_TCP_PCB        20
 /* MEMP_NUM_TCP_PCB_LISTEN: the number of listening TCP
    connections. */
-#define MEMP_NUM_TCP_PCB_LISTEN 12
+#define MEMP_NUM_TCP_PCB_LISTEN MEMP_NUM_TCP_PCB
 #endif
 /* MEMP_NUM_TCP_SEG: the number of simultaneously queued TCP
    segments. */
@@ -230,9 +231,9 @@ a lot of data that needs to be copied, this should be set high. */
 /* The following four are used only with the sequential API and can be
    set to 0 if the application only will use the raw API. */
 /* MEMP_NUM_NETBUF: the number of struct netbufs. */
-#define MEMP_NUM_NETBUF         20
+#define MEMP_NUM_NETBUF         MEMP_NUM_TCP_PCB
 /* MEMP_NUM_NETCONN: the number of struct netconns. */
-#define MEMP_NUM_NETCONN        20
+#define MEMP_NUM_NETCONN        MEMP_NUM_TCP_PCB
 /* MEMP_NUM_APIMSG: the number of struct api_msg, used for
    communication between the TCP/IP stack and the sequential
    programs. */
@@ -282,7 +283,6 @@ a lot of data that needs to be copied, this should be set high. */
 #define TCP_QUEUE_OOSEQ         1
 
 /* TCP Maximum segment size. */
-/* we change the TCP MSS for performance and legacy value is 1460 */
 #if defined(TS8266) || defined(TR6260) || defined(NRC7392)
 #define TCP_MSS			1460
 #else
@@ -304,9 +304,6 @@ a lot of data that needs to be copied, this should be set high. */
 
 /* Maximum number of retransmissions of SYN segments. */
 #define TCP_SYNMAXRTX           4
-
-
-#define TCP_OOSEQ_MAX_BYTES             (2 * TCP_MSS)
 
 /* LWIP_TCP_SACK_OUT==1: TCP will support sending selective acknowledgements (SACKs) */
 #define LWIP_TCP_SACK_OUT               1
@@ -347,6 +344,9 @@ a lot of data that needs to be copied, this should be set high. */
    interfaces. DHCP is not implemented in lwIP 0.5.1, however, so
    turning this on does currently not work. */
 #define LWIP_DHCP               1
+#if LWIP_DHCP
+#define LWIP_DHCP_EVENT         1
+#endif
 
 
 /* 1 if you want to do an ARP check on the offered address
@@ -425,8 +425,11 @@ a lot of data that needs to be copied, this should be set high. */
 #define LWIP_TCP_KEEPALIVE_TICK_UPDATE		1
 
 #define SNTP_SERVER_DNS            1
-#define SNTP_SET_SYSTEM_TIME_NTP(sec, us) \
- void set_rtc_utc_offset(u32_t, u32_t); \
-	set_rtc_utc_offset(sec, us)
+
+extern void sntp_set_system_time (unsigned long sec, unsigned long us);
+#define SNTP_SET_SYSTEM_TIME_US(sec, us) 	sntp_set_system_time(sec, us)
+
+extern void sntp_get_system_time (unsigned long *sec, unsigned long *us);
+#define SNTP_GET_SYSTEM_TIME(sec, us) 		sntp_get_system_time(sec, us)
 
 #endif /* __LWIPOPTS_H__ */

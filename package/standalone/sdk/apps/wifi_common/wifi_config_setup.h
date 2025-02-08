@@ -47,6 +47,7 @@ typedef struct  {
 	uint16_t scan_freq_list[MAX_FREQ_NUM];
 	uint8_t scan_freq_num;
 	uint16_t channel;
+	uint16_t nons1g_freq;
 	uint8_t bw;
 	uint16_t bcn_interval;
 	uint8_t ip_mode;
@@ -63,6 +64,7 @@ typedef struct  {
 	uint8_t dhcp_server;
 	uint32_t conn_timeout;
 	uint32_t disconn_timeout;
+	uint32_t dhcp_timeout;
 	uint32_t bss_max_idle;
 	uint32_t bss_retry_cnt;
 	uint8_t device_mode;
@@ -74,22 +76,26 @@ typedef struct  {
 	uint8_t ignore_broadcast_ssid;
 	uint8_t max_num_sta;
 	uint16_t listen_interval;
+	uint8_t scan_mode;
+	uint16_t fast_scan_freq;
+	uint8_t fast_scan_bssid[MAX_BSSID_LENGTH + 1];
+	uint8_t eap_type;
+	uint8_t identity[MAX_SSID_LENGTH + 1];
+	uint8_t private_key_password[MAX_PW_LENGTH + 1];
+	const char *eap_ca_cert;
+	const char *eap_client_cert;
+	const char *eap_private_key;
+	uint8_t sae_pwe;
+	uint8_t bgscan_enable;
+	uint16_t bgscan_short;
+	int bgscan_thresh;
+	uint16_t bgscan_long;
+	uint8_t auth_control;
+	uint8_t ps_mode;
+	uint16_t ps_idle;
+	uint32_t ps_sleep;
 }WIFI_CONFIG;
 #define WIFI_CONFIG_SIZE	sizeof (WIFI_CONFIG)
-
-/*********************************************************************
- * @fn set default configuration
- *
- * @brief Set default wifi configuration in memory
- *
- * @param vif
- *
- * @param wifi configuration ptr
- *
- * @return nrc_err_t
- **********************************************************************/
- static nrc_err_t set_wifi_defaults(WIFI_CONFIG* wifi_config);
-
 
 /*********************************************************************
  * @fn nrc_save_wifi_config
@@ -150,6 +156,18 @@ nrc_err_t nrc_wifi_set_config(WIFI_CONFIG* wifi_config);
  * @return nrc_err_t
  **********************************************************************/
 nrc_err_t nrc_erase_all_wifi_nvs(void);
+
+
+/*********************************************************************
+ * @fn nrc_erase_eap_certificate_wifi_nvs
+ *
+ * @brief Erase certificate configuration for EAP in NVS
+ *
+ * @param void
+ *
+ * @return nrc_err_t
+ **********************************************************************/
+ nrc_err_t nrc_erase_eap_certificate_nvs(void);
 
 
 /*********************************************************************

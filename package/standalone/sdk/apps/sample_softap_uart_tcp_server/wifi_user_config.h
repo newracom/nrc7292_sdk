@@ -39,4 +39,7 @@
  * particular use case or application.
 */
 
+#define COUNTRY_CODE "US"
+#define NRC_WIFI_CHANNEL 9250
+
 #endif // __WIFI_USER_CONFIG_H__ //

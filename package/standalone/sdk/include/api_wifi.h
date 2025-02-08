@@ -31,6 +31,7 @@ extern "C" {
 #endif
 
 #include "nrc_types.h"
+#include "nrc_sdk.h"
 
 #define WIFI_TX_POWER_MIN            1		/* minimum value of tx power input range */
 #define WIFI_TX_POWER_MAX            30		/* maximum value of tx power input range */
@@ -81,6 +82,7 @@ tWIFI_STATUS nrc_wifi_get_tx_power (int vif_id, uint8_t *txpower);
  * @fn tWIFI_STATUS nrc_wifi_set_tx_power (uint8_t txpower, uint8_t type)
  *
  * @brief Set the transmit power level (in dBm) and type
+ *        It should be invoked following the configuration of the country code.
  *
  * @param txpower: TX Power (in dBm) (1~30)
  *
@@ -293,6 +295,20 @@ bool nrc_wifi_tx_avaliable_duty_cycle(void);
  * @return wifi status.
  ***********************************************/
  tWIFI_STATE_ID nrc_wifi_get_state (int vif_id);
+
+
+/**********************************************
+ * @fn void nrc_wifi_set_state (int vif_id, tWIFI_STATE_ID state)
+ *
+ * @brief Set state of Wi-Fi connection
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param state: State of Wi-Fi
+ *
+ * @return N/A
+ ***********************************************/
+ void nrc_wifi_set_state (int vif_id, tWIFI_STATE_ID state);
 
 
 /**********************************************
@@ -511,9 +527,36 @@ tWIFI_STATUS nrc_wifi_softap_set_ignore_broadcast_ssid(int vif_id, int ignore_br
  ***********************************************/
 tWIFI_STATUS nrc_wifi_set_security (int vif_id, int mode, char *password);
 
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_eap_security(int vif_id, int mode, int eap, char *identity, char *password, const char *ca_cert, const char *client_cert, const char *private_key, char *private_key_password)
+ *
+ * @brief Set EAP security parameters for Wi-Fi connection
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param mode: security mode
+ *
+ * @param eap: eap type
+ *
+ * @param identity: identity
+ *
+ * @param password: password
+ *
+ * @param ca_cert: ca certificate(only TLS type)
+ *
+ * @param client_cert: client certificate(only TLS type)
+ *
+ * @param private_key: private key(only TLS type)
+ *
+ * @param private_key_password: private key password(only TLS type)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_eap_security(int vif_id, int mode, int eap, char *identity, char *password, const char *ca_cert, const char *client_cert, const char *private_key, char *private_key_password);
+
 
 /**********************************************
- * @fn tWIFI_STATUS nrc_wifi_set_security (int vif_id, char *pmk)
+ * @fn tWIFI_STATUS nrc_wifi_set_pmk (int vif_id, char *pmk)
  *
  * @brief Set PMK(Pairwise Master Key) parameters for Wi-Fi connection
  *
@@ -525,6 +568,38 @@ tWIFI_STATUS nrc_wifi_set_security (int vif_id, int mode, char *password);
  ***********************************************/
 tWIFI_STATUS nrc_wifi_set_pmk(int vif_id, char *pmk);
 
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_sae_pwe (int vif_id, int sae_pwe)
+ *
+ * @brief Set SAE mechanism for PWE derivation
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param sae_pwe: SAE mechanism for PWE derivation
+ *                 0 = hunting-and-pecking loop only (default without password identifier)
+ *                 1 = hash-to-element only (default with password identifier)
+ *                 2 = both hunting-and-pecking loop and hash-to-element enabled
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_sae_pwe (int vif_id, int sae_pwe);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_sae_pwe (int vif_id, int *sae_pwe)
+ *
+ * @brief Get current SAE mechanism for PWE derivation
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param sae_pwe: SAE mechanism for PWE derivation
+ *                 0 = hunting-and-pecking loop only (default without password identifier)
+ *                 1 = hash-to-element only (default with password identifier)
+ *                 2 = both hunting-and-pecking loop and hash-to-element enabled
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_sae_pwe (int vif_id, int *sae_pwe);
 
 /**********************************************
  * @fn tWIFI_STATUS nrc_wifi_get_scan_freq (int vif_id, uint16_t *freq_list, uint8_t *num_freq)
@@ -717,7 +792,19 @@ tWIFI_STATUS nrc_wifi_wps_pbc(int vif_id);
 
 
 /**********************************************
- * @fn tWIFI_STATUS nrc_wifi_softap_set_conf (int vif_id, char *ssid, uint16_t s1g_freq, uint8_t bw, tWIFI_SECURITY sec_mode, char *password)
+ * @fn tWIFI_STATUS nrc_wifi_wps_cancel (int vif_id)
+ *
+ * @brief Cancels the pending WPS operaion
+ *
+ * @param vif_id: Network interface index
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_wps_cancel (int vif_id);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_softap_set_conf (int vif_id, char *ssid, uint16_t s1g_freq, uint8_t bw, tWIFI_SECURITY sec_mode, char *password, uint8_t sae_pwe )
  *
  * @brief Set configuration for softap
  *
@@ -734,9 +821,11 @@ tWIFI_STATUS nrc_wifi_wps_pbc(int vif_id);
  *
  * @param password: PASSWORD
  *
+ * @param sae_pwe:  sae pwe settings (0: hunting-and-pecking loop, 1: hash-to-element, 2:Both)
+ *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-tWIFI_STATUS nrc_wifi_softap_set_conf (int vif_id, char *ssid, uint16_t s1g_freq, uint8_t bw, tWIFI_SECURITY sec_mode, char *password);
+tWIFI_STATUS nrc_wifi_softap_set_conf (int vif_id, char *ssid, uint16_t s1g_freq, uint8_t bw, tWIFI_SECURITY sec_mode, char *password, uint8_t sae_pwe);
 
 
 /**********************************************
@@ -893,7 +982,7 @@ tWIFI_STATUS nrc_wifi_softap_stop_dhcp_server (int vif_id);
 
 
 /**********************************************
- * @fn tWIFI_STATUS nrc_wifi_softap_get_sta_list(int vif_id, STA_LIST *info)
+ * @fn tWIFI_STATUS nrc_wifi_softap_get_sta_list(int vif_id, STA_LIST *info, uint16_t len)
  *
  * @brief get STAs' information (only for AP)
  *
@@ -901,9 +990,11 @@ tWIFI_STATUS nrc_wifi_softap_stop_dhcp_server (int vif_id);
  *
  * @param info: STAs' information (state/addr/aid/SNR/RSSI)
  *
+ * @param len: STA_LIST size
+ *
  * @return If enabled, then WIFI_SUCCESS. Otherwise, WIFI_FAIL is returned.
  ***********************************************/
-tWIFI_STATUS nrc_wifi_softap_get_sta_list(int vif_id, STA_LIST *info);
+tWIFI_STATUS nrc_wifi_softap_get_sta_list(int vif_id, STA_LIST *info, uint16_t len);
 
 
 /**********************************************
@@ -1049,13 +1140,15 @@ tWIFI_STATUS nrc_wifi_get_ip_address (int vif_id, char **ip_addr);
 
 
 /**********************************************
- * @fn tWIFI_STATUS nrc_wifi_set_ip_address (int vif_id, tWIFI_IP_MODE mode, char* ipaddr, char *netmask, char *gateway)
+ * @fn tWIFI_STATUS nrc_wifi_set_ip_address (int vif_id, tWIFI_IP_MODE mode, uint32_t timeout, char* ipaddr, char *netmask, char *gateway)
  *
  * @brief Set IP address
  *
  * @param vif_id: Network interface index
  *
  * @param mode: WIFI_STATIC_IP or WIFI_DYNAMIC_IP
+ *
+ * @param timeout : Wait timeout if WIFI_DYNAMIC_IP is selected. This value ignored for WIFI_STATIC_IP.
  *
  * @param ipaddr: IP address for static IP
  *
@@ -1065,7 +1158,7 @@ tWIFI_STATUS nrc_wifi_get_ip_address (int vif_id, char **ip_addr);
  *
  * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
  ***********************************************/
-tWIFI_STATUS nrc_wifi_set_ip_address (int vif_id, tWIFI_IP_MODE mode, char* ipaddr, char *netmask, char *gateway);
+tWIFI_STATUS nrc_wifi_set_ip_address (int vif_id, tWIFI_IP_MODE mode, uint32_t timeout, char* ipaddr, char *netmask, char *gateway);
 
 
 /**********************************************
@@ -1171,6 +1264,23 @@ tWIFI_STATUS nrc_wifi_set_tx_aggr_auto(int vif_id, tWIFI_TID tid, uint8_t max_ag
  * @return If enabled, then WIFI_SUCCESS. Otherwise, WIFI_FAIL is returned.
  ***********************************************/
 tWIFI_STATUS nrc_wifi_set_passive_scan(bool passive_scan_on);
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_simple_bgscan(int vif_id, uint16_t short_interval, int signal_threshold, uint16_t long_interval)
+ *
+ * @brief Set simple back ground scan
+ *
+ * @param vif_id: Network interface index
+ *
+ * @param short_interval: short scan interval (sec)
+ *
+ * @param signal_threshold: short/long interval choice signal threshold (db) (ex : -45)
+ *
+ * @param long_interval: long scan interval (sec)
+ *
+ * @return If enabled, then WIFI_SUCCESS. Otherwise, WIFI_FAIL is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_simple_bgscan(int vif_id, uint16_t short_interval, int signal_threshold, uint16_t long_interval);
 
 
 /**********************************************
@@ -1306,6 +1416,131 @@ tWIFI_STATUS nrc_wifi_get_listen_interval(int vif_id, uint16_t *listen_interval,
  ***********************************************/
 tWIFI_STATUS nrc_wifi_set_listen_interval(int vif_id, uint16_t listen_interval);
 
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_mic_scan(bool *enable, bool *channel_move, uint32_t *cnt_detected)
+ *
+ * @brief Retrieve MIC scan settings and channel detection count (applicable only to K2(KR MIC))
+ *
+ * @param enable: Pointer to a variable to store the MIC scan enable setting.
+ *
+ * @param channel_move: Pointer to a variable to store the channel move setting when the current channel is invalid.
+ *
+ * @param cnt_detected: Pointer to a variable to store the channel detection count.
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_mic_scan(bool *enable, bool *channel_move, uint32_t *cnt_detected);
+
+
+ /**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_mic_scan(bool enable, bool channel_move)
+ *
+ * @brief Configure MIC scan settings and channel detection count (applicable only to K2(KR MIC))
+ *
+ * @param enable:  MIC scan enable / disable (0|1)
+ *
+ * @param channel_move: channel move setting when the current channel is invalid.
+ *                      This is used for access points (AP) mode.
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_mic_scan (bool enable, bool channel_move);
+
+
+/**********************************************
+ * @fn  tWIFI_STATUS nrc_wifi_set_enable_auth_control(int vif_id, bool enable)
+ *
+ * @brief enable DAC (Distributed Auth Control) (refer to 802.11ah spec (11.3.9.3))
+ *
+ * @param vif_id : vif_id
+ *
+ * @param enable : true(enable), false(disable)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_enable_auth_control(int vif_id, bool enable);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_enable_auth_control(uint8_t *enable)
+ *
+ * @brief get current DAC (Distributed Auth Control)
+ *
+ * @param vif_id : vif_id
+ *
+ * @param val : value (0(disable),1(enable))
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_enable_auth_control(int vif_id, uint8_t *val);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_auth_control_param(uint8_t slot, uint8_t ti_min, uint8_t ti_max)
+ *
+ * @brief set DAC (Distributed Auth Control) parameter
+ *
+ * @param slot : authentication slot (in units of TUs)
+ *
+ * @param ti_min : minimum transmission interval (in units of beacon intervals)
+ *
+ * @param ti_max : maximum transmission interval (in units of beacon intervals)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_auth_control_param(uint8_t slot, uint8_t ti_min, uint8_t ti_max);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_auth_control_param(uint8_t* slot, uint8_t* ti_min, uint8_t* ti_max)
+ *
+ * @brief get DAC (Distributed Auth Control) parameter
+ *
+ * @param slot : authentication slot (in units of TUs)
+ *
+ * @param ti_min : minimum transmission interval (in units of beacon intervals)
+ *
+ * @param ti_max : maximum transmission interval (in units of beacon intervals)
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_auth_control_param(uint8_t* slot, uint8_t* ti_min, uint8_t* ti_max);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_set_auth_control_scale(uint8_t scale_factor)
+ *
+ * @brief set scale factor (1: in units of BI for TI_MIN/TI_MAX or 10: in units of 10*BI for TI_MIN/TI_MAX)
+ *
+ * @param scale_factor value
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_set_auth_control_scale(uint8_t scale_factor);
+
+
+/**********************************************
+ * @fn STATUS nrc_wifi_get_auth_control_scale(uint8_t *scale_factor)
+ *
+ * @brief get scale factor (1: in units of BI for TI_MIN/TI_MAX or 10: in units of 10*BI for TI_MIN/TI_MAX)
+ *
+ * @param scale_factor value
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_auth_control_scale(uint8_t *scale_factor);
+
+
+/**********************************************
+ * @fn tWIFI_STATUS nrc_wifi_get_auth_current_ti(int *ti)
+ *
+ * @brief get current transmission interval(TI) value of DAC
+ *
+ * @param ti value
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ ***********************************************/
+tWIFI_STATUS nrc_wifi_get_auth_current_ti(int *ti);
 
 #ifdef __cplusplus
 }

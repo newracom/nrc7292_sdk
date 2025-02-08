@@ -40,41 +40,59 @@ extern struct netif* nrc_netif[MAX_IF];
 
 void ethernet_start(void)
 {
-    char value[32];
-    size_t length = sizeof(value);
+	spi_device_t w5500_spi;
+	int gpio_int_pin;
+	char value[32];
+	size_t length = sizeof(value);
 
-    uint8_t mac[6] = {0x86, 0x25, 0x3f, 0xc7, 0x9b, 0x29};        // TODO: need real mac address
-    uint8_t *addr = NULL;
-    char *ifconfig_param[2];
+	uint8_t mac[6] = {0x86, 0x25, 0x3f, 0xc7, 0x9b, 0x29};        // TODO: need real mac address
+	uint8_t *addr = NULL;
+	char *ifconfig_param[2];
 
-    addr = mac;
+#ifdef NRC7394
+	gpio_int_pin = GPIO_30;
+	w5500_spi.pin_miso = 29;
+	w5500_spi.pin_mosi = 6;
+	w5500_spi.pin_cs = 28;
+	w5500_spi.pin_sclk = 7;
+#else
+	gpio_int_pin = GPIO_10;
+	w5500_spi.pin_miso = 12;
+	w5500_spi.pin_mosi = 13;
+	w5500_spi.pin_cs = 14;
+	w5500_spi.pin_sclk = 15;
+#endif
+	w5500_spi.frame_bits = SPI_BIT8;
+	w5500_spi.clock = 16000000;
+	w5500_spi.mode = SPI_MODE0;
+	w5500_spi.controller = SPI_CONTROLLER_SPI0;
+	w5500_spi.irq_save_flag = 0;
+	w5500_spi.isr_handler = NULL;
 
-    nrc_eth_set_ethernet_mode(NRC_ETH_MODE_STA);
+	addr = mac;
 
-    nrc_eth_set_network_mode(NRC_NETWORK_MODE_NAT);
+	nrc_eth_set_ethernet_mode(NRC_ETH_MODE_STA);
 
-    if (ethernet_init(addr) != NRC_SUCCESS)
-    {
-        nrc_usr_print("[%s] Error initializing ethernet...\n", __func__);
-        return;
-    }
+	nrc_eth_set_network_mode(NRC_NETWORK_MODE_NAT);
 
-    if (NAT)
-    {
-        strcpy(value, "192.168.2.1");
-        nrc_usr_print("Setting eth address to %s...\n", value);
-        ifconfig_param[0] = strdup("eth");
-        ifconfig_param[1] = strdup(value);
-        wifi_ifconfig(2, ifconfig_param);
-        free(ifconfig_param[0]);
-        free(ifconfig_param[1]);
+	if (ethernet_init(&w5500_spi, addr, gpio_int_pin) != NRC_SUCCESS) {
+		nrc_usr_print("[%s] Error initializing ethernet...\n", __func__);
+		return;
+	}
 
-        // wlan0 address is set during wps_pbc connection
+	if (NAT) {
+		strcpy(value, "192.168.2.1");
+		nrc_usr_print("Setting eth address to %s...\n", value);
+		ifconfig_param[0] = strdup("eth");
+		ifconfig_param[1] = strdup(value);
+		wifi_ifconfig(2, ifconfig_param);
+		free(ifconfig_param[0]);
+		free(ifconfig_param[1]);
 
-        start_dhcps_on_if(&eth_netif, 120);            // NAT only
-    }
+		// wlan0 address is set during wps_pbc connection
 
-
+		start_dhcps_on_if(&eth_netif, 120);            // NAT only
+	}
 }
 
 void user_init(void)

@@ -489,6 +489,7 @@ nd6_input(struct pbuf *p, struct netif *inp)
 
     /* Check for ANY address in src (DAD algorithm). */
     if (ip6_addr_isany(ip6_current_src_addr())) {
+#ifdef DISABLED_UNTIL_SELF_BROADCAST_PACKET_FILTER_FIX_IS_MADE
       /* Sender is validating this address. */
       for (i = 0; i < LWIP_IPV6_NUM_ADDRESSES; ++i) {
         if (!ip6_addr_isinvalid(netif_ip6_addr_state(inp, i)) &&
@@ -501,6 +502,7 @@ nd6_input(struct pbuf *p, struct netif *inp)
           }
         }
       }
+#endif
     } else {
       /* Sender is trying to resolve our address. */
       /* Verify that they included their own link-layer address. */
@@ -1847,9 +1849,9 @@ nd6_new_router(const ip6_addr_t *router_addr, struct netif *netif)
   for (router_index = LWIP_ND6_NUM_ROUTERS - 1; router_index >= 0; router_index--) {
     /* check if router already exists (this is a special case for 2 netifs on the same subnet
        - e.g. wifi and cable) */
-    if(default_router_list[router_index].neighbor_entry == &(neighbor_cache[neighbor_index])){ 
-      return router_index; 
-    } 
+    if(default_router_list[router_index].neighbor_entry == &(neighbor_cache[neighbor_index])){
+      return router_index;
+    }
     if (default_router_list[router_index].neighbor_entry == NULL) {
       /* remember lowest free index to create a new entry */
       free_router_index = router_index;

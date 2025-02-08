@@ -36,22 +36,34 @@
 
 /**********************************************************************************************/
 
-#define LWIP_SOCKET_NUM_MAX				MEMP_NUM_NETCONN /* 12, lib/lwip/contrib/port/lwipopts.h */
-
+/*
+ * lib/FreeRTOS/Source/include/event_groups.h
+ *
+ * The type that holds event bits always matches TickType_t - therefore the
+ * number of bits it holds is set by configUSE_16_BIT_TICKS (16 bits if set to 1,
+ * 32 bits if set to 0.
+ *
+ * Although event groups are not related to ticks, for internal implementation
+ * reasons the number of bits available for use in an event group is dependent
+ * on the configUSE_16_BIT_TICKS setting in FreeRTOSConfig.h.  If
+ * configUSE_16_BIT_TICKS is 1 then each event group contains 8 usable bits (bit
+ * 0 to bit 7).  If configUSE_16_BIT_TICKS is set to 0 then each event group has
+ * 24 usable bits (bit 0 to bit 23).  The EventBits_t type is used to store
+ * event bits within an event group.
+ */
 #if configUSE_16_BIT_TICKS
-#define LWIP_SOCKET_EVENT_BIT_MAX		8
+#define LWIP_SOCKET_EVENT_BIT_MAX		(16 - 8)
 #else
-#define LWIP_SOCKET_EVENT_BIT_MAX		24
+#define LWIP_SOCKET_EVENT_BIT_MAX		(32 - 8)
 #endif
 
-#if LWIP_SOCKET_NUM_MAX > LWIP_SOCKET_EVENT_BIT_MAX
-#error "LWIP_SOCKET_NUM_MAX > LWIP_SOCKET_EVENT_BIT_MAX"
-#endif
+/*
+ * lib/lwip/contrib/port/lwipopts.h 
+ */
+#define LWIP_SOCKET_NUM_MAX				MEMP_NUM_NETCONN 
 
 #define LWIP_SOCKET_TASK_PRIORITY		ATCMD_TASK_PRIORITY
 #define LWIP_SOCKET_TASK_STACK_SIZE		((4 * 1024) / sizeof(StackType_t))
-
-#define LWIP_SOCKET_FDS_MUTEX_TIMEOUT	portMAX_DELAY
 
 /**********************************************************************************************/
 
@@ -123,37 +135,27 @@ extern int _lwip_socket_deinit (void);
 extern int _lwip_socket_open_udp (int *fd, uint16_t local_port, bool ipv6, bool reuse_addr);
 extern int _lwip_socket_open_tcp_server (int *fd, uint16_t local_port, bool ipv6, bool reuse_addr);
 extern int _lwip_socket_open_tcp_client (int *fd, ip_addr_t *remote_addr, uint16_t remote_port,
-										int timeout_msec, bool ipv6, bool reuse_addr);
+								int timeout_msec, bool ipv6, bool reuse_addr);
 extern int _lwip_socket_close (int fd);
 
 extern int _lwip_socket_get_peer (int fd, ip_addr_t *ipaddr, uint16_t *port);
 extern int _lwip_socket_get_local (int fd, ip_addr_t *ipaddr, uint16_t *port);
 
-extern int _lwip_socket_send_request (int fd);
+extern int _lwip_socket_send_request (int fd, uint32_t timeout_ms);
 extern int _lwip_socket_send_done (int fd);
+extern int _lwip_socket_send_udp(int fd, ip_addr_t *remote_addr, uint16_t remote_port,
+								char *data, int len, struct netif *netif);
+extern int _lwip_socket_send_tcp(int fd, char *data, int len);
 
 extern int _lwip_socket_recv_request (int fd);
 extern int _lwip_socket_recv_done (int fd);
 extern int _lwip_socket_recv_len (int fd);
-
-extern int _lwip_socket_send (int fd, ip_addr_t *remote_addr, uint16_t remote_port,
+extern int _lwip_socket_recv_udp(int fd, ip_addr_t *remote_addr, uint16_t *remote_port,
 								char *data, int len);
-extern int _lwip_socket_recv (int fd, ip_addr_t *remote_addr, uint16_t *remote_port,
-								char *data, int len);
-
-#define _lwip_socket_send_udp(fd, remote_addr, remote_port, data, len) \
-								_lwip_socket_send(fd, remote_addr, remote_port, data, len)
-#define _lwip_socket_send_tcp(fd, data, len) \
-								_lwip_socket_send(fd, NULL, 0, data, len)
-
-#define _lwip_socket_recv_udp(fd, remote_addr, remote_port, data, len) \
-								_lwip_socket_recv(fd, remote_addr, remote_port, data, len)
-#define _lwip_socket_recv_tcp(fd, data, len) \
-								_lwip_socket_recv(fd, NULL, 0, data, len)
+extern int _lwip_socket_recv_tcp(int fd, char *data, int len);
 
 extern int _lwip_socket_addr_info_1 (const char *host, char *addr, int addrlen);
 extern int _lwip_socket_addr_info_2 (const char *host, const char *port, char *addr, int addrlen);
 
 /**********************************************************************************************/
 #endif /* #ifndef __LWIP_SOCKET_H__ */
-

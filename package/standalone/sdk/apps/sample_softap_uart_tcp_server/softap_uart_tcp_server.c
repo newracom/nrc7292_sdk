@@ -31,14 +31,13 @@
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
 
-#include "hif.h"
+#include "api_uart_dma.h"
 #include "driver_nrc.h"
 #include "nvs.h"
 #include "nvs_config.h"
 #include "sample_softap_uart_tcp_server_version.h"
 
 #include "nrc_tcp_server.h"
-#include "nrc_ctrl_cmds.h"
 
 #define UART_LOCAL_ECHO
 
@@ -75,8 +74,8 @@ static void uart_transmit(char *buffer, int size)
 
 	while (remain > 0) {
 		ptr += bytes_sent;
-		/* _hif_uart_write sends maximum of 16 bytes at a time */
-		bytes_sent = _hif_uart_write(ptr, remain);
+		/* nrc_uart_write sends maximum of 16 bytes at a time */
+		bytes_sent = nrc_uart_write(ptr, remain);
 		if (remain == bytes_sent) {
 			break;
 		} else {
@@ -134,6 +133,8 @@ static void uart_to_tcp_task(void *pvParameters)
 			send_buffer_size = 0;
 		}
 		xSemaphoreGive(sync_sem);
+
+		_delay_ms(10);
 	}
 }
 
@@ -143,12 +144,6 @@ static void tcp_server_task(void *pvParameters)
 	nrc_usr_print("Uart Server Port used : %d\n", port);
 	nrc_usr_print("[%s] sta_clients = %p\n", __func__, sta_clients);
 	start_server(port, &sta_clients, handle_tcp_to_uart);
-}
-static void tcp_control_server_task(void *pvParameters)
-{
-	unsigned short port = *((unsigned short *)pvParameters);
-	nrc_usr_print("Control Server Port used : %d\n", port);
-	start_server(port, &ctrl_clients, handle_tlv_command);
 }
 
 /******************************************************************************
@@ -178,8 +173,7 @@ static nrc_err_t start_servers()
 				NULL, uxTaskPriorityGet(NULL), &uart_tcp_task_handle);
 
 	_delay_ms(1000);
-	xTaskCreate(tcp_control_server_task, "tcp_control_server_task", 2048,
-						(void *) &control_port, uxTaskPriorityGet(NULL), NULL);
+
 	return 0;
 }
 
@@ -204,9 +198,8 @@ void uart_data_receive(char *buf, int len)
  *******************************************************************************/
 int uart_handler_init(void)
 {
-	_hif_info_t info;
+	uart_dma_info_t info;
 
-	info.type = _HIF_TYPE_UART;
 #if defined(NRC7292)
 	info.uart.channel = NRC_UART_CH2;
 #else
@@ -221,7 +214,7 @@ int uart_handler_init(void)
 	info.rx_params.buf.size = BUFFER_SIZE;
 	info.rx_params.cb = uart_data_receive;
 
-	return _hif_open(&info);
+	return nrc_uart_dma_open(&info);
 }
 
 

@@ -41,6 +41,14 @@
 
 /**********************************************************************************************/
 
+enum ATCMD_BOOT_REASON
+{
+	ATCMD_BOOT_POR = (1 << 0),
+	ATCMD_BOOT_WDT = (1 << 1),
+	ATCMD_BOOT_PMC = (1 << 2),
+	ATCMD_BOOT_HSPI = (1 << 3)
+};
+
 enum ATCMD_RET_TYPE
 {
 	ATCMD_RET_ERROR = -1,
@@ -63,7 +71,13 @@ enum ATCMD_EVENT
 
 	ATCMD_BEVENT_FWBINDL_IDLE = ATCMD_EVENT_START,
 	ATCMD_BEVENT_FWBINDL_DROP,
+	ATCMD_BEVENT_FWBINDL_FAIL,
 	ATCMD_BEVENT_FWBINDL_DONE,
+
+	ATCMD_BEVENT_SFUSER_IDLE,
+	ATCMD_BEVENT_SFUSER_DROP,
+	ATCMD_BEVENT_SFUSER_FAIL,
+	ATCMD_BEVENT_SFUSER_DONE,
 
 	/* Wi-Fi Events */
 	ATCMD_WEVENT_CONNECT_SUCCESS,
@@ -100,21 +114,43 @@ enum ATCMD_EVENT
 
 enum ATCMD_CB_TYPE
 {
-	ATCMD_CB_INFO = 0,
+	ATCMD_CB_BOOT = 0,
+	ATCMD_CB_INFO,
 	ATCMD_CB_EVENT,
 	ATCMD_CB_RXD
 };
 
+enum ATCMD_DATA_TYPE
+{
+	ATCMD_DATA_SOCKET = 0,
+	ATCMD_DATA_FWBIN,
+	ATCMD_DATA_SFUSER,
+	ATCMD_DATA_SFSYSUSER
+};
+
 typedef struct
 {
-	bool verbose;
+	enum ATCMD_DATA_TYPE type;
+	int length;
 
-	int id;
-	int len;
-	char remote_addr[ATCMD_IPADDR_LEN_MAX + 1];
-	int remote_port;
+	union
+	{
+		struct
+		{
+			int id;
+			char remote_addr[ATCMD_IPADDR_LEN_MAX + 1];
+			int remote_port;
+			bool verbose;
+		}; /* socket */
+
+		struct
+		{
+			int offset;
+		}; /* sfuser & sfsysuser */
+	};
 } atcmd_rxd_t;
 
+typedef int (*atcmd_boot_cb_t) (int reason);
 typedef int (*atcmd_info_cb_t) (enum ATCMD_INFO info, int argc, char *argv[]);
 typedef int (*atcmd_event_cb_t) (enum ATCMD_EVENT event, int argc, char *argv[]);
 typedef void (*atcmd_rxd_cb_t) (atcmd_rxd_t *rxd, char *data);
@@ -122,6 +158,8 @@ typedef void (*atcmd_rxd_cb_t) (atcmd_rxd_t *rxd, char *data);
 /**********************************************************************************************/
 
 extern char *nrc_atcmd_param_to_str (const char *param, char *str, int len);
+
+extern bool nrc_atcmd_is_ready (void);
 
 extern int nrc_atcmd_send (char *buf, int len);
 extern int nrc_atcmd_send_cmd (const char *fmt, ...);
@@ -131,14 +169,16 @@ extern void nrc_atcmd_recv (char *buf, int len);
 extern int nrc_atcmd_register_callback (int type, void *func);
 extern int nrc_atcmd_unregister_callback (int type);
 
-extern void nrc_atcmd_log_on (void);
-extern void nrc_atcmd_log_off (void);
-extern bool nrc_atcmd_log_is_on (void);
+extern bool nrc_atcmd_log_print (int log);
+#define nrc_atcmd_log_on()		nrc_atcmd_log_print(1)
+#define nrc_atcmd_log_off()		nrc_atcmd_log_print(0)
+#define nrc_atcmd_log_is_on()	nrc_atcmd_log_print(-1)
 
-extern void nrc_atcmd_data_info (uint64_t *send, uint64_t *recv);
 extern void nrc_atcmd_data_reset (void);
+extern void nrc_atcmd_data_info (uint64_t *send, uint64_t *recv);
+extern int nrc_atcmd_data_print (int send, int recv);
 
-extern int nrc_atcmd_firmware_download (char *bin_data, int bin_size, uint32_t bin_crc32);
+extern int nrc_atcmd_firmware_download (char *bin_data, int bin_size, uint32_t bin_crc32, int verify);
 
 /**********************************************************************************************/
 #endif /* #ifndef __NRC_H__ */

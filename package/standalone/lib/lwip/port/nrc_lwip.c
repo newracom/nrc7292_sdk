@@ -17,6 +17,7 @@
 #include "captdns.h"
 #endif
 #include "drv_rtc.h"
+#include "nrc_eth_if.h"
 
 #include "standalone.h"
 
@@ -39,7 +40,6 @@ bool default_hostname;
 static bool dhcpc_start_flag[END_INTERFACE] = {0, };
 struct ip_info ipinfo[END_INTERFACE];
 
-bool g_flag_dhcp_ok = false;
 u8_t wifi_mode;
 
 #define NETIF_ADDRS &ipaddr, &netmask, &gw
@@ -70,11 +70,11 @@ struct netif * nrc_netif_get_by_idx(uint8_t idx)
 #if LWIP_BRIDGE
 	} else if(idx == BRIDGE_INTERFACE){
 		return &br_netif;
-#endif /* LWIP_BRIDGE */		
+#endif /* LWIP_BRIDGE */
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
 	} else if(idx == ETHERNET_INTERFACE){
 		return &eth_netif;
-#endif /* SUPPORT_ETHERNET_ACCESSPOINT */		
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 	} else{
 		return NULL;
 	}
@@ -111,6 +111,22 @@ int nrc_is_local_mac(uint8_t *addr)
 	return -1;
 }
 
+int static_run(int vif)
+{
+	if (vif >= MAX_IF) {
+		E(TT_NET, "%s%d incorrect vif\n",
+			module_name(), vif);
+		return -1;
+	}
+	I(TT_NET, "%s%d static_run\n",
+		module_name(), vif);
+
+	if (set_standalone_hook_static(vif) == 0)
+		return 0;
+
+	return 0;
+}
+
 #if LWIP_IPV4 && LWIP_DHCP
 int dhcp_run(int vif)
 {
@@ -132,38 +148,38 @@ int dhcp_run(int vif)
 	return 0;
 }
 
-int static_run(int vif)
+static int _wifi_dhcpc_start(int vif, dhcp_event_handler_t event_handler)
 {
-	if (vif >= MAX_IF) {
-		E(TT_NET, "%s%d incorrect vif\n",
-			module_name(), vif);
-		return -1;
-	}
-	I(TT_NET, "%s%d static_run\n",
-		module_name(), vif);
-
-	if (set_standalone_hook_static(vif) == 0)
-		return 0;
-
-	return 0;
-}
-
-int wifi_station_dhcpc_start(int vif)
-{
-#if LWIP_IPV4 && LWIP_DHCP
-	int8_t ret;
 	struct netif *target_if;
+	char if_name[6];
+	err_t result;
 
-	target_if = nrc_netif_get_by_idx(vif);
+	switch (vif) {
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
+		case ETHERNET_INTERFACE:
 #if LWIP_BRIDGE
-	if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
-		target_if = &br_netif;
-	}
+			if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+				target_if = &br_netif;
+				break;
+			}
 #endif /* LWIP_BRIDGE */
 #endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 
-	if(wifi_station_dhcpc_status(vif)){
+		case WLAN0_INTERFACE:
+		case WLAN1_INTERFACE:
+			target_if = nrc_netif_get_by_idx(vif);
+			break;
+
+		case BRIDGE_INTERFACE:
+			target_if = &br_netif;
+			break;
+
+		default:
+			E(TT_NET, "%sinvalid vif (%d\n", module_name(), vif);
+			return -EINVAL;
+	}
+
+	if(wifi_dhcpc_status(vif)){
 		dhcp_stop(target_if);
 		dhcp_cleanup(target_if);
 		dhcpc_start_flag[vif] = false;
@@ -173,36 +189,161 @@ int wifi_station_dhcpc_start(int vif)
 		ip_addr_set_zero(&target_if->gw);
 	}
 
-	ret = dhcp_start(target_if);
-	if(!ret){
-		dhcpc_start_flag[vif] = true;
-	}else{
-		dhcpc_start_flag[vif] = false;
+	result = dhcp_start(target_if);
+
+#if LWIP_DHCP_EVENT
+	if (result == ERR_OK && event_handler)
+		dhcp_event_enable(target_if, event_handler);
+#endif
+
+	dhcpc_start_flag[vif] = !result;
+
+	if (vif == BRIDGE_INTERFACE)
+		snprintf(if_name, sizeof(if_name), "br");
+	else
+		snprintf(if_name, sizeof(if_name), "wlan%d", vif);
+
+	I(TT_NET, "%s%s dhcp client start, flag:%d\n", module_name(), if_name, dhcpc_start_flag[vif]);
+
+    return result != ERR_OK ? -1 : 0;
+}
+
+int wifi_dhcpc_start(int vif)
+{
+	return _wifi_dhcpc_start(vif, NULL);
+}
+
+int wifi_dhcpc_start_with_event (int vif, dhcp_event_handler_t event_handler)
+{
+	return _wifi_dhcpc_start(vif, event_handler);
+}
+
+int wifi_dhcpc_stop(int vif)
+{
+	struct netif *target_if;
+	char if_name[6];
+
+	switch (vif) {
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+		case ETHERNET_INTERFACE:
+#if LWIP_BRIDGE
+			if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+				target_if = &br_netif;
+				break;
+			}
+#endif /* LWIP_BRIDGE */
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
+
+		case WLAN0_INTERFACE:
+		case WLAN1_INTERFACE:
+			target_if = nrc_netif_get_by_idx(vif);
+			break;
+
+		case BRIDGE_INTERFACE:
+			target_if = &br_netif;
+			break;
+
+		default:
+			E(TT_NET, "%sinvalid vif (%d\n", module_name(), vif);
+			return -EINVAL;
 	}
-	I(TT_NET, "%s%d dhcp client start, ret:%d\n",
-		module_name(), vif, ret);
-    return true;
-#else
-	return false;
-#endif /* LWIP_IPV4 && LWIP_DHCP */
+
+#if LWIP_DHCP_EVENT
+	dhcp_event_disable(target_if);
+#endif
+	dhcp_stop(target_if);
+	dhcp_cleanup(target_if);
+	dhcpc_start_flag[vif] = false;
+
+	if (vif == BRIDGE_INTERFACE)
+		snprintf(if_name, sizeof(if_name), "br");
+	else
+		snprintf(if_name, sizeof(if_name), "wlan%d", vif);
+
+	I(TT_NET, "%s%s dhcp client stop\n", module_name(), if_name);
+
+	return 0;
+}
+
+int wifi_dhcpc_get_lease_time(int vif)
+{
+	struct dhcp *dhcp_data = NULL;
+	struct netif *target_if;
+
+	switch (vif) {
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+		case ETHERNET_INTERFACE:
+#if LWIP_BRIDGE
+			if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE) {
+				target_if = &br_netif;
+				break;
+			}
+#endif /* LWIP_BRIDGE */
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
+
+		case WLAN0_INTERFACE:
+		case WLAN1_INTERFACE:
+			target_if = nrc_netif_get_by_idx(vif);
+			break;
+
+		case BRIDGE_INTERFACE:
+			target_if = &br_netif;
+			break;
+
+		default:
+			E(TT_NET, "%sinvalid vif (%d\n", module_name(), vif);
+			return -EINVAL;
+	}
+
+	dhcp_data = netif_dhcp_data(target_if);
+
+	if (dhcp_data) {
+		return dhcp_data->offered_t0_lease;
+	} else {
+		return -EINVAL;
+	}
+}
+
+int wifi_dhcpc_status(int vif)
+{
+	if (vif >= END_INTERFACE)
+		return -EINVAL;
+
+    return dhcpc_start_flag[vif] ? 1 : 0;
+}
+
+int wifi_station_dhcpc_start(int vif)
+{
+	return wifi_dhcpc_start(vif);
 }
 
 int wifi_station_dhcpc_stop(int vif)
 {
-	if (wifi_station_dhcpc_status(vif) == true) {
-		dhcp_stop(nrc_netif[vif]);
-	}
-	dhcpc_start_flag[vif] = false;
-	I(TT_NET, "%s%d stop dhcp client\n",
-		module_name(), vif);
-	return true;
+	return wifi_dhcpc_stop(vif);
 }
 
 int wifi_station_dhcpc_status(int vif)
 {
-    return dhcpc_start_flag[vif];
+	return wifi_dhcpc_status(vif);
 }
-#endif
+
+int wifi_bridge_dhcpc_start(void)
+{
+	return wifi_dhcpc_start(BRIDGE_INTERFACE);
+}
+
+int wifi_bridge_dhcpc_stop(void)
+{
+	return wifi_dhcpc_stop(BRIDGE_INTERFACE);
+}
+
+int wifi_bridge_dhcpc_status(void)
+{
+	return wifi_dhcpc_status(BRIDGE_INTERFACE);
+}
+
+#endif /* LWIP_IPV4 && LWIP_DHCP */
+
 void reset_ip_address(int vif)
 {
 	int i;
@@ -230,10 +371,37 @@ void reset_ip_address(int vif)
 #endif
 }
 
+bool wifi_get_ip_address(int vif_id, char **ip_addr)
+{
+	struct netif *target_if = NULL;
+
+#if LWIP_IPV4
+	if ((vif_id != 0) && (vif_id != 1))
+		return false;
+
+	if (!ip_addr)
+		return false;
+
+	target_if = nrc_netif[vif_id];
+
+#ifdef SUPPORT_ETHERNET_ACCESSPOINT
+#if LWIP_BRIDGE
+	if (nrc_eth_get_network_mode() == NRC_NETWORK_MODE_BRIDGE)
+		target_if = &br_netif;
+#endif /* LWIP_BRIDGE */
+#endif /* SUPPORT_ETHERNET_ACCESSPOINT */
+
+	*ip_addr = ip4addr_ntoa(netif_ip4_addr(target_if));
+	return true;
+#else
+	return false;
+#endif /* LWIP_IPV4 */
+}
+
 void ifconfig_help_display(void)
 {
-	A("Usage:\n");
-	A("   ifconfig <interface> <address> [-n <netmask>] [-g <gateway>] [-m <mtu>] [-d <dns1 dns2>]\n");
+	CPA("Usage:\n");
+	CPA("   ifconfig <interface> <address> [-n <netmask>] [-g <gateway>] [-m <mtu>] [-d <dns1 dns2>]\n");
 }
 
 bool ifconfig_display(WIFI_INTERFACE if_index)
@@ -241,41 +409,41 @@ bool ifconfig_display(WIFI_INTERFACE if_index)
 	struct netif *netif = nrc_netif_get_by_idx(if_index);
 
 	if(netif == NULL){
-		A("[%s] invlid if_index:%d\n", __func__, if_index);
+		CPA("[%s] invlid if_index:%d\n", __func__, if_index);
 		return false;
 	}
 
 	if(if_index == WLAN0_INTERFACE || if_index == WLAN1_INTERFACE){
-		A("wlan%d\t", if_index);
+		CPA("wlan%d\t", if_index);
 #if LWIP_BRIDGE
 	} else if(if_index == BRIDGE_INTERFACE && netif_is_up(&br_netif)){
-		A("br\t");
+		CPA("br\t");
 #endif /* LWIP_BRIDGE */
 #ifdef SUPPORT_ETHERNET_ACCESSPOINT
 	} else if(if_index == ETHERNET_INTERFACE){
-		A("eth\t");
+		CPA("eth\t");
 #endif
-	} 
+	}
 
-	A("HWaddr ");
-	A(MAC_STR,MAC_VALUE(netif->hwaddr) );
-	A("   MTU:%d\n", netif->mtu);
+	CPA("HWaddr ");
+	CPA(MAC_STR,MAC_VALUE(netif->hwaddr) );
+	CPA("   MTU:%d\n", netif->mtu);
 #if LWIP_IPV4
-	A("\tinet:");
+	CPA("\tinet:");
 	ip_addr_debug_print_val(LWIP_DBG_ON, (netif->ip_addr));
-	A("\tnetmask:");
+	CPA("\tnetmask:");
 	ip_addr_debug_print_val(LWIP_DBG_ON, (netif->netmask));
-	A("\tgateway:");
+	CPA("\tgateway:");
 	ip_addr_debug_print_val(LWIP_DBG_ON, (netif->gw));
-	A("\n");
+	CPA("\n");
 #endif /* LWIP_IPV4 */
 #if LWIP_IPV6
 	for (int i = 0; i < LWIP_IPV6_NUM_ADDRESSES; i++) {
-		A(" 		  inet6: %s/0x%"X8_F"\n", ip6addr_ntoa(netif_ip6_addr(netif, i)),
+		CPA("\tinet6: %s/0x%"X8_F"\n", ip6addr_ntoa(netif_ip6_addr(netif, i)),
 			netif_ip6_addr_state(netif, i));
 	}
 #endif
-	A("\n");
+	CPA("\n");
 	return true;
 }
 
@@ -286,20 +454,20 @@ bool ifconfig_display_wg(struct netif *netif)
 		return false;
 	}
 
-	A("wg\t");
+	CPA("wg\t");
 
 
-	A("HWaddr ");
-	A(MAC_STR,MAC_VALUE(netif->hwaddr) );
-	A("   MTU:%d\n", netif->mtu);
+	CPA("HWaddr ");
+	CPA(MAC_STR,MAC_VALUE(netif->hwaddr) );
+	CPA("   MTU:%d\n", netif->mtu);
 #if LWIP_IPV4
-	A("\tinet:");
+	CPA("\tinet:");
 	ip_addr_debug_print_val(LWIP_DBG_ON, (netif->ip_addr));
-	A("\tnetmask:");
+	CPA("\tnetmask:");
 	ip_addr_debug_print_val(LWIP_DBG_ON, (netif->netmask));
-	A("\tgateway:");
+	CPA("\tgateway:");
 	ip_addr_debug_print_val(LWIP_DBG_ON, (netif->gw));
-	A("\n");
+	CPA("\n");
 #endif /* LWIP_IPV4 */
 #if LWIP_IPV6
 	for (int i = 0; i < LWIP_IPV6_NUM_ADDRESSES; i++) {
@@ -307,7 +475,7 @@ bool ifconfig_display_wg(struct netif *netif)
 			netif_ip6_addr_state(netif, i));
 	}
 #endif
-	A("\n");
+	CPA("\n");
 	return true;
 }
 #endif
@@ -331,7 +499,9 @@ static void ifconfig_display_all()
 	ifconfig_display(ETHERNET_INTERFACE);
 #endif /* SUPPORT_ETHERNET_ACCESSPOINT */
 	for(i = 0; i < MAX_IF; i++) {
-		ifconfig_display(i);
+		if(netif_is_up(nrc_netif[i])) {
+			ifconfig_display(i);
+		}
 	}
 #ifdef INCLUDE_WIREGUARD
 	ifconfig_display_wg(&wg_netif);
@@ -381,32 +551,32 @@ bool wifi_ifconfig(int argc, char *argv[])
 			netmask = argv[++i];
 			if (!inet_pton(AF_INET, netmask, &nm_addr))
 				return false;
-			A("netmask : %s\n", netmask);
+			CPA("netmask : %s\n", netmask);
 		} else if (strcmp(argv[i], "-g") == 0 && i + 1 < argc) {
 			gateway = argv[++i];
 			if (!inet_pton(AF_INET, gateway, &gw_addr))
 				return false;
-			A("gateway : %s\n", gateway);
+			CPA("gateway : %s\n", gateway);
 		} else if (strcmp(argv[i], "-m") == 0 && i + 1 < argc) {
 			mtu = argv[++i];
-			A("mtu : %s\n", mtu);
+			CPA("mtu : %s\n", mtu);
 		} else if (strcmp(argv[i], "-d") == 0 && i + 2 < argc) {
 			dns1 = argv[++i];
 			dns2 = argv[++i];
-			A("dns1 : %s\n", dns1);
-			A("dns2 : %s\n", dns2);
+			CPA("dns1 : %s\n", dns1);
+			CPA("dns2 : %s\n", dns2);
 		} else {
 			if (i==1){
 				if(inet_pton(AF_INET, argv[i], &addr)){
 					ip = argv[1];
-					A("ip : %s\n", ip);
+					CPA("ip : %s\n", ip);
 				}
 			}
 		}
 	}
 #if 0
 	for (int j = 0; j < argc; j++)
-		A("%s\n", argv[j]);
+		CPA("%s\n", argv[j]);
 #endif
 
 	if (ip == NULL) {
@@ -562,7 +732,7 @@ int setup_wifi_ap_mode(struct netif *net_if, int updated_lease_time)
 
 	vif = net_if->num;
 
-	A("%s vif:%d :%d min\n", __func__, vif, updated_lease_time);
+	CPA("%s vif:%d :%d min\n", __func__, vif, updated_lease_time);
 
 #if LWIP_DHCPS && LWIP_IPV4
 	ip4_addr_t ip4;
@@ -582,9 +752,9 @@ int setup_wifi_ap_mode(struct netif *net_if, int updated_lease_time)
 			ip_addr_copy_from_ip4(ipinfo[vif].netmask, ip4);
 	}
 
-	A("ip:%s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&ipinfo[vif].ip)));
-	A("gw:%s\n",ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&ipinfo[vif].gw)));
-	A("netmask:%s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&ipinfo[vif].netmask)));
+	CPA("ip:%s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&ipinfo[vif].ip)));
+	CPA("gw:%s\n",ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&ipinfo[vif].gw)));
+	CPA("netmask:%s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&ipinfo[vif].netmask)));
 	wifi_set_ip_info(vif, &ipinfo[vif]);
 #endif /* LWIP_DHCPS && LWIP_IPV4 */
 
@@ -607,8 +777,8 @@ int start_dhcps_on_if(struct netif *net_if, int updated_lease_time)
 	struct ip_info ipinfo;
 	ip4_addr_t ip4;
 
-	A("%s netif name : %c%c\n", __func__, net_if->name[0], net_if->name[1]);
-	A("%s lease time : %d min\n", __func__, updated_lease_time);
+	CPA("%s netif name : %c%c\n", __func__, net_if->name[0], net_if->name[1]);
+	CPA("%s lease time : %d min\n", __func__, updated_lease_time);
 	ipinfo.ip = net_if->ip_addr;
 	ipinfo.gw = net_if->gw;
 	ipinfo.netmask = net_if->netmask;
@@ -625,9 +795,9 @@ int start_dhcps_on_if(struct netif *net_if, int updated_lease_time)
 			ip_addr_copy_from_ip4(ipinfo.netmask, ip4);
 	}
 
-	A("ip:%s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&net_if->ip_addr)));
-	A("gw:%s\n",ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&net_if->gw)));
-	A("netmask:%s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&net_if->netmask)));
+	CPA("ip:%s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&net_if->ip_addr)));
+	CPA("gw:%s\n",ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&net_if->gw)));
+	CPA("netmask:%s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&net_if->netmask)));
 
 #if LWIP_DNS && LWIP_DHCPS
 	captdnsInit();
@@ -647,14 +817,9 @@ int start_dhcps_on_if(struct netif *net_if, int updated_lease_time)
 }
 #endif /* LWIP_BRIDGE */
 
-void set_dhcp_status(bool status)
+bool get_dhcp_status(int vif_id)
 {
-	g_flag_dhcp_ok = status;
-}
-
-bool get_dhcp_status(void)
-{
-	return g_flag_dhcp_ok;
+	return dhcp_supplied_address(nrc_netif_get_by_idx(vif_id));
 }
 
 int reset_wifi_ap_mode(int vif)
@@ -676,21 +841,20 @@ status_callback(struct netif *state_netif)
 
 	if (netif_is_up(state_netif)) {
 #if defined(INCLUDE_TRACE_WAKEUP)
-#if LWIP_BRIDGE		
+#if LWIP_BRIDGE
 		if(state_netif == &br_netif)
-			A("%s br is up.\n", module_name());
-		else	
+			CPA("%s br is up.\n", module_name());
+		else
 #endif /* LWIP_BRIDGE */
-		A("%s wlan%d is up.\n", module_name(), netif_get_index(state_netif) - 1);
+		CPA("%s wlan%d is up.\n", module_name(), netif_get_index(state_netif) - 1);
 #endif /* INCLUDE_TRACE_WAKEUP */
 #if LWIP_IPV4
 		if (!ip4_addr_isany_val(*netif_ip4_addr(state_netif))) {
 #if defined(INCLUDE_TRACE_WAKEUP)
-			A("%s IP is ready : ", module_name());
+			CPA("%s IP is ready : ", module_name());
 			ip_addr_debug_print_val(LWIP_DBG_ON, (state_netif->ip_addr));
-			A("\n", module_name());
+			CPA("\n", module_name());
 #endif /* INCLUDE_TRACE_WAKEUP */
-			set_dhcp_status(true);
 			set_standalone_ipaddr(0,
 				ip4_addr_get_u32(ip_2_ip4(&state_netif->ip_addr)),
 				ip4_addr_get_u32(ip_2_ip4(&state_netif->netmask)),
@@ -707,16 +871,16 @@ link_callback(struct netif *state_netif)
 {
 
 	if (netif_is_link_up(state_netif)) {
-		A("link_callback==UP\n");
+		CPA("link_callback==UP\n");
 #if LWIP_IPV6
 		netif_create_ip6_linklocal_address(state_netif, 1);
-		A("ip6 linklocal address: %s\n", ip6addr_ntoa(netif_ip6_addr(state_netif, 0)));
+		CPA("ip6 linklocal address: %s\n", ip6addr_ntoa(netif_ip6_addr(state_netif, 0)));
 
 		nd6_tmr(); /* tick nd to join multicast groups */
 		nd6_restart_netif(state_netif);
 #endif
 	} else {
-		A("link_callback==DOWN\n");
+		CPA("link_callback==DOWN\n");
 	}
 }
 
@@ -737,50 +901,75 @@ static void set_default_dns_server(void)
 	}
 }
 
-static void lwip_handle_interfaces(void * param)
+bool wifi_setup_interface(WIFI_INTERFACE i)
 {
-	int i =0 ;
-	for(i=0; i<MAX_IF;i++){
-		nrc_netif[i] = (struct netif*)mem_malloc(sizeof(struct netif));
-		nrc_netif[i]->num = i;
-		/* set MAC hardware address to be used by lwIP */
-		get_standalone_macaddr(i, nrc_netif[i]->hwaddr);
+	switch (i)
+	{
+	case WLAN0_INTERFACE:
+	case WLAN1_INTERFACE:
+		if (nrc_netif[i]) {
+			return true;
+		}
+		break;
+	case BRIDGE_INTERFACE:
+		return setup_wifi_bridge_interface();
+	default:
+		return false;
+	}
+
+	nrc_netif[i] = (struct netif*)mem_malloc(sizeof(struct netif));
+	nrc_netif[i]->num = i;
+
+	/* set MAC hardware address to be used by lwIP */
+	get_standalone_macaddr(i, nrc_netif[i]->hwaddr);
+
 #if LWIP_IPV4
-		ip4_addr_t ipaddr, netmask, gw;
-		memset(&ipaddr, 0, sizeof(ipaddr));
-		memset(&netmask, 0, sizeof(netmask));
-		memset(&gw, 0, sizeof(gw));
-		netif_add(nrc_netif[i], &ipaddr, &netmask, &gw, NULL, wlif_init, tcpip_input);
+	ip4_addr_t ipaddr, netmask, gw;
+	memset(&ipaddr, 0, sizeof(ipaddr));
+	memset(&netmask, 0, sizeof(netmask));
+	memset(&gw, 0, sizeof(gw));
+	netif_add(nrc_netif[i], &ipaddr, &netmask, &gw, NULL, wlif_init, tcpip_input);
 #endif
 
 #if LWIP_IPV6
 #if !LWIP_IPV4
-		netif_add(nrc_netif[i], NULL, wlif_init, tcpip_input);
+	netif_add(nrc_netif[i], NULL, wlif_init, tcpip_input);
 #endif
-		netif_create_ip6_linklocal_address(nrc_netif[i], 1);
+	netif_create_ip6_linklocal_address(nrc_netif[i], 1);
 #if LWIP_IPV6_AUTOCONFIG
-		nrc_netif[i]->ip6_autoconfig_enabled = 1;
+	nrc_netif[i]->ip6_autoconfig_enabled = 1;
 #endif
-		A("ip6 linklocal address: %s\n", ip6addr_ntoa(netif_ip6_addr(nrc_netif[i], 0)));
+	CPA("ip6 linklocal address: %s\n", ip6addr_ntoa(netif_ip6_addr(nrc_netif[i], 0)));
 #endif
 
-		netif_set_flags(nrc_netif[i], NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET);
-		netif_set_status_callback(nrc_netif[i], status_callback);
-		netif_set_link_callback(nrc_netif[i], link_callback);
+	netif_set_flags(nrc_netif[i], NETIF_FLAG_ETHARP | NETIF_FLAG_ETHERNET);
+	netif_set_status_callback(nrc_netif[i], status_callback);
+	netif_set_link_callback(nrc_netif[i], link_callback);
 
 	/* make it the default interface */
-		if(i == DEFAULT_NET_IF)
-			netif_set_default( nrc_netif[i] );
+	if(i == DEFAULT_NET_IF)
+		netif_set_default( nrc_netif[i] );
 
 	/* bring it up */
-		netif_set_up( nrc_netif[i] );
-	}
+	netif_set_up( nrc_netif[i] );
+
+	return true;
+}
+
+static void lwip_handle_interfaces(void * param)
+{
+	u32_t init_ifaces = (u32_t) param;
+
 #if LWIP_IPV6
 	nd6_tmr(); /* tick nd to join multicast groups */
-	for(i=0; i<MAX_IF;i++){
-		nd6_restart_netif( nrc_netif[i] );
-	}
 #endif
+
+	for (u32_t i = 0; i < END_INTERFACE; i++) {
+		if (init_ifaces & BIT(i)) {
+			wifi_setup_interface(i);
+		}
+	}
+
 	set_default_dns_server();
 }
 
@@ -794,14 +983,17 @@ void wifi_nd6_restart_netif( int vif )
 /* Initialisation required by lwIP. */
 void wifi_lwip_init( void )
 {
+	uint32_t init_ifaces = BIT(WLAN0_INTERFACE);
+	//uint32_t init_ifaces = BIT(WLAN0_INTERFACE) | BIT(WLAN1_INTERFACE);
+
 	/* Init lwIP and start lwIP tasks. */
-	tcpip_init( lwip_handle_interfaces, NULL );
+	tcpip_init( lwip_handle_interfaces, (void *) init_ifaces);
 }
 
 static void dhcps_help_display(void)
 {
-	A("Usage:\n");
-	A("  dhcps [-i <intf name>] [-lt <lease time(unit:min)] [-st]\n");
+	CPA("Usage:\n");
+	CPA("  dhcps [-i <intf name>] [-lt <lease time(unit:min)] [-st]\n");
 
 }
 
@@ -835,17 +1027,17 @@ bool wifi_dhcps(int argc, char *argv[])
 			if(if_idx < 0){
 				dhcps_help_display();
 				return false;
-			}			
+			}
 			nif = nrc_netif_get_by_idx(if_idx);
-			A("interface : %s\n", argv[i]);
+			CPA("interface : %s\n", argv[i]);
 		} else if (strcmp(argv[i], "-lt") == 0 && i + 1 < argc) {
 			updated_lease_time = atoi(argv[++i]);
-			A("lease time : %d\n", updated_lease_time);
+			CPA("lease time : %d\n", updated_lease_time);
 		}
 	}
 #if 0
 	for (int j = 0; j < argc; j++)
-		A("%s\n", argv[j]);
+		CPA("%s\n", argv[j]);
 #endif
 
 	if (if_idx == WLAN0_INTERFACE || if_idx == WLAN1_INTERFACE) {
@@ -863,8 +1055,8 @@ bool wifi_dhcps(int argc, char *argv[])
 #if LWIP_BRIDGE
 static void bridge_help_display(void)
 {
-	A("Usage:\n");
-	A("  bridge [addbr(create bridge interface)] [delbr(delete bridge interface)] [addif <intf name or -A(all wlan0, wlan1)>]\n");
+	CPA("Usage:\n");
+	CPA("  bridge [addbr(create bridge interface)] [delbr(delete bridge interface)] [addif <intf name or -A(all wlan0, wlan1)>]\n");
 
 }
 bool wifi_bridge(int argc, char *argv[])
@@ -879,21 +1071,21 @@ bool wifi_bridge(int argc, char *argv[])
 
 	if (strcmp(argv[0], "addbr") == 0) {
 		if(netif_is_up(&br_netif)){
-			A("bridge interface already exists!\n");
+			CPA("bridge interface already exists!\n");
 			return false;
 		}
 		if(setup_wifi_bridge_interface())
 			return true;
 	} else if (strcmp(argv[0], "delbr") == 0) {
 		if(!netif_is_up(&br_netif)){
-			A("bridge interface does not exist!\n");
+			CPA("bridge interface does not exist!\n");
 			return false;
 		}
 		if(delete_wifi_bridge_interface())
 			return true;
 	} else if (strcmp(argv[0], "addif") == 0) {
 		if(!netif_is_up(&br_netif)){
-			A("bridge interface does not exist!\n");
+			CPA("bridge interface does not exist!\n");
 			return false;
 		}
 		if(strcmp(argv[1], "-A") == 0){
@@ -905,7 +1097,7 @@ bool wifi_bridge(int argc, char *argv[])
 				bridge_help_display();
 				return false;
 			}
-			bridgeif_add_port(&br_netif, nrc_netif_get_by_idx(if_idx));		
+			bridgeif_add_port(&br_netif, nrc_netif_get_by_idx(if_idx));
 		}
 		return true;
 	}
@@ -921,6 +1113,10 @@ bool setup_wifi_bridge_interface(void)
 	ip4_addr_t ipaddr, netmask, gw;
 	struct eth_addr ethbroadcast = {{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}};
 
+	if (netif_is_up(&br_netif)) {
+		return true;
+	}
+
     ip4_addr_set_zero(&gw);
     ip4_addr_set_zero(&ipaddr);
     ip4_addr_set_zero(&netmask);
@@ -928,6 +1124,9 @@ bool setup_wifi_bridge_interface(void)
 	memcpy(bridge_data.ethaddr.addr, nrc_netif[0]->hwaddr, 6);
 	if (bridge_data.ethaddr.addr[3] < 0xff) {
 		bridge_data.ethaddr.addr[3]++;
+		if (memcmp(bridge_data.ethaddr.addr, nrc_netif[1]->hwaddr, 6) == 0) {
+			bridge_data.ethaddr.addr[3]++;
+		}
 	} else {
 		bridge_data.ethaddr.addr[3] = 0;
 	}
@@ -936,7 +1135,7 @@ bool setup_wifi_bridge_interface(void)
 	bridge_data.max_fdb_static_entries = 16;
 	netif_add(&br_netif, &ipaddr, &netmask, &gw, &bridge_data, bridgeif_init, tcpip_input);
 	if(bridgeif_fdb_add(&br_netif, &ethbroadcast, BR_FLOOD) < 0){
-		A("Bridge interface creation failed : fdb memory err\n");
+		CPA("Bridge interface creation failed : fdb memory err\n");
 		netif_remove(&br_netif);
 		return false;
 	}
@@ -964,57 +1163,110 @@ bool delete_wifi_bridge_interface(void)
 }
 #endif /* LWIP_BRIDGE */
 
-u64_t rtc_offset = 0;
+#include <time.h>
 
-void set_rtc_utc_offset(u32_t t, u32_t us)
+static u64_t diff_rtc_utc_us = 0;
+
+void sntp_set_system_time (unsigned long sec, unsigned long us)
 {
-	rtc_offset = t-(drv_rtc_get_us()/1000000);
-	A("[%s] rtc offset : %lld\n", __func__, rtc_offset);
+	u64_t rtc = drv_rtc_get_us();
+	u64_t utc = (u64_t)((u64_t)sec * 1000000) + (u64_t)us;
+
+	diff_rtc_utc_us = utc - rtc;
 }
 
-u64_t get_rtc_utc_offset(void)
+void sntp_get_system_time (unsigned long *sec, unsigned long *us)
 {
-	A("[%s] rtc offset : %lld\n", __func__, rtc_offset);
-	return (rtc_offset);
+	u64_t rtc = drv_rtc_get_us();
+	u64_t utc = rtc + diff_rtc_utc_us;
+
+	*sec = (u32_t)(utc / 1000000);
+	*us = (u32_t)(utc % 1000000);
 }
 
-u64_t get_utc_time(void){
-	u64_t time;
-	u64_t rtc_offset_value = get_rtc_utc_offset();
-	if(rtc_offset_value){
-		time = (drv_rtc_get_us()/1000000)+ rtc_offset_value;
-	} else {
-		time = 0;
+u32_t get_utc_time (void)
+{
+	u32_t sec;
+	u32_t us;
+
+	sntp_get_system_time(&sec, &us);
+
+	return sec;
+}
+
+char *get_utc_time_str (char *buf, int len)
+{
+/* ex) "Wed Jun 30 21:49:08 1993\n" */
+
+	static char _buf[26];
+	time_t time = get_utc_time();
+
+	if (!buf)
+	{
+		buf = _buf;
+		len = sizeof(_buf);
 	}
-	return time;
+
+	if (len < 26 || !ctime_r(&time, buf))
+		return NULL;
+
+	len = strlen(buf);
+	buf[len - 1] = '\0'; /* remove LF */
+
+	return buf;
 }
 
 /*
  * initialize_sntp() should be called after establishing a successful WiFi connection
  * and configuring DHCP to ensure accurate time synchronization.
  */
-bool initialize_sntp(void)
+int initialize_sntp(const char *server, u32_t timeout) /* sec */
 {
-	bool ret = false;
-	u64_t current_time = 0;
-	int retry = 0;
-	const int retry_count = 10;
+#define sntp_init_log(fmt, ...)		/* A(fmt, ##__VA_ARGS__) */
+
+	const char *str_mode[] = { "POLL", "LISTENONLY" };
+	ip_addr_t server_addr;
+	int time;
+
+	if (timeout > 0)
+		timeout *= 1000;
+	else
+		timeout = 10 * 1000;
 
 	sntp_setoperatingmode(SNTP_OPMODE_POLL);
-#if SNTP_SERVER_DNS
-	sntp_setservername(0, "pool.ntp.org");
+
+	if (ipaddr_aton(server, &server_addr)) {
+		sntp_setserver(0, &server_addr);
+
+		sntp_init_log("%s: mode=\"%s\" server=\"%s\" timeout=%ums\n", __func__,
+				str_mode[sntp_getoperatingmode()], ipaddr_ntoa(sntp_getserver(0)), timeout);
+	} else {
+#if !SNTP_SERVER_DNS
+		return -1;
+#else
+		if (server)
+			sntp_setservername(0, server);
+		else
+			sntp_setservername(0, "pool.ntp.org");
+
+		sntp_init_log("%s: mode=\"%s\" server=\"%s\" tiemout=%ums\n", __func__,
+			str_mode[sntp_getoperatingmode()], sntp_getservername(0), timeout);
 #endif
+	}
+
 	sntp_init();
 
-	while(++retry < retry_count) {
-		current_time = get_utc_time() ;
-		if(current_time != 0 ){
-			ret = true;
-			break;
+	for (time = 0 ; time < timeout ; time += 100) {
+		if (sntp_getreachability(0)) {
+			char buf[26];
+			sntp_init_log("%s: init_time=%dms, UTC %s", __func__, time, get_utc_time_str(buf, sizeof(buf)), time);
+			return 0;
 		}
-		A("Waiting for system time to be set... (%d/%d)", retry, retry_count);
+
 		vTaskDelay(pdMS_TO_TICKS(100));
 	}
-	return ret;
-}
 
+	sntp_init_log("%s: timeout=%dms\n", __func__, timeout);
+
+	return -1;
+}

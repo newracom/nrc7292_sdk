@@ -3,6 +3,8 @@
 
 #include "util_version.h"
 
+bool bcast_fota_is_enable();
+void bcast_fota_set_flag(bool enable);
 void bcast_fota_enqueue_ready(int cmd, uint8_t* data);
 void bcast_fota_enqueue_write(int cmd, uint8_t* data, uint16_t len);
 void bcast_fota_init(void);
@@ -13,6 +15,7 @@ void bcast_fota_set_delayed_reboot(bool reboot);
 bool bcast_fota_get_enable(void);
 void bcast_fota_set_enable(bool enable);
 bool bcast_fota_get_fast(void);
+void bcast_fota_set_bcn_intv(uint16_t intv);
 uint16_t bcast_fota_get_bcn_intv(void);
 #if defined(INCLUDE_ESL_PARAM)
 const char* bcast_fota_get_mqtt_server_topic();
@@ -41,6 +44,8 @@ typedef struct {
 	uint32_t total_chunk;
 	uint32_t retry_cnt;
 	uint32_t force;
+	uint32_t bi;
+	uint32_t mcs;
 } bcast_fota_info_t;
 
 typedef struct {

@@ -60,7 +60,7 @@ void nrc_reset_rtc(void);
 void nrc_sw_reset(void);
 
 /**********************************************
- * @fn void nrc_get_user_factory(char* data, uint16_t buf_len)
+ * @fn nrc_err_t nrc_get_user_factory(char* data, uint16_t buf_len)
  *
  * @brief Get user factory data
  *
@@ -72,6 +72,18 @@ void nrc_sw_reset(void);
  ***********************************************/
 nrc_err_t nrc_get_user_factory(char* data, uint16_t buf_len);
 
+/**********************************************
+ * @fn nrc_err_t nrc_get_user_factory_info(uint32_t *addr, uint32_t *size)
+ *
+ * @brief Get base address and total size of user factory area
+ *
+ * @param addr: A pointer to store base address of user factory area
+ *
+ * @param size: A pointer to store total size of user factory area
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_get_user_factory_info(uint32_t *addr, uint32_t *size);
 
 /**********************************************
  * @fn void nrc_led_trx_init(int tx_gpio, int rx_gpio, int timer_period, bool invert)
@@ -216,6 +228,18 @@ nrc_err_t nrc_get_flash_device_info(uint8_t* data, uint16_t len);
 
 
 /**********************************************
+ * @fn     uint32_t nrc_get_user_data_area_address(void)
+ *
+ * @brief  Get the base address of the user data area in flash memory.
+ *
+ * @param  void
+ *
+ * @return The base address of the user data area.
+ ***********************************************/
+uint32_t nrc_get_user_data_area_address(void);
+
+
+/**********************************************
  * @fn     uint32_t nrc_get_user_data_area_size(void)
  *
  * @brief  Get the size of the user data area in flash memory.
@@ -225,6 +249,17 @@ nrc_err_t nrc_get_flash_device_info(uint8_t* data, uint16_t len);
  * @return The size of the user data area in bytes.
  ***********************************************/
 uint32_t nrc_get_user_data_area_size(void);
+
+
+/**********************************************
+ * @fn    nrc_err_t nrc_erase_user_data_area(void)
+ *
+ * @brief  Erase the user data area in flash memory
+ *
+ * @return If successful, NRC_SUCCESS is returned. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_erase_user_data_area(void);
+
 
 
 /**********************************************
@@ -260,7 +295,36 @@ nrc_err_t nrc_write_user_data(uint32_t user_data_offset, uint8_t* data, uint32_t
  ***********************************************/
 nrc_err_t nrc_read_user_data(uint8_t* buffer, uint32_t user_data_offset, uint32_t size);
 
+#if !defined(NRC7292)
+/**********************************************
+ * @fn     uint8_t nrc_get_xtal_status(void)
+ *
+ * @brief  Get the status of the crystal (xtal)
+ *           It is designed specifically for NRC7394
+ *
+ * @param  void
+ *
+ * @return Crystal(xtal) status
+ *           0(Crystal status not checked)
+ *           1(Crystal is working)
+ *           2(Crystal is not working)
+ ***********************************************/
+uint8_t nrc_get_xtal_status(void);
+#endif /* !defined(NRC7292) */
 
+
+
+/**********************************************
+ * @fn     void nrc_set_jtag(bool enable)
+ *
+ * @brief  Set the JTAG pin
+ *
+ * @param  bool enable
+ * 			enable/disable JTAG debug pin
+ *
+ * @return None
+ ***********************************************/
+void nrc_set_jtag(bool enable);
 #ifdef __cplusplus
 }
 #endif

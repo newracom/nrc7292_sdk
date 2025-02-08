@@ -22,9 +22,11 @@ uint32_t Item::calculateCrc32() const
 {
     uint32_t result = 0xffffffff;
     const uint8_t* p = reinterpret_cast<const uint8_t*>(this);
+#ifdef CRC32_COMPUTE_EXTRA_ENABLE
     result = util_crc_compute_crc32((uint8_t *) (p + offsetof(Item, nsIndex)),
 									offsetof(Item, crc32) - offsetof(Item, nsIndex));
     result = util_crc_compute_crc32((uint8_t *) (p + offsetof(Item, key)), sizeof(key));
+#endif /* CRC32_COMPUTE_EXTRA_ENABLE */
     result = util_crc_compute_crc32((uint8_t *) (p + offsetof(Item, data)), sizeof(data));
     return result;
 }
@@ -33,9 +35,11 @@ uint32_t Item::calculateCrc32WithoutValue() const
 {
     uint32_t result = 0xffffffff;
     const uint8_t* p = reinterpret_cast<const uint8_t*>(this);
+#ifdef CRC32_COMPUTE_EXTRA_ENABLE
     result = util_crc_compute_crc32((uint8_t *) (p + offsetof(Item, nsIndex)),
                       offsetof(Item, datatype) - offsetof(Item, nsIndex));
     result = util_crc_compute_crc32((uint8_t *) (p + offsetof(Item, key)), sizeof(key));
+#endif /* CRC32_COMPUTE_EXTRA_ENABLE */
     result = util_crc_compute_crc32((uint8_t *) (p + offsetof(Item, chunkIndex)), sizeof(chunkIndex));
     return result;
 }

@@ -4,6 +4,45 @@
 *
 *******************************************************************
 
+[2025-02-07]
+Change summary for version 1.7:
+
+    New features
+    * AT-CMD feature
+      o Background scan for roaming (AT+WBGSCAN)
+      o Wi-Fi Protected Setup(WPS) (AT+WWPS)
+    * WPA3-SAE H2E support (STA only)
+
+    Bugfix
+    * Modify the short guard interval to apply only in 4M bandwidth and high modulation states (always)
+    * Issue where EAPOL fails during WPA2/WPA3 implementation, resulting in failure to generate PTK/GTK (non-periodic)
+    * Memory leak issue occurring during repeated connect/disconnect actions (non-periodic)
+    * CCA threshold being set to -60 upon waking up from deep sleep (always)
+    * Failure of downlink (AP->STA) block acknowledgment session (for aggregation) (always)
+    * Intermittent dropping of management frames by the AP for duplicated sequence number (non-periodic)
+    * Inaccurate scan results after scan completion (non-periodic)
+    * System freezing during scanning (non-periodic)
+    * Issues with interoperability with third-party APs at specific bandwidths and channels (always)
+    * Memory leak during the scan operation
+    * Wrong S1G channel index in KR 2MBW in 'show config'
+    * Wrong listen interval value when it's assigned as big value
+    * SoftAP restart failure issue
+    * Failed wake-up from deep sleep in non-TIM mode (non-periodic)
+
+    Changes
+    * Update SDK APIs
+      o Update SDK APIs: refer to UG-7292-005-Standalone SDK API document
+    * Update AT-CMD
+      o Update AT commands: refer to UG-7292-006-AT_Command document
+    * Update samples
+      o Update samples: refer to UG-7292-004-Standalone SDK document
+    * Apply the additional duty cycle condition which is defined in ARIB Standard, chapter 3.4.1
+    * SoftAP can support a bridged STA which uses 4-address
+    * Support frame defrgamentation
+    * Optimizing the wake-up time after deep sleep
+    * Update FirmwareFlashTool v6.4.0
+    * Enhanced TIM mode to support operation without RTC wakeup source
+
 [2024-12-04]
 Change summary for version 1.6.2:
 

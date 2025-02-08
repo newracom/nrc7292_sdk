@@ -1,15 +1,18 @@
 Tool Usage (Firmware Flash Tool)
-====================================
+================================
 
 Overview
 --------
-*Firmware Flash Tool* is a utility for running flash-related operations (reading/writing MAC addresses and uploading XIP standalone bootloader/ XIP standalone firmware) on NRC7292/NRC739X modules.
-    .. image:: images/firmware_flash_tool.png
+*Firmware Flash Tool* is a GUI utility for executing flash-related operations (e.g. reading/writing MAC addresses, flashing XIP standalone bootloader/firmware, identifying flash information, updating flash partitioning profile) on NRC7292/NRC7394 modules.
+ 
+   .. image:: images/firmware_flash_tool.png
 
 Tool Version
 ------------
-* v6.2 (Default: FirmwareFlashTool.exe)
-* v7.0 (Multi Upload: MultiFirmwareFlashTool.exe)
+
+* v6.4 (Default: FirmwareFlashTool.exe)
+
+* v7.4 (Multi Upload: MultiFirmwareFlashTool.exe)
 
 Binary Files
 ------------
@@ -17,28 +20,52 @@ Binary Files
 .. warning::
    Make sure that the correct 2nd bootloader, XIP bootloader and XIP firmware binaries corresponding to the module types (NRC7292 or NRC7394) are selected!
 
-**2nd Bootloader (written on RAM)**:
-    is the 2nd bootloader binary file to be temporarily written on RAM to replace the mask ROM bootloader to augment the bootloader functionalities.
+**2nd Bootloader**:
 
-**XIP Bootloader (written on flash)**:
-    is the XIP bootloader binary file to be stored on the flash memory. If the non-default 5s-wait XIP bootloader is uploaded on the module, the bootloader will wait for 5 seconds to handle firmware upload requests from the tool before jumping to the XIP firmware following a reset. This can be useful during the initial development phase for achieving a quick upload-test-debug cycle.
+    * The 2nd bootloader binary file to be temporarily written on RAM to replace the mask ROM bootloader to augment the bootloader functionalities for the tool operation.
 
-**XIP Firmware (written on flash)**:
-    is the XIP firmware binary file to be stored on the flash memory.
+**XIP Bootloader**:
+
+    * The XIP bootloader binary file to be stored on the flash memory. If the non-default 5s-wait XIP bootloader is uploaded on the module, the bootloader will wait for 5 seconds to handle firmware upload requests from the tool before jumping to the XIP firmware following a reset. This can be useful during the initial development phase for achieving a quick upload-test-debug cycle.
+
+**XIP Firmware**:
+
+    * The XIP firmware binary file to be stored on the flash memory.
 
 **Auto-reset**:
-    is an optional feature that triggers the bootloader to execute the uploaded XIP firmware following the upload procedure. This option is only valid with the non-default 5s-wait XIP bootloader operating in the standalone operation mode.
+
+    * An optional feature that triggers the bootloader to execute the uploaded XIP firmware following the upload procedure. This option is only valid with the non-default 5s-wait XIP bootloader operating in the standalone operation mode.
 
 **Clear NVS Sector**:
-    clears the NVS sector on the flash memory if selected.
+
+    * Clears the NVS sector on the flash memory if selected.
+
+**Flash Memory Map (NRC7394/2MB Only)**:
+
+    * Flash partitioning profiles to be written. (Default: 1)
+
+    * Profile: (F/W / FOTA / User Data) [KBytes]
+
+        * 1: (968 / 968 / 8)
+
+        * 2: (972 / 972 / 0)
+
+        * 3: (1936 / 0 / 8)
+
+        * 4: (1944 / 0 / 0)
 
 Operation
 ---------
-1. Set the DIP switch (for NRC7292) or jumper configuration (for NRC739X) to **Firmware Download / RAM Operation** mode as described on the instructions panel.
-2. Select the desired procedures by using the corresponding check boxes: MAC adresss write, XIP bootloader write, and XIP firmware write.
-3. Reset the board, and press the **START** button to run the selected procedures.
+
+1. Set the DIP switch (for NRC7292) or jumper configuration (for NRC7394) to **Download** mode.
+
+2. Select the desired procedures by using the GUI interface (e.g. MAC adresss write, XIP bootloader write, and XIP firmware write).
+
+3. Reset the board, and press the **START** button to execute the selected procedures.
 
 Multi Firmware Flash Tool
 -------------------------
+
 *Multi Firmware Flash Tool* is a variant of the *Firmware Flash Tool* that allows concurrent uploads.
+
     .. image:: images/multi_firmware_flash_tool.png

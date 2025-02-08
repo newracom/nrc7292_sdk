@@ -24,12 +24,16 @@ ifneq ($(MAKEFILE), )
 	ifneq ($(ALIAS), )
 		ifeq ($(UTARGET), $(filter $(UTARGET),standalone))
 			UPARAM := ALIAS=$(ALIAS)+pscb
+		else ifeq ($(UTARGET), $(filter $(UTARGET),cspi))
+			UPARAM := ALIAS=$(ALIAS)+ucode_for_cspi
 		else
 			UPARAM := ALIAS=$(ALIAS)
 		endif
 	else
 		ifeq ($(UTARGET), $(filter $(UTARGET),standalone))
 			UPARAM := ALIAS=pscb
+		else ifeq ($(UTARGET), $(filter $(UTARGET),cspi))
+			UPARAM := ALIAS=ucode_for_cspi
 		endif
 	endif
 	UMAKEFILE := $(USYSTEM).ucode
@@ -108,7 +112,7 @@ endif
 	@echo "PARAM := $(param)" >> $(FILENAME)
 
 ucode:
-ifeq ($(USYSTEM), $(filter $(USYSTEM),nrc7292 nrc7393 nrc7394 nrc4791))
+ifeq ($(USYSTEM), $(filter $(USYSTEM),nrc7292 nrc7394 nrc4791))
 ifeq ($(UTARGET), $(filter $(UTARGET),cspi standalone))
 ifeq ($(findstring noucode, $(ALIAS)), )
 ifeq ($(findstring halow, $(ALIAS)), )
@@ -121,7 +125,7 @@ endif
 endif
 
 ucodeclean:
-ifeq ($(USYSTEM), $(filter $(USYSTEM),nrc7292 nrc7393 nrc7394 nrc4791))
+ifeq ($(USYSTEM), $(filter $(USYSTEM),nrc7292 nrc7394 nrc4791))
 ifeq ($(UTARGET), $(filter $(UTARGET),cspi standalone))
 ifeq ($(findstring noucode, $(ALIAS)), )
 ifeq ($(findstring halow, $(ALIAS)), )
@@ -143,7 +147,7 @@ bdf:
 	@echo "#endif" >> $(BDFHDR)
 
 second_bl:
-ifeq ($(BLSYSTEM), $(filter $(BLSYSTEM),nrc7292 nrc7393 nrc7394 nrc5292))
+ifeq ($(BLSYSTEM), $(filter $(BLSYSTEM),nrc7292 nrc7394 nrc5292))
 ifeq ($(BLTARGET), $(filter $(BLTARGET),boot))
 ifneq ($(findstring xip, $(ALIAS)), )
 	$(PREFIX).$(BLMAKEFILE) $(BLPARAM)
@@ -154,7 +158,7 @@ endif
 endif
 
 second_blclean:
-ifeq ($(BLSYSTEM), $(filter $(BLSYSTEM),nrc7292 nrc7393 nrc7394 nrc5292))
+ifeq ($(BLSYSTEM), $(filter $(BLSYSTEM),nrc7292 nrc7394 nrc5292))
 ifeq ($(BLTARGET), $(filter $(BLTARGET),boot))
 ifneq ($(findstring xip, $(ALIAS)), )
 	$(PREFIX).$(BLMAKEFILE) $(BLPARAM) clean

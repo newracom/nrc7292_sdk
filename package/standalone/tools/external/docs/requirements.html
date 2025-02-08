@@ -1,27 +1,28 @@
+
+
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Setup and Requirements &mdash; NRC Tools 1.6 documentation</title>
-      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="_static/panels-bootstrap.5fd3999ee7762ccc51105388f4a9d115.css" type="text/css" />
-      <link rel="stylesheet" href="_static/panels-main.c949a650a448cc0ae9fd3441c0e17fb0.css" type="text/css" />
-      <link rel="stylesheet" href="_static/panels-variables.06eb56fa6e07937060861dad626602ad.css" type="text/css" />
-  <!--[if lt IE 9]>
-    <script src="_static/js/html5shiv.min.js"></script>
-  <![endif]-->
+  <title>Setup and Requirements &mdash; NRC Tools 1.7 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/panels-bootstrap.5fd3999ee7762ccc51105388f4a9d115.css?v=45cf7dbc" />
+      <link rel="stylesheet" type="text/css" href="_static/panels-main.c949a650a448cc0ae9fd3441c0e17fb0.css?v=2a6c4383" />
+      <link rel="stylesheet" type="text/css" href="_static/panels-variables.06eb56fa6e07937060861dad626602ad.css?v=d290406d" />
+
   
-        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/jquery.js"></script>
-        <script src="_static/underscore.js"></script>
-        <script src="_static/doctools.js"></script>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=392da36c"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="NRC Board Operation Mode Selection and Power Supply" href="board_operation_mode_selection.html" />
+    <link rel="next" title="NRC7292 Board Operation Mode Selection" href="nrc7292_board_operation_mode_selection.html" />
     <link rel="prev" title="NRC Tools Documentation" href="index.html" /> 
 </head>
 
@@ -30,11 +31,15 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-            <a href="index.html" class="icon icon-home"> NRC Tools
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            NRC Tools
           </a>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
@@ -48,7 +53,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#nrc-board-to-pc-connection-via-a-usb-to-uart-cable">NRC Board-to-PC Connection via a USB-to-UART Cable</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="board_operation_mode_selection.html">NRC Board Operation Mode Selection and Power Supply</a></li>
+<li class="toctree-l1"><a class="reference internal" href="nrc7292_board_operation_mode_selection.html">NRC7292 Board Operation Mode Selection</a></li>
 <li class="toctree-l1"><a class="reference internal" href="running_the_tools_on_mac_linux.html">Running the Tools on Windows/Mac/Linux</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tool_usage_firmware_flash_tool.html">Tool Usage (Firmware Flash Tool)</a></li>
 </ul>
@@ -66,8 +71,8 @@
         <div class="rst-content">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
-      <li>Setup and Requirements</li>
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Setup and Requirements</li>
       <li class="wy-breadcrumbs-aside">
             <a href="_sources/requirements.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -78,17 +83,17 @@
            <div itemprop="articleBody">
              
   <section id="setup-and-requirements">
-<span id="requirements"></span><h1>Setup and Requirements<a class="headerlink" href="#setup-and-requirements" title="Permalink to this headline"></a></h1>
+<span id="requirements"></span><h1>Setup and Requirements<a class="headerlink" href="#setup-and-requirements" title="Link to this heading"></a></h1>
 <section id="java-runtime-environment-8">
-<h2>Java Runtime Environment 8<a class="headerlink" href="#java-runtime-environment-8" title="Permalink to this headline"></a></h2>
+<h2>Java Runtime Environment 8<a class="headerlink" href="#java-runtime-environment-8" title="Link to this heading"></a></h2>
 <p><em>NRC Tools</em> require <a class="reference external" href="https://adoptopenjdk.net">Java Runtime Environment 8</a> to run. Download and install JRE 8 by following the link. Note that the webpage may also list other JRE versions (JRE 11, JRE 16, etc). Make sure that the correct version (JRE 8) is downloaded and installed.</p>
 </section>
 <section id="silicon-labs-usb-to-uart-driver">
-<h2>Silicon Labs USB-to-UART Driver<a class="headerlink" href="#silicon-labs-usb-to-uart-driver" title="Permalink to this headline"></a></h2>
+<h2>Silicon Labs USB-to-UART Driver<a class="headerlink" href="#silicon-labs-usb-to-uart-driver" title="Link to this heading"></a></h2>
 <p><em>NRC Tools</em> require <a class="reference external" href="https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers">Silicon Labs CP210x USB to UART Bridge VCP Drivers</a>. Download and install the driver version that is compatible with your operating system.</p>
 </section>
 <section id="nrc-board-to-pc-connection-via-a-usb-to-uart-cable">
-<h2>NRC Board-to-PC Connection via a USB-to-UART Cable<a class="headerlink" href="#nrc-board-to-pc-connection-via-a-usb-to-uart-cable" title="Permalink to this headline"></a></h2>
+<h2>NRC Board-to-PC Connection via a USB-to-UART Cable<a class="headerlink" href="#nrc-board-to-pc-connection-via-a-usb-to-uart-cable" title="Link to this heading"></a></h2>
 <p>A USB-to-UART cable is required to control the board from the PC running the NRC tools.</p>
 </section>
 </section>
@@ -98,13 +103,13 @@
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="index.html" class="btn btn-neutral float-left" title="NRC Tools Documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="board_operation_mode_selection.html" class="btn btn-neutral float-right" title="NRC Board Operation Mode Selection and Power Supply" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="nrc7292_board_operation_mode_selection.html" class="btn btn-neutral float-right" title="NRC7292 Board Operation Mode Selection" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Newracom Inc..</p>
+    <p>&#169; Copyright 2024, Newracom Inc..</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

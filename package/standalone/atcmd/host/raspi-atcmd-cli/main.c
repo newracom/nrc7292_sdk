@@ -27,6 +27,7 @@
 #include <getopt.h>
 #include <sys/stat.h>
 #include <zlib.h>
+#include <signal.h>
 
 #include "raspi-hif.h"
 #include "nrc-atcmd.h"
@@ -284,30 +285,15 @@ static int raspi_cli_option (int argc, char *argv[], raspi_cli_opt_t *opt)
 /**********************************************************************************************/
 
 static pthread_t g_raspi_cli_thread;
-static pthread_mutex_t g_raspi_cli_recv_mutex;
-
-static void raspi_cli_recv_lock (void)
-{
-	pthread_mutex_lock(&g_raspi_cli_recv_mutex);
-}
-
-static void raspi_cli_recv_unlock (void)
-{
-	pthread_mutex_unlock(&g_raspi_cli_recv_mutex);
-}
 
 static void *raspi_cli_recv_thread (void *arg)
 {
 	char buf[128 * 1024];
 	int ret;
 
-    pthread_mutex_init(&g_raspi_cli_recv_mutex, NULL);
-
 	while (1)
 	{
-		raspi_cli_recv_lock();
 		ret = raspi_hif_read(buf, sizeof(buf));
-		raspi_cli_recv_unlock();
 
 		if (ret > 0)
 		{
@@ -316,7 +302,9 @@ static void *raspi_cli_recv_thread (void *arg)
 		}
 		else if (ret < 0 && ret != -EAGAIN)
 		{
-			log_error("raspi_hif_read(), %s\n", strerror(-ret));
+			if (nrc_atcmd_is_ready())
+				log_error("raspi_hif_read(), %s\n", strerror(-ret));
+
 			sleep(1);
 		}
 
@@ -325,6 +313,8 @@ static void *raspi_cli_recv_thread (void *arg)
 			usleep(1 * 1000);
 		else if (ret < 0 && ret != -ETIME)
 			break;
+/*		else
+			log_debug("eirq_poll=%d\n", ret); */
 	}
 
 	pthread_exit(0);
@@ -365,6 +355,63 @@ static void raspi_cli_close (void)
 
 /**********************************************************************************************/
 
+static int raspi_cli_parse_params (char *params, char *argv[], int n_argv, const char delimiter)
+{
+	bool string = false;
+	int argc = 1;
+	int i;
+
+	if (params[0] == delimiter)
+		params++;
+	
+	argv[0] = params;
+
+	for (i = 1 ; i < n_argv ; i++)
+		argv[i] = NULL;
+
+	for (i = 0 ; params[i] != '\0' ; i++)
+	{
+/*		log_debug("[%d] %c\n", i, params[i]); */
+
+		if (params[i] == '\"')
+		{
+			params[i] = '\0';
+
+			string = !string;
+			if (string)
+				argv[argc - 1]++;
+
+			continue;
+		}
+
+		if (!string && params[i] == delimiter)
+		{
+			params[i] = '\0';
+
+			if (argc < n_argv)
+				argv[argc] = params + i + 1;
+
+			argc++;
+		}
+	}
+
+/*	for (i = 0 ; i < argc ; i++)
+		log_debug("%d : %s\n", i, argv[i]); */
+
+	if (argc > n_argv)
+	{
+		log_error("invalid params, %d/%d\n", argc, n_argv);
+		return -EINVAL;
+	}
+
+	if (argc == 1 && strlen(argv[0]) == 0)
+		argc = 0;
+
+/*	log_debug("argc=%d/%d\n", argc, n_argv); */
+
+	return argc;
+}
+
 static int raspi_cli_run_script (raspi_cli_hif_t *hif, char *script, bool atcmd_error_exit)
 {
 #define script_debug_call(fmt, ...)		/* log_debug(fmt, ##__VA_ARGS__) */
@@ -397,37 +444,43 @@ static int raspi_cli_run_script (raspi_cli_hif_t *hif, char *script, bool atcmd_
 	int cmd_len, prev_cmd_len;
 	int cmd_line;
 	union loop loop;
+	char *argv[10];
+	int argc;
 	int ret;
 	int i;
 
 	if (!script)
 	   return 0;
-	else if (memcmp(script, "~/", 2) == 0)
+
+	while (1)
 	{
-		log_info("CALL: %s, invalid script path (~/)\n", script);
-		return -1;
+		if (memcmp(script, "~/", 2) == 0)
+		{
+			log_info("CALL: %s, invalid script path (~/)\n", script);
+			return -1;
+		}
+		else if (memcmp(script, "./", 2) != 0)
+			break;
+
+		script += 2;
 	}
-	else
+
+	script_debug_call("run_script: %s\n", script);
+
+	script_path = ".";
+	script_name = script;
+
+	for (char *p = script ; p ; )
 	{
-		char *p;
+		p = strchr(p, '/');
+		if (p)
+			script_name = ++p;
+	}
 
-		script_debug_call("run_script: %s\n", script);
-
-		script_path = ".";
-		script_name = script;
-
-		for (p = script ; p ; )
-		{
-			p = strchr(p, '/');
-			if (p)
-				script_name = ++p;
-		}
-
-		if (script_name != script)
-		{
-			script_path = script;
-			*(script_name - 1) = '\0';
-		}
+	if (script_name != script)
+	{
+		script_path = script;
+		*(script_name - 1) = '\0';
 	}
 
 	script_debug_call("script: path=%s name=%s\n", script_path, script_name);
@@ -519,31 +572,27 @@ static int raspi_cli_run_script (raspi_cli_hif_t *hif, char *script, bool atcmd_
 			continue;
 		else if (memcmp(cmd, "AT", 2) == 0)
 		{
-			if (strcmp(cmd, "ATZ") == 0)
-				raspi_cli_recv_lock();
-
 			if (nrc_atcmd_send_cmd(cmd) == ATCMD_RET_ERROR && atcmd_error_exit)
 				goto error_exit;
-
-			if (strcmp(cmd, "ATZ") == 0)
-				raspi_cli_recv_unlock();
 		}
-		else if (memcmp(cmd, "UART ", 5) == 0) /* UART <baudrate> */
+		else if (memcmp(cmd, "UART", 4) == 0) /* UART <baudrate> */
 		{
-			if (hif->type == RASPI_HIF_UART)
+			argc = raspi_cli_parse_params(cmd + 4, argv, 1, ' ');
+
+			if (argc == 1 && hif->type == RASPI_HIF_UART)
 			{
 				bool flowctrl;
 				int baudrate;
 
-				if (cmd[5] == '+')
+				if (argv[0][0] == '+')
 				{
 					flowctrl = true;
-					baudrate = atoi(cmd + 6);
+					baudrate = atoi(argv[0] + 1);
 				}
 				else
 				{
 					flowctrl = false;
-					baudrate = atoi(cmd + 5);
+					baudrate = atoi(argv[0]);
 				}
 
 /*				log_info("flowctrl=%d baudrate=%d\n", flowctrl, baudrate); */
@@ -561,199 +610,184 @@ static int raspi_cli_run_script (raspi_cli_hif_t *hif, char *script, bool atcmd_
 					goto error_exit;
 			}
 		}
-		else if (memcmp(cmd, "DATA ", 5) == 0) /* DATA <length> */
+		else if (memcmp(cmd, "DATA", 4) == 0) /* DATA <length> */
 		{
-			static int next_data = 0;
-			int data_len;
-			int ret;
+			argc = raspi_cli_parse_params(cmd + 4, argv, 1, ' ');
 
-			data_len = strtol(cmd + 5, NULL, 10);
-			if (errno == ERANGE || data_len <= 0)
-				goto invalid_line;
-
-			log_info("DATA: %d\n", data_len);
-
-			for (i = 0 ; i < data_len ; i += ATCMD_DATA_LEN_MAX)
+			if (argc == 1)
 			{
-				if ((data_len - i) >= ATCMD_DATA_LEN_MAX)
+				static int next_data = 0;
+				int data_len;
+				int ret;
+
+				data_len = strtol(argv[0], NULL, 10);
+				if (errno == ERANGE || data_len <= 0)
+					goto invalid_line;
+
+				log_info("DATA: %d\n", data_len);
+
+				for (i = 0 ; i < data_len ; i += ATCMD_DATA_LEN_MAX)
 				{
-					ret = nrc_atcmd_send_data(data + next_data, ATCMD_DATA_LEN_MAX);
-					next_data += ATCMD_DATA_LEN_MAX;
+					if ((data_len - i) >= ATCMD_DATA_LEN_MAX)
+					{
+						ret = nrc_atcmd_send_data(data + next_data, ATCMD_DATA_LEN_MAX);
+						next_data += ATCMD_DATA_LEN_MAX;
+					}
+					else
+					{
+						ret = nrc_atcmd_send_data(data + next_data, data_len - i);
+						next_data += (data_len - i);
+					}
+
+					if (next_data > SCRIPT_DATA_VAL_MAX)
+						next_data %= (SCRIPT_DATA_VAL_MAX + 1);
+
+					if (ret	< 0)
+						goto error_exit;
 				}
+			}
+		}
+		else if (memcmp(cmd, "CALL", 4) == 0) /* CALL <script_name> */
+		{
+			argc = raspi_cli_parse_params(cmd + 4, argv, 1, ' ');
+
+			if (argc == 1)
+			{
+				char *call_script;
+				int ret;
+
+				if (argv[0][0] == '/')
+					call_script = argv[0];
 				else
 				{
-					ret = nrc_atcmd_send_data(data + next_data, data_len - i);
-					next_data += (data_len - i);
+					call_script = malloc(strlen(script_path) + strlen(argv[0]) + 2);
+					if (!call_script)
+						goto error_exit;
+
+					sprintf(call_script, "%s/%s", script_path, argv[0]);
 				}
 
-				if (next_data > SCRIPT_DATA_VAL_MAX)
-					next_data %= (SCRIPT_DATA_VAL_MAX + 1);
+				script_debug_call("call_script: %s, %s -> %s\n", script_path, argv[0], call_script);
 
-				if (ret	< 0)
+				ret = raspi_cli_run_script(hif, call_script, atcmd_error_exit);
+
+				if (call_script != argv[0])
+					free(call_script);
+
+				if (ret < 0)
 					goto error_exit;
 			}
 		}
-		else if (memcmp(cmd, "CALL ", 5) == 0) /* CALL <script_name> */
+		else if (memcmp(cmd, "WAIT", 4) == 0) /* WAIT <time>{s|m|u} [<time>{s|m|u}] */
 		{
-			char *call_script;
-			int ret;
+			argc = raspi_cli_parse_params(cmd + 4, argv, 2, ' ');
 
-			if (*(cmd + 5) == '/')
-				call_script = cmd + 5;
-			else
+			if (argc == 1 || argc == 2)
 			{
-				call_script = malloc(strlen(script_path) + strlen(cmd + 5) + 2);
-				if (!call_script)
-					goto error_exit;
+				uint32_t range[2] = {0, 0};
+				uint32_t wait;
+				char unit;
+				int len;
+				int tmp;
 
-				sprintf(call_script, "%s/%s", script_path, cmd + 5);
-			}
+				script_debug_wait("WAIT: %s %s\n", argv[0], argc == 2 ? argv[1] : "");				
 
-			script_debug_call("call_script: %s, %s -> %s\n", script_path, cmd + 5, call_script);
-
-			ret = raspi_cli_run_script(hif, call_script, atcmd_error_exit);
-
-			if (call_script != (cmd + 5))
-				free(call_script);
-
-			if (ret < 0)
-				goto error_exit;
-		}
-		else if (memcmp(cmd, "WAIT ", 5) == 0) /* WAIT <time>{s|m|u} [<time>{s|m|u}] */
-		{
-			uint32_t range[2] = {0, 0};
-			uint32_t wait;
-			char *params;
-			char *str;
-			char unit;
-			int len;
-			int tmp;
-			int i;
-
-			params = malloc(strlen(cmd + 5) + 1);
-			if (!params)
-				goto error_exit;
-
-			strcpy(params, cmd + 5);
-
-			script_debug_wait("WAIT: %s\n", params);
-
-			str = strtok(params, " ");
-
-			for (i = 0 ; str ; i++)
-			{
-				script_debug_wait("WAIT: %d. str=%s\n", i, str);
-
-				len = strlen(str);
-				unit = str[len - 1];
-				str[len - 1] = '\0';
-
-				switch (unit)
+				for (i = 0 ; i < argc ; i++)
 				{
-					case 's':
-					case 'm':
-					case 'u':
-						tmp = strtol(str, NULL, 10);
-						if (tmp > 0 && (unit == 's' || tmp  <= 1000))
-						{
-							if (unit == 's')
-								tmp *= 1000000;
-							else if (unit == 'm')
-								tmp *= 1000;
+					len = strlen(argv[i]);
+					unit = argv[i][len - 1];
+					argv[i][len - 1] = '\0';
 
-							if (i < 2)
+					switch (unit)
+					{
+						case 's':
+						case 'm':
+						case 'u':
+							tmp = strtol(argv[i], NULL, 10);
+							if (tmp > 0 && (unit == 's' || tmp  <= 1000))
 							{
-								range[i] = tmp;
+								if (unit == 's')
+									tmp *= 1000000;
+								else if (unit == 'm')
+									tmp *= 1000;
 
-								script_debug_wait("WAIT: %d. time=%u\n", i, range[i]);
+								if (i < 2)
+								{
+									range[i] = tmp;
+
+									script_debug_wait("WAIT: %d. time=%u\n", i, range[i]);
+								}
+
+								break;
 							}
 
-							break;
-						}
+						default:
+							goto invalid_line;
+					}
+				}
 
-					default:
+				script_debug_wait("WAIT: %u, %u\n", range[0], range[1]);
+
+				if (range[1] == 0)
+					wait = range[0];
+				else
+				{
+					long int num;
+
+					if (range[1] <= range[0])
+						goto invalid_line;
+
+					srand((unsigned int)time(NULL));
+					num = rand();
+
+					script_debug_wait("WAIT: rand=%ld\n", num);
+
+					if (num >= range[1])
+						num %= range[1];
+
+					if (num <= range[0])
+						num = range[0];
+
+					wait = num;
+				}
+
+				log_info("WAIT: %dus\n", wait);
+
+				usleep(wait);
+			}
+		}
+		else if (memcmp(cmd, "ECHO", 4) == 0) /* ECHO "<message>" */
+		{
+			argc = raspi_cli_parse_params(cmd + 4, argv, 1, ' ');
+
+			if (argc == 1)
+				log_info("ECHO: %s\n", argv[0]);
+		}
+		else if (memcmp(cmd, "LOOP", 4) == 0) /* LOOP <line> <count> */
+		{
+			argc = raspi_cli_parse_params(cmd + 4, argv, 2, ' ');
+
+			if (argc == 2)
+			{
+				for (i = 0 ; i < 2 ; i++)
+				{
+					loop.param[i] = strtol(argv[i], NULL, 10);
+					if (errno == ERANGE || loop.param[i] <= 0)
 						goto invalid_line;
 				}
 
-				str = strtok(NULL, " ");
+				loop.cur_cnt = loop.cur_line = 0;
+
+				loop.fpos = ftell(fp);
+				if (loop.fpos < 0)
+				{
+					log_info("LOOP: ftell(), %s\n", strerror(errno));
+					goto error_exit;
+				}
+
+				script_debug_loop("LOOP: cnt=%d line=%d fpos=%ld\n",
+						loop.max_cnt, loop.max_line, loop.fpos);
 			}
-
-			script_debug_wait("WAIT: %u, %u\n", range[0], range[1]);
-
-			free(params);
-
-			if (i > 2)
-				goto invalid_line;
-
-			if (range[1] == 0)
-				wait = range[0];
-			else
-			{
-				long int num;
-
-				if (range[1] <= range[0])
-					goto invalid_line;
-
-				srand((unsigned int)time(NULL));
-				num = rand();
-
-				script_debug_wait("WAIT: rand=%ld\n", num);
-
-				if (num >= range[1])
-					num %= range[1];
-
-				if (num <= range[0])
-					num = range[0];
-
-				wait = num;
-			}
-
-			log_info("WAIT: %d\n", wait);
-
-			usleep(wait);
-		}
-		else if (memcmp(cmd, "ECHO \"", 6) == 0) /* ECHO "<message>" */
-		{
-			char *msg_end = strchr(cmd + 6, '\"');
-
-			if (!msg_end)
-				goto invalid_line;
-
-			*msg_end = '\0';
-
-			log_info("ECHO: %s\n", cmd + 6);
-		}
-		else if (memcmp(cmd, "LOOP ", 5) == 0) /* LOOP <line> <count> */
-		{
-			char *param[2];
-
-			param[0] = cmd + 5;
-			param[1] = NULL;
-
-			for (i = 5 ; cmd[i] != '\0' ; i++)
-			{
-				if (cmd[i] == ' ')
-					param[1] = cmd + i + 1;
-			}
-
-			for (i = 0 ; i < 2 ; i++)
-			{
-				loop.param[i] = strtol(param[i], NULL, 10);
-				if (errno == ERANGE || loop.param[i] <= 0)
-					goto invalid_line;
-			}
-
-			loop.cur_cnt = loop.cur_line = 0;
-
-			loop.fpos = ftell(fp);
-			if (loop.fpos < 0)
-			{
-				log_info("LOOP: ftell(), %s\n", strerror(errno));
-				goto error_exit;
-			}
-
-			script_debug_loop("LOOP: cnt=%d line=%d fpos=%ld\n",
-								loop.max_cnt, loop.max_line, loop.fpos);
 		}
 		else if (memcmp(cmd, "TIME", 4) == 0) /* TIME */
 		{
@@ -826,7 +860,9 @@ static void raspi_cli_run_loop (raspi_cli_hif_t *hif)
 
 	char buf[ATCMD_DATA_LEN_MAX + 2];
 	int len;
-	int i;
+					
+	char *argv[10];
+	int argc;
 
 	while (1)
 	{
@@ -844,28 +880,11 @@ static void raspi_cli_run_loop (raspi_cli_hif_t *hif)
 		{
 			tx_mode = ATCMD_TX_NONE;
 
-			if (strcmp(buf, "ATZ") == 0)
-				raspi_cli_recv_lock();
-
 			if (nrc_atcmd_send_cmd(buf) == ATCMD_RET_OK)
 			{
 				if (memcmp(buf, "AT+SSEND=", 9) == 0)
 				{
-					int argc;
-					char *argv[4];
-
-					argv[0] = &buf[9];
-					argc = 1;
-
-					for (i = 0 ; buf[9 + i] != '\0' ; i++)
-					{
-						if (buf[9 + i] == ',')
-						{
-							if (argc < 4)
-								argv[argc] = &buf[9 + i + 1];
-							argc++;
-						}
-					}
+					argc = raspi_cli_parse_params(buf + 9, argv, 4, ',');
 
 					switch (argc)
 					{
@@ -882,262 +901,217 @@ static void raspi_cli_run_loop (raspi_cli_hif_t *hif)
 							break;
 
 						default:
-							log_info("invalid ssend command, argc=%d\n", argc);
+							log_info("invalid AT+SSEND command, argc=%d\n", argc);
 
 							tx_mode = ATCMD_TX_NONE;
 							tx_data_len = 0;
 					}
 				}
+				else if (memcmp(buf, "AT+SFUSER=1,", 12) == 0)
+				{
+					argc = raspi_cli_parse_params(buf + 12, argv, 2, ',');
+
+					if (argc == 2)
+					{
+						tx_mode = ATCMD_TX_NORMAL;
+						tx_data_len = atoi(argv[argc - 1]);						
+					}
+					else
+					{
+						log_info("invalid AT+SFUSER command, argc=%d\n", argc);
+
+						tx_mode = ATCMD_TX_NONE;
+						tx_data_len = 0;
+					}
+				}
 			}
-			
-			if (strcmp(buf, "ATZ") == 0)
-				raspi_cli_recv_unlock();
 
 			continue;
 		}
-		else if (memcmp(buf, "iperf ", 5) == 0) /* iperf <options> */
+		else if (memcmp(buf, "iperf", 4) == 0) /* iperf <options> */
 		{
 			iperf_main(buf);
 			continue;
 		}
-		else if (memcmp(buf, "uart ", 5) == 0 || memcmp(buf, "UART ", 5) == 0) /* uart <baudrate> */
+		else if (memcmp(buf, "uart", 4) == 0) /* uart <baudrate> */
 		{
 			if (hif->type == RASPI_HIF_UART)
 			{
-				bool flowctrl;
-				int baudrate;
+				argc = raspi_cli_parse_params(buf + 4, argv, 1, ' ');
 
-				if (buf[5] == '+')
+				if (argc == 1)
 				{
-					flowctrl = true;
-					baudrate = atoi(buf + 6);
-				}
-				else
-				{
-					flowctrl = false;
-					baudrate = atoi(buf + 5);
-				}
+					bool flowctrl;
+					int baudrate;
 
-/*				log_info("flowctrl=%d baudrate=%d\n", flowctrl, baudrate); */
-
-				if (nrc_atcmd_send_cmd("AT+UART=%d,%d", baudrate, flowctrl ? 1 : 0) >= 0)
-				{
-					if (flowctrl)
-						hif->flags |= RASPI_HIF_UART_HFC;
-					else
-						hif->flags &= ~RASPI_HIF_UART_HFC;
-
-					hif->speed = baudrate;
-
-					raspi_cli_close();
-
-					if (raspi_cli_open(hif) != 0)
+					if (argv[0][0] == '+')
 					{
-						log_info("failed\n\n");
-						return;
+						flowctrl = true;
+						baudrate = atoi(argv[0] + 1);
 					}
+					else
+					{
+						flowctrl = false;
+						baudrate = atoi(argv[0]);
+					}
+
+/*					log_info("flowctrl=%d baudrate=%d\n", flowctrl, baudrate); */
+
+					if (nrc_atcmd_send_cmd("AT+UART=%d,%d", baudrate, flowctrl ? 1 : 0) == ATCMD_RET_ERROR)
+						log_info("FAIL: send_cmd (%d)\n", __LINE__);
+					else
+					{
+						if (flowctrl)
+							hif->flags |= RASPI_HIF_UART_HFC;
+						else
+							hif->flags &= ~RASPI_HIF_UART_HFC;
+
+						hif->speed = baudrate;
+
+						raspi_cli_close();
+
+						if (raspi_cli_open(hif) != 0)
+						{
+							log_info("failed\n\n");
+							return;
+						}
+					}
+
+					continue;
 				}
+		
+				log_info("Usage: uart [{+}]<baudrate>\n");
 			}
 
-			continue;
-		}
-		else if (memcmp(buf, "log", 3) == 0)
-		{
-			char *param = buf + 3;
-
-			if (strlen(param) == 0)
-			{
-				log_info("ATCMD_LOG_%s\n", nrc_atcmd_log_is_on() ? "ON" : "OFF");
-				continue;
-			}
-			else if (strcmp(param, " on") == 0)
-			{
-				log_info("ATCMD_LOG_ON\n");
-				nrc_atcmd_log_on();
-				continue;
-			}
-			else if (strcmp(param, " off") == 0)
-			{
-
-				log_info("ATCMD_LOG_OFF\n");
-				nrc_atcmd_log_off();
-				continue;
-			}
-
-			log_info("Usage: log {on|off}\n");
 			continue;
 		}
 		else if (memcmp(buf, "data", 4) == 0)
 		{
-			char *param = buf + 4;
+			argc = raspi_cli_parse_params(buf + 4, argv, 8, ' ');
 
-			/*
-			 * TCP : send <id> <mode> <length> <time> [interval]
-			 * UDP : send <id> <ipaddr> <port> <mode> <length> <time> [interval]
-			 */
-			if (memcmp(param, " send ", 6) == 0)
+			if (argc >= 1)
 			{
-				param += 6;
-
-				if (strlen(param) > 0)
+				if (strcmp(argv[0], "reset") == 0)
 				{
-					int argc;
-					char *argv[5];
-					int i;
+					uint64_t send = ~0;
+					uint64_t recv = ~0;
 
-					argc = 1;
-					argv[0] = param;
-					for (i = 1 ; i < 5 ; i++)
-						argv[i] = NULL;
+					nrc_atcmd_data_reset();
+					nrc_atcmd_data_info(&send, &recv);
 
-					for (i = 0 ; param[i] != '\0' ; i++)
+					log_info(" - send : %llu\n", send);
+					log_info(" - recv : %llu\n", recv);
+					continue;
+				}
+				else if (strcmp(argv[0], "info") == 0)
+				{
+					uint64_t send = 0;
+					uint64_t recv = 0;
+
+					nrc_atcmd_data_info(&send, &recv);
+
+					log_info(" - send : %llu\n", send);
+					log_info(" - recv : %llu\n", recv);
+					continue;
+				}
+				else if (strcmp(argv[0], "print") == 0)
+				{
+					int on = -1;
+					int send = -1;
+					int recv = -1;
+
+					switch (argc)
 					{
-						if (param[i] == ' ')
+						case 3:
+						case 2:
+							if (strcmp(argv[1], "on") == 0)
+								on = 1;
+							else if (strcmp(argv[1], "off") == 0)
+								on = 0;
+							else
+								break;
+
+							if (argc == 2)
+								send = recv = on;
+							else if (strcmp(argv[2], "tx") == 0 || strcmp(argv[2], "send") == 0)
+								send = on;
+							else if (strcmp(argv[2], "rx") == 0 || strcmp(argv[2], "recv") == 0)
+								recv = on;
+							else
+								break;
+
+						case 1: 
 						{
-							param[i] = '\0';
+							int result = nrc_atcmd_data_print(send, recv);
 
-							if (argc < 7)
-								argv[argc] = param + i + 1;
-
-							argc++;
+							log_info(" - print_send : %d\n", !!(result & (1 << 0)));
+							log_info(" - print_recv : %d\n", !!(result & (1 << 1)));
+							continue;
 						}
 					}
+				}
+				else if (strcmp(argv[0], "send") == 0 && (argc >= 5 && argc <= 8))
+				{
+					const char *str_mode[3] = { "normal", "passthrough", "buffered-passthrough" };
+					bool atcmd_log_off = true;
+					bool tcp = (argc <= 6) ? true : false;
+					int id = atoi(argv[1]);
+					char *ipaddr = tcp ? NULL : argv[2];
+					int port = tcp ? 0 : atoi(argv[3]);
+					int mode = atoi(argv[tcp ? 2 : 4]);
+					int length = atoi(argv[tcp ? 3 : 5]);
+					int time = atoi(argv[tcp ? 4 : 6]);
+					int interval = (argc == 6 || argc == 8) ? atoi(argv[argc - 1]) : 0;
 
-/*					for (i = 0 ; i < argc ; i++)
-						log_info(" - argv[%d] : %s\n", i, argv[i]); */
-
-					if (argc >= 4 && argc <= 7)
+					if (mode >= 3 && mode <= 5)
 					{
-						const char *str_mode[3] = { "normal", "passthrough", "buffered-passthrough" };
-						bool atcmd_log_off = true;
-						bool tcp = (argc <= 5) ? true : false;
-						int id = atoi(argv[0]);
-						char *ipaddr = tcp ? NULL : argv[1];
-						int port = tcp ? 0 : atoi(argv[2]);
-						int mode = atoi(argv[tcp ? 1 : 3]);
-						int length = atoi(argv[tcp ? 2 : 4]);
-						int time = atoi(argv[tcp ? 3 : 5]);
-						int interval = (argc == 5 || argc == 7) ? atoi(argv[argc - 1]) : 0;
+						mode -= 3;
+						atcmd_log_off = false;
+					}
 
-						if (mode >= 3 && mode <= 5)
+					if ((id >= 0) && (tcp || (ipaddr && port)) && (mode >= 0 && mode <= 2) 
+							&& (length > 0) && (time > 0) && (interval >= 0))
+					{
+						char *data = malloc(length);
+
+						log_info("\n");
+						log_info(" - id       : %d (%s)\n", id, tcp ? "tcp" : "udp");
+						if (!tcp)
+							log_info(" - host     : %s:%d\n", ipaddr, port);
+						log_info(" - mode     : %d (%s)\n", mode, str_mode[mode]);
+						log_info(" - length   : %d\n", length);
+						log_info(" - time     : %d sec\n", time);
+						log_info(" - interval : %d msec\n", interval);
+						log_info("\n");
+
+						if (data)
 						{
-							mode -= 3;
-							atcmd_log_off = false;
-						}
+							double cur_time = 0;
+							int ret;
+							int i;
 
-						if ((id >= 0) && (tcp || (ipaddr && port)) && (mode >= 0 && mode <= 2) && (length > 0) && (time > 0) && (interval >= 0))
-						{
-							char *data = malloc(length);
+							for (i = 0 ; i < length ; i++)
+								data[i] = '0' + (i % 10);
 
-							log_info("\n");
-							log_info(" - id       : %d (%s)\n", id, tcp ? "tcp" : "udp");
-							if (!tcp)
-								log_info(" - host     : %s:%d\n", ipaddr, port);
-							log_info(" - mode     : %d (%s)\n", mode, str_mode[mode]);
-							log_info(" - length   : %d\n", length);
-							log_info(" - time     : %d sec\n", time);
-							log_info(" - interval : %d msec\n", interval);
-							log_info("\n");
-
-							if (data)
+							if (raspi_get_time(&cur_time) == 0)
 							{
-								double cur_time = 0;
-								int ret;
+								uint64_t send = 0;
+								uint64_t recv = 0;
+								double start_time = cur_time;
+								double end_time = cur_time + time;
+								double report_time = cur_time + 1;
 
-								for (i = 0 ; i < length ; i++)
-									data[i] = '0' + (i % 10);
+/*								log_info("cur_time : %lf\n", cur_time);
+								log_info("start_time : %lf\n", start_time);
+								log_info("end_time : %lf\n", end_time);
+								log_info("report_time : %lf\n", report_time); */
 
-								if (raspi_get_time(&cur_time) == 0)
+								if (atcmd_log_off)
+									nrc_atcmd_log_off();
+
+								if (nrc_atcmd_send_cmd("AT") != ATCMD_RET_OK)
 								{
-									uint64_t send = 0;
-									uint64_t recv = 0;
-									double start_time = cur_time;
-									double end_time = cur_time + time;
-									double report_time = cur_time + 1;
-
-/*									log_info("cur_time : %lf\n", cur_time);
-									log_info("start_time : %lf\n", start_time);
-									log_info("end_time : %lf\n", end_time);
-									log_info("report_time : %lf\n", report_time); */
-
-									if (atcmd_log_off)
-										nrc_atcmd_log_off();
-
-									if (nrc_atcmd_send_cmd("AT") != 0)
-									{
-										log_info("FAIL: send_cmd (%d)\n", __LINE__);
-
-										if (atcmd_log_off)
-											nrc_atcmd_log_on();
-
-										continue;
-									}
-
-									if (mode == 1 || mode == 2)
-									{
-										if (tcp)
-											ret = nrc_atcmd_send_cmd("AT+SSEND=%d,%d", id, mode == 1 ? 0 : -length);
-										else
-											ret = nrc_atcmd_send_cmd("AT+SSEND=%d,\"%s\",%d,%d", id, ipaddr, port, mode == 1 ? 0 : -length);
-
-										if (ret != 0)
-										{
-											log_info("FAIL: send_cmd (%d)\n", __LINE__);
-											mode = -1;
-										}
-									}
-
-									while (mode >= 0 && cur_time <= end_time)
-									{
-										if (mode == 0)
-										{
-											if (tcp)
-												ret = nrc_atcmd_send_cmd("AT+SSEND=%d,%d", id, length);
-											else
-												ret = nrc_atcmd_send_cmd("AT+SSEND=%d,\"%s\",%d,%d", id, ipaddr, port, length);
-
-											if (ret != 0)
-											{
-												log_info("FAIL: send_cmd (%d)\n", __LINE__);
-												break;
-											}
-										}
-
-										if (nrc_atcmd_send_data(data, length) != 0)
-										{
-											log_info("FAIL: send_data\n");
-											break;
-										}
-
-										if (interval > 0)
-											usleep(interval * 1000);
-
-										if (raspi_get_time(&cur_time) != 0)
-										{
-											log_info("FAIL: get_time\n");
-											break;
-										}
-
-										if (cur_time >= report_time)
-										{
-											report_time++;
-											nrc_atcmd_data_info(&send, &recv);
-											log_info(" T:%.3lf S:%llu R:%llu\n", cur_time - start_time, send, recv);
-										}
-									}
-
-									nrc_atcmd_data_info(&send, &recv);
-									log_info("DONE: T:%.3lf S:%llu R:%llu\n", cur_time - start_time, send, recv);
-
-									if (mode >= 0)
-									{
-										sleep(2);
-
-										if (nrc_atcmd_send_cmd("AT") != 0)
-											log_info("FAIL: send_cmd (%d)\n", __LINE__);
-
-										sleep(1);
-									}
+									log_info("FAIL: send_cmd (%d)\n", __LINE__);
 
 									if (atcmd_log_off)
 										nrc_atcmd_log_on();
@@ -1145,46 +1119,105 @@ static void raspi_cli_run_loop (raspi_cli_hif_t *hif)
 									continue;
 								}
 
-								log_info("FAIL: get_time\n");
+								if (mode == 1 || mode == 2)
+								{
+									if (tcp)
+										ret = nrc_atcmd_send_cmd("AT+SSEND=%d,%d", id, mode == 1 ? 0 : -length);
+									else
+										ret = nrc_atcmd_send_cmd("AT+SSEND=%d,\"%s\",%d,%d", 
+																id, ipaddr, port, mode == 1 ? 0 : -length);
+
+									if (ret != ATCMD_RET_OK)
+									{
+										log_info("FAIL: send_cmd (%d)\n", __LINE__);
+										mode = -1;
+									}
+								}
+
+								while (mode >= 0 && cur_time <= end_time)
+								{
+									if (mode == 0)
+									{
+										if (tcp)
+											ret = nrc_atcmd_send_cmd("AT+SSEND=%d,%d", id, length);
+										else
+											ret = nrc_atcmd_send_cmd("AT+SSEND=%d,\"%s\",%d,%d", 
+																	id, ipaddr, port, length);
+
+										if (ret != ATCMD_RET_OK)
+										{
+											log_info("FAIL: send_cmd (%d)\n", __LINE__);
+											break;
+										}
+									}
+
+									if (nrc_atcmd_send_data(data, length) != 0)
+									{
+										log_info("FAIL: send_data\n");
+										break;
+									}
+
+									if (interval > 0)
+										usleep(interval * 1000);
+
+									if (raspi_get_time(&cur_time) != 0)
+									{
+										log_info("FAIL: get_time\n");
+										break;
+									}
+
+									if (cur_time >= report_time)
+									{
+										report_time++;
+										nrc_atcmd_data_info(&send, &recv);
+										log_info(" T:%.3lf S:%llu R:%llu\n", cur_time - start_time, send, recv);
+									}
+								}
+
+								nrc_atcmd_data_info(&send, &recv);
+								log_info("DONE: T:%.3lf S:%llu R:%llu\n", cur_time - start_time, send, recv);
+
+								if (mode >= 0)
+								{
+									sleep(3);
+
+									if (nrc_atcmd_send_cmd("AT") != ATCMD_RET_OK)
+										log_info("FAIL: send_cmd (%d)\n", __LINE__);
+
+									sleep(1);
+								}
+
+								if (atcmd_log_off)
+									nrc_atcmd_log_on();
+
 								continue;
 							}
 
-							log_info("FAIL: malloc\n");
+							log_info("FAIL: get_time\n");
 							continue;
 						}
+
+						log_info("FAIL: malloc\n");
+						continue;
 					}
 				}
 			}
-			else if (strcmp(param, " info") == 0)
-			{
-				uint64_t send = 0;
-				uint64_t recv = 0;
 
-				nrc_atcmd_data_info(&send, &recv);
-
-				log_info(" - send : %llu\n", send);
-				log_info(" - recv : %llu\n", recv);
-				continue;
-			}
-			else if (strcmp(param, " reset") == 0)
-			{
-				uint64_t send = ~0;
-				uint64_t recv = ~0;
-
-				nrc_atcmd_data_reset();
-				nrc_atcmd_data_info(&send, &recv);
-
-				log_info(" - send : %llu\n", send);
-				log_info(" - recv : %llu\n", recv);
-				continue;
-			}
-
+			/*
+			 * TCP : send <id> <mode> <length> <time> [interval]
+			 * UDP : send <id> <ipaddr> <port> <mode> <length> <time> [interval]
+			 */
 			log_info("\n");
-			log_info("Usage: data send <id> <mode> <length> <time> [interval]\n");
-			log_info("       data info\n");
+			log_info("Usage: data info\n");
 			log_info("       data reset\n");
+			log_info("       data print <send:0,1> <recv:0,1>\n");
+			log_info("       data send <id> <mode> <length> <time> [interval]\n");
+			log_info("       data send <id> <ipaddr> <port> <mode> <length> <time> [interval]\n");
 			log_info("\n");
 			log_info("Options:\n");
+			log_info("  id        socket id\n");
+			log_info("  ipaddr    ip addressn (UDP)\n");
+			log_info("  port      port number (UDP)\n");
 			log_info("  id        socket id\n");
 			log_info("  mode      data send mode (0:normal, 1:passthrough, 2:buffered-passthrough)\n");
 			log_info("  length    data send length\n");
@@ -1192,54 +1225,221 @@ static void raspi_cli_run_loop (raspi_cli_hif_t *hif)
 			log_info("  interval  data send interval (msec) (default 0)\n");
 			continue;
 		}
-		else if (memcmp(buf, "update ", 7) == 0) /* update <binary> */
+		else if (memcmp(buf, "update", 6) == 0) /* update <verify> <binary> */
 		{
-			char *pathname = buf + 7;
-			int pathname_len = strlen(pathname);
+			argc = raspi_cli_parse_params(buf + 6, argv, 2, ' ');
 
-			if (pathname_len <= 4 || strcmp(pathname + pathname_len - 4, ".bin") != 0)
-				log_info("Not binary file\n");
-			else
+			if (argc == 2)
 			{
-				struct stat st;
-				int fd = open(pathname, O_RDONLY);
+				int verify = atoi(argv[0]);
 
-				if (fd < 0)
+				if (verify >= 0 && verify <= 2)
 				{
-					log_error("open(), %s\n", strerror(errno));
+					char *pathname = argv[1];
+					int pathname_len = strlen(pathname);
+
+					if (pathname_len <= 4 || strcmp(pathname + pathname_len - 4, ".bin") != 0)
+						log_info("Not binary file\n");
+					else
+					{
+						struct stat st;
+						int fd = open(pathname, O_RDONLY);
+
+						if (fd < 0)
+						{
+							log_error("open(), %s\n", strerror(errno));
+							continue;
+						}
+
+						if (stat(pathname, &st) == 0)
+						{
+							uint32_t size = st.st_size;
+							uint32_t crc;
+							uint8_t *buf;
+
+							buf = malloc(size);
+							if (!buf)
+							{
+								log_error("malloc(), %s\n", strerror(errno));
+								continue;
+							}
+
+							if (read(fd, buf, size) != size)
+							{
+								log_error("read(), %s\n", strerror(errno));
+								continue;
+							}
+
+							crc = crc32(0L, Z_NULL, 0);
+							crc = crc32(crc, buf, size);
+
+							log_info("UPDATE: size=%u crc32=0x%X\n", size, crc);
+
+							nrc_atcmd_firmware_download((char *)buf, size, crc, verify);
+						}
+
+						close(fd);
+					}
+
 					continue;
 				}
-
-				if (stat(pathname, &st) == 0)
-				{
-					uint32_t size = st.st_size;
-					uint32_t crc;
-					uint8_t *buf;
-
-					buf = malloc(size);
-					if (!buf)
-					{
-						log_error("malloc(), %s\n", strerror(errno));
-						continue;
-					}
-
-					if (read(fd, buf, size) != size)
-					{
-						log_error("read(), %s\n", strerror(errno));
-						continue;
-					}
-
-					crc = crc32(0L, Z_NULL, 0);
-					crc = crc32(crc, buf, size);
-
-					log_info("UPDATE: size=%u crc32=0x%X\n", size, crc);
-
-					nrc_atcmd_firmware_download((char *)buf, size, crc);
-				}
-
-				close(fd);
 			}
 
+			log_info("Usage: update <verify> <binary>\n");
+			continue;
+		}
+		else if (memcmp(buf, "sfuser", 6) == 0) /* sfuser <mode> [<offset> <length>|"<string>"] */
+		{
+			argc = raspi_cli_parse_params(buf + 6, argv, 3, ' ');
+
+			if (argc == 1 || argc == 3)
+			{
+				if (strcmp(argv[0], "size") == 0)
+				{
+					if (nrc_atcmd_send_cmd("AT+SFUSER?") != ATCMD_RET_OK)
+						log_info("FAIL: send_cmd (%d)\n", __LINE__);
+
+					continue;
+				}
+				else
+				{
+					int mode;
+				   
+					if (strcmp(argv[0], "read") == 0)
+						mode = 0;
+					else if (strcmp(argv[0], "write") == 0)
+						mode = 1;
+					else if (strcmp(argv[0], "erase") == 0)
+						mode = 2;
+					else
+						log_info("FAIL: invalid mode\n");
+
+					switch (mode)
+					{
+						case 0: /* read */
+							if (argc == 3)
+							{
+								int offset = atoi(argv[1]);
+								int length = atoi(argv[2]);
+
+								if (nrc_atcmd_send_cmd("AT+SFUSER=0,%d,%d", offset, length) != ATCMD_RET_OK)
+									log_info("FAIL: send_cmd (%d)\n", __LINE__);
+							}
+
+							continue;
+
+						case 1: /* write */
+							if (argc == 3)
+							{
+								int offset = atoi(argv[1]);
+								int length = 0;
+								char *data = NULL;
+
+								if (argv[2][0] != '\"')
+								{
+									length = atoi(argv[2]);								   
+
+									data = malloc(length);
+									if (data)
+									{
+										int i;
+
+										for (i = 0 ; i < length ; i++)
+											data[i] = '0' + (i % 10);
+									}
+										
+/*									log_info("sfuser_write: %p %d\n", data, length); */
+								}
+								else if (argv[2][strlen(argv[2]) - 1] == '\"')
+								{
+									length = strlen(argv[2]) - 2;
+
+									data = argv[2] + 1;
+									data[length] = '\0';
+									
+/*									log_info("sfuser_write: %s (%d)\n", data, length); */
+								}
+
+								if (length > 0 && data)
+								{
+									log_info("sfuser_write: %s (%d)\n", data, length);
+
+									if (nrc_atcmd_send_cmd("AT+SFUSER=1,%d,%d", offset, length) == ATCMD_RET_OK)
+										nrc_atcmd_send_data(data, length);
+									else
+										log_info("FAIL: send_cmd (%d)\n", __LINE__);
+
+									if (data != (argv[2] + 1))
+										free(data);
+								}
+							}
+
+							continue;
+
+						case 2: /* erase */
+							if (argc == 1)
+							{
+								if (nrc_atcmd_send_cmd("AT+SFUSER=2") != ATCMD_RET_OK)
+									log_info("FAIL: send_cmd (%d)\n", __LINE__);
+							}
+							else
+							{
+								int offset = atoi(argv[1]);
+								int length = atoi(argv[2]);
+
+								if (nrc_atcmd_send_cmd("AT+SFUSER=2,%d,%d", offset, length) != ATCMD_RET_OK)
+									log_info("FAIL: send_cmd (%d)\n", __LINE__);
+							}
+
+							continue;
+					}
+				}
+			}
+
+			log_info("Usage: sfuser {write} [<offset> \"<string>\"\n");
+			log_info("       sfuser {read|write|erase} [<offset> <length>]\n");
+			continue;
+		}
+		else if (memcmp(buf, "log", 3) == 0)
+		{
+			argc = raspi_cli_parse_params(buf + 3, argv, 1, ' ');
+
+			switch (argc)
+			{
+				case 1:
+					if (strcmp(argv[0], "on") == 0)
+						nrc_atcmd_log_on();
+					else if (strcmp(argv[0], "off") == 0)
+						nrc_atcmd_log_off();
+					else 
+						break;
+				
+				case 0:		
+					log_info(" atcmd log %s\n", nrc_atcmd_log_is_on() ? "on" : "off");
+					continue;
+			}
+
+			log_info("Usage: log {on|off}\n");
+			continue;
+		}
+		else if (memcmp(buf, "reset", 5) == 0) /* reset [{hspi}] */
+		{
+			argc = raspi_cli_parse_params(buf + 5, argv, 1, ' ');
+
+			if (argc == 0)
+			{
+				/* HW reset with GPIO output */
+			}
+			else if (strcmp(argv[0], "hspi") == 0)
+			{
+				if (hif->type == RASPI_HIF_SPI)
+				{
+					nrc_hspi_reset();
+					continue;
+				}
+			}
+			
+			log_info("Usage: reset [{hspi}]\n");
 			continue;
 		}
 		else if (strcmp(buf, "exit") == 0 || strcmp(buf, "EXIT") == 0)
@@ -1267,15 +1467,49 @@ static void raspi_cli_run_loop (raspi_cli_hif_t *hif)
 
 /**********************************************************************************************/
 
+void signal_handler (int signum)
+{
+	switch (signum)
+	{
+		case SIGINT:
+			log_info("SIGINT\n");
+			break;
+
+		case SIGTERM:
+			log_info("SIGTERM\n");
+			break;
+
+		default:
+			log_info("%s: %d\n", __func__, signum);
+			return;
+	}
+	
+	raspi_cli_close();
+
+	exit(0);
+}
+
 int main (int argc, char *argv[])
 {
+	int signum[] = { SIGINT, SIGTERM };
 	raspi_cli_opt_t opt;
+	int i;
 
 	if (raspi_cli_option(argc, argv, &opt) != 0)
 		return -1;
 
 	if (raspi_cli_open(&opt.hif) != 0)
 		return -1;
+
+	for (i = 0 ; i < sizeof(signum) / sizeof(int) ; i++)
+	{
+		if (signal(signum[i], signal_handler) == SIG_ERR)
+		{
+			log_error("signal(), signum[%d]=%d, %s\n", i, signum[i], strerror(errno));
+			raspi_cli_close();
+			return -1;
+		}
+	}
 
 	log_info("\n");
 

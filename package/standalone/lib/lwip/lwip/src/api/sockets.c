@@ -1580,9 +1580,9 @@ sendmsg_emsgsize:
 #endif /* LWIP_UDP || LWIP_RAW */
 }
 
-ssize_t
-lwip_sendto(int s, const void *data, size_t size, int flags,
-            const struct sockaddr *to, socklen_t tolen)
+static ssize_t
+_lwip_sendto(int s, const void *data, size_t size, int flags,
+            const struct sockaddr *to, socklen_t tolen, struct netif *netif)
 {
   struct lwip_sock *sock;
   err_t err;
@@ -1669,7 +1669,10 @@ lwip_sendto(int s, const void *data, size_t size, int flags,
 #endif /* LWIP_IPV4 && LWIP_IPV6 */
 
     /* send the data */
-    err = netconn_send(sock->conn, &buf);
+    if (netif)
+      err = netconn_send_if(sock->conn, &buf, netif);
+    else
+      err = netconn_send(sock->conn, &buf);
   }
 
   /* deallocated the buffer */
@@ -1678,6 +1681,20 @@ lwip_sendto(int s, const void *data, size_t size, int flags,
   sock_set_errno(sock, err_to_errno(err));
   done_socket(sock);
   return (err == ERR_OK ? short_size : -1);
+}
+
+ssize_t
+lwip_sendto(int s, const void *data, size_t size, int flags,
+            const struct sockaddr *to, socklen_t tolen)
+{
+    return _lwip_sendto(s, data, size, flags, to, tolen, NULL);
+}
+
+ssize_t
+lwip_sendto_if(int s, const void *data, size_t size, int flags,
+            const struct sockaddr *to, socklen_t tolen, struct netif *netif)
+{
+    return _lwip_sendto(s, data, size, flags, to, tolen, netif);
 }
 
 int

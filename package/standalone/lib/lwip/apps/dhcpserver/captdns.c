@@ -300,8 +300,10 @@ static void captdnsTask(void *pvParameters) {
 }
 
 
+static TaskHandle_t captdnsInit_task_handle = NULL;
+
 void captdnsInit(void) {
 	LWIP_DEBUGF(DNS_DEBUG | LWIP_DBG_TRACE, ("captdnsInit\n"));
-	xTaskCreate(captdnsTask, (const char *)"captdns_task", 1200, NULL, 3, NULL);
+	xTaskCreate(captdnsTask, (const char *)"captdns_task", 1200, NULL, 3, &captdnsInit_task_handle);
 }
 #endif /* LWIP_DHCPS && LWIP_DNS*/

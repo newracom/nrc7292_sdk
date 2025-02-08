@@ -26,7 +26,7 @@ enum spi_order_e {
     SPI_MSB = 1
 };
 
-bool nrc_ssp_init(uint8_t ch, enum spi_cpol_e cpol, enum spi_cpha_e cpha, enum spi_order_e order, uint8_t bits, uint32_t freq_hz);
+bool nrc_ssp_init(uint8_t ch, enum spi_cpol_e cpol, enum spi_cpha_e cpha, enum spi_order_e order, uint8_t bits, uint32_t freq_hz, uint8_t frame_format);
 void nrc_ssp(uint8_t ch, bool enable);
 void nrc_ssp_deinit(uint8_t ch);
 uint32_t nrc_ssp_xfer(uint8_t ch, uint8_t *wbuffer, uint8_t *rbuffer, size_t size);

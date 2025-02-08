@@ -25,6 +25,7 @@ void mdelay(uint32_t delay);
 void phy_set_cfo2sfo_factor(uint32_t channel_freq, uint32_t op_mode);
 void phy_arf_txgain_control(uint32_t arf_txgain);
 void phy_arf_rxgain_control(uint32_t arf_rxgain);
+void phy_nrf_rxgain_recovery(uint32_t nrf_rxgain);
 void phy_arf_rxgain_fixed(uint32_t fixed_rxgain);
 void phy_arf_rxgain_fixed_off();
 #ifndef	RELEASE
@@ -89,6 +90,7 @@ void phy_inter_power_scan(uint8_t range, uint8_t log);
 void hal_phy_set_bssid(bool enable, int index, int value);
 uint32_t phy_get_txgain();
 uint32_t phy_get_rxgain();
+void drv_phy_rx_rst();
 #endif //__NRC_PHY_H__
 
 

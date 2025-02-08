@@ -4,6 +4,7 @@
 /*						 				Structures for 802.11ah HaLow										*/
 /************************************************************************************************************/
 
+#define NDP_MAC_FRAME_PAGING_TYPE			6
 #define NDP_MAC_FRAME_PROBE_REQ_TYPE			7
 
 struct S1GGenericFrameHeader {
@@ -632,6 +633,7 @@ typedef struct _SigNdp1M {
 		NdpAck1M        ack;
 		NdpPSPollAck1M  pspoll_ack;
 		NdpBlockAck1M   block_ack;
+		NdpPaging1M     paging;
 		NdpProbeReq1M	probe_req;
 	} body;
 
@@ -647,7 +649,8 @@ typedef struct _SigNdp2M {
 		NdpAck2M            ack;
 		NdpPSPollAck2M      pspoll_ack;
 		NdpBlockAck2M       block_ack;
-		NdpProbeReq2M		probe_req;
+		NdpPaging2M         paging;
+		NdpProbeReq2M       probe_req;
 		NdpBFReportPoll2M   bfr_poll;
 	} body;
 } SigNdp2M;
@@ -659,4 +662,6 @@ uint8_t		lmac_s1g_beacon_bcn_compatible_pos(S1GExtensionFrameHeader *header);
 uint8_t		lmac_s1g_beacon_header_offset(S1GExtensionFrameHeader *header);
 
 bool ieee80211ah_is_ndp_preq(void *sig);
+bool ieee80211ah_is_ndp_paging(void *sig);
+uint16_t lmac_get_partial_aid(uint16_t aid, uint8_t *bssid, bool ndp);
 #endif /* __PROTOCOL_S1G_H__ */

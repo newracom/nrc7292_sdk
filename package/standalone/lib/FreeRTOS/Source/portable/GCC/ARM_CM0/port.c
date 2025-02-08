@@ -82,6 +82,11 @@ static void vPortStartFirstTask( void ) __attribute__ (( naked ));
  */
 static void prvTaskExitError( void );
 
+/*
+ * Checks whether the current execution context is interrupt.
+ */
+BaseType_t xPortIsInsideInterrupt( void );
+
 /*-----------------------------------------------------------*/
 
 /* Each task maintains its own interrupt status in the critical nesting
@@ -95,6 +100,17 @@ static UBaseType_t uxCriticalNesting = 0xaaaaaaaa;
  */
 StackType_t *pxPortInitialiseStack( StackType_t *pxTopOfStack, TaskFunction_t pxCode, void *pvParameters )
 {
+#if defined(NRC_FREERTOS)
+    /* Mark stack on bottom to dump to marker */
+    pxTopOfStack--;
+    *pxTopOfStack = STACK_START_MARKER;
+    pxTopOfStack--;
+    *pxTopOfStack = STACK_START_MARKER;
+    pxTopOfStack--;
+    *pxTopOfStack = STACK_START_MARKER;
+    pxTopOfStack--;
+    *pxTopOfStack = STACK_START_MARKER;
+#endif
 	/* Simulate the stack frame as it would be created by a context switch
 	interrupt. */
 	pxTopOfStack--; /* Offset added to account for the way the MCU uses the stack on entry/exit of interrupts. */
@@ -361,3 +377,25 @@ void prvSetupTimerInterrupt( void )
 }
 /*-----------------------------------------------------------*/
 
+BaseType_t xPortIsInsideInterrupt( void )
+{
+	uint32_t ulCurrentInterrupt;
+	BaseType_t xReturn;
+
+	/* Obtain the number of the currently executing interrupt. Interrupt Program
+	 * Status Register (IPSR) holds the exception number of the currently-executing
+	 * exception or zero for Thread mode.*/
+	__asm volatile ( "mrs %0, ipsr" : "=r" ( ulCurrentInterrupt )::"memory" );
+
+	if( ulCurrentInterrupt == 0 )
+	{
+		xReturn = pdFALSE;
+	}
+	else
+	{
+		xReturn = pdTRUE;
+	}
+
+	return xReturn;
+}
+/*-----------------------------------------------------------*/

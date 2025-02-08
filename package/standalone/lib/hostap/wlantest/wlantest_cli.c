@@ -12,25 +12,11 @@
 #include "utils/common.h"
 #include "utils/eloop.h"
 #include "utils/edit.h"
+#include "common/cli.h"
 #include "wlantest_ctrl.h"
 
-
-static int get_cmd_arg_num(const char *str, int pos)
-{
-	int arg = 0, i;
-
-	for (i = 0; i <= pos; i++) {
-		if (str[i] != ' ') {
-			arg++;
-			while (i <= pos && str[i] != ' ')
-				i++;
-		}
-	}
-
-	if (arg > 0)
-		arg--;
-	return arg;
-}
+static void print_help(FILE *stream, const char *cmd);
+static char ** wlantest_cli_cmd_list(void);
 
 
 static int get_prev_arg_pos(const char *str, int pos)
@@ -1566,88 +1552,121 @@ static char ** complete_get_tid(int s, const char *str, int pos)
 }
 
 
+static int wlantest_cli_cmd_help(int s, int argc, char *argv[])
+{
+	print_help(stdout, argc > 0 ? argv[0] : NULL);
+	return 0;
+}
+
+
+static char ** wlantest_cli_complete_help(int s, const char *str, int pos)
+{
+	int arg = get_cmd_arg_num(str, pos);
+	char **res = NULL;
+
+	switch (arg) {
+	case 1:
+		res = wlantest_cli_cmd_list();
+		break;
+	}
+
+	return res;
+}
+
+
 struct wlantest_cli_cmd {
 	const char *cmd;
 	int (*handler)(int s, int argc, char *argv[]);
 	const char *usage;
-	const char *desc;
 	char ** (*complete)(int s, const char *str, int pos);
 };
 
-static int cmd_help(int s, int argc, char *argv[]);
 static const struct wlantest_cli_cmd wlantest_cli_commands[] = {
-	{ "ping", cmd_ping, NULL, "test connection to wlantest", NULL },
-	{ "terminate", cmd_terminate, NULL, "terminate wlantest", NULL },
-	{ "list_bss", cmd_list_bss, NULL, "get BSS list", NULL },
-	{ "list_sta", cmd_list_sta, "<BSSID>", "get STA list",
+	{ "ping", cmd_ping, "= test connection to wlantest", NULL },
+	{ "terminate", cmd_terminate, "= terminate wlantest", NULL },
+	{ "list_bss", cmd_list_bss, "= get BSS list", NULL },
+	{ "list_sta", cmd_list_sta, "<BSSID> = get STA list",
 	  complete_list_sta },
-	{ "flush", cmd_flush, NULL, "drop all collected BSS data", NULL },
+	{ "flush", cmd_flush, "= drop all collected BSS data", NULL },
 	{ "clear_sta_counters", cmd_clear_sta_counters,
-	  "<BSSID> <STA>", "clear STA counters", complete_clear_sta_counters },
+	  "<BSSID> <STA> = clear STA counters", complete_clear_sta_counters },
 	{ "clear_bss_counters", cmd_clear_bss_counters,
-	  "<BSSID>", "clear BSS counters", complete_clear_bss_counters },
+	  "<BSSID> = clear BSS counters", complete_clear_bss_counters },
 	{ "get_sta_counter", cmd_get_sta_counter,
-	  "<counter> <BSSID> <STA>", "get STA counter value",
+	  "<counter> <BSSID> <STA> = get STA counter value",
 	  complete_get_sta_counter },
 	{ "get_bss_counter", cmd_get_bss_counter,
-	  "<counter> <BSSID>", "get BSS counter value",
+	  "<counter> <BSSID> = get BSS counter value",
 	  complete_get_bss_counter },
-	{ "inject", cmd_inject, NULL,
+	{ "inject", cmd_inject,
 	  "<frame> <prot> <sender> <BSSID> <STA/ff:ff:ff:ff:ff:ff>",
 	  complete_inject },
-	{ "send", cmd_send, NULL,
+	{ "send", cmd_send,
 	  "<prot> <raw frame as hex dump>",
 	  complete_send },
-	{ "version", cmd_version, NULL, "get wlantest version", NULL },
+	{ "version", cmd_version, "= get wlantest version", NULL },
 	{ "add_passphrase", cmd_add_passphrase,
-	  "<passphrase>", "add a known passphrase", NULL },
+	  "<passphrase> = add a known passphrase", NULL },
 	{ "add_wepkey", cmd_add_wepkey,
-	  "<WEP key>", "add a known WEP key", NULL },
+	  "<WEP key> = add a known WEP key", NULL },
 	{ "info_sta", cmd_info_sta,
-	  "<field> <BSSID> <STA>", "get STA information",
+	  "<field> <BSSID> <STA> = get STA information",
 	  complete_info_sta },
 	{ "info_bss", cmd_info_bss,
-	  "<field> <BSSID>", "get BSS information",
+	  "<field> <BSSID> = get BSS information",
 	  complete_info_bss },
 	{ "clear_tdls_counters", cmd_clear_tdls_counters,
-	  "<BSSID> <STA1> <STA2>", "clear TDLS counters",
+	  "<BSSID> <STA1> <STA2> = clear TDLS counters",
 	  complete_clear_tdls_counters },
 	{ "get_tdls_counter", cmd_get_tdls_counter,
-	  "<counter> <BSSID> <STA1> <STA2>", "get TDLS counter value",
+	  "<counter> <BSSID> <STA1> <STA2> = get TDLS counter value",
 	  complete_get_tdls_counter },
-	{ "relog", cmd_relog, NULL, "re-open log-file (allow rolling logs)", NULL },
+	{ "get_bss_counter", cmd_get_bss_counter,
+	  "<counter> <BSSID> = get BSS counter value",
+	  complete_get_bss_counter },
+	{ "relog", cmd_relog, "= re-open log-file (allow rolling logs)", NULL },
 	{ "get_tx_tid", cmd_get_tx_tid,
-	  "<BSSID> <STA> <TID>", "get STA TX TID counter value",
+	  "<BSSID> <STA> <TID> = get STA TX TID counter value",
 	  complete_get_tid },
 	{ "get_rx_tid", cmd_get_rx_tid,
-	  "<BSSID> <STA> <TID>", "get STA RX TID counter value",
+	  "<BSSID> <STA> <TID> = get STA RX TID counter value",
 	  complete_get_tid },
-	{ "help", cmd_help, "<cmd>", "list all commands or show usage of specific command", NULL },
+	{ "help", wlantest_cli_cmd_help,
+	  "= show this usage help", wlantest_cli_complete_help },
 	{ NULL, NULL, NULL, NULL }
 };
 
 
-static int cmd_help(int s, int argc, char *argv[])
+/*
+ * Prints command usage, lines are padded with the specified string.
+ */
+static void print_cmd_help(FILE *stream, const struct wlantest_cli_cmd *cmd,
+			   const char *pad)
 {
-	const struct wlantest_cli_cmd *cmd = NULL;
-	// char *cmd_str, *last = NULL;
-	if (argc == 0) {
-		printf("List of Commands:\n");
-		for (cmd = wlantest_cli_commands; cmd->cmd; cmd++) {
-			printf("%-20s- %s\n", cmd->cmd, cmd->desc);
-		}
-		return 0;
-	} else if (argc == 1) {
-		for (cmd = wlantest_cli_commands; cmd->cmd; cmd++) {
-			if (os_strcasecmp(cmd->cmd, argv[0]) == 0) {
-				printf("CMD  : %s%s %s\n", cmd->cmd, cmd->desc ? "-" : "", cmd->desc);
-				printf("Usage: %s %s\n", cmd->cmd, cmd->usage);
-				return 0;
-			}
-		}
-	}
+	char c;
+	size_t n;
 
-	return -1;
+	if (!cmd->usage)
+		return;
+	fprintf(stream, "%s%s ", pad, cmd->cmd);
+	for (n = 0; (c = cmd->usage[n]); n++) {
+		fprintf(stream, "%c", c);
+		if (c == '\n')
+			fprintf(stream, "%s", pad);
+	}
+	fprintf(stream, "\n");
+}
+
+
+static void print_help(FILE *stream, const char *cmd)
+{
+	int n;
+
+	fprintf(stream, "commands:\n");
+	for (n = 0; wlantest_cli_commands[n].cmd; n++) {
+		if (!cmd || str_starts(wlantest_cli_commands[n].cmd, cmd))
+			print_cmd_help(stream, &wlantest_cli_commands[n], "  ");
+	}
 }
 
 
@@ -1694,38 +1713,6 @@ static int ctrl_command(int s, int argc, char *argv[])
 struct wlantest_cli {
 	int s;
 };
-
-
-#define max_args 10
-
-static int tokenize_cmd(char *cmd, char *argv[])
-{
-	char *pos;
-	int argc = 0;
-
-	pos = cmd;
-	for (;;) {
-		while (*pos == ' ')
-			pos++;
-		if (*pos == '\0')
-			break;
-		argv[argc] = pos;
-		argc++;
-		if (argc == max_args)
-			break;
-		if (*pos == '"') {
-			char *pos2 = os_strrchr(pos, '"');
-			if (pos2)
-				pos = pos2 + 1;
-		}
-		while (*pos != '\0' && *pos != ' ')
-			pos++;
-		if (*pos == ' ')
-			*pos++ = '\0';
-	}
-
-	return argc;
-}
 
 
 static void wlantest_cli_edit_cmd_cb(void *ctx, char *cmd)
@@ -1783,7 +1770,7 @@ static char ** wlantest_cli_cmd_completion(struct wlantest_cli *cli,
 		const struct wlantest_cli_cmd *c = &wlantest_cli_commands[i];
 		if (os_strcasecmp(c->cmd, cmd) == 0) {
 			edit_clear_line();
-			printf("\r%s\n%s\n", c->desc, c->usage);
+			printf("\r%s\n", c->usage);
 			edit_redraw();
 			if (c->complete)
 				return c->complete(cli->s, str, pos);

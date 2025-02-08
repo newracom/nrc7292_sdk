@@ -54,7 +54,7 @@ typedef enum {
 	GPIO_16 = 16,	/**< GPIO_16 */
 	GPIO_17 = 17,	/**< GPIO_17 */
 } NRC_GPIO_PIN;
-#elif defined(NRC7393)||defined(NRC7394)
+#elif defined(NRC7394)
 typedef enum {
 	GPIO_00 = 0,	/**< GPIO_00 */ /* Not available on EVK*/
 	GPIO_01 = 1,	/**< GPIO_01 */ /* Not available on EVK*/
@@ -126,7 +126,7 @@ typedef struct {
 	NRC_GPIO_MODE gpio_mode;		/**< Mode */
 } NRC_GPIO_CONFIG;
 
-#if defined(NRC7393)||defined(NRC7394)
+#if defined(NRC7394)
 typedef enum {
 	TRIGGER_EDGE,
 	TRIGGER_LEVEL
@@ -201,7 +201,7 @@ nrc_err_t nrc_gpio_input(uint32_t *word);
  ***********************************************/
 nrc_err_t nrc_gpio_inputb(int pin, int *level);
 
-#if defined(NRC7393)||defined(NRC7394)
+#if defined(NRC7394)
 /**********************************************
  * @fn nrc_err_t nrc_gpio_trigger_config(int vector, nrc_gpio_trigger_t trigger, nrc_gpio_trigger_level_t level)
  *

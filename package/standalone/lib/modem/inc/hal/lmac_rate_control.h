@@ -188,8 +188,8 @@ void lmac_rc_initialize();
 void lmac_rc_node_initialize (int i, PER_NODE *n);
 void lmac_rc_update_stats( uint8_t vif , uint16_t aid , uint8_t index , uint8_t attempt ,
 									uint8_t success, int8_t rssi_of_sta_ack);
-void lmac_rc_configure(uint8_t vif , uint8_t bw);
-void lmac_rc_node_configure (PER_NODE *n, bw_t bw);
+void lmac_rc_configure(uint8_t vif , uint8_t bw, bool keep_param);
+void lmac_rc_node_configure (PER_NODE *n, bw_t bw, bool keep_param);
 uint8_t lmac_rc_get_rate_index(uint8_t vif , uint16_t aid ,  uint8_t retry, uint8_t *n_max_mpdu);
 const RC_RATE *lmac_rc_get_rate(uint8_t index);
 RC_INFO *lmac_rc_get_rcinfo();
@@ -200,6 +200,10 @@ void lmac_rc_set_last_tsf(uint32_t state);
 void lmac_rc_show_by_vif (uint8_t vif_id);
 void lmac_rc_show_by_aid (uint8_t vif_id, uint16_t aid);
 void lmac_rc_show();
+uint8_t lmac_rc_get_retry_order(uint8_t vif, uint8_t * retry_chain, uint16_t aid);
+
+
+
 void lmac_rc_set_param(uint8_t ewma, uint8_t uinterval, uint8_t pinterval);
 void lmac_rc_set_update_interval(uint8_t uinterval);
 #if defined(INCLUDE_DUTYCYCLE)

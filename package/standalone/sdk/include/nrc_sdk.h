@@ -67,9 +67,10 @@
 #include "api_adc.h"
 #include "api_pwm.h"
 #include "api_spi.h"
-#include "api_httpc.h"
 #include "api_fota.h"
 #include "api_ps.h"
+#include "api_pbc.h"
+#include "api_timer.h"
 
 #ifndef __must_check
 #if __GNUC__ > 3 || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4)

@@ -208,6 +208,7 @@ static nrc_err_t connect_to_ap(WIFI_CONFIG *param)
 
 	/* set initial wifi configuration */
 	wifi_init(param);
+	param->dhcp_timeout = GET_IP_RETRY_MAX;
 
 	/* connect to AP */
 	while(1) {
@@ -234,19 +235,10 @@ static nrc_err_t connect_to_ap(WIFI_CONFIG *param)
 	}
 
 	/* check if IP is ready */
-	retry_cnt = 0;
-	while(1){
-		if (nrc_addr_get_state(0) == NET_ADDR_SET) {
-			nrc_usr_print("[%s] IP ...\n",__func__);
-			break;
-		}
-		if (++retry_cnt > GET_IP_RETRY_MAX) {
-			nrc_usr_print("(Get IP) Exceeded retry limit (%d). Run sw_reset\n", GET_IP_RETRY_MAX);
-			nrc_sw_reset();
-		}
-		_delay_ms(1000);
+	if (nrc_wait_for_ip(0, param->dhcp_timeout) == NRC_FAIL) {
+		nrc_usr_print("(Get IP) Exceeded retry limit (%d). Run sw_reset\n", GET_IP_RETRY_MAX);
+		nrc_sw_reset();
 	}
-
 
 	nrc_usr_print("[%s] Device is online connected to %s\n",__func__, param->ssid);
 	return NRC_SUCCESS;

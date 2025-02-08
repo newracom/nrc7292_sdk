@@ -105,6 +105,7 @@ uint8_t drv_get_boot_reason();
 void drv_set_boot_reason(uint32_t br);
 uint8_t drv_scfg_get_boot_reason();
 void drv_scfg_clr_boot_reason();
+bool drv_is_boot_reason_sw_reset();
 
 void drv_pmc_sleep(int mode, uint64_t sleep_duration_ms);
 //void drv_pmc_enter_sleep0(uint32_t after_ms);

@@ -82,7 +82,8 @@ struct ret_apinfo {
 	uint16_t	short_bcn_interval;
 	uint8_t		ctrl_resp_preamble_1m: 1;
 	uint8_t		ndp_1m_dup: 1;
-	uint8_t		reserved:6 ;
+	uint8_t		sae_pwe:2;
+	uint8_t		reserved:4 ;
 } __attribute__ ((packed));
 #define RET_APINFO_SIZE sizeof(struct ret_apinfo)
 
@@ -105,12 +106,8 @@ struct ret_s1ginfo {
 	uint8_t		ndp_preq_support: 1;
 	uint8_t 	legacy_ack_support: 1;
 	uint8_t 	beacon_bypass_support: 1;
-	uint8_t 	reserved: 1;
+	uint8_t 	twtgrouping_support: 1;
 	uint8_t		rx_s1gmcs_map: 8;
-#if defined(INCLUDE_TWT_SUPPORT)
-	uint32_t	twt_service_period;
-#endif
-	uint32_t	twt_wake_interval;
 	int		cca_threshold;
 } __attribute__ ((packed));
 #define RET_S1GINFO_SIZE sizeof(struct ret_s1ginfo)
@@ -176,7 +173,8 @@ struct ret_tidinfo {
 //12B
 struct ret_ipinfo {
 	uint32_t	ip_addr;
-	uint32_t	net_mask;
+	uint32_t	net_mask:31;
+	uint32_t	ip_mode:1;
 	uint32_t	gw_addr;
 } __attribute__ ((packed));
 #define RET_IPINFO_SIZE sizeof(struct ret_ipinfo)
@@ -212,11 +210,22 @@ struct ret_wakeupinfo {
 	 * wakeup_gpio_pin
 	 *	- [7, Reserved]
 	 *	- [6, Enable debounce function for switch]
-	 *	- [5, Reserved]
+	 *	- [5, 1: Active High, 0: Active Low]
 	 *	- [4:0, GPIO Number]
 	 */
 	uint8_t 	wakeup_gpio_pin;
 
+#if defined(NRC7394)
+	/*
+	 * wakeup_gpio_pin2
+	 *	- [7, Reserved]
+	 *	- [6, Enable debounce function for switch]
+	 *	- [5, 1: Active High, 0: Active Low]
+	 *	- [4:0, GPIO Number]
+	 */
+	uint8_t 	wakeup_gpio_pin2;
+
+#endif
 	/*
 	 * wakeup_source
 	 *	- [3:7, reservedn]
@@ -273,13 +282,13 @@ struct ret_drvinfo {
 	uint16_t fw_boot_mode:2;		//FW boot mode (1B) : 0(XIP), 1 or 2(ROM, it must be distinguished in the code based on the core type)
 	uint16_t do_reset:1;			//FW reboot mode in uCode (1B) : 0(reboot with jump), 1(reboot with reset)
 	uint16_t cqm_off:1;
-	uint16_t kern_ver:12;			// 4bit for major. 8bit for minor. 
+	uint16_t kern_ver:12;			// 4bit for major. 8bit for minor.
 	uint8_t sw_enc:2;
 	uint8_t brd_rev:2;
 	uint8_t bitmap_encoding:1;
 	uint8_t reverse_scrambler:1;
 	uint8_t supported_ch_width:1; //supported CH width (0:1/2MHz, 1:1/2/4Mhz)
-	uint8_t reserved:1;
+	uint8_t ps_pretend_flag:1;
 	uint32_t vendor_oui;
 } __attribute__ ((packed));
 #define RET_DRV_INFO_SIZE sizeof(struct ret_drvinfo)
@@ -308,6 +317,16 @@ struct ret_rcinfo {
 //#endif
 } __attribute__ ((packed));
 #define RET_RC_INFO_SIZE sizeof(struct ret_rcinfo)
+
+#if defined(NRC7394)
+// 1024B
+#define RET_USER_DATA_SIZE 1024
+struct ret_userData {
+	uint8_t data[RET_USER_DATA_SIZE];
+} __attribute__ ((packed));
+#else
+#define RET_USER_DATA_SIZE 0
+#endif
 
 #if defined (INCLUDE_WOWLAN_PATTERN)
 // 56B
@@ -345,10 +364,35 @@ struct ret_keepaliveinfo {
 	uint16_t winsize;  /* need ?, CKLEE_TODO */
 	uint32_t last_tsf;
 	uint32_t period_sec;
-};
+} __attribute__ ((packed));
 #endif
 
-#define RET_USERSPACE_SIZE 32
+#define MAX_ETHERTYPE_FILTER	10
+#define MAX_MAC_FILTER			10
+
+struct ethertype_filter {
+	uint8_t num;
+	uint16_t entry[MAX_ETHERTYPE_FILTER];
+};
+
+struct mac_filter {
+	uint8_t num;
+	uint8_t entry[MAX_MAC_FILTER][6]; /* MAC_ADDR_LEN */
+};
+
+struct ret_bcmc_filter_info
+{
+	struct ethertype_filter ef;
+	struct mac_filter mf;
+};
+
+#define MAX_BCMC_SIZE			2048
+struct ret_bcmc_info
+{
+	uint8_t frame_num;
+	uint8_t buffer[MAX_BCMC_SIZE];
+};
+
 #define RET_RECOVERED_SIZE 1
 
 //116B
@@ -401,7 +445,7 @@ struct ret_airtimeinfo {
 #define RET_PMK_SIZE 32
 #if defined(NRC7292)
 #define WOWLAN_MAX_PATTERNS 1
-#elif defined(NRC7393)||defined(NRC7394)||defined(NRC5292)
+#elif defined(NRC7394) || defined(NRC5292) || defined(NRC5293)
 #define WOWLAN_MAX_PATTERNS 2
 #else
 #error "define wowlan pattern size, if ret size is enough, set 2 or set 1"
@@ -412,18 +456,38 @@ struct ret_airtimeinfo {
  * Last 16 Bytes for uCode Header
  */
 
-#if defined(NRC7393)||defined(NRC7394)
+#if defined(NRC7394)
 #if !(defined(BOOT_LOADER) || (MASKROM) || (INCLUDE_RF_NRC7292RFE) || (LMAC_TEST))
 #include "drv_port.h"
-#include "../fdk/lib/hal/hal_modem.h" 
+#include "hal_modem.h"
 #include "nrc_retention.h"
 #endif
 #endif
 
+#if defined(INCLUDE_TWT_SUPPORT)
+#include "lmac_twt_common.h"
+struct ret_twtinfo {
+	ret_twt agm[MAX_TWT_AGREEMENT];
+} __attribute__ ((packed));
+#define RET_TWT_INFO_SIZE sizeof(struct ret_twtinfo)
+#endif
+
+#if defined(INCLUDE_AUTH_CONTROL)
+//4Byte
+struct ret_authctrlinfo {
+	uint32_t	enable:1;
+	uint32_t	slot:7;
+	uint32_t	min:8;
+	uint32_t	max:8;
+	uint32_t	scale:8;
+} __attribute__ ((packed));
+#endif
+
 struct retention_info {
-#if defined(NRC7393)||defined(NRC7394)
+#if defined(NRC7394)
 #if !(defined(BOOT_LOADER) || (MASKROM) || (INCLUDE_RF_NRC7292RFE) || (LMAC_TEST))
 	nrc_ret_info_t			nrc_ret_info;
+	struct ret_userData		user_data;		//User data (1KB)
 #endif
 #endif
 	struct ret_stainfo		sta_info;		//station info (20B)
@@ -455,6 +519,18 @@ struct retention_info {
 #if defined (INCLUDE_PS_SCHEDULE)
 	struct ret_schedule_info schedule_info;			//callback info (65B)
 #endif
+#if defined(INCLUDE_TWT_SUPPORT)
+	struct ret_twtinfo		twt_info;
+#endif
+#if defined(INCLUDE_BCMC_RX)
+	struct ret_bcmc_info bcmc_info;
+#endif
+#if defined(INCLUDE_BCMC_RX_FILTER)
+	struct ret_bcmc_filter_info bcmc_filter_info;
+#endif
+#if defined(INCLUDE_AUTH_CONTROL)
+	struct ret_authctrlinfo auth_ctrl_info;
+#endif
 	/* GPIO setting while in deep sleep */
 	uint32_t sleep_gpio_dir_mask;
 	uint32_t sleep_gpio_out_mask;
@@ -476,7 +552,6 @@ struct retention_info {
 	uint8_t				pmk[RET_PMK_SIZE];	//PMK(PSK) (32B)
 	uint32_t			sig_a;			//sig a (4B)
 	uint32_t			sig_b;			//sig b (4B)
-	uint8_t 			userspace_area[RET_USERSPACE_SIZE];	//user space (64B)
 	uint8_t				ps_mode;		//Power saving mode (1B) (none/modem/tim/nontim)
 	uint64_t			ps_duration;		//Power save duration (8B) (in ms unit)
 	uint64_t			usr_timeout;		//TIM-mode user timer (8B) (in ms unit)
@@ -487,7 +562,8 @@ struct retention_info {
 	uint8_t				wake_by_usr:1;		//wakeup in ucode for user timer(1bit) (1: wakeup, 0: none)
 	uint8_t				xtal_status:2;		// 0(not checked), 1(working), 2(not working)
 	uint8_t				ps_null_pm0:1;		//0(nothing) 1(need to send null with PM0 after wakeup)
-	uint8_t				reserved:2;		//reserved 3 bits
+	uint8_t				fast_connect:1;		//0(disable) 1(enable)
+	uint8_t				reserved:1;		//reserved 3 bits
 	bool				recovered;		//recovery status(1B) (true:recovered, false:not recovered)
 	bool				sleep_alone;		//sleep without connection(1B) (true:alone false:with AP)
 	uint8_t				rc_mode:2;		// rate control(1B) for STA
@@ -540,13 +616,34 @@ static inline bool PS_CHECK_SIG() {
 	return false;
 };
 
+#if defined (INCLUDE_STANDALONE) && (INCLUDE_FAST_CONNECT)
+#define PS_FILL_SIG_2() do { \
+    struct retention_info* ret_info;\
+    ret_info = nrc_ps_get_retention_info();\
+	ret_info->sig_a 	= PS_SIG_C; \
+	ret_info->sig_b 	= PS_SIG_D; \
+} while(0)
+
+static inline bool PS_CHECK_SIG_2() {
+	struct retention_info* ret_info;
+	ret_info = nrc_ps_get_retention_info();
+	if (ret_info->sig_a == PS_SIG_C
+		&& ret_info->sig_b == PS_SIG_D)
+		return true;
+	return false;
+};
+#endif /* defined (INCLUDE_STANDALONE) && (INCLUDE_FAST_CONNECT) */
+
 #if !defined(UCODE)
 void nrc_ps_init();
 void nrc_ps_init_retention_info(bool cold_boot);
 void nrc_ps_recovery();
-int nrc_ps_config_wakeup_pin(bool check_debounce, int pin_number);
+int nrc_ps_config_wakeup_pin(bool check_debounce, int pin_number, bool active_high);
+#if defined(NRC7394)
+int nrc_ps_config_wakeup_pin2(bool check_debounce, int pin_number, bool active_high);
+#endif
 int nrc_ps_config_wakeup_source(uint8_t wakeup_source);
-int nrc_ps_get_wakeup_pin(bool *check_debounce, int *pin_number);
+int nrc_ps_get_wakeup_pin(bool *check_debounce, int *pin_number, bool *active_high);
 int nrc_ps_get_wakeup_source(uint8_t *wakeup_source);
 int nrc_ps_get_wakeup_reason(uint8_t *wakeup_reason);
 int nrc_ps_get_wakeup_count(uint32_t *wakeup_count);
@@ -656,5 +753,9 @@ void ps_set_gpio_pullup(uint32_t mask);
 uint32_t ps_get_gpio_pullup(void);
 int nrc_ps_event_user_get(enum ps_event event);
 int nrc_ps_event_user_clear(enum ps_event event);
+bool nrc_ps_check_fast_connect(void);
+bool nrc_ps_set_user_data(void* data, uint16_t size);
+bool nrc_ps_get_user_data(void* data, uint16_t size);
+uint16_t nrc_ps_get_user_data_size(void);
 
 #endif /*__NRC_PS_API_H__*/

@@ -205,8 +205,8 @@ int raspi_uart_open (char *device, uint32_t baudrate, bool rts_cts)
 		return -EINVAL;
 	}
 
-	comfd = open(device, O_RDWR | O_NOCTTY);
-/*	comfd = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK); */
+/*	comfd = open(device, O_RDWR | O_NOCTTY); */
+	comfd = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
 /*	comfd = open(device, O_RDWR | O_NOCTTY | O_NDELAY); */
 	if (comfd < 0)
 	{

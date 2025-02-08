@@ -40,15 +40,12 @@
 #ifdef CONFIG_ATCMD_IPV6
 #define ICMP6_ECHO_HLEN				sizeof(struct icmp6_echo_hdr)
 
-#ifdef ATCMD_NETIF_INDEX
-#define SIN6_SCOPE_ID				(ATCMD_NETIF_INDEX + 1)
-#else
 #define SIN6_SCOPE_ID				1
-#endif
 #endif /* #ifdef CONFIG_ATCMD_IPV6 */
 
 
 extern struct netif *nrc_netif[];
+extern struct netif br_netif;
 
 /**********************************************************************************************/
 #endif /* #ifndef __LWIP_COMMON_H__ */

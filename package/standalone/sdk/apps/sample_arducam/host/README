@@ -1,0 +1,17 @@
+JPEG server to receive picture data.
+
+To get help
+
+java -jar JPEGStreamDecoder_v1_4_0.jar -h
+
+<Newracom JPEG Stream Decoder Usage>
+	TCP SERVER MODE (DEFAULT PORT): (PORT = 8080)
+		java -jar jpeg_stream_decoder.jar
+
+	TCP SERVER MODE (CUSTOM PORT):
+		java -jar jpeg_stream_decoder.jar <port>
+	HTTP SERVER MODE:
+		java -jar jpeg_stream_decoder.jar <port> http
+
+For this example.
+java -jar jpeg_stream_decoder.jar 8099

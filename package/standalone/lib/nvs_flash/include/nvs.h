@@ -38,14 +38,15 @@ void hal_uart_printf(const char *f, ...);
 #define NVS_LOGD(x, format, ...) do{} while(0)
 #endif
 
-/* Use User_Config_1, User_Config_2, and User_config_3 */
+#define NVS_MAX_MEMORY_SIZE					4*4096 /* Do not change nvs max size */
+
+/* Use User_Config_1, User_Config_2, and User_config_3, and User_config_4 can be used*/
 #define SPI_SECTORS_USED                    4
-#if defined(SUPPORT_DEVICEWORX)
-#define SPI_FLASH_SEC_SIZE                  0x32000//200KB
-#else
-#define SPI_FLASH_SEC_SIZE                  0x1000//4KB
-#endif
+#define SPI_FLASH_SEC_SIZE                  4096
 #define MIN_PARTITION_SIZE                  (SPI_FLASH_SEC_SIZE * SPI_SECTORS_USED)
+#if MIN_PARTITION_SIZE >  NVS_MAX_MEMORY_SIZE
+#error "WARNING: MIN_PARTITION_SIZE must be less than MIN_PARTITION_SIZE (16KB)"
+#endif
 
 #define NVS_OK                              0
 #define NVS_FAIL                            -1

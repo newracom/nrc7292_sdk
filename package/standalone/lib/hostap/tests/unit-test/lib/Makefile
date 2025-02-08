@@ -28,8 +28,6 @@ LIB_OBJS = \
 	os_unix.o \
 	ieee802_11_common.o
 
-$(warning $(LIB_OBJS))
-
 .PHONY: all
 
 all: $(LIB_TARGET)

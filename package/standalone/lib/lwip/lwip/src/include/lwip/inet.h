@@ -124,7 +124,8 @@ extern const struct in6_addr in6addr_any;
 #ifndef INET_ADDRSTRLEN
 #define INET_ADDRSTRLEN     IP4ADDR_STRLEN_MAX
 #endif
-#if LWIP_IPV6
+//#if LWIP_IPV6
+#if 1
 #ifndef INET6_ADDRSTRLEN
 #define INET6_ADDRSTRLEN    IP6ADDR_STRLEN_MAX
 #endif

@@ -938,7 +938,7 @@ netconn_sendto(struct netconn *conn, struct netbuf *buf, const ip_addr_t *addr, 
  * @return ERR_OK if data was sent, any other err_t on error
  */
 err_t
-netconn_send(struct netconn *conn, struct netbuf *buf)
+_netconn_send(struct netconn *conn, struct netbuf *buf, struct netif *netif)
 {
   API_MSG_VAR_DECLARE(msg);
   err_t err;
@@ -950,10 +950,23 @@ netconn_send(struct netconn *conn, struct netbuf *buf)
   API_MSG_VAR_ALLOC(msg);
   API_MSG_VAR_REF(msg).conn = conn;
   API_MSG_VAR_REF(msg).msg.b = buf;
+  API_MSG_VAR_REF(msg).netif = netif;
   err = netconn_apimsg(lwip_netconn_do_send, &API_MSG_VAR_REF(msg));
   API_MSG_VAR_FREE(msg);
 
   return err;
+}
+
+err_t
+netconn_send(struct netconn *conn, struct netbuf *buf)
+{
+  return _netconn_send(conn, buf, NULL);
+}
+
+err_t
+netconn_send_if(struct netconn *conn, struct netbuf *buf, struct netif *netif)
+{
+  return _netconn_send(conn, buf, netif);
 }
 
 /**

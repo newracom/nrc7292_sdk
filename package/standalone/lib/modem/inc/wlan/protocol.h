@@ -2,6 +2,10 @@
 #define __PROTOCOL_H__
 #include <sys/types.h>
 
+#ifndef BIT
+#define BIT(n) ((uint32_t)(0x00000001L << n))
+#endif
+
 #define MAC2STR(a) (a)[0], (a)[1], (a)[2], (a)[3], (a)[4], (a)[5]
 #define MACSTR "%02x:%02x:%02x:%02x:%02x:%02x"
 #define MAC_ADDR_LEN        (6)
@@ -42,9 +46,14 @@
 #define FC_PV0_TYPE_MGMT_ACTION_BLOCK_ACK_NDP_ADDBA_RESP	129
 #define FC_PV0_TYPE_MGMT_ACTION_BLOCK_ACK_NDP_DELBA_REQ 	130
 
-#define FC_PV0_TYPE_MGMT_ACTION_NOACK_TWT_SETUP		6
-#define FC_PV0_TYPE_MGMT_ACTION_NOACK_TWT_TEARDOWN	7
-#define FC_PV0_TYPE_MGMT_ACTION_NOACK_TWT_INFO		11
+#define FC_PV0_TYPE_MGMT_ACTION_UNPROTECTED_S1G		22
+#define FC_PV0_TYPE_MGMT_ACTION_UNPROTECTED_TWT_SETUP		6
+#define FC_PV0_TYPE_MGMT_ACTION_UNPROTECTED_TWT_TEARDOWN	7
+#define FC_PV0_TYPE_MGMT_ACTION_UNPROTECTED_TWT_INFO		11
+#define FC_PV0_TYPE_MGMT_ACTION_S1G				23
+#define FC_PV0_TYPE_MGMT_ACTION_PROTECTED_TWT_SETUP		4
+#define FC_PV0_TYPE_MGMT_ACTION_PROTECTED_TWT_TEARDOWN		5
+#define FC_PV0_TYPE_MGMT_ACTION_PROTECTED_TWT_INFO		6
 
 #define FC_PV0_TYPE_DATA_DATA                   0
 #define FC_PV0_TYPE_DATA_DATA_CF_ACK            1
@@ -86,6 +95,7 @@
 #define IEEE80211_QOSCTL_ACK_POLICY_NOEXPL		2
 #define IEEE80211_QOSCTL_ACK_POLICY_BA 			3
 
+#define OUI_IEEE_REGISTRATION_AUTHORITY 0xFCFFAA
 
 typedef struct _QoSField {
 	uint16_t    qos_tid                 : 4;
@@ -277,64 +287,6 @@ typedef struct _CCMPHeader {
 } CCMPHeader;
 #define CCMPH(x) reinterpret_cast<CCMPHeader*>(x)
 
-#if defined(INCLUDE_TWT_SUPPORT)
-typedef struct _TWT_Setup {
-	uint8_t category				: 8;
-	uint8_t action					: 8;
-	uint8_t dial_token				: 8;
-
-	uint8_t ndp_paging_indicator: 1;
-	uint8_t responder_pm_mode: 1;
-	uint8_t reserved1: 6;
-	uint16_t twt_request: 1;
-	uint16_t twt_setup_command: 3;
-	uint16_t reserved2: 1;
-	uint16_t implicit: 1;
-	uint16_t flow_type: 1;
-	uint16_t twt_flow_id: 3;
-	uint16_t twt_wake_interval_exp: 5;
-	uint16_t twt_protection: 1;
-	uint32_t target_wake_time_lo;
-	uint32_t target_wake_time_hi;
-	/* Remove because of Non-Support
-	uint8_t twt_group_id: 7;
-	uint8_t zero_offset_present: 1;
-	uint8_t zero_offset[6];
-	uint16_t twt_unit: 4;
-	uint16_t twt_offset: 12;
-	*/
-	uint8_t nom_min_twt_wake_duration;
-	uint16_t twt_wake_int_mantissa;
-	uint8_t twt_channel;
-	/* Remove because of Non-Support
-	uint32_t pid: 9;
-	uint32_t max_ndp_paging_period: 8;
-	uint32_t partial_tsf_offset: 4;
-	uint32_t ndp_paging_action: 3;
-	uint32_t min_sleep_duration: 6;
-	uint32_t reserved3: 2;
-	*/
-} __attribute__((packed)) TWT_Setup ;
-
-typedef struct _TWT_Teardown {
-	uint8_t category				: 8;
-	uint8_t action					: 8;
-	uint8_t flow					: 3;
-	uint8_t reserved				: 5;
-} __attribute__((packed)) TWT_Teardown;
-
-typedef struct _TWT_Info {
-	uint8_t category				: 8;
-	uint8_t action					: 8;
-	uint8_t	twt_flow_id				: 3;
-	uint8_t res_requested			: 1;
-	uint8_t next_twt_req			: 1;
-	uint8_t next_twt_subfield_size	: 2;
-	uint8_t reserved				: 1;
-	uint64_t next_twt;
-} __attribute__((packed)) TWT_Info;
-#endif /* defined(INCLUDE_TWT_SUPPORT) */
-
 typedef struct _WEPHeader {
 	uint8_t	iv0;
 	uint8_t	iv1;
@@ -463,6 +415,48 @@ typedef struct ieee80211s_hdr {
 	uint8_t    eaddr2[6];
 } __attribute__((packed)) MeshControlField;
 
+/* EAPOL MSG */
+#define EAPOL_TYPE_EAPOL_KEY			(3)
+#define EAPOL_KEY_INFO_KEY_TYPE			BIT(3)
+#define EAPOL_KEY_INFO_KEY_INDEX		(BIT(4) | BIT(5))
+#define EAPOL_KEY_INFO_INSTALL			BIT(6)
+#define EAPOL_KEY_INFO_TXRX				BIT(6)
+#define EAPOL_KEY_INFO_ACK				BIT(7)
+#define EAPOL_KEY_INFO_MIC				BIT(8)
+#define EAPOL_KEY_INFO_SECURE			BIT(9)
+#define EAPOL_KEY_INFO_ERROR			BIT(10)
+#define EAPOL_KEY_INFO_REQUEST			BIT(11)
+#define EAPOL_KEY_INFO_ENCR_KEY_DATA	BIT(12)
+#define EAPOL_KEY_INFO_SMK_MESSAGE		BIT(13)
+
+struct eapol_hdr {
+	uint8_t version;
+	uint8_t type;
+	uint16_t length;
+};
+
+struct eapol_key {
+	uint8_t type;
+	uint8_t key_info[2];
+	uint8_t key_length[2];
+	uint8_t replay_counter[8];
+	uint8_t key_nonce[32];
+	uint8_t key_iv[16];
+	uint8_t key_rsc[8];
+	uint8_t key_id[8];
+	uint8_t key_mic[16];
+	uint16_t key_data_length;
+} __attribute__((packed)) ;
+
+enum eapol_msg {
+	EAPOL_MSG_NONE = 0,
+	EAPOL_MSG_M1,
+	EAPOL_MSG_M2,
+	EAPOL_MSG_M3,
+	EAPOL_MSG_M4,
+	EAPOL_MSG_MAX
+};
+
 int ieee80211_ver(void* frame);
 bool ieee80211_is_pv0(void* frame);
 bool ieee80211_is_pv1(void* frame);
@@ -489,15 +483,18 @@ bool ieee80211_is_auth(GenericMacHeader* gmh);
 bool ieee80211_is_deauth(GenericMacHeader* gmh);
 bool ieee80211_is_disasoc(GenericMacHeader* gmh);
 bool ieee80211_is_assoc_req(GenericMacHeader* gmh);
+bool ieee80211_is_reassoc_req(GenericMacHeader* gmh);
 bool ieee80211_is_assoc_resp(GenericMacHeader* gmh);
-bool lmac_check_action_frame(GenericMacHeader* gmh);
+bool ieee80211_is_reassoc_resp(GenericMacHeader* gmh);
+bool ieee80211_is_action(GenericMacHeader* gmh);
+bool ieee80211_is_action_noack(GenericMacHeader* gmh);
 bool ieee80211_is_protected(GenericMacHeader* gmh);
 bool ieee80211_is_s1g_beacon(GenericMacHeader *gmh);
 bool ieee80211_is_frag(GenericMacHeader* gmh);
 bool ieee80211_is_last_frag(GenericMacHeader* gmh);
 bool ieee80211_has_morefrags(GenericMacHeader* gmh);
 bool ieee80211_is_amsdu(GenericMacHeader* gmh);
-bool ieee80211_is_eapol(GenericMacHeader *gmh, int len);
+uint8_t ieee80211_is_eapol(GenericMacHeader *gmh, int len);
 bool ieee80211_has_htc(GenericMacHeader* gmh);
 uint8_t* ieee80211_get_bssid(GenericMacHeader *gmh);
 bool ieee80211_is_arp(GenericMacHeader* gmh);
@@ -515,6 +512,7 @@ bool ieee80211_is_any_mgmt(void *mh);
 
 const uint8_t* broadcast_addr();
 bool is_broadcast_addr(const uint8_t* addr);
+bool is_equal_mac_addr(uint8_t *addr1, uint8_t *addr2);
 
 uint8_t get_mesh_control_length(GenericMacHeader* gmh);
 uint8_t ieee80211_mhd_length(GenericMacHeader* gmh);

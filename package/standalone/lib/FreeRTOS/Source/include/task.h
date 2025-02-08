@@ -2329,6 +2329,21 @@ void *pvTaskIncrementMutexHeldCount( void ) PRIVILEGED_FUNCTION;
  */
 void vTaskInternalSetTimeOutState( TimeOut_t * const pxTimeOut ) PRIVILEGED_FUNCTION;
 
+#if defined(NRC_FREERTOS)
+/**
+ * Only avilable when configRECORD_STACK_HIGH_ADDRESS is set to 1.
+ *
+ * Iterate callback function for all the stack history of the task.
+ * The top part of the SP may not be valid, but you can use it as a reference.
+ *
+ * @param xTask The handle of the task to iterate the stack history of.
+ *
+ * @param pvFunc The function to call with the stack history.
+ * The first parameter is the single stack address, the second is the boolean
+ * value indicating if the xTask is whether the current task or not.
+ */
+void vIterateTaskStackHistory( TaskHandle_t xTask , void ( *pvFunc )( StackType_t * , BaseType_t ) );
+#endif
 
 #ifdef __cplusplus
 }

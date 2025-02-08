@@ -28,7 +28,7 @@
 #define TEST_COUNT 10
 #define TEST_INTERVAL 1000 /* msec */
 
-#if defined(NRC7393) || defined(NRC7394)
+#if defined(NRC7394)
 #define PWM_GPIO0 GPIO_06
 #define PWM_GPIO1 GPIO_07
 #define PWM_GPIO2 GPIO_10

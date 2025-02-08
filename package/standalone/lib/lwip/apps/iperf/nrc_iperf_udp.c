@@ -48,6 +48,7 @@ static struct udp_client_data *udp_client_list = NULL;
 extern void sys_arch_msleep(u32_t delay_ms);
 extern bool wpa_driver_get_associate_status(uint8_t vif);
 
+#if !defined(DISABLE_IPERF_APP)
 #if defined(LWIP_IPERF) && (LWIP_IPERF == 1)
 
 static void iperf_udp_client_init_payload (iperf_udp_datagram_t *datagram, int32_t datagram_size)
@@ -143,17 +144,17 @@ static void iperf_udp_client_report (iperf_opt_t * option)
 			}
 #endif
 		} else {
-			A("##### [%s] etharp_find_addr failed\n", __func__);
+			CPA("##### [%s] etharp_find_addr failed\n", __func__);
 		}
 	}
 
 	nrc_iperf_spin_lock();
-	A("[iperf UDP Client Report for server %s, snr:%u, rssi:%d]\n", ipaddr_ntoa(&option->addr), snr, rssi);
-	A("  Interval          Transfer      Bandwidth\n");
-	A("  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec\n",
+	CPA("[iperf UDP Client Report for server %s, snr:%u, rssi:%d]\n", ipaddr_ntoa(&option->addr), snr, rssi);
+	CPA("  Interval          Transfer      Bandwidth\n");
+	CPA("  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec\n",
 					start_time, end_time,
 					byte_to_string(byte), bps_to_string(bps));
-	A("  sent : %ld datagrams\n", option->client_info.datagram_cnt);
+	CPA("  sent : %llu datagrams\n", option->client_info.datagram_cnt);
 	nrc_iperf_spin_unlock();
 }
 
@@ -166,8 +167,8 @@ static void iperf_udp_client_report_from_server (iperf_server_header_t *header)
 	iperf_time_t jitter = ntohl(header->jitter1) + (ntohl(header->jitter2) / 1000000.);
 
 	nrc_iperf_spin_lock();
-	A("  Server Report:\n");
-	A("  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec  %.3f ms  %ld/%ld (%.2g%%)\n",
+	CPA("  Server Report:\n");
+	CPA("  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec  %.3f ms  %ld/%ld (%.2g%%)\n",
 					0., time,
 					byte_to_string(byte),
 					bps_to_string(byte_to_bps(time, byte)),
@@ -217,7 +218,7 @@ static int iperf_await_server_fin_packet (iperf_opt_t * option, 	iperf_udp_datag
 		}
 	}
 	if ((!ack_success))
-		A("Not received server fin packet\n");
+		CPA("Not received server fin packet\n");
 	else
 		iperf_udp_client_report_from_server((iperf_server_header_t *)&buf->server_header);
 
@@ -231,15 +232,35 @@ uint16_t iperf_udp_client_send_delay(u32_t bandwidth, u32_t data_size)
 
 	if(!time_delay)
 		time_delay = 1;
-	//A("packet delay = %d ms, bandwidth = %d  data_size = %d\n" , time_delay ,bandwidth, data_size);
+	//CPA("packet delay = %d ms, bandwidth = %d  data_size = %d\n" , time_delay ,bandwidth, data_size);
 	return time_delay;
+}
+
+ATTR_NC __attribute__((optimize("O3"))) bool iperf_check_throttle(iperf_opt_t * option)
+{
+	iperf_time_t now;
+	iperf_time_t interval;
+	uint32_t byte;
+	uint32_t bps;
+
+	iperf_get_time(&now);
+
+	byte = option->client_info.datagram_cnt * option->mBufLen;
+	interval = now - option->client_info.start_time;
+	bps = byte_to_bps(interval, byte);
+
+	if (bps < option->mAppRate) {
+		return true;
+	} else {
+		return false;
+	}
 }
 
 ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_client(void *pvParameters)
 {
 	int sock = -1;
 	int ret;
-	iperf_time_t start_time, stop_time, now;
+	iperf_time_t start_time, now, duration;
 	struct sockaddr_storage to;
 	struct sockaddr_storage bind;
 	int count = 0;
@@ -249,12 +270,21 @@ ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_client(void *pvParameters
 	uint32_t packet_count = 0;
 	iperf_udp_datagram_t *datagram = NULL;
 	iperf_opt_t * option  = pvParameters;
+	TaskHandle_t task_handle = option->task_handle;
+
 	int alloc_size = (option->mBufLen < IPERF_DEFAULT_DATA_BUF_LEN) ? IPERF_DEFAULT_DATA_BUF_LEN : option->mBufLen;
-	TaskHandle_t periodic_report_task = NULL;
+	const int multisend_num = 3;
+	int multisend;
+
+#if DEBUG_IPERF_TASK_HANDLE
+	nrc_iperf_spin_lock();
+	CPA("%s Start [handle:%d]\n", __func__, task_handle);
+	nrc_iperf_spin_unlock();
+#endif
 
 #if LWIP_IPV6
 	if(IP_IS_V6(&option->addr) && !ip6_addr_isipv4mappedipv6(ip_2_ip6(&option->addr))) {
-		A("[%s] Unsupported IPV6\n", __func__);
+		CPA("[%s] Unsupported IPV6\n", __func__);
 		goto task_exit;
 	}
 #endif /* LWIP_IPV6 */
@@ -270,7 +300,7 @@ ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_client(void *pvParameters
 
 		sock = socket(AF_INET, SOCK_DGRAM, 0);
 		if (sock < 0) {
-			A("create socket failed!\n");
+			CPA("create socket failed!\n");
 			goto exit;
 		}
 
@@ -281,7 +311,7 @@ ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_client(void *pvParameters
 
 		if (bind(sock, (struct sockaddr*)&bind, sizeof(bind)) < 0){
 			int err = errno;
-			A("[%s] bind(%d) returned error: %d.\n", __func__, sock, -err);
+			CPA("[%s] bind(%d) returned error: %d.\n", __func__, sock, -err);
 			goto exit;
 		}
 
@@ -292,12 +322,10 @@ ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_client(void *pvParameters
 	}
 #endif /* LWIP_IPV4 */
 
-	option->mSock = sock;
-
 	tosval = (int)option->mTOS;
 	ret = setsockopt(sock, IPPROTO_IP, IP_TOS, (void *) &tosval, sizeof(tosval));
 	if (ret == -1) {
-		A("Set socket IP_TOS option failed!\n");
+		CPA("Set socket IP_TOS option failed!\n");
 		goto exit;
 	}
 
@@ -310,25 +338,27 @@ ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_client(void *pvParameters
 	iperf_udp_client_init_datagram(option, datagram);
 
 	nrc_iperf_spin_lock();
-	A("------------------------------------------------------------\n");
-	A("Client connecting to %s, UDP port %d\n",
+	CPA("------------------------------------------------------------\n");
+	CPA("Client connecting to %s, UDP port %d\n",
 		ipaddr_ntoa(&option->addr), option->mPort);
-	A("Sending %ld byte datagrams, Duration %4.1f sec\n",
+	CPA("Sending %ld byte datagrams, Duration %4.1f sec\n",
 		option->mBufLen, option->mAmount / 100.0);
-	A("------------------------------------------------------------\n");
+	CPA("------------------------------------------------------------\n");
 	nrc_iperf_spin_unlock();
 
 	iperf_get_time(&start_time);
+	duration = (option->mAmount / 100.);
 
+	option->mSock = sock;
 	option->client_info.start_time = start_time;
-	stop_time = start_time + (option->mAmount / 100.);
+	option->client_info.duration= duration;
 
 	delay = iperf_udp_client_send_delay(option->mAppRate,option->mBufLen);
 	vif = wifi_get_vif_id(&option->addr);
 
 	if (option->mInterval > 0) {
-		xTaskCreate(nrc_iperf_periodic_report, "iperf periodic report",
-					1024, (void *) option, LWIP_IPERF_TASK_PRIORITY, &periodic_report_task);
+		xTaskCreate(nrc_iperf_periodic_report, "iperf_udp_client_report", 1024,
+			(void *) option, LWIP_IPERF_TASK_PRIORITY, &option->client_info.periodic_report_task);
 	}
 
 	while (1)
@@ -340,21 +370,31 @@ ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_client(void *pvParameters
 
 		if (wpa_driver_get_associate_status(vif)== false){
 			option->client_info.end_time = now;
+			CPA("Wi-Fi connection lost\n");
 			break;
 		}
 
-		if (option->mForceStop || (now >= stop_time)){
-			datagram->id = htonl(~(packet_count-1));
-			iperf_send(sock, (const char *)datagram, option->mBufLen,
-				 (struct sockaddr*)&to, sizeof(to));
-
+		if (option->mForceStop || iperf_time_expried(start_time, duration) ){
 			option->client_info.end_time = now;
+			datagram->id = htonl(~(packet_count-1));
+			if(iperf_send(sock, (const char *)datagram, option->mBufLen,
+				 (struct sockaddr*)&to, sizeof(to)) == -1)
+				CPA("[%s] iperf udp server report fail\n", __func__);
+
 			break;
 		}else{
-			datagram->id = htonl(packet_count++);
-			iperf_send(sock, (const char *)datagram, option->mBufLen,
-				(struct sockaddr*)&to, sizeof(to));
-			option->client_info.datagram_cnt++;
+			for (multisend = 0; multisend < multisend_num; multisend++) {
+				if(iperf_check_throttle(option)){
+					datagram->id = htonl(packet_count);
+					if(iperf_send(sock, (const char *)datagram, option->mBufLen,
+						(struct sockaddr*)&to, sizeof(to)) != -1) {
+						option->client_info.datagram_cnt++;
+						packet_count++;
+					}
+				} else {
+					break;
+				}
+			}
 
 			/* put a actual delay to calculate bandwidth exactly */
 			{
@@ -366,10 +406,14 @@ ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_client(void *pvParameters
 		}
 	}
 
-	if (periodic_report_task)
-		vTaskDelete(periodic_report_task);
+	if(option->client_info.periodic_report_task) {
+		sys_arch_msleep(100);
+		xTaskNotifyGive(option->client_info.periodic_report_task);
+		ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+	}
 
 	iperf_udp_client_report(option);
+
 	if (wpa_driver_get_associate_status(vif)== true)
 		iperf_await_server_fin_packet(option, datagram);
 
@@ -383,6 +427,11 @@ exit:
 
 task_exit:
 	iperf_option_free(option);
+#if DEBUG_IPERF_TASK_HANDLE
+	nrc_iperf_spin_lock();
+	CPA("%s END [handle:%d]\n", __func__, task_handle);
+	nrc_iperf_spin_unlock();
+#endif
 	vTaskDelete(NULL);
 }
 
@@ -392,20 +441,25 @@ static struct udp_client_data *udp_new_client(iperf_opt_t *option)
 
 	udp_c_data = (struct udp_client_data *) mem_malloc(sizeof(struct udp_client_data));
 	if (!udp_c_data) {
-		A("[%s] new client malloc failed\n", __func__);
+		CPA("[%s] new client malloc failed\n", __func__);
 		return NULL;
 	}
 
 	memset(udp_c_data, 0, sizeof(struct udp_client_data));
 
 	udp_c_data->option = (iperf_opt_t *) mem_malloc(sizeof(iperf_opt_t));
+	if(!udp_c_data->option) {
+		CPA("[%s] option malloc failed\n", __func__);
+		mem_free(udp_c_data);
+		return NULL;
+	}
 	memcpy(udp_c_data->option, option, sizeof(iperf_opt_t));
 	udp_c_data->next = udp_client_list;
 	udp_client_list = udp_c_data;
 
 	if (option->mInterval > 0) {
-		xTaskCreate(nrc_iperf_periodic_report, "iperf periodic report",
-					1024, (void *) udp_c_data->option, LWIP_IPERF_TASK_PRIORITY, &udp_c_data->option->server_info.periodic_report_task);
+		xTaskCreate(nrc_iperf_periodic_report, "iperf_udp_server_report", 1024,
+			(void *) udp_c_data->option, LWIP_IPERF_TASK_PRIORITY, &udp_c_data->option->server_info.periodic_report_task);
 	}
 	return udp_c_data;
 }
@@ -429,29 +483,6 @@ ATTR_NC __attribute__((optimize("O3"))) static struct udp_client_data *find_matc
 		}
 	}
 	return NULL;
-}
-
-ATTR_NC __attribute__((optimize("O3"))) static void udp_free_client(struct udp_client_data *client)
-{
-	struct udp_client_data *tmp;
-
-	if (!client) {
-		return;
-	}
-
-	if (client == udp_client_list) {
-		udp_client_list = udp_client_list->next;
-	} else {
-		for (tmp = udp_client_list; (tmp->next != client) && tmp; tmp = tmp->next);
-		tmp->next = client->next;
-	}
-	mem_free(client->option);
-
-	if (client->option->server_info.periodic_report_task) {
-		vTaskDelete(client->option->server_info.periodic_report_task);
-	}
-
-	mem_free(client);
 }
 
 static void iperf_udp_server_report (struct udp_client_data *client)
@@ -499,13 +530,13 @@ static void iperf_udp_server_report (struct udp_client_data *client)
 			}
 #endif
 		} else {
-			A("##### [%s] etharp_find_addr failed\n", __func__);
+			CPA("##### [%s] etharp_find_addr failed\n", __func__);
 		}
 	}
 
 	nrc_iperf_spin_lock();
-	A("[iperf UDP Server Report for %s:%d, snr:%u, rssi:%d]\n", inet_ntoa(from->sin_addr), ntohs(from->sin_port), snr, rssi);
-	A("  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec  %6.3f ms  %4ld/%5ld (%.2g%%)",
+	CPA("[iperf UDP Server Report for %s:%d, snr:%u, rssi:%d]\n", inet_ntoa(from->sin_addr), ntohs(from->sin_port), snr, rssi);
+	CPA("  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec  %6.3f ms  %4ld/%5ld (%.2g%%)",
 	  start_time, stop_time,
 	  byte_to_string(byte), bps_to_string(bps),
 	  client->option->server_info.jitter * 1000,
@@ -514,10 +545,35 @@ static void iperf_udp_server_report (struct udp_client_data *client)
 	  (double)(client->option->server_info.error_cnt * 100.) / client->option->server_info.datagram_seq);
 
 	if (client->option->server_info.outoforder_cnt > 0)
-		A("\t OUT_OF_ORDER(%ld)\n", client->option->server_info.outoforder_cnt);
+		CPA("\t OUT_OF_ORDER(%ld)\n", client->option->server_info.outoforder_cnt);
 	else
-		A("\n");
+		CPA("\n");
 	nrc_iperf_spin_unlock();
+}
+
+ATTR_NC __attribute__((optimize("O3"))) static void udp_free_client(struct udp_client_data *client)
+{
+	struct udp_client_data *tmp;
+
+	if (!client) {
+		return;
+	}
+
+	if (client == udp_client_list) {
+		udp_client_list = udp_client_list->next;
+	} else {
+		for (tmp = udp_client_list; (tmp->next != client) && tmp; tmp = tmp->next);
+		tmp->next = client->next;
+	}
+
+	if(client->option->server_info.periodic_report_task) {
+		sys_arch_msleep(100);
+		xTaskNotifyGive(client->option->server_info.periodic_report_task);
+		ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+	}
+	iperf_udp_server_report(client);
+	mem_free(client->option);
+	mem_free(client);
 }
 
 
@@ -556,13 +612,13 @@ static void iperf_udp_server_report_to_client (iperf_opt_t * option)
 	memcpy (&client_addr, &(option->server_info.clientaddr), sizeof(struct sockaddr));
 
 	if (client_addr.sa_family != AF_INET) {
-		A("invalid client addr\n");
+		CPA("invalid client addr\n");
 		return;
 	}
 
 	datagram = (iperf_udp_datagram_t *)mem_malloc(IPERF_DEFAULT_DATA_BUF_LEN);
 	if (!datagram){
-		A("datagram malloc failed\n");
+		CPA("datagram malloc failed\n");
 		return;
 	}
 	memset(datagram, 0, IPERF_DEFAULT_DATA_BUF_LEN);
@@ -667,7 +723,7 @@ ATTR_NC __attribute__((optimize("O3"))) static void iperf_udp_server_recv (iperf
 			if(IP_IS_V4(&option->addr)) {
 				struct sockaddr_in *from4 = (struct sockaddr_in*)&option->server_info.clientaddr;
 				nrc_iperf_spin_lock();
-				A("UDP server connected with %s port %d\n",
+				CPA("UDP server connected with %s port %d\n",
 					   inet_ntoa(from4->sin_addr), ntohs(from4->sin_port));
 				nrc_iperf_spin_unlock();
 			}
@@ -681,13 +737,13 @@ ATTR_NC __attribute__((optimize("O3"))) static void iperf_udp_server_recv (iperf
 				option->server_info.datagram_seq++;
 
 				if (id < option->server_info.datagram_seq) {
-					/* A("out of order: %d -> %d\n", option->server_info.datagram_seq, id); */
+					/* CPA("out of order: %d -> %d\n", option->server_info.datagram_seq, id); */
 					option->server_info.outoforder_cnt++;
 					option->server_info.datagram_seq = id;
 					if(option->server_info.error_cnt>0)
 						option->server_info.error_cnt--;
 				} else if (id > option->server_info.datagram_seq) {
-					/* A("lost datagrams: %d, %d -> %d\n", id - option->server_info.datagram_seq,
+					/* CPA("lost datagrams: %d, %d -> %d\n", id - option->server_info.datagram_seq,
 															option->server_info.datagram_seq, id); */
 					option->server_info.error_cnt += id - option->server_info.datagram_seq;
 					option->server_info.datagram_seq = id;
@@ -700,7 +756,7 @@ ATTR_NC __attribute__((optimize("O3"))) static void iperf_udp_server_recv (iperf
 	}
 	else {
 		nrc_iperf_spin_lock();
-		A("len=%d\n", len);
+		CPA("len=%d\n", len);
 		nrc_iperf_spin_unlock();
 	}
 }
@@ -717,18 +773,22 @@ ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_server(void *pvParameters
 	char *buf = NULL;
 	struct sockaddr_storage server;
 	struct timeval timeout, timeout_recv;
+	TaskHandle_t task_handle = option->task_handle;
 
 	/* Setup fd_set structure */
 	fd_set fds;
 
 	struct udp_client_data *client = NULL;
 
+#if DEBUG_IPERF_TASK_HANDLE
 	nrc_iperf_spin_lock();
-	A("%s Start\n", __func__);
+	CPA("%s Start [handle:%d]\n", __func__, task_handle);
 	nrc_iperf_spin_unlock();
+#endif
+
 #if LWIP_IPV6
 		if(IP_IS_V6(&option->addr) && !ip6_addr_isipv4mappedipv6(ip_2_ip6(&option->addr))) {
-			A("[%s] Unsupported IPV6\n", __func__);
+			CPA("[%s] Unsupported IPV6\n", __func__);
 			goto task_exit;
 		}
 #endif /* LWIP_IPV6 */
@@ -743,7 +803,7 @@ ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_server(void *pvParameters
 
 		sock = socket(AF_INET, SOCK_DGRAM, 0);
 		if (sock < 0) {
-			A("create socket failed!\n");
+			CPA("create socket failed!\n");
 			goto exit;
 		}
 
@@ -754,7 +814,7 @@ ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_server(void *pvParameters
 
 		if (bind(sock, (struct sockaddr*)&server, sizeof(server)) < 0){
 			int err = errno;
-			A("[%s] bind(%d) returned error: %d.\n", __func__, sock, -err);
+			CPA("[%s] bind(%d) returned error: %d.\n", __func__, sock, -err);
 			goto exit;
 		}
 	}
@@ -765,17 +825,17 @@ ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_server(void *pvParameters
 	timeout.tv_sec = 2;
 	timeout.tv_usec = 0;
 	if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) == -1) {
-		A("setsockopt failed!!");
+		CPA("setsockopt failed!!");
 		goto exit;
 	}
 	if (bind(sock, (struct sockaddr *)&server, sizeof(struct sockaddr_storage)) < 0) {
-		A("iperf server bind failed!! exit\n");
+		CPA("iperf server bind failed!! exit\n");
 		goto exit;
 	}
 
 	buf = mem_malloc(IPERF_UDP_MAX_RECV_SIZE);
 	if (buf == NULL) {
-		A("No memory\n");
+		CPA("No memory\n");
 		goto exit;
 	}
 	memset(buf, 0, IPERF_UDP_MAX_RECV_SIZE);
@@ -812,7 +872,7 @@ ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_server(void *pvParameters
 			if (!client) {
 				if (id == 0) {
 					if ((client = udp_new_client(option)) == NULL) {
-						A("[%s] failed to create new client\n", __func__);
+						CPA("[%s] failed to create new client\n", __func__);
 						break;
 					}
 				} else {
@@ -834,8 +894,6 @@ ATTR_NC __attribute__((optimize("O3"))) void iperf_udp_server(void *pvParameters
 		if (client) {
 			if(client->option->server_info.start == 1) {
 				iperf_udp_server_report_to_client(client->option);
-				iperf_udp_server_report(client);
-
 				udp_free_client(client);
 			}
 		}
@@ -850,10 +908,13 @@ exit:
 	}
 
 task_exit:
-	nrc_iperf_spin_lock();
-	A("%s End\n", __func__);
-	nrc_iperf_spin_unlock();
 	iperf_option_free(option);
+#if DEBUG_IPERF_TASK_HANDLE
+	nrc_iperf_spin_lock();
+	CPA("%s END [handle:%d]\n", __func__, task_handle);
+	nrc_iperf_spin_unlock();
+#endif
 	vTaskDelete(NULL);
 }
 #endif /* LWIP_IPERF */
+#endif /*!defined(DISABLE_IPERF_APP) */

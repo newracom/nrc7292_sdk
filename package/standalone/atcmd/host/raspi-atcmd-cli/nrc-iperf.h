@@ -194,6 +194,8 @@ typedef struct
 typedef struct
 {
 	bool done;
+	bool socket_closed;
+	bool server_report;
 	int32_t datagram_cnt;
 
 	/* options */

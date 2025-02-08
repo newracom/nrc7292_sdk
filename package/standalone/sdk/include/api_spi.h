@@ -88,7 +88,6 @@ typedef struct spi_device {
  ***********************************************/
 nrc_err_t nrc_spi_master_init(spi_device_t* spi);
 
-
 /**********************************************
  * @fn nrc_err_t nrc_spi_init_cs(uint8_t pin_cs)
  *
@@ -136,27 +135,6 @@ nrc_err_t nrc_spi_start_xfer(spi_device_t* spi);
  ***********************************************/
 nrc_err_t nrc_spi_stop_xfer(spi_device_t* spi);
 
-/**********************************************
- * @fn  void nrc_spi_dma_start_xfer(spi_device_t* spi)
- *
- * @brief Enable CS without disabling interrupt
- *
- * @param spi_device_t: A pointer for spi configuration
- *
- * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
- ***********************************************/
-nrc_err_t nrc_spi_dma_start_xfer(spi_device_t* spi);
-
-/**********************************************
- * @fn  void nrc_spi_dma_stop_xfer(spi_device_t* spi)
- *
- * @brief Disable CS without disabling interrupt
- *
- * @param spi_device_t: A pointer for spi configuration
- *
- * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
- ***********************************************/
-nrc_err_t nrc_spi_dma_stop_xfer(spi_device_t* spi);
 
 /**********************************************
  * @fn nrc_err_t_t nrc_spi_xfer(uint8_t *wbuffer, uint8_t *rbuffer, uint32_t size)
@@ -241,6 +219,7 @@ nrc_err_t nrc_spi_write_values(spi_device_t* spi, uint8_t addr, uint8_t *data, i
  * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
 nrc_err_t nrc_spi_read_values(spi_device_t* spi, uint8_t addr, uint8_t *data, int size);
+
 
 #ifdef __cplusplus
 }

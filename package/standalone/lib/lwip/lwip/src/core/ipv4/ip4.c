@@ -380,39 +380,46 @@ ip4_input_accept(struct netif *netif)
                          ip4_addr_get_u32(ip4_current_dest_addr()) & ~ip4_addr_get_u32(netif_ip4_netmask(netif))));
 
   /* interface is up and configured? */
-  if ((netif_is_up(netif)) && (!ip4_addr_isany_val(*netif_ip4_addr(netif)))) {
+  if (netif_is_up(netif)) {
+	if (!ip4_addr_isany_val(*netif_ip4_addr(netif))) {
 #if LWIP_IPV4_CHECK_SRC_ADDR
-    if (ip4_addr_cmp(ip4_current_src_addr(), netif_ip4_addr(netif))) {
-	  LWIP_DEBUGF(IP_DEBUG, ("ip4_input: source address %"U16_F".%"U16_F".%"U16_F".%"U16_F" is the same\n",
-                         ip4_addr1_16(ip4_current_src_addr()), ip4_addr2_16(ip4_current_src_addr()),
-                         ip4_addr3_16(ip4_current_src_addr()), ip4_addr4_16(ip4_current_src_addr())));
-	  return 0;
-    }
+		if (ip4_addr_cmp(ip4_current_src_addr(), netif_ip4_addr(netif))) {
+			LWIP_DEBUGF(IP_DEBUG, ("ip4_input: source address %"U16_F".%"U16_F".%"U16_F".%"U16_F" is the same\n",
+						ip4_addr1_16(ip4_current_src_addr()), ip4_addr2_16(ip4_current_src_addr()),
+						ip4_addr3_16(ip4_current_src_addr()), ip4_addr4_16(ip4_current_src_addr())));
+			return 0;
+		}
 #endif /* LWIP_IPV4_CHECK_SRC_ADDR */
 
-    /* unicast to this interface address? */
-    if (ip4_addr_cmp(ip4_current_dest_addr(), netif_ip4_addr(netif)) ||
-        /* or broadcast on this interface network address? */
-        ip4_addr_isbroadcast(ip4_current_dest_addr(), netif)
+		/* unicast to this interface address? */
+		if (ip4_addr_cmp(ip4_current_dest_addr(), netif_ip4_addr(netif)) ||
+				/* or broadcast on this interface network address? */
+				ip4_addr_isbroadcast(ip4_current_dest_addr(), netif)
 #if LWIP_NETIF_LOOPBACK && !LWIP_HAVE_LOOPIF
-        || (ip4_addr_get_u32(ip4_current_dest_addr()) == PP_HTONL(IPADDR_LOOPBACK))
+				|| (ip4_addr_get_u32(ip4_current_dest_addr()) == PP_HTONL(IPADDR_LOOPBACK))
 #endif /* LWIP_NETIF_LOOPBACK && !LWIP_HAVE_LOOPIF */
-       ) {
-      LWIP_DEBUGF(IP_DEBUG, ("ip4_input: packet accepted on interface %c%c\n",
-                             netif->name[0], netif->name[1]));
-      /* accept on this netif */
-      return 1;
-    }
+		   ) {
+			LWIP_DEBUGF(IP_DEBUG, ("ip4_input: packet accepted on interface %c%c\n",
+						netif->name[0], netif->name[1]));
+			/* accept on this netif */
+			return 1;
+		}
 #if LWIP_AUTOIP
-    /* connections to link-local addresses must persist after changing
-        the netif's address (RFC3927 ch. 1.9) */
-    if (autoip_accept_packet(netif, ip4_current_dest_addr())) {
-      LWIP_DEBUGF(IP_DEBUG, ("ip4_input: LLA packet accepted on interface %c%c\n",
-                             netif->name[0], netif->name[1]));
-      /* accept on this netif */
-      return 1;
-    }
+		/* connections to link-local addresses must persist after changing
+		   the netif's address (RFC3927 ch. 1.9) */
+		if (autoip_accept_packet(netif, ip4_current_dest_addr())) {
+			LWIP_DEBUGF(IP_DEBUG, ("ip4_input: LLA packet accepted on interface %c%c\n",
+						netif->name[0], netif->name[1]));
+			/* accept on this netif */
+			return 1;
+		}
 #endif /* LWIP_AUTOIP */
+	} else if (ip4_addr_isbroadcast(ip4_current_dest_addr(), netif)) {
+		LWIP_DEBUGF(IP_DEBUG, ("ip4_input: packet accepted on interface %c%c\n",
+					netif->name[0], netif->name[1]));
+		/* accept on this netif */
+		return 1;
+	}
   }
   return 0;
 }

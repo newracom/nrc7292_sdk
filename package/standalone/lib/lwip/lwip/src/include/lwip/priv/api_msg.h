@@ -152,6 +152,8 @@ struct api_msg {
 #if LWIP_NETCONN_SEM_PER_THREAD
   sys_sem_t* op_completed_sem;
 #endif /* LWIP_NETCONN_SEM_PER_THREAD */
+
+  struct netif *netif; /* For supporting limited broadcast UDP */
 };
 
 #if LWIP_NETCONN_SEM_PER_THREAD

@@ -39,8 +39,23 @@ struct lmac_stats {
 #endif
 };
 
+struct moving_average {
+	int size;
+	int count;
+	int min;
+	int max;
+	int index;
+	int (*compute)(void *arr_t, int index, int count);
+	uint8_t arr[];
+};
+
 void lmac_stats_init();
 struct lmac_stats * stats();
+
+int nrc_stats_rate_index_init(int count);
+void nrc_stats_rate_index_deinit(void);
+void nrc_stats_rate_index_update(uint8_t rate_index);
+int nrc_stats_rate_index(void);
 
 #if defined(INCLUDE_MEASURE_AIRTIME) || defined(INCLUDE_MEASURE_AIRTIME_NONESL)
 void clear_airtime_deepsleep_statistics();

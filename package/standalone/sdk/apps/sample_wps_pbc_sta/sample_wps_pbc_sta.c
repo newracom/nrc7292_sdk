@@ -24,6 +24,7 @@
  */
 
 #include "nrc_sdk.h"
+#include "nrc_lwip.h"
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
 #include "wifi_config.h"
@@ -112,7 +113,7 @@ static void wps_pbc_sta_btn_pressed(int vector)
 	pre_gpio_value = input_high;
 }
 
-static void wps_pbc_sta_success(void *priv, uint8_t *ssid, uint8_t ssid_len, uint8_t security_mode, char *passphrase)
+static void wps_pbc_sta_success(void *priv, int net_id, uint8_t *ssid, uint8_t ssid_len, uint8_t security_mode, char *passphrase)
 {
 	nvs_err_t err = NVS_OK;
 
@@ -171,14 +172,6 @@ nrc_err_t run_sample_wps_pbc_sta(WIFI_CONFIG *param)
 		return WIFI_FAIL_SET_IP;
 	}
 
-	/* Set TX Power */
-	txpower = param->tx_power;
-
-	if(nrc_wifi_set_tx_power(txpower, 1) != WIFI_SUCCESS) {
-		nrc_usr_print("[%s] Fail set TX Power\n", __func__);
-		return WIFI_FAIL;
-	}
-
 	nrc_usr_print("[%s] Trying to add network...\n",__func__);
 	if (nrc_wifi_add_network(0) < 0) {
 		nrc_usr_print("[%s] Fail to init network \n", __func__);
@@ -187,6 +180,13 @@ nrc_err_t run_sample_wps_pbc_sta(WIFI_CONFIG *param)
 
 	if(nrc_wifi_set_country(0, nrc_wifi_country_from_string(COUNTRY_CODE)) != WIFI_SUCCESS) {
 		nrc_usr_print("[%s] Fail to set Country\n", __func__);
+		return WIFI_FAIL;
+	}
+
+	/* Set TX Power */
+	txpower = param->tx_power;
+	if(nrc_wifi_set_tx_power(txpower, 1) != WIFI_SUCCESS) {
+		nrc_usr_print("[%s] Fail set TX Power\n", __func__);
 		return WIFI_FAIL;
 	}
 
@@ -203,14 +203,14 @@ nrc_err_t run_sample_wps_pbc_sta(WIFI_CONFIG *param)
 			if (nrc_wifi_get_state(0) == WIFI_STATE_CONNECTED) {
 				nrc_usr_print("[%s] Get IP Address ...\n", __func__);
 				if (param->ip_mode == WIFI_DYNAMIC_IP) {
-					if (nrc_wifi_set_ip_address(0, param->ip_mode, NULL, NULL, NULL) != WIFI_SUCCESS) {
-						nrc_usr_print("[%s] Fail to set IP Address\n", __func__);
+					if (nrc_wifi_set_ip_address(0, param->ip_mode, param->dhcp_timeout, NULL, NULL, NULL) != WIFI_SUCCESS) {
+						nrc_usr_print("[%s] Fail to set IP Address(DHCP)\n", __func__);
 					}
 					else
 						break;
 				} else {
-					if (nrc_wifi_set_ip_address(0, param->ip_mode, param->static_ip, param->netmask, param->gateway) != WIFI_SUCCESS) {
-						nrc_usr_print("[%s] Fail to set IP Address\n", __func__);
+					if (nrc_wifi_set_ip_address(0, param->ip_mode, 0, param->static_ip, param->netmask, param->gateway) != WIFI_SUCCESS) {
+						nrc_usr_print("[%s] Fail to set Static IP Address\n", __func__);
 					}
 					else
 						break;
@@ -219,6 +219,11 @@ nrc_err_t run_sample_wps_pbc_sta(WIFI_CONFIG *param)
 				nrc_usr_print("[%s] Disconnected..\n", __func__);
 			}
 			_delay_ms(1000);
+		}
+
+		/* check if IP is ready */
+		if (nrc_wait_for_ip(0, param->dhcp_timeout) == NRC_FAIL) {
+			return NRC_FAIL;
 		}
 
 		btn_pressed  = false;
@@ -307,14 +312,23 @@ nrc_err_t run_sample_wifi_state(WIFI_CONFIG *param)
 
 	/* check if IP is ready */
 	while(1) {
+		_delay_ms(1000);
+
+		if (nrc_wifi_get_state(0) == WIFI_STATE_DISCONNECTED) {
+			break;
+		}
+
 		if (nrc_addr_get_state(0) == NET_ADDR_SET) {
+			struct netif *interface = nrc_netif_get_by_idx(0);
 			nrc_usr_print("[%s] IP ...\n",__func__);
+			nrc_usr_print("IP4 : %s\n", ipaddr_ntoa(&interface->ip_addr));
+			nrc_usr_print("Netmask : %s\n", ipaddr_ntoa(&interface->netmask));
+			nrc_usr_print("Gateway : %s\n", ipaddr_ntoa(&interface->gw));
 			break;
 		} else {
 			nrc_usr_print("[%s] IP Address setting State : %d != NET_ADDR_SET(%d) yet...\n",
 						  __func__, nrc_addr_get_state(0), NET_ADDR_SET);
 		}
-		_delay_ms(1000);
 	}
 
 	ap_info = nrc_mem_malloc(sizeof(AP_INFO));
@@ -386,6 +400,7 @@ void user_init(void)
 		nrc_usr_print("[%s] start for wps_pbc_sta \n", __func__);
 		ret = run_sample_wps_pbc_sta(param);
 		nrc_usr_print("[%s] run_sample_wps_pbc_sta!! %s \n",__func__, (ret==0) ?  "Success" : "Fail");
+		_delay_ms(1000);
 		nrc_sw_reset();
 	}
 

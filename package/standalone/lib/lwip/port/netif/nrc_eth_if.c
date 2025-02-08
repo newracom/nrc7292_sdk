@@ -54,7 +54,7 @@ static void print_buffer(uint8_t *buffer, uint32_t size)
 	LWIP_PLATFORM_DIAG(("   0        1        2        3        4        5        6        7        8        9       10       11       12       13       14       15    \n"));
 	LWIP_PLATFORM_DIAG(("-----------------------------------------------------------------------------------------------------------------------------------------------\n"));
 	for (i = 0; i < size; i++) {
-		system_printf("0x%02x (%c) ", buffer[i],
+		nrc_usr_print("0x%02x (%c) ", buffer[i],
 					  ((buffer[i] >= 32) && (buffer[i] <= 126))? buffer[i] : 0x20);
 		if ((i % 16) == 15) {
 			LWIP_PLATFORM_DIAG(("\n"));
@@ -163,7 +163,7 @@ static void link_callback(struct netif *eth_if)
 				STA_LIST info;
 				char mac_addr[20];
 				/* Retrieve all station currently associated */
-				if (nrc_wifi_softap_get_sta_list(0, &info) == WIFI_SUCCESS) {
+				if (nrc_wifi_softap_get_sta_list(0, &info, sizeof(STA_LIST)) == WIFI_SUCCESS) {
 					for (int i = 0; i < info.total_num; i++) {
 						sprintf(mac_addr, "%02x:%02x:%02x:%02x:%02x:%02x",
 								info.sta[i].addr[0],
@@ -210,11 +210,16 @@ static void nrc_bind_eth_if(esp_eth_mac_t *mac)
 
 #if LWIP_BRIDGE
 	if (network_mode == NRC_NETWORK_MODE_BRIDGE) {
-		if (eth_mode == NRC_ETH_MODE_AP) {
-			memcpy(bridge_data.ethaddr.addr, eth_netif.hwaddr, 6);
+#ifndef USE_SAME_BR_WLAN0_MAC
+		memcpy(bridge_data.ethaddr.addr, nrc_netif[1]->hwaddr, 6);
+		if (bridge_data.ethaddr.addr[3] < 0xff) {
+			bridge_data.ethaddr.addr[3]++;
 		} else {
-			memcpy(bridge_data.ethaddr.addr, nrc_netif[0]->hwaddr, 6);
+			bridge_data.ethaddr.addr[3] = 0;
 		}
+#else
+		memcpy(bridge_data.ethaddr.addr, nrc_netif[0]->hwaddr, 6);
+#endif
 		bridge_data.max_ports = 2;
 		bridge_data.max_fdb_dynamic_entries = 128;
 		bridge_data.max_fdb_static_entries = 16;
@@ -367,31 +372,31 @@ int nat_add(struct netif *out_if, struct netif *in_if)
 	struct nat_rule *rule;
 	err_t ret;
 
-	system_printf("[%s] allocating rule...\n", __func__);
+	nrc_usr_print("[%s] allocating rule...\n", __func__);
 	rule = pvPortCalloc(1, sizeof(struct nat_rule));
 	rule->inp = in_if;
 	rule->outp = out_if;
 	ret = nat_rule_add(rule);
 	if (ret < 0) {
-		system_printf("[%s] nat rule addition failed...\n", __func__);
+		nrc_usr_print("[%s] nat rule addition failed...\n", __func__);
 		vPortFree(rule);
 	}
 
-	system_printf("[%s] returning...\n", __func__);
+	nrc_usr_print("[%s] returning...\n", __func__);
 	return ret;
 }
 
-nrc_err_t ethernet_init(uint8_t *mac_addr)
+nrc_err_t ethernet_init(spi_device_t *eth_spi, uint8_t *mac_addr, int gpio_int_pin)
 {
     eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
-	uint8_t addr[6] = {0,};
+    uint8_t addr[6] = {0,};
     mac_config.smi_mdc_gpio_num = -1;
     mac_config.smi_mdio_gpio_num = -1;
 #ifdef ETH_DRIVER_ENC28J60
-    esp_eth_mac_t *mac = esp_eth_mac_new_enc28j60(&mac_config);
+    esp_eth_mac_t *mac = esp_eth_mac_new_enc28j60(eth_spi, &mac_config, gpio_int_pin);
 #endif
 #ifdef ETH_DRIVER_W5500
-	esp_eth_mac_t *mac = esp_eth_mac_new_w5500(&mac_config);
+	esp_eth_mac_t *mac = esp_eth_mac_new_w5500(eth_spi, &mac_config, gpio_int_pin);
 #endif
     eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
     phy_config.autonego_timeout_ms = 0; // ENC28J60 doesn't support auto-negotiation
@@ -400,7 +405,7 @@ nrc_err_t ethernet_init(uint8_t *mac_addr)
     esp_eth_phy_t *phy = esp_eth_phy_new_enc28j60(&phy_config);
 #endif
 #ifdef ETH_DRIVER_W5500
-	esp_eth_phy_t *phy = esp_eth_phy_new_w5500(&phy_config);
+    esp_eth_phy_t *phy = esp_eth_phy_new_w5500(&phy_config);
 #endif
     esp_eth_config_t eth_config = ETH_DEFAULT_CONFIG(mac, phy);
     eth_config.stack_input = eth_stack_input_handler;

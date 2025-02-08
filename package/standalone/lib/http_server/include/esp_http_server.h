@@ -329,7 +329,7 @@ esp_err_t httpd_stop(httpd_handle_t handle);
  */
 
 /* Max supported HTTP request header length */
-#define HTTPD_MAX_REQ_HDR_LEN 512
+#define HTTPD_MAX_REQ_HDR_LEN 1024
 
 /* Max supported HTTP request URI length */
 #define HTTPD_MAX_URI_LEN 512

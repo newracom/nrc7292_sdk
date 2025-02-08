@@ -29,7 +29,8 @@ typedef enum _ps_mode {
 
 typedef enum _ps_sleep_mode {
 	PS_SLEEP_MODE_MODEM,
-	PS_SLEEP_MODE_DEEP
+	PS_SLEEP_MODE_DEEP,
+	PS_SLEEP_MODE_NONE
 } ps_sleep_mode;
 
 typedef enum _ps_tim_mode {
@@ -59,6 +60,7 @@ typedef enum _ps_pm_type {
 } ps_pm_type;
 
 typedef enum _ps_pm_send_state {
+	PS_PM_SEND_NONE,
 	PS_PM_SEND_PROCESSING,
 	PS_PM_SEND_SUCCESS,
 	PS_PM_SEND_FAIL
@@ -218,9 +220,6 @@ void lmac_ps_set_sync_time_ms(uint32_t time);
 uint32_t lmac_ps_get_sync_time_ms(void);
 void lmac_ps_set_addr(uint8_t *addr, bool ap);
 void lmac_ps_set_country(uint8_t *cc);
-#if defined(NRC7394)
-void lmac_ps_set_freq(uint32_t freq);
-#endif
 void lmac_ps_set_ssid(uint8_t *ssid, uint8_t  len);
 void lmac_ps_set_ndp_preq(uint8_t enable);
 void lmac_ps_set_guard_interval(uint8_t gi);
@@ -241,8 +240,11 @@ void lmac_ps_set_sgi(uint8_t sgi);
 void lmac_ps_set_bss_maxidle(uint8_t option, uint16_t usf_period);
 void lmac_ps_set_security(uint8_t security);
 void lmac_ps_set_akm(uint8_t akm);
+void lmac_ps_set_sae_pwe(uint8_t sae_pwe);
 void lmac_ps_set_pmk(uint8_t *pmk, uint32_t pmk_len);
+uint32_t lmac_ps_get_pmk(uint8_t **pmk);
 void lmac_ps_set_ip_addr(uint32_t ipaddr, uint32_t netmask, uint32_t gwaddr);
+void lmac_ps_set_ip_mode(uint32_t ip_mode);
 void lmac_ps_set_ucode_wake_src(uint8_t source);
 void lmac_ps_set_init_retention();
 void lmac_ps_set_rf_reg_dump(uint32_t *dump_val);
@@ -255,6 +257,7 @@ void lmac_ps_set_short_beacon_interval(uint32_t sbi);
 void lmac_ps_set_dtim_period(uint8_t period);
 void lmac_ps_set_1m_ctrl_resp_preamble(uint8_t support);
 void lmac_ps_set_ps_mode(uint8_t mode, uint64_t duration);
+int lmac_ps_get_ps_mode(void);
 void lmac_ps_set_qos_null_pm1_ack_flag(int ack_flag);
 int lmac_ps_get_qos_null_pm1_ack_flag();
 void lmac_ps_set_usr_timer(uint8_t vif_id, uint32_t timeout_ms);
@@ -270,6 +273,11 @@ void lmac_ps_set_legacy_ack(uint8_t enable);
 #if defined(INCLUDE_BEACON_BYPASS)
 void lmac_ps_set_beacon_bypass(uint8_t enable);
 #endif /* INCLUDE_BEACON_BYPASS */
+#if defined(INCLUDE_AUTH_CONTROL)
+uint8_t lmac_ps_get_auth_control_enable();
+void lmac_ps_set_auth_control_enable(uint8_t enable);
+void lmac_ps_set_auth_control_param(uint8_t scale, uint8_t slot, uint8_t min, uint8_t max);
+#endif /* INCLUDE_AUTH_CONTROL */
 #if defined (INCLUDE_AVOID_FRAG_ATTACK_TEST)
 void lmac_ps_set_prev_ptk(uint8_t *ptk, uint32_t ptk_len);
 #endif /* INCLUDE_AVOID_FRAG_ATTACK_TEST */
@@ -292,6 +300,7 @@ void lmac_dyn_ps_init();
 uint32_t lmac_dyn_ps_get_timeout(uint8_t vif_id);
 int lmac_dyn_ps_set_timeout(uint8_t vif_id, uint32_t dps_timeout_ms);
 void lmac_dyn_ps_check_timeout(uint8_t vif_id);
+void lmac_ps_enter_sleep(SYS_BUF *head);
 void lmac_dyn_ps_set_last_rx_tsf();
 uint32_t lmac_dyn_ps_get_last_rx_tsf();
 uint32_t lmac_dyn_ps_get_last_rx_diff();
@@ -301,6 +310,7 @@ uint32_t lmac_dyn_ps_get_last_bcmc_rx_diff();
 void lmac_dyn_ps_set_last_tx_tsf();
 uint32_t lmac_dyn_ps_get_last_tx_tsf();
 uint32_t lmac_dyn_ps_get_last_tx_diff();
+bool lmac_ps_wait_for_ack(uint32_t timeout);
 
 extern lmac_ps_info g_lmac_ps_info;
 

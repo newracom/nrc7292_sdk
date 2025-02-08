@@ -68,6 +68,7 @@ typedef struct _CCA_RESULT_4M
 #define lmac_set_mcs(x, y)			set_mcs(y)
 #define lmac_get_mcs(x)				get_mcs()
 #define lmac_set_prim_ch_bw(x, y)		set_prim_ch_bw(y)
+#define lmac_get_prim_ch_bw(x)			get_prim_ch_bw()
 #define lmac_set_prim_ch_loc(x, y)		set_prim_ch_loc(y)
 #define lmac_get_prim_ch_loc(x)			get_prim_ch_loc()
 #define lmac_set_ch_bw(x, y)			set_ch_bw(y)
@@ -98,6 +99,7 @@ typedef struct _CCA_RESULT_4M
 #define lmac_mode_bssid(x, y)			drv_mode_bssid(x, y)
 #define lmac_set_max_agg_sched_num(x)	set_max_agg_sched_num(x)
 #define lmac_get_max_agg_sched_num(x)	get_max_agg_sched_num(x)
+#define lmac_get_rts(x)                 get_rts(x)
 #if defined(INCLUDE_DYNAMIC_FRAG)
 #define lmac_set_dynamic_frag(x)		set_dynamic_frag(x)
 #define lmac_get_dynamic_frag()		get_dynamic_frag()
@@ -107,8 +109,8 @@ typedef struct _CCA_RESULT_4M
 #define lmac_get_dynamic_defrag()		get_dynamic_defrag()
 #endif
 #if defined(INCLUDE_AUTH_CONTROL)
-#define lmac_set_auth_ctrl(x)		set_auth_ctrl(x)
-#define lmac_get_auth_ctrl()		get_auth_ctrl()
+#define lmac_set_enable_auth_ctrl(x)		set_enable_auth_ctrl(x)
+#define lmac_get_enable_auth_ctrl()		get_enable_auth_ctrl()
 #endif
 
 #else
@@ -128,6 +130,7 @@ struct      cipher_def; // declare
 void        sbr_init(int vector);
 #endif
 void        lmac_init(int vector);
+void        lmac_default_gain(void);
 void        lmac_start(void);
 void        lmac_idle_hook(void);
 void        lmac_set_dl_callback(void (*dl_callback)(int vif_id, struct _SYS_BUF*) );
@@ -143,10 +146,10 @@ void        lmac_key_counter_reset();
 void        lmac_set_mac_address(int vif_id , uint8_t* addr);
 void        lmac_set_dev_mac(int hw_index, uint8_t *mac_addr);
 uint8_t*    lmac_get_mac_address(int vif_id);
-#if defined(NRC7393) || defined(NRC7394)
+#if defined(NRC7394)
 void        lmac_set_enable_mac_addr(int vif_id, bool enable);
 bool        lmac_get_enable_mac_addr(int vif_id);
-#endif /* defined(NRC7393) */
+#endif /* defined(NRC7394) */
 void        lmac_set_bssid(int vif_id, uint8_t *bssid);
 void        lmac_set_enable_bssid(int vif_id, bool enable);
 bool        lmac_get_enable_bssid(int vif_id);
@@ -161,7 +164,9 @@ bool        lmac_is_ibss(int vif_id);
 bool        lmac_is_mesh_ap(void);
 bool        lmac_is_relay(void);
 bool        lmac_is_concurrent(void);
+bool        lmac_is_rev(void);
 void        lmac_set_cca_ignore(bool ignore);
+uint8_t     lmac_get_cca_ignore();
 bool        lmac_scan_set_channel(int vif_id, double freq, bw_t bw);
 double      lmac_scan_read_cca(int vif_id, double freq, bw_t bw, uint32_t scan_duration);
 bool        lmac_scan_read_cca_fast(int vif_id, double freq, bw_t bw, uint32_t scan_duration, CCA_RESULT_4M *cca_results);
@@ -194,7 +199,10 @@ void        lmac_set_agg_manual(int ac, bool manaul);
 #endif
 bool        lmac_set_short_gi(int vif_id, uint8_t short_gi, bool gi_auto_flag);
 void        lmac_enable_1m(bool enable, bool enable_dup);
+bool        lmac_set_rts_rid(int vif_id, int rid);
+int         lmac_get_rts_rid(void);
 bool        lmac_set_rts(int vif_id, uint8_t mode, uint16_t threshold, int rid);
+int         lmac_get_cts(int vif_id);
 bool        lmac_set_cts(int ndp);
 int8_t      lmac_get_ap_vif_id();
 int8_t      lmac_get_sta_vif_id();
@@ -309,7 +317,8 @@ void lmac_lbt_set_pause_time(uint32_t pause_time);
 uint32_t lmac_lbt_get_pause_time();
 void lmac_lbt_set_resume_time(uint32_t resume_time);
 uint32_t lmac_lbt_get_resume_time();
-void lmac_lbt_backup_aifsn(uint8_t ac, uint8_t aifsn);
+void lmac_lbt_set_backup_aifsn(uint8_t ac, uint8_t aifsn);
+uint8_t lmac_lbt_get_backup_aifsn(uint8_t ac);
 bool lmac_check_tx_pause_flag();
 #if defined(INCLUDE_LEGACY_ACK)
 void lmac_set_ack_configure(uint8_t type);

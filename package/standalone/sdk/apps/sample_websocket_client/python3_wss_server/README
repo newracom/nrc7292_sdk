@@ -1,0 +1,7 @@
+usage: wss_server.py [-h] [--ssl]
+
+WebSocket server with SSL support
+
+optional arguments:
+  -h, --help  show this help message and exit
+  --ssl       Use SSL/TLS (wss://)

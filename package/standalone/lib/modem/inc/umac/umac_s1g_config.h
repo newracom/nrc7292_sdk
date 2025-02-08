@@ -123,6 +123,8 @@ void		umac_s1g_config_set_twtresponder_support(bool twt);
 bool		umac_s1g_config_get_twtresponder_support();
 void		umac_s1g_config_set_twtrequester_support(bool twt);
 bool		umac_s1g_config_get_twtrequester_support();
+void		umac_s1g_config_set_twtgrouping_support(bool group);
+bool		umac_s1g_config_get_twtgrouping_support();
 
 // AMPDU Support
 void		umac_s1g_config_set_ampdu_support(bool ampdu);
@@ -213,6 +215,11 @@ bool		umac_s1g_config_get_ess_type_network();
 
 void 		umac_s1g_config_set_broadcast_ssid_type(uint8_t hide_ssid_type);
 int8_t 		umac_s1g_config_get_broadcast_ssid_type();
+
+void		umac_s1g_config_set_centralized_auth_control(bool enable);
+void		umac_s1g_config_set_distributed_auth_control(bool enable);
+bool		umac_s1g_config_get_centralized_auth_control();
+bool		umac_s1g_config_get_distributed_auth_control();
 #else /* defined(INCLUDE_S1G_CONFIG) */
 static inline void umac_s1g_config_init() {}
 static inline void umac_s1g_config_load(int8_t vif_id, MAC_STA_TYPE type){}
@@ -287,5 +294,9 @@ static inline bool umac_s1g_config_get_ess_type_network(){return false;}
 static inline bool umac_s1g_config_get_debug_mode() {return false;}
 static inline void umac_s1g_config_set_broadcast_ssid_type(uint8_t hide_ssid_type){}
 static inline int8_t umac_s1g_config_get_broadcast_ssid_type(){return -1;}
+static inline void umac_s1g_config_set_centralized_auth_control(bool enable) {};
+static inline void umac_s1g_config_set_distributed_auth_control(bool enable) {};
+static inline bool umac_s1g_config_get_centralized_auth_control() {return false;}
+static inline bool umac_s1g_config_get_distributed_auth_control() {return false;}
 #endif /* defined(INCLUDE_S1G_CONFIG) */
 #endif /* UMAC_S1G_CONFIG_H */

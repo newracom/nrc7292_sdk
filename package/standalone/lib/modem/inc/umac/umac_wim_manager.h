@@ -52,6 +52,9 @@ void umac_wim_manager_check_ps_abnormal();
 void umac_wim_manager_inform_CSA();
 void umac_wim_manager_inform_chan_switch();
 void umac_wim_manager_inform_lbt_enable(bool enable);
+#if defined(INCLUDE_MANAGE_BLACKLIST)
+void umac_wim_manager_clean_txq_sta(uint8_t *mac_addr, uint8_t vif_id);
+#endif
 uint8_t *ssid_string(uint8_t *ssid, uint8_t ssidlen);
 
 #endif //__UMAC_WIM_MANAGER_H__

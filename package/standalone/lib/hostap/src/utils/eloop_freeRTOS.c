@@ -18,6 +18,8 @@
 #include "common.h"
 #include "trace.h"
 #include "eloop.h"
+#include "eloop_freeRTOS.h"
+#include "ctrl_iface_freeRTOS.h"
 #include "wpa_debug.h"
 
 #define US_TIME_UNIT			(1000000)
@@ -48,15 +50,16 @@ struct eloop_global {
 	int signaled;
 	int pending_terminate;
 	int terminate;
-	struct eloop_timeout *next_timeout;
 	TaskHandle_t task;
 	SemaphoreHandle_t run_signal;
 	SemaphoreHandle_t timeout_list_lock;
 };
 
 static struct eloop_global	eloop;
-//static StaticTimer_t		eloop_timer;
 static TickType_t eloop_rearrange_timeout(void);
+
+QueueHandle_t eloop_message_queue_req = NULL;
+QueueHandle_t eloop_message_queue_rsp = NULL;
 
 #if 0
 #ifdef CONFIG_NO_STDOUT_DEBUG
@@ -87,6 +90,19 @@ int eloop_init(void)
 
 	eloop.task = xTaskGetHandle("wpa_supplicant");
 
+	eloop_message_queue_req = xQueueCreate(ELOOP_MESSAGE_COUNT, sizeof(char*));
+	if (eloop_message_queue_req == NULL)
+	{
+		/* fail to create message queue for eloop */
+		return -1;
+	}
+
+	eloop_message_queue_rsp = xQueueCreate(ELOOP_MESSAGE_COUNT, sizeof(char*));
+	if (eloop_message_queue_rsp == NULL)
+	{
+		/* fail to create message queue for eloop */
+		return -1;
+	}
 	if (!eloop.task) {
 		wpa_printf(MSG_ERROR, "eloop: Unable to find wpa_supplicant task.\n");
 		return -1;
@@ -97,7 +113,7 @@ int eloop_init(void)
 
 static bool lock_timeout_list()
 {
-	const int MAX_TIMEOUT = pdMS_TO_TICKS(100);
+	const int MAX_TIMEOUT = pdMS_TO_TICKS(portMAX_DELAY);
 	return (xSemaphoreTake(eloop.timeout_list_lock, MAX_TIMEOUT) == pdTRUE);
 }
 
@@ -111,7 +127,13 @@ static void unlock_timeout_list()
 	xSemaphoreGive(eloop.timeout_list_lock);
 }
 
-static void eloop_run_signal()
+//-----------------------------------------------------------------------//
+// README: Changed it from static void to void because it is called to 
+//  trigger eloop in the function below. 
+//    - wpa_cmd_receive() @crtl_iface_freeRTOS.c 
+//    - wpa_cli_send_and_resp() @api_wifi.c
+//-----------------------------------------------------------------------//
+void eloop_run_signal()
 {
 	xSemaphoreGive(eloop.run_signal);
 }
@@ -185,8 +207,10 @@ TickType_t eloop_rearrange_timeout(void)
 
 	dl_list_for_each_safe(eto, prev, &eloop.timeout, struct eloop_timeout, list) {
 		if (os_reltime_before_or_same(&eto->time, &now)) {
+			uint32_t flags = system_irq_save();
 			dl_list_del(&eto->list);
 			dl_list_add_tail(&eloop.execute, &eto->list);
+			system_irq_restore(flags);
 		}
 	}
 
@@ -201,22 +225,6 @@ TickType_t eloop_rearrange_timeout(void)
 				(first->time.usec - now.usec + 1) / 1000);
 }
 
-void eloop_clear_timeout_list(struct dl_list *list) {
-	struct eloop_timeout *eto = NULL;
-
-	if (!lock_timeout_list())
-		return;
-
-	if (!dl_list_empty(list)) {
-		dl_list_for_each(eto, list, struct eloop_timeout, list) {
-			if (eto != NULL)
-				eloop_remove_timeout(eto);
-		}
-	}
-	dl_list_init(&eloop.execute);
-	unlock_timeout_list();
-}
-
 static int eloop_trigger_timeout(void)
 {
 	struct eloop_timeout *timeout = NULL, *prev = NULL;
@@ -225,7 +233,11 @@ static int eloop_trigger_timeout(void)
 	dl_list_for_each_safe(timeout, prev, &eloop.execute,
 		struct eloop_timeout, list) {
 		timeout->handler(timeout->eloop_data, timeout->user_data);
+
+		uint32_t flags = system_irq_save();
 		eloop_remove_timeout(timeout);
+		system_irq_restore(flags);
+
 		executed++;
 	}
 
@@ -240,6 +252,14 @@ int eloop_register_timeout(unsigned int secs, unsigned int usecs,
 {
 	struct eloop_timeout *timeout = NULL, *tmp = NULL;
 	int cnt = 0;
+
+	if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED &&
+		secs == 0 && usecs == 0) {
+		if (handler) {
+			handler(eloop_data, user_data);
+		};
+		return 0;
+	}
 
 	timeout = (struct eloop_timeout *) os_zalloc(sizeof(*timeout));
 
@@ -263,9 +283,23 @@ int eloop_register_timeout(unsigned int secs, unsigned int usecs,
 	}
 
 	if (secs == 0 && usecs == 0) {
+		//-------------------------------------------------------------//
+		// README: Protected eloop.execute list with an interrupt mask 
+		//  due to the lack of protection. eloop.execute is accessed
+		//  through the follwing functions.
+		//  - eloop_rearrange_timeout()
+		//  - eloop_trigger_timeout()
+		//  - eloop_register_timeout()
+		//  - eloop_deplete_timeout()
+		//  - eloop_replenish_timeout()
+		//  - eloop_run()
+		//-------------------------------------------------------------//
+		uint32_t flags = system_irq_save();
 		dl_list_add_tail(&eloop.execute, &timeout->list);
-		eloop_run_signal();
+		system_irq_restore(flags);
+
 		unlock_timeout_list();
+		eloop_run_signal();		
 		return 0;
 	}
 
@@ -279,17 +313,26 @@ int eloop_register_timeout(unsigned int secs, unsigned int usecs,
 
 	if (dl_list_empty(&eloop.timeout)) {
 		dl_list_add_tail(&eloop.timeout, &timeout->list);
+		//-------------------------------------------------------------//
+		// README: If calling eloop while holding the semaphore for 
+		//  eloop.timeout, other tasks may not be able to acquire the 
+		//  semaphore and could end up in a waiting state, potentially 
+		//  causing malfunction. 
+		//-------------------------------------------------------------//
+		unlock_timeout_list();
 		eloop_run_signal();
+		return 0;
 	} else {
 		cnt = 0;
 		dl_list_for_each(tmp, &eloop.timeout, struct eloop_timeout, list) {
 			if (os_reltime_before(&timeout->time, &tmp->time)) {
 				dl_list_add(tmp->list.prev, &timeout->list);
+				unlock_timeout_list();
 
 				if (cnt == 0) // Re-calcuate how much in sleep
 					eloop_run_signal();
-			unlock_timeout_list();
-			return 0;
+
+				return 0;
 			}
 			cnt++;
 		}
@@ -408,13 +451,16 @@ int eloop_deplete_timeout(unsigned int req_secs, unsigned int req_usecs,
 				tmp->time.usec += requested.usec;
 				if (requested.sec == 0 && requested.usec == 0) {
 					dl_list_del(&tmp->list);
+					uint32_t flags = system_irq_save();
 					dl_list_add_tail(&eloop.execute, &tmp->list);
+					system_irq_restore(flags);
 				} else {
 					while (tmp->time.usec >= SEC_TO_US(1)) {
 						tmp->time.sec++;
 						tmp->time.usec -= US_TIME_UNIT;
 					}
 				}
+				unlock_timeout_list();
 				eloop_run_signal();
 #else // mutex overlapped
 				eloop_cancel_timeout(handler, eloop_data,
@@ -424,7 +470,6 @@ int eloop_deplete_timeout(unsigned int req_secs, unsigned int req_usecs,
 						       handler, eloop_data,
 						       user_data);
 #endif
-				unlock_timeout_list();
 				return 1;
 			}
 			unlock_timeout_list();
@@ -465,13 +510,16 @@ int eloop_replenish_timeout(unsigned int req_secs, unsigned int req_usecs,
 				tmp->time.usec += requested.usec;
 				if (requested.sec == 0 && requested.usec == 0) {
 					dl_list_del(&tmp->list);
+					uint32_t flags = system_irq_save();
 					dl_list_add_tail(&eloop.execute, &tmp->list);
+					system_irq_restore(flags);
 				} else {
 					while (tmp->time.usec >= SEC_TO_US(1)) {
 						tmp->time.sec++;
 						tmp->time.usec -= US_TIME_UNIT;
 					}
 				}
+				unlock_timeout_list();
 				eloop_run_signal();
 #else // mutex overlapped
 				eloop_cancel_timeout(handler, eloop_data,
@@ -481,7 +529,6 @@ int eloop_replenish_timeout(unsigned int req_secs, unsigned int req_usecs,
 						       handler, eloop_data,
 						       user_data);
 #endif
-				unlock_timeout_list();
 				return 1;
 			}
 			unlock_timeout_list();
@@ -502,7 +549,7 @@ int eloop_register_signal(int sig, eloop_signal_handler handler,
 int eloop_register_signal_terminate(eloop_signal_handler handler,
 		void *user_data)
 {
-#if !defined(INCLUDE_MEASURE_AIRTIME)	
+#if !defined(INCLUDE_MEASURE_AIRTIME)
 	wpa_printf(MSG_INFO, "eloop: %s", __func__);
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
 	return 0;
@@ -520,15 +567,65 @@ int eloop_register_signal_reconfig(eloop_signal_handler handler,
 void eloop_run(void)
 {
 	TickType_t next;
+	eloop_msg_t* eloop_msg;
 
 	while (!eloop.terminate && !eloop.pending_terminate) {
 		eloop_trigger_timeout();
 		next = eloop_rearrange_timeout();
+		//-------------------------------------------------------------//
+		// README: Protected eloop.execute list with an interrupt mask 
+		//  due to the lack of protection.
+		//-------------------------------------------------------------//
+		uint32_t flags = system_irq_save();
+		int ret = dl_list_empty(&eloop.execute);
+		system_irq_restore(flags);
 
-		if (!dl_list_empty(&eloop.execute))
+		if (!ret)
 			continue;
 
 		eloop_wait_for_signal(next);
+
+		//---------------------------------------------------------------------//
+		// README: If a wpa command is invoked via cli or api_wifi, a Message is
+		//  sent through the following function.
+		//   - wpa_cmd_receive() @ctrl_iface_freeRTOS.c 
+		//   - wpa_cli_send_and_resp() @api_wifi.c
+		//---------------------------------------------------------------------//
+		if (xQueueReceive(eloop_message_queue_req, &eloop_msg, 0) == pdPASS)
+		{
+			if (eloop_msg->wait_rsp) {
+				ctrl_iface_resp_t* resp = NULL;
+				ctrl_iface_resp_t* resp_ret = NULL;
+
+				resp_ret = ctrl_iface_receive_response(eloop_msg->vif_id, eloop_msg->buf);
+
+				//create resonse (OK : len_0, msg_NULL, MSG:len_n, msg_XX, FAIL: len_-1, msg_NULL)
+				resp = os_malloc(sizeof(ctrl_iface_resp_t));
+				if (resp) {
+					if (resp_ret && resp_ret->len < 4096) {
+						resp->len = resp_ret->len;
+						resp->msg = resp_ret->msg;
+					} else {
+						resp->len = -1;
+						resp->msg = NULL;
+					}
+				} else {
+					wpa_printf(MSG_INFO, "[%s] fail to allocate resp", __func__);
+				}
+
+				resp_ret->msg = NULL;
+				resp_ret->len = 0;
+
+				os_free(eloop_msg->buf);
+				os_free(eloop_msg);
+
+				xQueueSend(eloop_message_queue_rsp, &resp, 0);
+			} else {
+				ctrl_iface_receive(eloop_msg->vif_id, eloop_msg->buf);
+				os_free(eloop_msg->buf);
+				os_free(eloop_msg);
+			}
+		}
 	}
 	eloop.terminate = 0;
 }

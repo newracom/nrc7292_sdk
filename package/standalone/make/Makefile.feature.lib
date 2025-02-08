@@ -123,6 +123,15 @@ endif
 
 #// --------------------------------------------------
 #// LIB
+#// http_client (http client)
+#// --------------------------------------------------
+ifeq ($(CONFIG_HTTP_CLIENT), y)
+	HTTP_CLIENT_BASE = $(LIB_PATH)/http_client
+	include $(HTTP_CLIENT_BASE)/module.mk
+endif
+
+#// --------------------------------------------------
+#// LIB
 #// ethernet (ethernet driver)
 #// --------------------------------------------------
 ifeq ($(CONFIG_ETHERNET), y)
@@ -233,4 +242,21 @@ endif
 ifeq ($(CONFIG_WIREGUARD), y)
 	WIREGUARD_BASE = $(LIB_PATH)/wireguard-lwip
 	include $(WIREGUARD_BASE)/module.mk
+endif
+
+#// --------------------------------------------------
+#// zlib
+#// --------------------------------------------------
+ZLIB_ROOT    = $(LIB_PATH)/zlib
+
+ifeq ($(CONFIG_ZLIB), y)
+    include $(ZLIB_ROOT)/module.mk
+	DEFINE	+= -DSUPPORT_ZLIB
+endif
+
+#// WEBSOCKET_CLIENT
+#// --------------------------------------------------
+ifeq ($(CONFIG_WEBSOCKET_CLIENT), y)
+       WEBSOCKET_CLIENT_BASE = $(LIB_PATH)/websocket_client
+       include $(WEBSOCKET_CLIENT_BASE)/module.mk
 endif

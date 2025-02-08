@@ -9,6 +9,7 @@ unsigned char* get_bdf_data(unsigned int* size)
 	unsigned char *buffer = NULL;
 	unsigned int length = 0;
 
+	buffer = (unsigned char *)BDF_DATA;
 	length = (unsigned int)BDF_LEN;
 	*size = length;
 
@@ -16,13 +17,6 @@ unsigned char* get_bdf_data(unsigned int* size)
 		E(TT_API, "Size of BD file is zero\n");
 		return NULL;
 	}
-
-	buffer = pvPortMalloc(length);
-	if(!buffer)
-		return NULL;
-
-	memset(buffer, 0x0, length);
-	memcpy(buffer, BDF_DATA, length);
 
 	V(TT_API, "bd buffer %p length %d\n",buffer, length);
 

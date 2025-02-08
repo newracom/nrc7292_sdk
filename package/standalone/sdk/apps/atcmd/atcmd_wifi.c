@@ -25,9 +25,12 @@
 
 
 #include "atcmd.h"
-#if !defined(NRC7292)
-#include "nrc_sflash.h"
-#endif
+
+#include "dhcpserver.h"
+#include "lwip/etharp.h"
+
+/* #define CONFIG_SHOW_WIFI_PASSWORD */
+
 /**********************************************************************************************/
 
 extern uint32_t _atcmd_timeout_value (const char *cmd);
@@ -39,8 +42,6 @@ static int _atcmd_wifi_dhcp_run (int argc, char *argv[]);
 static void _atcmd_wifi_dhcp_task_resume (void);
 
 /**********************************************************************************************/
-
-static struct netif *netif = NULL;
 
 //#define ATCMD_WIFI_INFO_STATIC
 #ifdef ATCMD_WIFI_INFO_STATIC
@@ -87,18 +88,37 @@ static bool _atcmd_wifi_bssid_valid (const char *bssid)
 	return true;
 }
 
-static bool _atcmd_wifi_country_valid (atcmd_wifi_country_t country_code)
+static bool _atcmd_wifi_security_valid (atcmd_wifi_security_t security, bool wpa3)
 {
-	if (strlen(country_code) == 2)
+	if (strcmp(security, "open") == 0)
+		return true;
+	else if (strcmp(security, "wpa2") == 0 || strcmp(security, "psk") == 0)
 	{
-		int i;
-
-		for (i = 0 ; g_wifi_country_list[i].cc_index < COUNTRY_CODE_MAX ; i++)
-		{
-			if (strcmp(country_code, g_wifi_country_list[i].alpha2_cc) == 0)
-				return true;
-		}
+		strcpy(security, "wpa2-psk");
+		return true;
 	}
+	else if (strcmp(security, "wpa2-psk") == 0)
+		return true;
+
+#if defined(CONFIG_ATCMD_WPA3)
+	if (!wpa3)
+		return false;
+
+	if (strcmp(security, "owe") == 0)
+	{
+		strcpy(security, "wpa3-owe");
+		return true;
+	}
+	else if (strcmp(security, "wpa3-owe") == 0)
+		return true;
+	else if (strcmp(security, "sae") == 0)
+	{
+		strcpy(security, "wpa3-sae");
+		return true;
+	}
+	else if (strcmp(security, "wpa3-sae") == 0)
+		return true;
+#endif
 
 	return false;
 }
@@ -111,25 +131,6 @@ static bool _atcmd_wifi_password_valid (atcmd_wifi_password_t password)
 		return false;
 
 	return true;
-}
-
-static bool _atcmd_wifi_security_valid (atcmd_wifi_security_t security,
-										atcmd_wifi_password_t password,
-										bool wpa3)
-{
-	if (strcmp(security, "open") == 0)
-		return true;
-	else if (strcmp(security, "wpa2-psk") == 0)
-		return _atcmd_wifi_password_valid(password);
-	else if (wpa3)
-	{
-		if (strcmp(security, "wpa3-owe") == 0)
-			return true;
-		else if (strcmp(security, "wpa3-sae") == 0)
-			return _atcmd_wifi_password_valid(password);
-	}
-
-	return false;
 }
 
 /**********************************************************************************************/
@@ -221,9 +222,9 @@ static void _atcmd_wifi_event_polled (int event)
 	g_atcmd_wifi_info->event &= ~(1 << event);
 }
 
-static int _atcmd_wifi_scan_result_report (SCAN_RESULTS *results, bool scan_ssid, bool to_host);
+static int _atcmd_wifi_scan_result_report (SCAN_RESULTS *results, const char *ssid, bool to_host);
 
-static void _atcmd_wifi_event_scan_done (int vif, void *data, int len)
+static void _atcmd_wifi_event_scan_done (int vif_id, void *data, int len)
 {
 	atcmd_wifi_scan_t *scan = &g_atcmd_wifi_info->scan;
 
@@ -235,28 +236,29 @@ static void _atcmd_wifi_event_scan_done (int vif, void *data, int len)
 		{
 			_atcmd_wifi_event_polled(ATCMD_WIFI_EVT_SCAN_DONE);
 
-			_atcmd_wifi_scan_result_report(&scan->results, false, false);
+			_atcmd_wifi_scan_result_report(&scan->results, NULL, false);
 		}
 	}
 }
 
-static void _atcmd_wifi_event_connect_success (int vif, void *data, int len)
+static void _atcmd_wifi_event_connect_success (int vif_id, void *data, int len)
 {
 	atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
 
-	if (!softap->active)
+/*	if (!softap->active) */
 	{
 		atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
 		bool event = true;
 
-		if (connect->connecting)
+		if (_atcmd_wifi_connecting())
 		{
-			if (!_atcmd_wifi_event_polling(ATCMD_WIFI_EVT_CONNECT_SUCCESS))
-				event = false;
-			else
+			if (_atcmd_wifi_event_polling(ATCMD_WIFI_EVT_CONNECT_SUCCESS))
 				_atcmd_wifi_event_polled(ATCMD_WIFI_EVT_CONNECT_SUCCESS);
+			else
+				event = false;
 		}
 
+		connect->recovery = false;
 		connect->connected = true;
 		connect->connecting = false;
 		connect->disconnecting = false;
@@ -273,7 +275,7 @@ static void _atcmd_wifi_event_connect_success (int vif, void *data, int len)
 	}
 }
 
-static void _atcmd_wifi_event_disconnect (int vif, void *data, int len)
+static void _atcmd_wifi_event_disconnect (int vif_id, void *data, int len)
 {
 	atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
 
@@ -285,14 +287,14 @@ static void _atcmd_wifi_event_disconnect (int vif, void *data, int len)
 /*		_atcmd_debug("%s: %d %d %d", __func__,
 				connect->connected, connect->connecting, connect->disconnecting); */
 
-		if (connect->connecting)
+		if (_atcmd_wifi_disconnected() || _atcmd_wifi_connecting())
 			event = false;
-		else if (connect->disconnecting)
+		else if (_atcmd_wifi_disconnecting())
 		{
-			if (!_atcmd_wifi_event_polling(ATCMD_WIFI_EVT_DISCONNECT))
-				event = false;
-			else
+			if (_atcmd_wifi_event_polling(ATCMD_WIFI_EVT_DISCONNECT))
 				_atcmd_wifi_event_polled(ATCMD_WIFI_EVT_DISCONNECT);
+			else
+				event = false;
 		}
 
 		if (connect->connected || connect->disconnecting)
@@ -307,10 +309,20 @@ static void _atcmd_wifi_event_disconnect (int vif, void *data, int len)
 			ATCMD_MSG_WEVENT("\"DISCONNECT\",\"%s\",\"%s\",\"%s\"",
 					connect->bssid, connect->ssid, connect->security);
 		}
+
+		if (connect->recovery)
+		{
+			connect->recovery = false;
+
+			strcpy(connect->ssid, ATCMD_WIFI_INIT_SSID);
+			strcpy(connect->bssid, ATCMD_WIFI_INIT_BSSID);
+			strcpy(connect->security, ATCMD_WIFI_INIT_SECURITY);
+			strcpy(connect->password, ATCMD_WIFI_INIT_PASSWORD);
+		}
 	}
 }
 
-static void _atcmd_wifi_event_sta_connect (int vif, void *data, int len)
+static void _atcmd_wifi_event_sta_connect (int vif_id, void *data, int len)
 {
 	atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
 
@@ -321,7 +333,7 @@ static void _atcmd_wifi_event_sta_connect (int vif, void *data, int len)
 
 		if (!data || len != ETH_ALEN)
 		{
-			_atcmd_error("data: %p %d", data, len);
+			_atcmd_error("[%d] data: %p %d", vif_id, data, len);
 			return;
 		}
 
@@ -331,17 +343,38 @@ static void _atcmd_wifi_event_sta_connect (int vif, void *data, int len)
 
 		if (strlen(addr) != ATCMD_WIFI_MACADDR_LEN)
 		{
-			_atcmd_error("snprint()");
+			_atcmd_error("[%d] snprint()", vif_id);
 			return;
 		}
 
-		_atcmd_info("sta_connect: %s", addr);
+		_atcmd_info("[%d] sta_connect: %s", vif_id, addr);
 
 		ATCMD_MSG_WEVENT("\"STA_CONNECT\",\"%s\"", addr);
 	}
 }
 
-static void _atcmd_wifi_event_sta_disconnect (int vif, void *data, int len)
+static bool ip_from_arp_cache(char *addr, ip4_addr_t *ip_addr)
+{
+	if (!addr || !ip_addr) {
+		return false;
+	}
+
+	for (int i = 0; i < ARP_TABLE_SIZE; i++) {
+		ip4_addr_t *ip;
+		struct netif *netif;
+		struct eth_addr *ethaddr;
+
+		if (etharp_get_entry(i, &ip, &netif, &ethaddr)) {
+			if (memcmp(addr, ethaddr->addr, ETH_HWADDR_LEN) == 0) {
+				memcpy(ip_addr, ip, sizeof(ip4_addr_t));
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+static void _atcmd_wifi_event_sta_disconnect (int vif_id, void *data, int len)
 {
 	atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
 
@@ -352,7 +385,7 @@ static void _atcmd_wifi_event_sta_disconnect (int vif, void *data, int len)
 
 		if (!data || len != ETH_ALEN)
 		{
-			_atcmd_error("data: %p %d", data, len);
+			_atcmd_error("[%d] data: %p %d", vif_id, data, len);
 			return;
 		}
 
@@ -362,13 +395,22 @@ static void _atcmd_wifi_event_sta_disconnect (int vif, void *data, int len)
 
 		if (strlen(addr) != ATCMD_WIFI_MACADDR_LEN)
 		{
-			_atcmd_error("snprint()");
+			_atcmd_error("[%d] snprint()", vif_id);
 			return;
 		}
 
-		_atcmd_info("sta_disconnect: %s", addr);
-
+#ifdef CONFIG_ATCMD_STA_DISCONNECT_IP_ADDR
+		ip4_addr_t ip;
+		memset(&ip, 0, sizeof(ip4_addr_t));
+		if (!ip_from_arp_cache(_addr, &ip)) {
+			dhcps_get_ip((u8_t *)_addr, &ip);
+		}
+		_atcmd_info("[%d] sta_disconnect: %s %s", vif_id, addr, ip4addr_ntoa(&ip));
+		ATCMD_MSG_WEVENT("\"STA_DISCONNECT\",\"%s\", \"%s\"", addr, ip4addr_ntoa(&ip));
+#else
+		_atcmd_info("[%d] sta_disconnect: %s", vif_id, addr);
 		ATCMD_MSG_WEVENT("\"STA_DISCONNECT\",\"%s\"", addr);
+#endif
 	}
 }
 
@@ -376,36 +418,42 @@ static void _atcmd_wifi_event_sta_disconnect (int vif, void *data, int len)
 
 static int _atcmd_wifi_macaddr_get (int argc, char *argv[])
 {
+	atcmd_wifi_macaddr_t macaddr[2];
+
 	switch (argc)
 	{
 		case 0:
-		case 1:
-		case 2:
-		{
-			int (*get_macaddr[3]) (char *) =
-			{
-				wifi_api_get_macaddr,
-				wifi_api_get_macaddr0,
-				wifi_api_get_macaddr1,
-			};
-			char param_macaddr[ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_macaddr_t))];
-			atcmd_wifi_macaddr_t macaddr;
-
-			if (get_macaddr[argc](macaddr) != 0)
+			if (wifi_api_get_macaddr(macaddr[0], macaddr[1]) != 0)
 				return ATCMD_ERROR_FAIL;
 
-			if (!atcmd_str_to_param(macaddr, param_macaddr, sizeof(param_macaddr)))
-				return ATCMD_ERROR_FAIL;
-
-			if (argc == 1)
-				ATCMD_MSG_INFO("WMACADDR0", "%s", param_macaddr);
-			else if (argc == 2)
-				ATCMD_MSG_INFO("WMACADDR1", "%s", param_macaddr);
-			else
-				ATCMD_MSG_INFO("WMACADDR", "%s", param_macaddr);
+			_atcmd_info("wifi_macaddr_get: %s %s", macaddr[0], macaddr[1]);
+			ATCMD_MSG_INFO("WMACADDR", "\"%s\",\"%s\"", macaddr[0], macaddr[1]);
 			break;
-		}
+/*
+		case 1:
+			if (wifi_api_get_macaddr(macaddr[0], NULL) != 0)
+				return ATCMD_ERROR_FAIL;
 
+			if (argc == 0)
+			{
+				_atcmd_info("wifi_macaddr_get: %s", macaddr[0]);
+				ATCMD_MSG_INFO("WMACADDR", "\"%s\"", macaddr[0]);
+			}
+			else
+			{
+				_atcmd_info("wifi_macaddr0_get: %s", macaddr[0]);
+				ATCMD_MSG_INFO("WMACADDR0", "\"%s\"", macaddr[0]);
+			}
+			break;
+
+		case 2:
+			if (wifi_api_get_macaddr(NULL, macaddr[1]) != 0)
+				return ATCMD_ERROR_FAIL;
+
+			_atcmd_info("wifi_macaddr1_get: %s", macaddr[1]);
+			ATCMD_MSG_INFO("WMACADDR1", "\"%s\"", macaddr[1]);
+			break;
+*/
 		default:
 			return ATCMD_ERROR_INVAL;
 	}
@@ -430,6 +478,7 @@ static atcmd_info_t g_atcmd_wifi_macaddr =
 
 /**********************************************************************************************/
 
+/*
 static int _atcmd_wifi_macaddr0_get (int argc, char *argv[])
 {
 	return _atcmd_wifi_macaddr_get(1, NULL);
@@ -449,9 +498,11 @@ static atcmd_info_t g_atcmd_wifi_macaddr0 =
 	.handler[ATCMD_HANDLER_GET] = _atcmd_wifi_macaddr0_get,
 	.handler[ATCMD_HANDLER_SET] = NULL,
 };
+*/
 
 /**********************************************************************************************/
 
+/*
 static int _atcmd_wifi_macaddr1_get (int argc, char *argv[])
 {
 	return _atcmd_wifi_macaddr_get(2, NULL);
@@ -471,6 +522,7 @@ static atcmd_info_t g_atcmd_wifi_macaddr1 =
 	.handler[ATCMD_HANDLER_GET] = _atcmd_wifi_macaddr1_get,
 	.handler[ATCMD_HANDLER_SET] = NULL,
 };
+*/
 
 /**********************************************************************************************/
 
@@ -536,7 +588,7 @@ static int _atcmd_wifi_country_set (int argc, char *argv[])
 			if (!atcmd_param_to_str(param_country, country, sizeof(country)))
 				return ATCMD_ERROR_FAIL;
 
-			if (!_atcmd_wifi_country_valid(country))
+			if (!wifi_api_valid_country(country))
 				return ATCMD_ERROR_INVAL;
 
 			if (strcmp(country, "KR") == 0)
@@ -588,21 +640,48 @@ static atcmd_info_t g_atcmd_wifi_country =
 
 static int _atcmd_wifi_tx_power_get (int argc, char *argv[])
 {
+	uint32_t count = 1;
+	uint32_t interval = 0;
+
 	switch (argc)
 	{
+		case 2: /* AT+WTXPOWER?=<count>,<interval> */
+			if (atcmd_param_to_uint32(argv[1], &interval) != 0)
+				return ATCMD_ERROR_INVAL;
+
+		case 1: /* AT+WTXPOWER?=<count> */
+			if (atcmd_param_to_uint32(argv[0], &count) != 0)
+				return ATCMD_ERROR_INVAL;
+
+			if (interval == 0)
+				interval = 1;
+
 		case 0:
 		{
-			uint8_t power;
+			uint8_t power[2] = { 0, 0 };
+			uint32_t i;
 
-			if (wifi_api_get_tx_power(&power) != 0)
-				return ATCMD_ERROR_FAIL;
+			for (i = 0 ; i < count ; i++)
+			{
+				power[0] = power[1] = 0;
 
-			_atcmd_info("tx_power_get: type=%s,%u power=%u",
+				if (wifi_api_get_tx_power(&power[0], &power[1]) != 0)
+					return ATCMD_ERROR_FAIL;
+
+				_atcmd_info("tx_power_get: type=%s,%u power=%u,%u",
 						str_txpwr_type[g_atcmd_wifi_info->txpower.type],
-						g_atcmd_wifi_info->txpower.val, power);
+						g_atcmd_wifi_info->txpower.val, power[0], power[1]);
 
-			ATCMD_MSG_INFO("WTXPOWER", "%d", power);
+				if (!wifi_api_is_relay_mode())
+					power[1] = 0;
 
+				ATCMD_MSG_INFO("WTXPOWER", "%u,%u,\"%s\",%u", power[0], power[1],
+						str_txpwr_type[g_atcmd_wifi_info->txpower.type],
+						g_atcmd_wifi_info->txpower.val);
+				
+				if (interval > 0)
+					_delay_ms(interval * 1000);
+			}
 			break;
 		}
 
@@ -615,29 +694,56 @@ static int _atcmd_wifi_tx_power_get (int argc, char *argv[])
 
 static int _atcmd_wifi_tx_power_set (int argc, char *argv[])
 {
+	enum TX_POWER_TYPE type = TX_POWER_NONE;
+
 	switch (argc)
 	{
 		case 0:
-			ATCMD_MSG_HELP("AT+WTXPOWER=<power:%d..%d>",
+			ATCMD_MSG_HELP("AT+WTXPOWER=<power:%d..%d>[,\"{auto|fixed|limit}\"]",
 					ATCMD_WIFI_TXPOWER_MIN, ATCMD_WIFI_TXPOWER_MAX);
 			break;
 
+		case 2:
+		{
+			char str_type[6];
+
+			if (!atcmd_param_to_str(argv[1], str_type, sizeof(str_type)))
+				return ATCMD_ERROR_INVAL;
+
+			if (strcmp(str_type, "auto") == 0)
+				type = TX_POWER_AUTO;
+			else if (strcmp(str_type, "fixed") == 0)
+				type = TX_POWER_FIXED;
+			else if (strcmp(str_type, "limit") == 0)
+				type = TX_POWER_LIMIT;
+			else
+				return ATCMD_ERROR_INVAL;
+		}
+
 		case 1:
 		{
-			enum TX_POWER_TYPE type = TX_POWER_FIXED;
-			int8_t power;
+			uint8_t power;			
 
-			if (atcmd_param_to_int8(argv[0], &power) == 0)
+			if (atcmd_param_to_uint8(argv[0], &power) == 0)
 			{
-				if (power == 0)
+				switch (type)
 				{
-					type = TX_POWER_AUTO;
-					power = ATCMD_WIFI_TXPOWER_MAX;
-				}
-				else if (power < 0)
-				{
-					type = TX_POWER_LIMIT;
-					power *= -1;
+					case TX_POWER_AUTO:
+						power = ATCMD_WIFI_TXPOWER_MAX;
+						break;
+
+					case TX_POWER_FIXED:
+					case TX_POWER_LIMIT:
+						break;
+
+					default:
+						if (power > 0)
+							type = TX_POWER_FIXED;
+						else
+						{
+							type = TX_POWER_AUTO;
+							power = ATCMD_WIFI_TXPOWER_MAX;
+						}
 				}
 
 				if (power >= ATCMD_WIFI_TXPOWER_MIN && power <= ATCMD_WIFI_TXPOWER_MAX)
@@ -682,14 +788,36 @@ static atcmd_info_t g_atcmd_wifi_tx_power =
 
 static int _atcmd_wifi_rx_signal_get (int argc, char *argv[])
 {
+	atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
+	atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
+	bool rssi_average = false;
+
+	if (!wifi_api_is_relay_mode() && softap->active)
+	{
+		_atcmd_info("wifi_rxsig_get: softap mode");
+		return ATCMD_ERROR_NOTSUPP;
+	}
+
+	if (!connect->connected)
+	{
+		_atcmd_info("wifi_rxsig_get: not connected");
+		return ATCMD_ERROR_NOTSUPP;
+	}
+
 	switch (argc)
 	{
+		case 1:
+			rssi_average = true;
+
 		case 0:
 		{
 			int8_t rssi;
 			uint8_t snr;
 
-			if (wifi_api_get_rssi(&rssi) != 0 || wifi_api_get_snr(&snr) != 0)
+			if (wifi_api_get_rssi(&rssi, rssi_average) != 0)
+				return ATCMD_ERROR_FAIL;
+
+			if (wifi_api_get_snr(&snr) != 0)
 				return ATCMD_ERROR_FAIL;
 
 			ATCMD_MSG_INFO("WRXSIG", "%d,%u", (int)rssi, snr);
@@ -705,20 +833,46 @@ static int _atcmd_wifi_rx_signal_get (int argc, char *argv[])
 
 static int _atcmd_wifi_rx_signal_set (int argc, char *argv[])
 {
+	atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
+	atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
+	int average = 0;
+
+	if (!wifi_api_is_relay_mode() && softap->active)
+	{
+		_atcmd_info("wifi_rxsig_set: softap mode");
+		return ATCMD_ERROR_NOTSUPP;
+	}
+
+	if (!connect->connected)
+	{
+		_atcmd_info("wifi_rxsig_set: not connected");
+		return ATCMD_ERROR_NOTSUPP;
+	}
+
 	switch (argc)
 	{
 		case 0:
-			ATCMD_MSG_HELP("AT+WRXSIG=<time>");
+			ATCMD_MSG_HELP("AT+WRXSIG=<time>[,<average>]");
 			break;
+
+		case 2:
+			average = atoi(argv[1]);
+			if (average != 0 && average != 1)
+				return ATCMD_ERROR_INVAL;
 
 		case 1:
 		{
 			int time_sec = atoi(argv[0]);
+			int ret;
 			int i;
+
+			_atcmd_info("wifi_rxsig_set: time=%d average=%d", time_sec, average);
 
 			for (i = 0 ; i < time_sec ; i++)
 			{
-				_atcmd_wifi_rx_signal_get(0, NULL);
+				ret = _atcmd_wifi_rx_signal_get(average, NULL);
+				if (ret != ATCMD_SUCCESS)
+					return ret;
 
 				if (time_sec > 1)
 					_delay_ms(1000);
@@ -757,13 +911,14 @@ static int _atcmd_wifi_rate_control_get (int argc, char *argv[])
 	{
 		case 0:
 		{
-			bool enable;
+			bool rate_ctrl;
 
-			if (wifi_api_get_rate_control(&enable) != 0)
+			if (wifi_api_get_rate_control(&rate_ctrl) != 0)
 				return ATCMD_ERROR_FAIL;
 
-			ATCMD_MSG_INFO("WRATECTRL", "%d", enable ? 1 : 0);
+			_atcmd_info("wifi_rate_ctrl_get: %s", rate_ctrl ? "enabled" : "disabled");
 
+			ATCMD_MSG_INFO("WRATECTRL", "%d", rate_ctrl ? 1 : 0);
 			break;
 		}
 
@@ -784,25 +939,17 @@ static int _atcmd_wifi_rate_control_set (int argc, char *argv[])
 
 		case 1:
 		{
-			switch (atoi(argv[0]))
+			int param = atoi(argv[0]);
+
+			if (param == 0 || param == 1)
 			{
-				case 0:
-					_atcmd_info("wifi_rate_ctrl: off");
+				bool rate_ctrl = !!param;
 
-					wifi_api_set_rate_control(false);
-					break;
+				_atcmd_info("wifi_rate_ctrl_set: %s", rate_ctrl ? "enable" : "disable");
 
-				case 1:
-					_atcmd_info("wifi_rate_ctrl: on");
-
-					wifi_api_set_rate_control(true);
-					break;
-
-				default:
-					return ATCMD_ERROR_INVAL;
+				wifi_api_set_rate_control(rate_ctrl);
+				break;
 			}
-
-			break;
 		}
 
 		default:
@@ -831,23 +978,46 @@ static atcmd_info_t g_atcmd_wifi_rate_control =
 
 static int _atcmd_wifi_mcs_get (int argc, char *argv[])
 {
-/*	bool enable;
-
-	wifi_api_get_rate_control(&enable);
-
-	if (enable)
-		return ATCMD_ERROR_NOTSUPP; */
+	uint32_t count = 1;
+	uint32_t interval = 0;
 
 	switch (argc)
 	{
+		case 2: /* AT+WMCS?=<count>,<interval> */
+			if (atcmd_param_to_uint32(argv[1], &interval) != 0)
+				return ATCMD_ERROR_INVAL;
+
+		case 1: /* AT+WMCS?=<count> */
+			if (atcmd_param_to_uint32(argv[0], &count) != 0)
+				return ATCMD_ERROR_INVAL;
+
+			if (interval == 0)
+				interval = 1;
 		case 0:
 		{
-			uint8_t index;
+			wifi_mcs_t index0, index1;
+			uint32_t i;
 
-			if (wifi_api_get_mcs(&index) != 0)
-				return ATCMD_ERROR_FAIL;
+			for (i = 0 ; i < count ; i++)
+			{
+				memset(&index0, 0, sizeof(wifi_mcs_t));
+				memset(&index1, 0, sizeof(wifi_mcs_t));
 
-			ATCMD_MSG_INFO("WMCS", "%u", index);
+				if (wifi_api_get_mcs(&index0, &index1) != 0)
+					return ATCMD_ERROR_FAIL;
+
+				if (!wifi_api_is_relay_mode())
+					index1.tx = index1.rx = 0;
+
+				_atcmd_info("wifi_mcs_get: tx=%d,%d rx=%d,%d",
+						index0.tx, index1.tx, index0.rx, index1.rx);
+
+				ATCMD_MSG_INFO("WMCS", "%u,%u,%u,%u", index0.tx, index1.tx, index0.rx, index1.rx);
+
+				if (interval > 0)
+					_delay_ms(interval * 1000);
+			}
+
 			break;
 		}
 
@@ -860,11 +1030,10 @@ static int _atcmd_wifi_mcs_get (int argc, char *argv[])
 
 static int _atcmd_wifi_mcs_set (int argc, char *argv[])
 {
-	bool enable;
+	bool rate_ctrl;
 
-	wifi_api_get_rate_control(&enable);
-
-	if (enable)
+	wifi_api_get_rate_control(&rate_ctrl);
+	if (rate_ctrl)
 		return ATCMD_ERROR_NOTSUPP;
 
 	switch (argc)
@@ -875,19 +1044,16 @@ static int _atcmd_wifi_mcs_set (int argc, char *argv[])
 
 		case 1:
 		{
-			uint8_t index;
+			int index = atoi(argv[0]);
 
-			if (atcmd_param_to_uint8(argv[0], &index) == 0)
+			if ((index >= 0 && index <= 7) || index == 10)
 			{
-				if ((index >= 0 && index <= 7) || index == 10)
-				{
-					_atcmd_info("wifi_mcs: %u", index);
+				_atcmd_info("wifi_mcs_set: %d", index);
 
-					if (wifi_api_set_mcs(index) != 0)
-						return ATCMD_ERROR_FAIL;
+				if (wifi_api_set_mcs(index) != 0)
+					return ATCMD_ERROR_FAIL;
 
-					break;
-				}
+				break;
 			}
 		}
 
@@ -1015,6 +1181,8 @@ static int _atcmd_wifi_cca_threshold_get (int argc, char *argv[])
 			if (wifi_api_get_cca_threshold(&threshold) != 0)
 				return ATCMD_ERROR_FAIL;
 
+			_atcmd_info("wifi_cca_threshold_get: %d", threshold);
+
 			ATCMD_MSG_INFO("WCCATHRESHOLD", "%d", threshold);
 			break;
 		}
@@ -1043,6 +1211,8 @@ static int _atcmd_wifi_cca_threshold_set (int argc, char *argv[])
 
 			if (threshold < CCA_THRESHOLD_MIN || threshold > CCA_THRESHOLD_MAX)
 				return ATCMD_ERROR_INVAL;
+
+			_atcmd_info("wifi_cca_threshold_set: %d", threshold);
 
 			if (wifi_api_set_cca_threshold(threshold) != 0)
 				return ATCMD_ERROR_FAIL;
@@ -1156,14 +1326,23 @@ static int _atcmd_wifi_tsf_get (int argc, char *argv[])
 	{
 		case 0:
 		{
-			uint64_t tsf = 0;
+			uint64_t tsf[2];
 
-			if (wifi_api_get_tsf(&tsf) != 0)
+			if (wifi_api_get_tsf(&tsf[0], &tsf[1]) != 0)
 				return ATCMD_ERROR_FAIL;
 
-			_atcmd_info("wifi_tsf_get: %llu (0x%llX)", tsf, tsf);
+			if (wifi_api_is_relay_mode())
+			{
+				_atcmd_info("wifi_tsf_get: %llu %llu (0x%llX 0x%llX)", tsf[0], tsf[1], tsf[0], tsf[1]);
 
-			ATCMD_MSG_INFO("WTSF", "%llu", tsf);
+				ATCMD_MSG_INFO("WTSF", "%llu,%llu", tsf[0], tsf[1]);
+			}
+			else
+			{
+				_atcmd_info("wifi_tsf_get: %llu (0x%llX)", tsf[0], tsf[0]);
+
+				ATCMD_MSG_INFO("WTSF", "%llu", tsf[0]);
+			}
 
 			break;
 		}
@@ -1358,7 +1537,7 @@ static int _atcmd_wifi_scan_freq_get (atcmd_wifi_channels_t *channels, bool prin
 
 	ATCMD_WIFI_LOCK();
 
-	if (wifi_api_add_network() != 0)
+	if (wifi_api_add_network(false) != 0)
 	{
 		ATCMD_WIFI_UNLOCK();
 		_atcmd_info("scan_freq_get: failed add_network()");
@@ -1430,7 +1609,7 @@ static int __atcmd_wifi_scan_freq_set (atcmd_wifi_channels_t *channels)
 
 	ATCMD_WIFI_LOCK();
 
-	if (wifi_api_add_network() != 0)
+	if (wifi_api_add_network(false) != 0)
 	{
 		ATCMD_WIFI_UNLOCK();
 		_atcmd_info("scan_freq_set: failed add_network()");
@@ -1571,12 +1750,9 @@ static int _atcmd_wifi_scan_freq_delete (int n_scan_channel, atcmd_wifi_channel_
 	return __atcmd_wifi_scan_freq_set(supported_channels);
 }
 
-static int _atcmd_wifi_scan_result_report (SCAN_RESULTS *results, bool scan_ssid, bool to_host)
+static int _atcmd_wifi_scan_result_report (SCAN_RESULTS *results, const char *ssid, bool to_host)
 {
-	char param_bssid[ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_bssid_t))];
-	char param_ssid[ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_ssid_t))];
-	char param_flags[ATCMD_STR_PARAM_SIZE(ATCMD_WIFI_SCAN_FLAGS_LEN_MAX)];
-	uint16_t nons1g_freq, s1g_freq;
+	uint16_t s1g_freq;
 	SCAN_RESULT *result;
 	int i;
 
@@ -1592,26 +1768,23 @@ static int _atcmd_wifi_scan_result_report (SCAN_RESULTS *results, bool scan_ssid
 		if (!to_host)
 			continue;
 
-		if (atcmd_str_to_param(result->bssid, param_bssid, sizeof(param_bssid)) &&
-				atcmd_str_to_param(result->flags, param_flags, sizeof(param_flags)) &&
-				atcmd_str_to_param(result->ssid, param_ssid, sizeof(param_ssid)))
+		s1g_freq = atoi(result->freq);
+		if (s1g_freq > 0)
 		{
-			nons1g_freq = atoi(result->freq);
-			s1g_freq = wifi_api_get_s1g_freq(nons1g_freq);
-			if (s1g_freq > 0)
+			if (ssid)
 			{
-				if (scan_ssid)
+				if (strcmp(ssid, result->ssid) == 0)
 				{
-					ATCMD_MSG_INFO("WSCANSSID", "%s,%.1f,%d,%s,%s",
-							param_bssid, s1g_freq / 10., (int8_t)atoi(result->sig_level),
-							param_flags, param_ssid);
+					ATCMD_MSG_INFO("WSCANSSID", "\"%s\",%.1f@%d,%d,\"%s\",\"%s\"",
+							result->bssid, s1g_freq / 10., result->bandwidth, (int8_t)atoi(result->sig_level),
+							result->flags, result->ssid);
 				}
-				else
-				{
-					ATCMD_MSG_INFO("WSCAN", "%s,%.1f,%d,%s,%s",
-							param_bssid, s1g_freq / 10., (int8_t)atoi(result->sig_level),
-							param_flags, param_ssid);
-				}
+			}
+			else
+			{
+				ATCMD_MSG_INFO("WSCAN", "\"%s\",%.1f@%d,%d,\"%s\",\"%s\"",
+						result->bssid, s1g_freq / 10., result->bandwidth, (int8_t)atoi(result->sig_level),
+						result->flags, result->ssid);
 			}
 		}
 	}
@@ -1640,7 +1813,7 @@ static int _atcmd_wifi_scan_run (int argc, char *argv[])
 		return ATCMD_ERROR_BUSY;
 	}
 
-	if (wifi_api_add_network() != 0)
+	if (wifi_api_add_network(false) != 0)
 	{
 		ATCMD_WIFI_UNLOCK();
 		_atcmd_error("failed add_network()");
@@ -1677,7 +1850,7 @@ _atcmd_wifi_scan_retry:
 			_delay_ms(100);
 		}
 
-		_atcmd_wifi_scan_result_report(&scan->results, !!ssid, true);
+		_atcmd_wifi_scan_result_report(&scan->results, ssid, true);
 
 		if (scan->results.n_result == 0 && !scan_retry)
 		{
@@ -1930,6 +2103,293 @@ static atcmd_info_t g_atcmd_wifi_scan_ssid =
 
 /**********************************************************************************************/
 
+#ifdef CONFIG_ATCMD_BGSCAN
+
+static int _atcmd_wifi_scan_background_get (int argc, char *argv[])
+{
+	switch (argc)
+	{
+		case 0:
+		{
+			atcmd_wifi_bgscan_t *bgscan = &g_atcmd_wifi_info->bgscan;
+
+			_atcmd_info("wifi_bgscan_get: scanning=%d interval=%d,%d threshold=%d",
+						bgscan->scanning,
+						bgscan->short_interval, bgscan->long_interval,
+						bgscan->signal_threshold);
+
+			ATCMD_MSG_INFO("WBGSCAN", "%d,%d,%d,%d",
+						bgscan->scanning,
+						bgscan->short_interval, bgscan->long_interval,
+						bgscan->signal_threshold);
+			break;
+		}
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+
+static int _atcmd_wifi_scan_background_set (int argc, char *argv[])
+{
+	switch (argc)
+	{
+		case 0:
+			/*
+			 * short_interval: short scan interval (sec)
+			 * ong_interval: long scan interval (sec)
+			 * signal_threshold: short/long interval choice signal threshold (ex : -45)
+			 */
+			ATCMD_MSG_HELP("AT+WBGSCAN=<short_interval>,<long_interval>,<signal_threshold>");
+			break;
+
+		case 3:
+		{
+			int short_interval = atoi(argv[0]);
+			int long_interval = atoi(argv[1]);
+			int signal_threshold = atoi(argv[2]);
+
+			if (short_interval >= 0 && long_interval >= 0 && signal_threshold <= 0)
+			{
+				atcmd_wifi_bgscan_t *bgscan = &g_atcmd_wifi_info->bgscan;
+
+				_atcmd_info("wifi_bgscan_set: interval=%d,%d threshold=%d",
+							short_interval, long_interval, signal_threshold);
+
+				if (short_interval == 0 && long_interval == 0 && signal_threshold == 0)
+					bgscan->scanning = false;
+				else
+					bgscan->scanning = true;
+
+				bgscan->short_interval = short_interval;
+				bgscan->long_interval = long_interval;
+				bgscan->signal_threshold = signal_threshold;
+			}
+			break;
+		}
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+
+static atcmd_info_t g_atcmd_wifi_scan_background =
+{
+	.list.next = NULL,
+	.list.prev = NULL,
+
+	.group = ATCMD_GROUP_WIFI,
+
+	.cmd = "BGSCAN",
+	.id = ATCMD_WIFI_SCAN_BACKGROUND,
+
+	.handler[ATCMD_HANDLER_RUN] = NULL,
+	.handler[ATCMD_HANDLER_GET] = _atcmd_wifi_scan_background_get,
+	.handler[ATCMD_HANDLER_SET] = _atcmd_wifi_scan_background_set,
+};
+
+#endif /* #ifdef CONFIG_ATCMD_BGSCAN */
+
+/**********************************************************************************************/
+
+#if defined(CONFIG_ATCMD_SAEPWE) && defined(CONFIG_ATCMD_WPA3)
+
+#if 1
+static int _atcmd_wifi_sae_pwe_get (int argc, char *argv[])
+{
+	switch (argc)
+	{
+		case 0:
+			_atcmd_info("wifi_sae_pwe_get: sta=%d ap=%d relay=%d,%d", 
+					g_atcmd_wifi_info->sae_pwe_sta,
+					g_atcmd_wifi_info->sae_pwe_ap,
+					g_atcmd_wifi_info->sae_pwe_relay_sta,
+					g_atcmd_wifi_info->sae_pwe_relay_ap);
+
+			ATCMD_MSG_INFO("WSAEPWE", "%d", g_atcmd_wifi_info->sae_pwe[0]);
+			break;
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+
+static int _atcmd_wifi_sae_pwe_set (int argc, char *argv[])
+{
+	if (!_atcmd_wifi_disconnected())
+		return ATCMD_ERROR_NOTSUPP; 
+
+	switch (argc)
+	{
+		case 0:
+			/*
+			 * <sae_pwe>
+			 *   SAE mechanism for PWE derivation
+			 *    - 0 = hunting-and-pecking loop only (default without password identifier)
+			 *    - 1 = hash-to-element only (default with password identifier)
+			 *    - 2 = both hunting-and-pecking loop and hash-to-element enabled
+			 *    - Note: The default value is likely to change from 0 to 2 once the new
+			 *            hash-to-element mechanism has received more interoperability testing.
+			 *            When using SAE password identifier, the hash-to-element mechanism is used
+			 *            regardless of the sae_pwe parameter value.
+			 */
+			ATCMD_MSG_HELP("AT+WSAEPWE=<sae_pwe>");
+			break;
+
+		case 1:
+		{
+			int sae_pwe = atoi(argv[0]);
+
+			if (sae_pwe >= 0 && sae_pwe <= 2)
+			{
+				int i;
+
+				_atcmd_info("wifi_sae_pwe_set: %d", sae_pwe);
+
+				for (i = 0 ; i < 4 ; i++)
+					g_atcmd_wifi_info->sae_pwe[i] = sae_pwe;
+
+				break;
+			}
+		}
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+#else
+static int _atcmd_wifi_sae_pwe_get (int argc, char *argv[])
+{
+	switch (argc)
+	{
+		case 0:
+			_atcmd_info("wifi_sae_pwe_get: sta=%d ap=%d relay=%d,%d", 
+					g_atcmd_wifi_info->sae_pwe_sta,
+					g_atcmd_wifi_info->sae_pwe_ap,
+					g_atcmd_wifi_info->sae_pwe_relay_sta,
+					g_atcmd_wifi_info->sae_pwe_relay_ap);
+
+			ATCMD_MSG_INFO("WSAEPWE", "%d,%d,%d,%d",
+					g_atcmd_wifi_info->sae_pwe_sta,
+					g_atcmd_wifi_info->sae_pwe_ap,
+					g_atcmd_wifi_info->sae_pwe_relay_sta,
+					g_atcmd_wifi_info->sae_pwe_relay_ap);
+
+			break;
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+
+static int _atcmd_wifi_sae_pwe_set (int argc, char *argv[])
+{
+	int mode;
+	int sae_pwe[2] = { -1, -1 };
+
+	if (!_atcmd_wifi_disconnected())
+		return ATCMD_ERROR_NOTSUPP; 
+
+	switch (argc)
+	{
+		case 0:
+			/*
+			 * <mode>
+			 *    - 0 : STA
+			 *    - 1 : AP
+			 *    - 2 : RELAY
+			 *
+			 * <sae_pwe>
+			 *   SAE mechanism for PWE derivation
+			 *    - 0 = hunting-and-pecking loop only (default without password identifier)
+			 *    - 1 = hash-to-element only (default with password identifier)
+			 *    - 2 = both hunting-and-pecking loop and hash-to-element enabled
+			 *    - Note: The default value is likely to change from 0 to 2 once the new
+			 *            hash-to-element mechanism has received more interoperability testing.
+			 *            When using SAE password identifier, the hash-to-element mechanism is used
+			 *            regardless of the sae_pwe parameter value.
+			 */
+			ATCMD_MSG_HELP("AT+WSAEPWE=0,<sae_pwe_sta>");
+#if defined(CONFIG_ATCMD_SOFTAP_WPA3)
+			ATCMD_MSG_HELP("AT+WSAEPWE=1,<sae_pwe_ap>");
+			ATCMD_MSG_HELP("AT+WSAEPWE=2,<sae_pwe_sta>[,<sae_pwe_ap>]");
+#else
+			ATCMD_MSG_HELP("AT+WSAEPWE=2,<sae_pwe_sta>");
+#endif			
+			break;
+
+#if defined(CONFIG_ATCMD_SOFTAP_WPA3)
+		case 3:
+			sae_pwe[1] = atoi(argv[2]);
+#endif			
+		case 2:
+			mode = atoi(argv[0]);
+			sae_pwe[0] = atoi(argv[1]);
+
+			if (sae_pwe[0] >= 0 && sae_pwe[0] <= 2)
+			{
+#if !defined(CONFIG_ATCMD_SOFTAP_WPA3)
+				if (mode == 0)
+#else					
+				if (mode == 0 || mode == 1)
+#endif
+				{
+					_atcmd_info("wifi_sae_pwe_set: %s=%d", (mode == 0) ? "sta" : "ap", sae_pwe[0]);
+					g_atcmd_wifi_info->sae_pwe[mode] = sae_pwe[0];
+					break;
+				}
+				else if (mode == 2)
+				{
+					if (argc == 2 || (sae_pwe[1] >= 0 && sae_pwe[1] <= 2))
+					{
+						_atcmd_info("wifi_sae_pwe_set: relay=%d,%d", sae_pwe[0], sae_pwe[1]);
+						g_atcmd_wifi_info->sae_pwe[mode] = sae_pwe[0];
+#if defined(CONFIG_ATCMD_SOFTAP_WPA3)
+						if (argc == 3)
+							g_atcmd_wifi_info->sae_pwe[mode + 1] = sae_pwe[1];
+#endif						
+						break;
+					}
+				}
+			}
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+#endif
+
+static atcmd_info_t g_atcmd_wifi_sae_pwe =
+{
+	.list.next = NULL,
+	.list.prev = NULL,
+
+	.group = ATCMD_GROUP_WIFI,
+
+	.cmd = "SAEPWE",
+	.id = ATCMD_WIFI_SAE_PWE,
+
+	.handler[ATCMD_HANDLER_RUN] = NULL,
+	.handler[ATCMD_HANDLER_GET] = _atcmd_wifi_sae_pwe_get,
+	.handler[ATCMD_HANDLER_SET] = _atcmd_wifi_sae_pwe_set,
+};
+
+#endif /* #if defined(CONFIG_ATCMD_SAEPWE) && defined(CONFIG_ATCMD_WPA3) */
+
+/**********************************************************************************************/
+
 static bool _atcmd_wifi_connect_valid_ap (char *ssid, char *bssid, char *security)
 {
 	atcmd_wifi_scan_t *scan = &g_atcmd_wifi_info->scan;
@@ -2006,81 +2466,82 @@ static bool _atcmd_wifi_connect_valid_ap (char *ssid, char *bssid, char *securit
 static void _atcmd_wifi_connect_update_ap_info (void)
 {
 	atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
-	atcmd_wifi_bssid_t bssid;
-	atcmd_wifi_ssid_t ssid;
+	wifi_ap_info_t ap_info;
 
-	_atcmd_info("wifi_connect: bssid=%s ssid=%s", connect->bssid, connect->ssid);
-
-	if (wifi_api_get_ap_bssid(bssid) == 0)
+	if (wifi_api_get_ap_info(&ap_info) == 0)
 	{
-/*		_atcmd_debug(" - bssid: %s", bssid); */
+		_atcmd_info("wifi_connect: %.1f@%u %s %s %s", 
+					ap_info.channel.freq/10., ap_info.channel.bw,
+					ap_info.bssid, ap_info.ssid, ap_info.security);
 
-		if (strlen(bssid) > 0 && strcmp(connect->bssid, bssid) != 0)
+		if (strcmp(connect->bssid, ap_info.bssid) != 0)
 		{
-			_atcmd_info("wifi_connect: bssid, %s -> %s", connect->bssid, bssid);
-
-			strcpy(connect->bssid, bssid);
+			_atcmd_info(" - bssid: %s -> %s", connect->bssid, ap_info.bssid);
+			strcpy(connect->bssid, ap_info.bssid);
 		}
-	}
 
-	if (wifi_api_get_ap_ssid(ssid, sizeof(ssid)) == 0)
-	{
-/*		_atcmd_debug(" - ssid: %s", ssid); */
-
-		if (strlen(ssid) > 0 && strcmp(connect->ssid, ssid) != 0)
+		if (strcmp(connect->ssid, ap_info.ssid) != 0)
 		{
-			_atcmd_info("wifi_connect: ssid, %s -> %s", connect->ssid, ssid);
+			_atcmd_info(" - ssid: %s -> %s", connect->ssid, ap_info.ssid);
+			strcpy(connect->ssid, ap_info.ssid);
+		}
 
-			strcpy(connect->ssid, ssid);
+		if (strcmp(connect->security, ap_info.security) != 0)
+		{
+			_atcmd_info(" - security: %s -> %s", connect->security, ap_info.security);
+			strcpy(connect->security, ap_info.security);
 		}
 	}
 }
 
-static int _atcmd_wifi_connect_run (int argc, char *argv[])
+static int _atcmd_wifi_connect (atcmd_wifi_bssid_t bssid, atcmd_wifi_ssid_t ssid, 
+								atcmd_wifi_security_t security, atcmd_wifi_password_t password, 
+								bool event_poll)
 {
 	atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
-	bool connection_timeout = false;
-	bool event_poll = false;
+	atcmd_wifi_bgscan_t *bgscan = &g_atcmd_wifi_info->bgscan;
 	uint32_t timeout_msec = _atcmd_timeout_value("WCONN");
-
-	switch (argc)
-	{
-		case 1:
-			event_poll = true;
-
-		case 0:
-			break;
-
-		default:
-			_atcmd_info("wifi_connect: invalid argc");
-			return ATCMD_ERROR_INVAL;
-	}
+	bool connection_timeout = false;
+	int sae_pwe;
 
 /*	_atcmd_debug("wifi_connect: event_poll=%d net_id=%d", event_poll, net_id); */
-
-	ATCMD_WIFI_LOCK();
-
-	if (wifi_api_add_network() != 0)
-		goto wifi_connect_fail;
 
 	if (connect->connecting || connect->connected)
 	{
 		_atcmd_info("wifi_connect: %s", connect->connected ? "connected" : "connecting");
 
-		ATCMD_WIFI_UNLOCK();
-
 		return ATCMD_ERROR_BUSY;
 	}
 
-	_atcmd_info("wifi_connect: %s %s %s %u", connect->ssid, connect->bssid, connect->security, timeout_msec);
+	ATCMD_WIFI_LOCK();
 
-	if (strlen(connect->ssid) > 0 && wifi_api_set_ssid(connect->ssid) != 0)
+	if (wifi_api_add_network(false) != 0)
 		goto wifi_connect_fail;
 
-	if (strlen(connect->bssid) > 0 && wifi_api_set_bssid(connect->bssid) != 0)
+	if (bgscan->scanning) {
+		_atcmd_info("Start bgscan simple:%u:%d:%u\n",
+					bgscan->short_interval,
+					bgscan->signal_threshold,
+					bgscan->long_interval);
+
+		wifi_api_set_scan_background(bgscan->short_interval, bgscan->signal_threshold, bgscan->long_interval);
+	}
+
+	if (wifi_api_is_relay_mode())
+		sae_pwe = g_atcmd_wifi_info->sae_pwe_relay_sta;
+   	else
+		sae_pwe = g_atcmd_wifi_info->sae_pwe_sta;
+
+	_atcmd_info("wifi_connect: ssid=%s bssid=%s security=%s sae_pwe=%d timeout=%u", 
+					ssid, bssid, security, sae_pwe, timeout_msec);
+
+	if (strlen(ssid) > 0 && wifi_api_set_ssid(ssid) != 0)
 		goto wifi_connect_fail;
 
-	if (wifi_api_set_security(connect->security, connect->password) != 0)
+	if (strlen(bssid) > 0 && wifi_api_set_bssid(bssid) != 0)
+		goto wifi_connect_fail;
+
+	if (wifi_api_set_security(security, password, sae_pwe) != 0)
 		goto wifi_connect_fail;
 
 	connect->connected = false;
@@ -2143,7 +2604,9 @@ static int _atcmd_wifi_connect_run (int argc, char *argv[])
 		goto wifi_connect_fail;
 	}
 
-	_atcmd_wifi_connect_update_ap_info();
+/*	_atcmd_wifi_connect_update_ap_info(); */
+
+	strcpy(connect->password, password);
 
 	_atcmd_info("wifi_connect: done");
 
@@ -2159,12 +2622,35 @@ wifi_connect_fail:
 
 	_atcmd_info("wifi_connect: %s", connection_timeout ? "timeout" : "fail");
 
-	if (wifi_api_remove_network() != 0)
+	if (wifi_api_remove_network(false) != 0)
 		_atcmd_error("api_remove_network()");
 
 	ATCMD_WIFI_UNLOCK();
 
 	return connection_timeout ? ATCMD_ERROR_TIMEOUT : ATCMD_ERROR_FAIL;
+}
+
+static int _atcmd_wifi_connect_run (int argc, char *argv[])
+{
+	atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
+	bool event_poll = false;
+
+	switch (argc)
+	{
+		case 1:
+			event_poll = true;
+
+		case 0:
+			break;
+
+		default:
+			_atcmd_info("wifi_connect: invalid argc");
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return _atcmd_wifi_connect(connect->bssid, connect->ssid, 
+							connect->security, connect->password, 
+							event_poll);
 }
 
 static int _atcmd_wifi_connect_get (int argc, char *argv[])
@@ -2173,35 +2659,44 @@ static int _atcmd_wifi_connect_get (int argc, char *argv[])
 	{
 		case 0:
 		{
-			char param_ssid[ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_ssid_t))];
-			char param_bssid[ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_bssid_t))];
-			char param_security[ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_security_t))];
-			char param_password[ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_password_t))];
-
 			atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
 			char *status = NULL;
 
 			if (connect->disconnecting)
-				status = "\"disconnecting\"";
+				status = "disconnecting";
 			else if (connect->connecting)
-				status = "\"connecting\"";
+				status = "connecting";
 			else if (connect->connected)
-				status = "\"connected\"";
+				status = "connected";
 			else
-				status = "\"disconnected\"";
+				status = "disconnected";
 
-			if (atcmd_str_to_param(connect->ssid, param_ssid, sizeof(param_ssid)) &&
-				atcmd_str_to_param(connect->bssid, param_bssid, sizeof(param_bssid)) &&
-				atcmd_str_to_param(connect->security, param_security, sizeof(param_security)) &&
-				atcmd_str_to_param(connect->password, param_password, sizeof(param_password)))
+#if defined(CONFIG_SHOW_WIFI_PASSWORD)
+			if (strlen(connect->password) <= 16)
 			{
-				ATCMD_MSG_INFO("WCONN", "%s,%s,%s,%s,%s",
-								param_ssid, param_bssid, param_security, param_password, status);
-
-				break;
+				ATCMD_MSG_INFO("WCONN", "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"",
+								connect->ssid, connect->bssid, 
+								connect->security, connect->password, 
+								status);
 			}
+			else
+			{
+				char password[16 + 1];
 
-			return ATCMD_ERROR_FAIL;
+				memcpy(password, connect->password, 16);
+				password[16] = '\0';
+
+				ATCMD_MSG_INFO("WCONN", "\"%s\",\"%s\",\"%s\",\"%s...%d\",\"%s\"",
+								connect->ssid, connect->bssid, 
+								connect->security, password, strlen(connect->password), 
+								status);
+			}
+#else		
+			ATCMD_MSG_INFO("WCONN", "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"",
+							connect->ssid, connect->bssid, connect->security, 
+							connect->recovery ? "*" : "", status);
+#endif
+			break;
 		}
 
 		default:
@@ -2261,34 +2756,21 @@ static int _atcmd_wifi_connect_set (int argc, char *argv[])
 				if (!atcmd_param_to_str(param_security, str_security, sizeof(str_security)))
 					return ATCMD_ERROR_INVAL;
 
-				if (strcmp(str_security, "wpa2") == 0 || strcmp(str_security, "psk") == 0)
-					strcpy(str_security, "wpa2-psk");
-#if defined(CONFIG_ATCMD_WPA3)
-				else if (strcmp(str_security, "owe") == 0)
-					strcpy(str_security, "wpa3-owe");
-				else if (strcmp(str_security, "sae") == 0)
-					strcpy(str_security, "wpa3-sae");
-#endif
+				if (!_atcmd_wifi_security_valid(str_security, true))
+					return ATCMD_ERROR_INVAL;
 			}
 
 			if (param_password)
 			{
 				if (!atcmd_param_to_str(param_password, str_password, sizeof(str_password)))
 					return ATCMD_ERROR_INVAL;
-			}
 
-			if (!_atcmd_wifi_security_valid(str_security, str_password, true))
-				return ATCMD_ERROR_INVAL;
+				if (!_atcmd_wifi_password_valid(str_password))
+					return ATCMD_ERROR_INVAL;
+			}
 
 			if (_atcmd_wifi_connect_valid_ap(str_ssid, str_bssid, str_security))
-			{
-				strcpy(connect->ssid, str_ssid);
-				strcpy(connect->bssid, str_bssid);
-				strcpy(connect->security, str_security);
-				strcpy(connect->password, str_password);
-
-				return _atcmd_wifi_connect_run(0, NULL);
-			}
+				return _atcmd_wifi_connect(str_bssid, str_ssid, str_security, str_password, false);
 
 			_atcmd_info("wifi_connect: invalid AP, ssid=%s bssid=%s security=%s",
 										str_ssid, str_bssid, str_security);
@@ -2430,6 +2912,8 @@ static int _atcmd_wifi_disconnect_run (int argc, char *argv[])
 			_atcmd_wifi_event_polled(ATCMD_WIFI_EVT_DISCONNECT);
 	}
 
+	wifi_api_stop_dhcp_client();
+
 	_atcmd_info("wifi_disconnect: done");
 
 	ATCMD_WIFI_UNLOCK();
@@ -2458,34 +2942,28 @@ static int _atcmd_wifi_ipaddr_get (int argc, char *argv[])
 {
 	switch (argc)
 	{
-		case 3: /* DHCP */
+		case 4: /* DHCP client */
+		case 3: /* DHCP server */
 		case 0:
 		{
 			atcmd_wifi_ipaddr_t str_ip4addr[3];
 
-			if (wifi_api_get_ip_address(str_ip4addr[0], str_ip4addr[1], str_ip4addr[2]) != 0)
+			if (wifi_api_get_ip4_address(str_ip4addr[0], str_ip4addr[1], str_ip4addr[2]) != 0)
 				return ATCMD_ERROR_FAIL;
 
 			if (argc == 0)
 			{
-				char param_ip4addr[3][ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_ipaddr_t))];
-				int i;
-
-				for (i = 0 ; i < 3 ; i++)
-				{
-					if (!atcmd_str_to_param(str_ip4addr[i], param_ip4addr[i],
-								ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_ipaddr_t))))
-						return ATCMD_ERROR_FAIL;
-				}
-
-				ATCMD_MSG_INFO("WIPADDR", "%s,%s,%s",
-								param_ip4addr[0], param_ip4addr[1], param_ip4addr[2]);
+				ATCMD_MSG_INFO("WIPADDR", "\"%s\",\"%s\",\"%s\"",
+								str_ip4addr[0], str_ip4addr[1], str_ip4addr[2]);
 			}
-			else
+			else /* DHCP */
 			{
 				strcpy(argv[0], str_ip4addr[0]);
 				strcpy(argv[1], str_ip4addr[1]);
 				strcpy(argv[2], str_ip4addr[2]);
+
+				if (argc == 4)
+					*(int *)argv[3] = wifi_api_get_dhcp_lease_time();
 			}
 
 			break;
@@ -2522,7 +3000,7 @@ static int _atcmd_wifi_ipaddr_set (int argc, char *argv[])
 					return ATCMD_ERROR_FAIL;
 			}
 
-			if (wifi_api_set_ip_address(str_ip4addr[0], str_ip4addr[1], str_ip4addr[2]) != 0)
+			if (wifi_api_set_ip4_address(str_ip4addr[0], str_ip4addr[1], str_ip4addr[2]) != 0)
 				return ATCMD_ERROR_FAIL;
 
 			break;
@@ -2560,6 +3038,7 @@ static int _atcmd_wifi_ipaddr6_get (int argc, char *argv[])
 	{
 		case 0: /* AT+WIPADDR6? */
 		{
+			struct netif *netif = nrc_netif[0];
 			atcmd_wifi_ipaddr_t str_ip6addr;
 			char msg_info[LWIP_IPV6_NUM_ADDRESSES][ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_ipaddr_t)) + 5];
 			int len;
@@ -2603,6 +3082,7 @@ static int _atcmd_wifi_ipaddr6_set (int argc, char *argv[])
 
 		case 2:
 		{
+			struct netif *netif = nrc_netif[0];
 			struct
 			{
 				uint8_t val;
@@ -2745,16 +3225,44 @@ static void _atcmd_wifi_dhcp_task_stop (void)
 	}
 }
 
+static void _atcmd_wifi_dhcp_release_handler (void)
+{
+	_atcmd_info("wifi_dhcp: release");
+
+	ATCMD_MSG_WEVENT("\"DHCP_RELEASE\"");
+}
+
+static void _atcmd_wifi_dhcp_renew_handler (void)
+{
+	atcmd_wifi_ipaddr_t ip4addr[3];
+
+	if (wifi_api_get_ip4_address(ip4addr[0], ip4addr[1], ip4addr[2]) == 0)
+	{
+		int lease_time = wifi_api_get_dhcp_lease_time();
+
+		_atcmd_info("wifi_dhcp: renew, %s %s %s %d",
+					ip4addr[0], ip4addr[1], ip4addr[2], lease_time);
+
+		ATCMD_MSG_WEVENT("\"DHCP_RENEW\",\"%s\",\"%s\",\"%s\",%d",
+					ip4addr[0], ip4addr[1], ip4addr[2], lease_time);
+	}
+}
+
 static int _atcmd_wifi_dhcp_run (int argc, char *argv[])
 {
+	dhcpc_event_cb_t event_cb[ATCMD_DHCPC_EVT_MAX] =
+	{
+		[ATCMD_DHCPC_EVT_RELEASE] = _atcmd_wifi_dhcp_release_handler,
+		[ATCMD_DHCPC_EVT_RENEW] = _atcmd_wifi_dhcp_renew_handler
+	};
 	bool task_run = (argc == 0) ? false : true;
 	atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
 	uint32_t timeout_msec = _atcmd_timeout_value("WDHCP");
+	int ret;
 
 	if (!connect->connected)
 	{
 		_atcmd_info("wifi_dhcp: not connected");
-
 		return ATCMD_ERROR_INVAL;
 	}
 
@@ -2765,72 +3273,72 @@ static int _atcmd_wifi_dhcp_run (int argc, char *argv[])
 	if (task_run)
 		ATCMD_MSG_WEVENT("\"DHCP_START\"");
 
-	switch (wifi_api_start_dhcp_client(timeout_msec))
+	switch (wifi_api_start_dhcp_client(timeout_msec, event_cb))
 	{
+		case DHCP_RECOVERY:
+			_atcmd_info("wifi_dhcp: recovery");
+			ret = ATCMD_SUCCESS;
+			break;
+
 		case DHCP_SUCCESS:
-		{
-			char param_ip4addr[3][ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_ipaddr_t))];
-			char *argv[3] = { param_ip4addr[0], param_ip4addr[1], param_ip4addr[2] };
-
 			_atcmd_info("wifi_dhcp: success");
-
-			if (_atcmd_wifi_ipaddr_get(3, argv) != ATCMD_SUCCESS)
-				_atcmd_info("wifi_dhcp: failed to get ip address");
-
-			if (task_run)
-			{
-				ATCMD_MSG_WEVENT("\"DHCP_SUCCESS\",\"%s\",\"%s\",\"%s\"",
-						param_ip4addr[0], param_ip4addr[1], param_ip4addr[2]);
-			}
-			else
-			{
-				ATCMD_MSG_INFO("WDHCP", "\"%s\",\"%s\",\"%s\"",
-						param_ip4addr[0], param_ip4addr[1], param_ip4addr[2]);
-			}
-
-			ATCMD_WIFI_UNLOCK();
-
-			return ATCMD_SUCCESS;
-		}
+			ret = ATCMD_SUCCESS;
+			break;
 
 		case DHCP_BUSY:
 			_atcmd_info("wifi_dhcp: busy");
-
 			if (task_run)
 				ATCMD_MSG_WEVENT("\"DHCP_BUSY\"");
-
-			ATCMD_WIFI_UNLOCK();
-
-			return ATCMD_ERROR_BUSY;
+			ret = ATCMD_ERROR_BUSY;
+			break;
 
 		case DHCP_TIMEOUT:
 			_atcmd_info("wifi_dhcp: timeout, %umsec", timeout_msec);
-
 			if (task_run)
 				ATCMD_MSG_WEVENT("\"DHCP_TIMEOUT\",%u", timeout_msec / 1000);
-
-			ATCMD_WIFI_UNLOCK();
-
-			return ATCMD_ERROR_TIMEOUT;
+			ret = ATCMD_ERROR_TIMEOUT;
+			break;
 
 		case DHCP_STOP:
 			_atcmd_info("wifi_dhcp: stop");
-
 			if (task_run)
 				ATCMD_MSG_WEVENT("\"DHCP_STOP\"");
+			ret = ATCMD_ERROR_FAIL;
 			break;
 
 		default:
 			_atcmd_info("wifi_dhcp: fail");
-
 			if (task_run)
 				ATCMD_MSG_WEVENT("\"DHCP_FAIL\"");
+			ret = ATCMD_ERROR_FAIL;
+	}
 
+	if (ret == ATCMD_SUCCESS)
+	{
+		atcmd_wifi_ipaddr_t ip4addr[3];
+
+		if (wifi_api_get_ip4_address(ip4addr[0], ip4addr[1], ip4addr[2]) != 0)
+			_atcmd_info("wifi_dhcp: failed to get ip address");
+		else
+		{
+			int lease_time = wifi_api_get_dhcp_lease_time();
+
+			if (task_run)
+			{
+				ATCMD_MSG_WEVENT("\"DHCP_SUCCESS\",\"%s\",\"%s\",\"%s\",%d",
+						ip4addr[0], ip4addr[1], ip4addr[2], lease_time);
+			}
+			else
+			{
+				ATCMD_MSG_INFO("WDHCP", "\"%s\",\"%s\",\"%s\",%d",
+						ip4addr[0], ip4addr[1], ip4addr[2], lease_time);
+			}
+		}
 	}
 
 	ATCMD_WIFI_UNLOCK();
 
-	return ATCMD_ERROR_FAIL;
+	return ret;
 }
 
 static int _atcmd_wifi_dhcp_get (int argc, char *argv[])
@@ -2902,11 +3410,16 @@ static int _atcmd_wifi_dhcps_run (int argc, char *argv[])
 {
 	atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
 
+	if (wifi_api_is_relay_mode())
+	{
+		_atcmd_info("wifi_dhcps: relay mode");
+		return ATCMD_ERROR_NOTSUPP;
+	}
+
 	if (!softap->active)
 	{
-		_atcmd_info("wifi_dhcps: inactive");
-
-		return ATCMD_ERROR_INVAL;
+		_atcmd_info("wifi_dhcps: sta mode");
+		return ATCMD_ERROR_NOTSUPP;
 	}
 
 	if (softap->dhcp_server)
@@ -2972,23 +3485,31 @@ static int _atcmd_wifi_dhcps_set (int argc, char *argv[])
 	switch (argc)
 	{
 		case 0:
-			ATCMD_MSG_HELP("AT+WDHCP={0|1}");
+			ATCMD_MSG_HELP("AT+WDHCPS={0|1}");
 			break;
 
 		case 1:
-			switch (atoi(argv[0]))
+		{
+			int param = atoi(argv[0]);
+
+			if (param == 0 || param == 1)
 			{
-				case 0:
+				bool enable = !!param;
+
+				if (enable)
+					return _atcmd_wifi_dhcps_run(0, NULL);
+
+				if (softap->dhcp_server)
+				{
 					if (wifi_api_stop_dhcp_server() != 0)
 						return ATCMD_ERROR_FAIL;
 
 					softap->dhcp_server = false;
+				}
 
-					return ATCMD_SUCCESS;
-
-				case 1:
-					return _atcmd_wifi_dhcps_run(0, NULL);
+				break;
 			}
+		}
 
 		default:
 			return ATCMD_ERROR_INVAL;
@@ -3017,25 +3538,23 @@ static atcmd_info_t g_atcmd_wifi_dhcps =
 
 static void _atcmd_wifi_ping_report_callback (_lwip_ping_report_t *report)
 {
-	char param_remote_ip[ATCMD_STR_PARAM_SIZE(ATCMD_WIFI_IPADDR_LEN_MAX)];
+	atcmd_wifi_ipaddr_t str_remote_ip;
 
-	if (!atcmd_str_to_param(ipaddr_ntoa(&report->remote_ip),
-							param_remote_ip, sizeof(param_remote_ip)))
-		return;
+	strcpy(str_remote_ip, ipaddr_ntoa(&report->remote_ip));
 
 	switch (report->status)
 	{
 		case _LWIP_PING_SUCCESS:
 			if (IP_IS_V6(&report->remote_ip))
 			{
-				ATCMD_MSG_INFO("WPING6", "%u,%s,%u,%u,%u",
-					report->data_size, param_remote_ip,
+				ATCMD_MSG_INFO("WPING6", "%u,\"%s\",%u,%u,%u",
+					report->data_size, str_remote_ip,
 					report->icmp_seq, report->ttl, report->resp_time);
 			}
 			else
 			{
-				ATCMD_MSG_INFO("WPING", "%u,%s,%u,%u,%u",
-					report->data_size, param_remote_ip,
+				ATCMD_MSG_INFO("WPING", "%u,\"%s\",%u,%u,%u",
+					report->data_size, str_remote_ip,
 					report->icmp_seq, report->ttl, report->resp_time);
 			}
 			break;
@@ -3044,15 +3563,15 @@ static void _atcmd_wifi_ping_report_callback (_lwip_ping_report_t *report)
 		case _LWIP_PING_RECV_TIMEOUT:
 			if (IP_IS_V6(&report->remote_ip))
 			{
-				ATCMD_MSG_INFO("WPING6", "%u,%s,%u,%s",
-					report->data_size, param_remote_ip, report->icmp_seq,
-					report->status == _LWIP_PING_SEND_FAIL ? "\"send_fail\"" : "\"recv_timeout\"");
+				ATCMD_MSG_INFO("WPING6", "%u,\"%s\",%u,\"%s\"",
+					report->data_size, str_remote_ip, report->icmp_seq,
+					report->status == _LWIP_PING_SEND_FAIL ? "send_fail" : "recv_timeout");
 			}
 			else
 			{
-				ATCMD_MSG_INFO("WPING", "%u,%s,%u,%s",
-					report->data_size, param_remote_ip, report->icmp_seq,
-					report->status == _LWIP_PING_SEND_FAIL ? "\"send_fail\"" : "\"recv_timeout\"");
+				ATCMD_MSG_INFO("WPING", "%u,\"%s\",%u,\"%s\"",
+					report->data_size, str_remote_ip, report->icmp_seq,
+					report->status == _LWIP_PING_SEND_FAIL ? "send_fail" : "recv_timeout");
 			}
 	}
 }
@@ -3073,16 +3592,10 @@ static int _atcmd_wifi_ping_run (int argc, char *argv[])
 	{
 		_lwip_ping_params_t *params = g_atcmd_wifi_info->ping.params + (ipv6 ? 1 : 0);
 
-		if (!ipv6 && ip4_addr_get_u32(ip_2_ip4(&params->remote_ip)) == IPADDR_ANY)
+		if (ip_addr_isany(&params->remote_ip))
 		{
-			ip_addr_t ipaddr_gw;
-
-			memcpy(&ipaddr_gw, netif_ip4_gw(netif), sizeof(ip_addr_t));
-
-			if (ip4_addr_get_u32(ip_2_ip4(&ipaddr_gw)) == IPADDR_ANY)
-				return ATCMD_ERROR_FAIL;
-
-			ip_addr_copy(params->remote_ip, ipaddr_gw);
+			_atcmd_info("wifi_ping_run: ip is any");
+			return ATCMD_ERROR_INVAL;
 		}
 
 		_atcmd_info("wifi_ping_run: ip=%s interval=%u count=%u size=%u",
@@ -3330,21 +3843,14 @@ static int _atcmd_wifi_dns_get (int argc, char *argv[])
 	{
 		case 0:
 		{
-			char param_ipaddr[2][ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_ipaddr_t))];
-			atcmd_wifi_ipaddr_t str_ipaddr;
+			atcmd_wifi_ipaddr_t str_ipaddr[2];
 			ip_addr_t *ipaddr;
 			int i;
 
 			for (i = 0 ; i < 2 ; i++)
-			{
-				strcpy(str_ipaddr, ipaddr_ntoa(dns_getserver(i)));
+				strcpy(str_ipaddr[i], ipaddr_ntoa(dns_getserver(i)));
 
-				if (!atcmd_str_to_param(str_ipaddr, param_ipaddr[i],
-							ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_ipaddr_t))))
-					return ATCMD_ERROR_FAIL;
-			}
-
-			ATCMD_MSG_INFO("WDNS", "%s,%s", param_ipaddr[0], param_ipaddr[1]);
+			ATCMD_MSG_INFO("WDNS", "\"%s\",\"%s\"", str_ipaddr[0], str_ipaddr[1]);
 			break;
 		}
 
@@ -3412,6 +3918,8 @@ static atcmd_info_t g_atcmd_wifi_dns =
 };
 
 /**********************************************************************************************/
+
+#ifdef CONFIG_ATCMD_FOTA
 
 #include "atcmd_fota.h"
 
@@ -3574,7 +4082,92 @@ static atcmd_info_t g_atcmd_wifi_fota =
 	.handler[ATCMD_HANDLER_SET] = _atcmd_wifi_fota_set,
 };
 
+#endif /* #ifdef CONFIG_ATCMD_FOTA */
+
 /**********************************************************************************************/
+
+#include "ctrl_iface_freeRTOS.h"
+#include "nrc_ps_api.h"
+
+static void _atcmd_wifi_deep_sleep_recovery (void)
+{
+	ctrl_iface_recovery_t rconf;
+
+	nrc_ps_get_rconf(&rconf);
+
+	if (0)
+	{
+		uint8_t *ipaddr;
+		uint8_t *netmask;
+		uint8_t *gateway;
+		uint32_t tmp;
+
+		ipaddr = (uint8_t *)&rconf.ip_addr;
+		tmp = (rconf.net_mask << 1) | 1;
+		netmask = (uint8_t *)&tmp;
+		gateway = (uint8_t *)&rconf.gw_addr;;
+
+		_atcmd_info("[ retention_info : total=%d ]", RET_TOTAL_SIZE);
+		_atcmd_info(" - country: %c%c", rconf.country[0], rconf.country[1]);	
+		_atcmd_info(" - channel: %u", rconf.channel);
+		_atcmd_info(" - ssid: %s (%d)", rconf.ssid, strlen(rconf.ssid));
+		_atcmd_info(" - bssid: %s (%d)", rconf.bssid, strlen(rconf.bssid));
+		_atcmd_info(" - security: %u", rconf.security);
+		_atcmd_info(" - akm: %u", rconf.akm);
+		_atcmd_info(" - sae_pwe: %u", rconf.sae_pwe);
+		_atcmd_info(" - password: %s", rconf.password ? rconf.password : ""); 
+		_atcmd_info(" - pmk: %s", rconf.pmk ? rconf.pmk : ""); 
+		_atcmd_info(" - ip_mode: %s (%d)", rconf.ip_mode ? "dhcp" : "static", rconf.ip_mode);
+		_atcmd_info(" - ip_addr: %u.%u.%u.%u", ipaddr[0], ipaddr[1], ipaddr[2], ipaddr[3]);
+		_atcmd_info(" - netmask: %u.%u.%u.%u", netmask[0], netmask[1], netmask[2], netmask[3]);
+		_atcmd_info(" - gateway: %u.%u.%u.%u", gateway[0], gateway[1], gateway[2], gateway[3]);
+	}
+
+	if (memcmp(rconf.country, g_atcmd_wifi_info->country, 2) != 0)
+	{
+		int argc = 1;
+		char *argv[1];
+		char param_country[5];
+
+		snprintf(param_country, 5, "\"%c%c\"", rconf.country[0], rconf.country[1]);
+
+		if (_atcmd_wifi_country_set(argc, argv) != ATCMD_SUCCESS)
+			_atcmd_info("wifi_recovery: failed to set the country %s", param_country);
+	}
+
+	if (wifi_api_connected())
+	{
+		atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
+
+		connect->recovery = true;
+		connect->connected = true;
+		connect->connecting = false;
+		connect->disconnecting = false;
+
+		strcpy(connect->ssid, rconf.ssid);
+		strcpy(connect->bssid, rconf.bssid);
+
+		strcpy(connect->password, "*"); 
+
+		if (rconf.security == 4 && rconf.akm == 0)
+			strcpy(connect->security, "open");
+		else if (rconf.security == 2 && rconf.akm == 2)
+			strcpy(connect->security, "wpa2-psk");
+		else if (rconf.security == 16 && rconf.akm == 18)
+			strcpy(connect->security, "wpa3-owe");
+		else if (rconf.security == 8 && rconf.akm == 8)
+			strcpy(connect->security, "wpa3-sae");
+		else
+			strcpy(connect->security, "unknown");
+
+/*		if (rconf.password)
+			strcpy(connect->password, rconf.password); */
+
+		g_atcmd_wifi_info->sae_pwe_sta = rconf.sae_pwe;
+
+		_atcmd_wifi_connect_update_ap_info();
+	}
+}
 
 static void _atcmd_wifi_deep_sleep_send_event (void)
 {
@@ -3582,14 +4175,20 @@ static void _atcmd_wifi_deep_sleep_send_event (void)
 	{
 		_atcmd_info("wifi_event: deepsleep_wakeup");
 
+		_atcmd_wifi_deep_sleep_recovery();
+
 		ATCMD_MSG_WEVENT("\"DEEPSLEEP_WAKEUP\"");
 	}
 }
 
 static int _atcmd_wifi_deep_sleep_set (int argc, char *argv[])
 {
+	atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
 	char *param_timeout = NULL;
 	char *param_gpio = NULL;
+
+	if (wifi_api_is_relay_mode() || softap->active)
+		return ATCMD_ERROR_NOTSUPP;
 
 	switch (argc)
 	{
@@ -3634,9 +4233,15 @@ static int _atcmd_wifi_deep_sleep_set (int argc, char *argv[])
 
 			_atcmd_info("wifi_deep_sleep: timeout=%u gpio=%u", timeout, gpio);
 
+			if (timeout == 0 && !_atcmd_wifi_connected())
+			{
+				_atcmd_info("wifi_deep_sleep: not connected");
+				return ATCMD_ERROR_NOTSUPP;
+			}
+
 			ret = wifi_api_start_deep_sleep(timeout, gpio);
 			if (ret == 0)
-				break;
+				return ATCMD_NO_RETURN;
 			else if (ret != -EINVAL)
 				return ATCMD_ERROR_FAIL;
 		}
@@ -3663,8 +4268,9 @@ static atcmd_info_t g_atcmd_wifi_deep_sleep =
 	.handler[ATCMD_HANDLER_SET] = _atcmd_wifi_deep_sleep_set,
 };
 
-#ifdef CONFIG_ATCMD_SOFTAP
 /**********************************************************************************************/
+
+#ifdef CONFIG_ATCMD_SOFTAP
 
 static void _atcmd_wifi_softap_init_info (void)
 {
@@ -3696,6 +4302,7 @@ static int _atcmd_wifi_softap_run (int argc, char *argv[])
 	atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
 	atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
 	uint32_t timeout_msec = _atcmd_timeout_value("WSOFTAP");
+	int sae_pwe;
 
 	if (softap->active)
 	{
@@ -3706,33 +4313,53 @@ static int _atcmd_wifi_softap_run (int argc, char *argv[])
 
 	ATCMD_WIFI_LOCK();
 
-	if (wifi_api_add_network() != 0)
+	if (wifi_api_add_network(true) != 0)
 		goto wifi_softap_fail;
 
-	if (connect->connecting || connect->connected)
+	if (wifi_api_is_relay_mode())
+		sae_pwe = g_atcmd_wifi_info->sae_pwe_relay_ap;
+	else
 	{
-		_atcmd_info("wifi_softap: %s to AP", connect->connected ? "connected" : "connecting");
+		if (connect->connecting || connect->connected)
+		{
+			_atcmd_info("wifi_softap: %s to AP", connect->connected ? "connected" : "connecting");
 
-		goto wifi_softap_fail;
+			goto wifi_softap_fail;
+		}
+		else if (connect->disconnecting)
+		{
+			_atcmd_info("wifi_softap: disconnecting from AP");
+
+			goto wifi_softap_fail;
+		}
+		
+		sae_pwe = g_atcmd_wifi_info->sae_pwe_ap;
 	}
-	else if (connect->disconnecting)
+
+	_atcmd_info("wifi_softap: bandwidth=%u freq=%u ssid=%s ssid_type=%d security=%s password=%s sae_pwe=%d",
+				softap->channel_bw, softap->channel_freq, 
+				softap->ssid, softap->ssid_type,
+				softap->security, softap->password, sae_pwe,
+				timeout_msec); 
+
+	if (wifi_api_start_softap(softap->channel_bw, softap->channel_freq, 
+							softap->ssid, softap->ssid_type,
+							softap->security, softap->password, sae_pwe, 
+							timeout_msec) == 0)
 	{
-		_atcmd_info("wifi_softap: disconnecting from AP");
+		uint16_t freq;
+		uint8_t bw;
 
-		goto wifi_softap_fail;
-	}
-
-	_atcmd_info("wifi_softap: bandwidth=%u freq=%u ssid=%s security=%s password=%s",
-			softap->channel_bw, softap->channel_freq, softap->ssid,
-			softap->security, softap->password);
-
-	if (wifi_api_start_softap(softap->channel_bw, softap->channel_freq, softap->ssid,
-				softap->security, softap->password, softap->ssid_type, timeout_msec) == 0)
-	{
-		_atcmd_info("wifi_softap: done");
+		if (wifi_api_get_channel(&freq, &bw, true) == WIFI_SUCCESS)
+		{
+			softap->channel_freq = freq;
+			softap->channel_bw = bw;
+		}
 
 		softap->active = true;
 		ATCMD_WIFI_UNLOCK();
+
+		_atcmd_info("wifi_softap: done");
 
 		return ATCMD_SUCCESS;
 	}
@@ -3740,6 +4367,9 @@ static int _atcmd_wifi_softap_run (int argc, char *argv[])
 wifi_softap_fail:
 
 	_atcmd_info("wifi_softap: fail");
+
+	if (wifi_api_remove_network(true) != 0)
+		_atcmd_error("api_remove_network()");
 
 	ATCMD_WIFI_UNLOCK();
 
@@ -3754,48 +4384,50 @@ static int _atcmd_wifi_softap_get (int argc, char *argv[])
 		{
 			atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
 
-			char param_ssid[ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_ssid_t))];
-			char param_security[ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_security_t))];
-			char param_password[ATCMD_STR_PARAM_SIZE(sizeof(atcmd_wifi_password_t))];
-
-			if (atcmd_str_to_param(softap->ssid, param_ssid, sizeof(param_ssid)) &&
-				atcmd_str_to_param(softap->security, param_security, sizeof(param_security)) &&
-				atcmd_str_to_param(softap->password, param_password, sizeof(param_password)))
+			if (softap->active)
 			{
+#if defined(CONFIG_SHOW_WIFI_PASSWORD)
+				_atcmd_info("wifi_softap_get: channel=%u,%u ssid=%s security=%s password=%s",
+						softap->channel_bw, softap->channel_freq,
+						softap->ssid, softap->security, softap->password);
 
-				_atcmd_info("wifi_softap_get: bandwidth=%u freq=%u ssid=%s security=%s password=%s",
-								softap->channel_bw, softap->channel_freq,
-								param_ssid, param_security, param_password);
-
-#if 1
 				if (softap->dhcp_server)
 				{
-					ATCMD_MSG_INFO("WSOFTAP", "%.1f,%s,%s,%s,\"dhcp\"",
-						softap->channel_freq / 10., param_ssid, param_security, param_password);
+					ATCMD_MSG_INFO("WSOFTAP", "%u,%.1f,\"%s\",\"%s\",\"%s\",\"dhcp\"",
+							softap->channel_bw, softap->channel_freq / 10.,
+							softap->ssid, softap->security, softap->password);
 				}
 				else
 				{
-					ATCMD_MSG_INFO("WSOFTAP", "%.1f,%s,%s,%s",
-						softap->channel_freq / 10.,	param_ssid, param_security, param_password);
+					ATCMD_MSG_INFO("WSOFTAP", "%u,%.1f,\"%s\",\"%s\",\"%s\"",
+							softap->channel_bw, softap->channel_freq / 10.,
+							softap->ssid, softap->security, softap->password);
 				}
 #else
+				_atcmd_info("wifi_softap_get: channel=%u,%u ssid=%s security=%s",
+						softap->channel_bw, softap->channel_freq,
+						softap->ssid, softap->security);
+
 				if (softap->dhcp_server)
 				{
-					ATCMD_MSG_INFO("WSOFTAP", "%.1f@%u,%s,%s,%s,\"dhcp\"",
-								softap->channel_freq / 10., softap->channel_bw,
-								param_ssid, param_security, param_password);
+					ATCMD_MSG_INFO("WSOFTAP", "%u,%.1f,\"%s\",\"%s\",\"\",\"dhcp\"",
+							softap->channel_bw, softap->channel_freq / 10.,
+							softap->ssid, softap->security, softap->password);
 				}
 				else
 				{
-					ATCMD_MSG_INFO("WSOFTAP", "%.1f@%u,%s,%s,%s",
-								softap->channel_freq / 10., softap->channel_bw,
-								param_ssid, param_security, param_password);
+					ATCMD_MSG_INFO("WSOFTAP", "%u,%.1f,\"%s\",\"%s\",\"\"",
+							softap->channel_bw, softap->channel_freq / 10.,
+							softap->ssid, softap->security, softap->password);
 				}
-#endif
-				break;
+#endif				
+			}
+			else
+			{
+				_atcmd_info("wifi_softap_get: no run");
 			}
 
-			return ATCMD_ERROR_FAIL;
+			break;
 		}
 
 		default:
@@ -3893,13 +4525,15 @@ static int _atcmd_wifi_softap_set (int argc, char *argv[])
 			}
 		}
 
-		_atcmd_info("bw: %s", param_bw);
+/*		_atcmd_info("bw: %s", param_bw);
 		_atcmd_info("freq: %s", param_freq);
 		_atcmd_info("ssid: %s", param_ssid);
 		_atcmd_info("security: %s", param_security);
-		_atcmd_info("password: %s", param_password);
+		_atcmd_info("password: %s", param_password); */
 
-		if (atcmd_param_to_float(param_freq, &freq) != 0)
+		if (atoi(param_freq) == 0)
+			freq = 0;
+		else if (atcmd_param_to_float(param_freq, &freq) != 0)
 			return ATCMD_ERROR_INVAL;
 
 		if (param_ssid)
@@ -3910,28 +4544,26 @@ static int _atcmd_wifi_softap_set (int argc, char *argv[])
 
 		if (param_security)
 		{
+#if defined(CONFIG_ATCMD_SOFTAP_WPA3)
+			bool wpa3 = true;
+#else
+			bool wpa3 = false;
+#endif
 			if (!atcmd_param_to_str(param_security, str_security, sizeof(str_security)))
 				return ATCMD_ERROR_INVAL;
 
-
-			if (strcmp(str_security, "wpa2") == 0 || strcmp(str_security, "psk") == 0)
-				strcpy(str_security, "wpa2-psk");
-#if defined(CONFIG_ATCMD_SOFTAP_WPA3)
-			else if (strcmp(str_security, "owe") == 0)
-				strcpy(str_security, "wpa3-owe");
-			else if (strcmp(str_security, "sae") == 0)
-				strcpy(str_security, "wpa3-sae");
-#endif
+			if (!_atcmd_wifi_security_valid(str_security, wpa3))
+				return ATCMD_ERROR_INVAL;
 		}
 
 		if (param_password)
 		{
 			if (!atcmd_param_to_str(param_password, str_password, sizeof(str_password)))
 				return ATCMD_ERROR_INVAL;
-		}
 
-		if (!_atcmd_wifi_security_valid(str_security, str_password, false))
-			return ATCMD_ERROR_INVAL;
+			if (!_atcmd_wifi_password_valid(str_password))
+				return ATCMD_ERROR_INVAL;
+		}
 
 		softap->channel_bw = bw;
 		softap->channel_freq = (int)(freq * 10);
@@ -3940,9 +4572,9 @@ static int _atcmd_wifi_softap_set (int argc, char *argv[])
 		strcpy(softap->security, str_security);
 		strcpy(softap->password, str_password);
 
-/*		_atcmd_debug("wifi_softap: bandwidth=%u freq=%u ssid=%s security=%s password=%s",
+		_atcmd_debug("wifi_softap_set: bandwidth=%u freq=%u ssid=%s security=%s password=%s",
 						softap->channel_bw, softap->channel_freq,
-						softap->ssid, softap->security, softap->password); */
+						softap->ssid, softap->security, softap->password);
 
 		return _atcmd_wifi_softap_run(0, NULL);
 	}
@@ -3965,7 +4597,11 @@ static atcmd_info_t g_atcmd_wifi_softap =
 	.handler[ATCMD_HANDLER_SET] = _atcmd_wifi_softap_set,
 };
 
+#endif /* #ifdef CONFIG_ATCMD_SOFTAP */
+
 /**********************************************************************************************/
+
+#ifdef CONFIG_ATCMD_SOFTAP
 
 static const char *str_ssid_type[] = { "full", "empty", "clear" };
 
@@ -4045,7 +4681,11 @@ static atcmd_info_t g_atcmd_wifi_softap_ssid =
 	.handler[ATCMD_HANDLER_SET] = _atcmd_wifi_softap_ssid_set,
 };
 
+#endif /* #ifdef CONFIG_ATCMD_SOFTAP */
+
 /**********************************************************************************************/
+
+#ifdef CONFIG_ATCMD_SOFTAP
 
 static int _atcmd_wifi_bss_max_idle_get (int argc, char *argv[])
 {
@@ -4128,7 +4768,11 @@ static atcmd_info_t g_atcmd_wifi_bss_max_idle =
 	.handler[ATCMD_HANDLER_SET] = _atcmd_wifi_bss_max_idle_set,
 };
 
+#endif /* #ifdef CONFIG_ATCMD_SOFTAP */
+
 /**********************************************************************************************/
+
+#ifdef CONFIG_ATCMD_SOFTAP
 
 static int _atcmd_wifi_stainfo_get (int argc, char *argv[])
 {
@@ -4189,18 +4833,46 @@ static int _atcmd_wifi_stainfo_get (int argc, char *argv[])
 
 static int _atcmd_wifi_stainfo_set (int argc, char *argv[])
 {
+	atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
+	int time_sec = 1;
+
+	if (!softap->active)
+		return ATCMD_ERROR_NOTSUPP;
+
 	switch (argc)
 	{
 		case 0:
-			ATCMD_MSG_HELP("AT+WSTAINFO=<aid>");
+			ATCMD_MSG_HELP("AT+WSTAINFO=<aid>[,<time>]");
 			return ATCMD_SUCCESS;
 
+		case 2:
+			time_sec = atoi(argv[1]);
+			if (time_sec <= 0)
+				return ATCMD_ERROR_INVAL;
+
 		case 1:
-			return _atcmd_wifi_stainfo_get(argc, argv);
+		{
+			int ret;
+			int i;
+
+			for (i = 0 ; i < time_sec ; i++)
+			{
+				ret = _atcmd_wifi_stainfo_get(1, argv);
+				if (ret != ATCMD_SUCCESS)
+					return ret;
+
+				if (time_sec > 1)
+					_delay_ms(1000);
+			}
+
+			break;
+		}
 
 		default:
 			return ATCMD_ERROR_INVAL;
 	}
+
+	return ATCMD_SUCCESS;
 }
 
 static atcmd_info_t g_atcmd_wifi_stainfo =
@@ -4218,7 +4890,11 @@ static atcmd_info_t g_atcmd_wifi_stainfo =
 	.handler[ATCMD_HANDLER_SET] = _atcmd_wifi_stainfo_set,
 };
 
+#endif /* #ifdef CONFIG_ATCMD_SOFTAP */
+
 /**********************************************************************************************/
+
+#ifdef CONFIG_ATCMD_SOFTAP
 
 static int _atcmd_wifi_max_sta_get (int argc, char *argv[])
 {
@@ -4304,36 +4980,68 @@ static atcmd_info_t g_atcmd_wifi_max_sta =
 	.handler[ATCMD_HANDLER_SET] = _atcmd_wifi_max_sta_set,
 };
 
-/**********************************************************************************************/
 #endif /* #ifdef CONFIG_ATCMD_SOFTAP */
 
-static int _atcmd_wifi_timeout_get (int argc, char *argv[])
+/**********************************************************************************************/
+
+#if !defined(NRC7292) && defined(CONFIG_ATCMD_SOFTAP) && defined(CONFIG_ATCMD_RELAY) 
+
+static int _atcmd_wifi_relay_get (int argc, char *argv[])
 {
 	switch (argc)
 	{
 		case 0:
 		{
-			argc = 1;
-			argv[0] = "0";
+			atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
+			atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
 
-			return _atcmd_basic_timeout_get(argc, argv);
-		}
+			if (connect->connected && softap->active)
+			{
+				if (strcmp(softap->security, connect->security) != 0)
+				{
+					_atcmd_error("security mismatch, ap=%s sta=%s",
+							softap->security, connect->security);
+				}
+				else if (strcmp(softap->security, "open") != 0)
+				{
+					if (strcmp(softap->password, connect->password) != 0)
+					{
+#if defined(CONFIG_SHOW_WIFI_PASSWORD)
+						_atcmd_error("%s password mismatch, ap=%s sta=%s",
+								softap->security, softap->password, connect->password);
+#else
+						_atcmd_error("%s password mismatch", softap->security);
+#endif						
+					}
+				}
 
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-}
+#if defined(CONFIG_SHOW_WIFI_PASSWORD)
+				_atcmd_info("wifi_relay_get: channel=%u,%u, ssid=%s,%s security=%s,%s",
+						softap->channel_bw, softap->channel_freq,
+						softap->ssid, connect->ssid,
+						connect->security, connect->password);
 
-static int _atcmd_wifi_timeout_set (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-			ATCMD_MSG_HELP("AT+WTIMEOUT=\"<command>\",<time>");
+				ATCMD_MSG_INFO("WRELAY", "%d,%.1f,\"%s\",\"%s\",\"%s\",\"%s\"",
+						softap->channel_bw, softap->channel_freq / 10.,
+						softap->ssid, connect->ssid,
+						connect->security, connect->password);
+#else
+				_atcmd_info("wifi_relay_get: channel=%u,%u, ssid=%s,%s security=%s",
+						softap->channel_bw, softap->channel_freq,
+						softap->ssid, connect->ssid, connect->security);
+
+				ATCMD_MSG_INFO("WRELAY", "%d,%.1f,\"%s\",\"%s\",\"%s\",\"\"",
+						softap->channel_bw, softap->channel_freq / 10.,
+						softap->ssid, connect->ssid, connect->security);
+#endif				
+			}
+			else
+			{
+				_atcmd_info("wifi_relay_get: no run");
+			}
+
 			break;
-
-		case 2:
-			return _atcmd_basic_timeout_set(argc, argv);
+		}
 
 		default:
 			return ATCMD_ERROR_INVAL;
@@ -4342,27 +5050,342 @@ static int _atcmd_wifi_timeout_set (int argc, char *argv[])
 	return ATCMD_SUCCESS;
 }
 
-static atcmd_info_t g_atcmd_wifi_timeout =
+static int _atcmd_wifi_relay_set (int argc, char *argv[])
+{
+	struct
+	{
+		int argc;
+
+		union
+		{
+			char *argv[4];
+
+			struct
+			{
+				char *freq;
+				char *ssid;
+				char *security;
+				char *password;
+			};
+		};
+	} params_ap;
+
+	struct
+	{
+		int argc;
+
+		union
+		{
+			char *argv[3];
+
+			struct
+			{
+				char *ssid;
+				char *security;
+				char *password;
+			};
+		};
+	} params_sta;
+
+	char *param_security = NULL;
+	char *param_password = NULL;
+
+	memset(&params_ap, 0, sizeof(params_ap));
+	memset(&params_sta, 0, sizeof(params_sta));
+
+	switch (argc)
+	{
+		case 0:
+			ATCMD_MSG_HELP("AT+WRELAY=\"<ap_ssid>\",\"<sta_ssid>\"[,\"<sta_security>\"[,\"<sta_password>\"]]");
+			break;
+
+		case 1:
+			if (atoi(argv[0]) != 0)
+				return ATCMD_ERROR_INVAL;
+
+			if (!wifi_api_is_relay_mode())
+				_atcmd_info("wifi_relay_set: already disabled");
+			else
+			{
+				char *argv = "0";
+
+				_atcmd_info("wifi_relay_set: disable");
+
+				_atcmd_wifi_disconnect_run(0, NULL);
+				_atcmd_wifi_softap_set(1, &argv);
+
+				wifi_api_remove_network(false);
+				wifi_api_remove_network(true);
+
+				wifi_api_disable_relay_mode();
+			}
+
+			break;
+
+		case 4:
+			param_password = argv[3];
+
+		case 3:
+			param_security = argv[2];
+
+		case 2:
+			if (wifi_api_is_relay_mode())
+			{
+				_atcmd_info("wifi_relay_set: already enabled");
+				return ATCMD_ERROR_BUSY;
+			}
+
+			params_ap.freq = "0";
+			params_ap.ssid = argv[0];
+			params_ap.argc = 2;
+
+			params_sta.ssid = argv[1];
+			params_sta.argc = 1;
+
+			if (strlen(params_ap.ssid) == 0)
+				params_ap.ssid = params_sta.ssid;
+
+			if (param_security)
+			{
+#if defined(CONFIG_ATCMD_SOFTAP_WPA3)
+				bool wpa3 = true;
+#else
+				bool wpa3 = false;
+#endif
+				atcmd_wifi_security_t str_security;
+
+				if (!atcmd_param_to_str(param_security, str_security, sizeof(str_security)))
+					return ATCMD_ERROR_INVAL;
+
+				if (!_atcmd_wifi_security_valid(str_security, wpa3))
+					return ATCMD_ERROR_INVAL;
+
+				if (strcmp(str_security, "open") != 0)
+				{
+					if (!param_password)
+						return ATCMD_ERROR_INVAL;
+
+					params_ap.security = param_security;
+					params_ap.password = param_password;
+					params_ap.argc += 2;
+
+					params_sta.security = param_security;
+					params_sta.password = param_password;
+					params_sta.argc += 2;
+				}
+			}
+
+/*			_atcmd_debug("ap=%d sta=%d", params_ap.argc, params_sta.argc); */
+
+			if (params_ap.argc >= 2 && params_sta.argc >= 1)
+			{
+				enum ATCMD_ERROR ret;
+
+				_atcmd_info("wifi_relay_set: enable, ap=%s,%s,%s, sta=%s,%s,%s",
+					params_ap.ssid, params_ap.security, params_ap.password,
+					params_sta.ssid, params_sta.security, params_sta.password);
+
+				wifi_api_enable_relay_mode();
+
+				ret = _atcmd_wifi_connect_set(params_sta.argc, params_sta.argv);
+			   	if (ret == ATCMD_SUCCESS)
+				{
+					ret = _atcmd_wifi_softap_set(params_ap.argc, params_ap.argv);
+				   	if (ret != ATCMD_SUCCESS)
+					{
+						_atcmd_wifi_disconnect_run(0, NULL);
+						wifi_api_remove_network(false);
+					}
+				}
+
+				if (ret != ATCMD_SUCCESS)
+					wifi_api_disable_relay_mode();
+
+				return ret;
+			}
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+
+
+static atcmd_info_t g_atcmd_wifi_relay =
 {
 	.list.next = NULL,
 	.list.prev = NULL,
 
 	.group = ATCMD_GROUP_WIFI,
 
-	.cmd = "TIMEOUT",
-	.id = ATCMD_WIFI_TIMEOUT,
+	.cmd = "RELAY",
+	.id = ATCMD_WIFI_RELAY,
 
 	.handler[ATCMD_HANDLER_RUN] = NULL,
-	.handler[ATCMD_HANDLER_GET] = _atcmd_wifi_timeout_get,
-	.handler[ATCMD_HANDLER_SET] = _atcmd_wifi_timeout_set,
+	.handler[ATCMD_HANDLER_GET] = _atcmd_wifi_relay_get,
+	.handler[ATCMD_HANDLER_SET] = _atcmd_wifi_relay_set,
 };
+
+#endif /* #if !defined(NRC7292) && defined(CONFIG_ATCMD_SOFTAP) && defined(CONFIG_ATCMD_RELAY) */
 
 /**********************************************************************************************/
 
-#if defined(INCLUDE_MANUAL_CONT_TX_SUPPORT) /* Furuno */
+#ifdef CONFIG_ATCMD_WPS
+
+static void _atcmd_wifi_wps_event_handler (enum WPS_STATUS status, int vif_id, ...)
+{
+	switch (status)
+	{
+		case WPS_SUCCESS:
+		{
+			atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
+
+			if (softap->active)
+				_atcmd_info("[%d] wifi_wps_evt: success", vif_id);
+			else
+			{
+				atcmd_wifi_connect_t *connect = &g_atcmd_wifi_info->connect;
+				const char *ssid;
+				const char *security;
+				const char *password;
+				va_list ap;
+
+				va_start(ap, vif_id);
+
+				ssid = va_arg(ap, const char *);
+				security = va_arg(ap, const char *);
+				password = va_arg(ap, const char *);
+
+				va_end(ap);
+
+				strcpy(connect->ssid, ssid);
+				strcpy(connect->security, security);
+
+				if (strcmp(security, "open") == 0)
+					strcpy(connect->password, "");
+				else
+					strcpy(connect->password, password);					
+
+				_atcmd_info("[%d] wifi_wps_evt: success, ssid=%s security=%s password=%d", 
+							vif_id, ssid, security, strlen(password));
+			}
+				
+			ATCMD_MSG_WEVENT("\"WPS_SUCCESS\"");
+			break;
+		}
+
+		case WPS_TIMEOUT:
+			_atcmd_info("[%d] wifi_wps_evt: timeout", vif_id);
+
+			ATCMD_MSG_WEVENT("\"WPS_TIMEOUT\"");
+			break;
+
+		case WPS_FAIL:
+			_atcmd_info("[%d] wifi_wps_evt: fail", vif_id);
+
+			ATCMD_MSG_WEVENT("\"WPS_FAIL\"");
+			break;
+
+		default:
+			_atcmd_info("[%d] wifi_wps_evt: unknown", vif_id);
+	}
+}
+
+static int _atcmd_wifi_wps_enable (const char *bssid)
+{
+	wifi_wps_cb_t cb = _atcmd_wifi_wps_event_handler;
+
+	_atcmd_info("wifi_wps: enable, bssid=%s", bssid);
+
+	switch (wifi_api_enable_wps(bssid, cb))
+	{
+		case 0: 
+			return ATCMD_SUCCESS;
+
+		case -EBUSY: 
+			return ATCMD_ERROR_BUSY;
+
+		case -ETIMEDOUT: 
+			return ATCMD_ERROR_TIMEOUT;
+	}
+			
+	return ATCMD_ERROR_FAIL;
+}
+
+static int _atcmd_wifi_wps_disable (void)
+{
+	_atcmd_info("wifi_wps: disable");
+
+	if (wifi_api_disable_wps() != 0)
+		return ATCMD_ERROR_FAIL;
+
+	return ATCMD_SUCCESS;
+}
+
+static int _atcmd_wifi_wps_run (int argc, char *argv[])
+{
+	if (wifi_api_is_relay_mode())
+		return ATCMD_ERROR_NOTSUPP;
+
+	return _atcmd_wifi_wps_enable(NULL); 
+}
+
+static int _atcmd_wifi_wps_set (int argc, char *argv[])
+{
+	atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
+
+	if (wifi_api_is_relay_mode() || softap->active)
+		return ATCMD_ERROR_NOTSUPP;
+
+	switch (argc)
+	{
+		case 0:
+			ATCMD_MSG_HELP("AT+WWPS=\"<bssid>\"");
+			break;
+
+		case 1:
+			if (strcmp(argv[0], "0") == 0)
+				return _atcmd_wifi_wps_disable();
+			else
+			{				
+				atcmd_wifi_bssid_t bssid;
+
+				if (atcmd_param_to_str(argv[0], bssid, sizeof(bssid)))
+					if (_atcmd_wifi_bssid_valid(bssid))
+						return _atcmd_wifi_wps_enable(bssid); 
+			}
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+
+static atcmd_info_t g_atcmd_wifi_wps =
+{
+	.list.next = NULL,
+	.list.prev = NULL,
+
+	.group = ATCMD_GROUP_WIFI,
+
+	.cmd = "WPS",
+	.id = ATCMD_WIFI_WPS,
+
+	.handler[ATCMD_HANDLER_RUN] = _atcmd_wifi_wps_run,
+	.handler[ATCMD_HANDLER_GET] = NULL,
+	.handler[ATCMD_HANDLER_SET] = _atcmd_wifi_wps_set,
+};
+
+#endif /* #ifdef CONFIG_ATCMD_WPS */
+
+/**********************************************************************************************/
+
+#if defined(INCLUDE_MANUAL_CONT_TX_SUPPORT)
 
 extern bool system_modem_api_set_cont_tx (bool enable, uint32_t freq_100k, const char* bw,
-											uint8_t mcs, uint8_t txpwr, uint32_t interval);
+											uint8_t mcs, uint8_t txpwr, uint8_t type, uint32_t interval);
 
 #define CTX_FREQ_MIN		7500
 #define CTX_FREQ_MAX		9500
@@ -4377,8 +5400,9 @@ static struct
 	uint8_t bw;
 	uint8_t mcs;
 	uint8_t txpwr;
+	uint8_t type;
 	uint32_t interval;
-} g_atcmd_wifi_ctx = { false, 0, 0, 0, 0, 0 };
+} g_atcmd_wifi_ctx = { false, 0, 0, 0, 0, 0, 0 };
 
 static int _atcmd_wifi_continuous_tx_start (void)
 {
@@ -4392,12 +5416,13 @@ static int _atcmd_wifi_continuous_tx_start (void)
 		uint8_t bw = g_atcmd_wifi_ctx.bw;
 		uint8_t mcs = g_atcmd_wifi_ctx.mcs;
 		uint8_t txpwr = g_atcmd_wifi_ctx.txpwr;
+		uint8_t type = g_atcmd_wifi_ctx.type;
 		uint32_t interval = g_atcmd_wifi_ctx.interval;
 		char str_bw[2+1];
 
 		snprintf(str_bw, sizeof(str_bw), "%cm", '0' + bw);
 
-		if (!system_modem_api_set_cont_tx(true, freq, str_bw, mcs, txpwr, interval))
+		if (!system_modem_api_set_cont_tx(true, freq, str_bw, mcs, txpwr, type, interval))
 			return -1;
 
 		g_atcmd_wifi_ctx.enable = 1;
@@ -4412,7 +5437,7 @@ static void _atcmd_wifi_continuous_tx_stop (void)
 	{
 		_atcmd_info("cont_tx_stop");
 
-		system_modem_api_set_cont_tx(false, 0, NULL, 0, 0, 0);
+		system_modem_api_set_cont_tx(false, 0, NULL, 0, 0, 0, 0);
 
 		g_atcmd_wifi_ctx.enable = 0;
 	}
@@ -4568,261 +5593,194 @@ static atcmd_info_t g_atcmd_wifi_continuous_tx =
 
 /**********************************************************************************************/
 
-#if defined(CONFIG_ATCMD_WIFI_INTERNAL)
+#if defined(INCLUDE_MANUAL_CONT_TX_SUPPORT) && defined(NRC7394)
 
-static int _atcmd_wifi_rf_cal_get (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-		{
-			bool cal_use;
-			atcmd_wifi_country_t country;
+#define STX_FREQ_MIN		7500
+#define STX_FREQ_MAX		9500
 
-			if (wifi_api_get_rf_cal(&cal_use, country) != 0)
-				return ATCMD_ERROR_FAIL;
-
-			if (!_atcmd_wifi_country_valid(country))
-				strcpy(country, "?");
-
-			_atcmd_info("wifi_rf_cal_get: %s %s", cal_use ? "on" : "off", country);
-
-			ATCMD_MSG_INFO("WRFCAL", "%d,\"%s\"", cal_use ? 1 : 0, country);
-			break;
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static int _atcmd_wifi_rf_cal_set (int argc, char *argv[])
-{
-	char *param_country = NULL;
-
-	switch (argc)
-	{
-		case 0:
-			ATCMD_MSG_HELP("AT+WRFCAL={0|1}");
-			break;
-
-		case 1:
-		{
-			uint8_t cal_use;
-
-			if (atcmd_param_to_uint8(argv[0], &cal_use) == 0 && cal_use <= 1)
-			{
-				if (wifi_api_set_rf_cal(!!cal_use) != 0)
-					return ATCMD_ERROR_FAIL;
-
-				break;
-			}
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static atcmd_info_t g_atcmd_wifi_rf_cal =
-{
-	.list.next = NULL,
-	.list.prev = NULL,
-
-	.group = ATCMD_GROUP_WIFI,
-
-	.cmd = "RFCAL",
-	.id = ATCMD_WIFI_RF_CAL,
-
-	.handler[ATCMD_HANDLER_RUN] = NULL,
-	.handler[ATCMD_HANDLER_GET] = _atcmd_wifi_rf_cal_get,
-	.handler[ATCMD_HANDLER_SET] = _atcmd_wifi_rf_cal_set,
-};
-
-#endif /* #if defined(CONFIG_ATCMD_WIFI_INTERNAL) */
-
-/**********************************************************************************************/
-
-#if defined(CONFIG_ATCMD_WIFI_INTERNAL)
-
-static int _atcmd_wifi_lbt_get (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-		{
-			uint16_t cs_duration;
-			uint32_t pause_time;
-			uint32_t tx_resume_time;
-
-			switch (wifi_api_get_lbt(&cs_duration, &pause_time, &tx_resume_time))
-			{
-				case 0:
-					break;
-
-				case -ENOTSUP:
-					return ATCMD_ERROR_NOTSUPP;
-
-				default:
-					return ATCMD_ERROR_FAIL;
-			}
-
-			_atcmd_info("wifi_lbt_get: cs_duration=%u pause_time=%u tx_resume_time=%u",
-							cs_duration, pause_time, tx_resume_time);
-
-			ATCMD_MSG_INFO("WLBT", "%u,%u,%u", cs_duration, pause_time, tx_resume_time);
-
-			break;
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static int _atcmd_wifi_lbt_set (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-			ATCMD_MSG_HELP("AT+WLBT=<cs_duration>,<pause_time>,<tx_resume_time>");
-			break;
-
-		case 3:
-		{
-			uint16_t cs_duration;
-			uint32_t pause_time;
-			uint32_t tx_resume_time;
-
-			if (atcmd_param_to_uint16(argv[0], &cs_duration) != 0)
-				return ATCMD_ERROR_INVAL;
-
-			if (atcmd_param_to_uint32(argv[1], &pause_time) != 0)
-				return ATCMD_ERROR_INVAL;
-
-			if (atcmd_param_to_uint32(argv[2], &tx_resume_time) != 0)
-				return ATCMD_ERROR_INVAL;
-
-			_atcmd_info("wifi_lbt_set: cs_duration=%u pause_time=%u tx_resume_time=%u",
-								cs_duration, pause_time, tx_resume_time);
-
-			switch (wifi_api_set_lbt(cs_duration, pause_time, tx_resume_time))
-			{
-				case 0:
-					break;
-
-				case -ENOTSUP:
-					return ATCMD_ERROR_NOTSUPP;
-
-				default:
-					return ATCMD_ERROR_FAIL;
-			}
-
-			break;
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static atcmd_info_t g_atcmd_wifi_lbt =
-{
-	.list.next = NULL,
-	.list.prev = NULL,
-
-	.group = ATCMD_GROUP_WIFI,
-
-	.cmd = "LBT",
-	.id = ATCMD_WIFI_LBT,
-
-	.handler[ATCMD_HANDLER_RUN] = NULL,
-	.handler[ATCMD_HANDLER_GET] = _atcmd_wifi_lbt_get,
-	.handler[ATCMD_HANDLER_SET] = _atcmd_wifi_lbt_set,
-};
-
-#endif /* #if defined(CONFIG_ATCMD_WIFI_INTERNAL) */
-
-/**********************************************************************************************/
-
-#if defined(CONFIG_ATCMD_WIFI_INTERNAL)
-
-static int _atcmd_wifi_mic_scan_get (int argc, char *argv[])
-{
-	if (strcmp(g_atcmd_wifi_info->country, "K2") != 0)
-		return ATCMD_ERROR_NOTSUPP;
-
-	switch (argc)
-	{
-		case 0:
-		{
-			bool enable;
-			bool channel_move;
-			uint32_t cnt_detected;
-
-			if (wifi_api_get_mic_scan(&enable, &channel_move, &cnt_detected) != 0)
-				return ATCMD_ERROR_FAIL;
-
-			ATCMD_MSG_INFO("WMICSCAN", "%d,%d,%u", enable, channel_move, cnt_detected);
-			break;
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static int _atcmd_wifi_mic_scan_set (int argc, char *argv[])
+static struct
 {
 	bool enable;
-	bool channel_move;
+	uint16_t freq;
+	uint8_t bw;
+	uint8_t txpwr;
+} g_atcmd_wifi_stx = { false, 0, 0, 0 };
 
-	if (strcmp(g_atcmd_wifi_info->country, "K2") != 0)
-		return ATCMD_ERROR_NOTSUPP;
+static int _atcmd_wifi_sine_tx_start (void)
+{
+	_atcmd_info("sine_tx_start");
 
-	wifi_api_get_mic_scan(&enable, &channel_move, NULL);
+	if (g_atcmd_wifi_stx.enable)
+		return 1;
+	else
+	{
+		uint32_t freq = g_atcmd_wifi_stx.freq;
+		uint8_t bw = g_atcmd_wifi_stx.bw;
+		uint8_t txpwr = g_atcmd_wifi_stx.txpwr;
+		char str_bw[2+1];
+
+		snprintf(str_bw, sizeof(str_bw), "%cm", '0' + bw);
+
+		if (!system_modem_api_set_sine_tx(true, freq, str_bw, txpwr))
+			return -1;
+
+		g_atcmd_wifi_stx.enable = 1;
+	}
+
+	return 0;
+}
+
+static void _atcmd_wifi_sine_tx_stop (void)
+{
+	if (g_atcmd_wifi_stx.enable)
+	{
+		_atcmd_info("sine_tx_stop");
+
+		system_modem_api_set_sine_tx(false, 0, NULL, 0);
+
+		g_atcmd_wifi_stx.enable = 0;
+	}
+}
+
+static int _atcmd_wifi_sine_tx_run (int argc, char *argv[])
+{
+	_atcmd_info("sine_tx_run: freq=%u bw=%u power=%u",
+		g_atcmd_wifi_stx.freq, g_atcmd_wifi_stx.bw, g_atcmd_wifi_stx.txpwr);
+
+	switch (_atcmd_wifi_sine_tx_start())
+	{
+		case 1:
+			return ATCMD_ERROR_BUSY;
+
+		case -1:
+			return ATCMD_ERROR_FAIL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+
+static int _atcmd_wifi_sine_tx_get (int argc, char *argv[])
+{
+	switch (argc)
+	{
+		case 0:
+			_atcmd_info("sine_tx_get: freq=%u bw=%u txpwr=%u",
+				g_atcmd_wifi_stx.freq, g_atcmd_wifi_stx.bw, g_atcmd_wifi_stx.txpwr);
+
+			ATCMD_MSG_INFO("WSTX", "%u,%u,%u",
+				g_atcmd_wifi_stx.freq, g_atcmd_wifi_stx.bw, g_atcmd_wifi_stx.txpwr);
+
+			break;
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+
+static int _atcmd_wifi_sine_tx_set (int argc, char *argv[])
+{
+	uint16_t freq = 0;
+	uint8_t bw = 0;
+	uint8_t txpwr = 0;
 
 	switch (argc)
 	{
 		case 0:
-			ATCMD_MSG_HELP("AT+WMICSCAN={0|1}[,<channel_move>]");
+			ATCMD_MSG_HELP("AT+WSTX=<frequency>,<bandwidth>,<tx_power>");
+			ATCMD_MSG_HELP("AT+WSTX=0");
+			return ATCMD_SUCCESS;
+
+		case 3:
+			if (atcmd_param_to_uint8(argv[2], &txpwr) != 0 || (txpwr < TX_POWER_MIN || txpwr > TX_POWER_MAX))
+			{
+				_atcmd_info("sine_tx_set: invalid tx power (%u)", txpwr);
+				break;
+			}
+
+			if (atcmd_param_to_uint8(argv[1], &bw) != 0 || (bw != 1 && bw != 2 && bw != 4))
+			{
+				_atcmd_info("sine_tx_set: invalid bandwidth (%u)", bw);
+				break;
+			}
+
+			if (atcmd_param_to_uint16(argv[0], &freq) != 0 || (freq < STX_FREQ_MIN || freq > STX_FREQ_MAX))
+			{
+				_atcmd_info("sine_tx_set: invalid frequency (%u)", freq);
+				break;
+			}
+
+			if (g_atcmd_wifi_stx.enable)
+				return ATCMD_ERROR_BUSY;
+
+			g_atcmd_wifi_stx.freq = freq;
+			g_atcmd_wifi_stx.bw = bw;
+			g_atcmd_wifi_stx.txpwr = txpwr;
+
+			_atcmd_info("sine_tx_set: freq=%u bw=%u txpwr=%u",
+					g_atcmd_wifi_stx.freq, g_atcmd_wifi_stx.bw, g_atcmd_wifi_stx.txpwr);
+
+			return ATCMD_SUCCESS;
+
+		case 1:
+			if (atoi(argv[0]) != 0)
+				break;
+
+			_atcmd_wifi_sine_tx_stop();
+
+			return ATCMD_SUCCESS;
+	}
+
+	return ATCMD_ERROR_INVAL;
+}
+
+static atcmd_info_t g_atcmd_wifi_sine_tx =
+{
+	.list.next = NULL,
+	.list.prev = NULL,
+
+	.group = ATCMD_GROUP_WIFI,
+
+	.cmd = "STX",
+	.id = ATCMD_WIFI_SINE_TX,
+
+	.handler[ATCMD_HANDLER_RUN] = _atcmd_wifi_sine_tx_run,
+	.handler[ATCMD_HANDLER_GET] = _atcmd_wifi_sine_tx_get,
+	.handler[ATCMD_HANDLER_SET] = _atcmd_wifi_sine_tx_set,
+};
+
+#endif /* #if defined(INCLUDE_MANUAL_CONT_TX_SUPPORT) && defined(NRC7394) */
+
+/**********************************************************************************************/
+
+static int _atcmd_wifi_timeout_get (int argc, char *argv[])
+{
+	switch (argc)
+	{
+		case 0:
+		{
+			argc = 1;
+			argv[0] = "0";
+
+			return _atcmd_basic_timeout_get(argc, argv);
+		}
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+}
+
+static int _atcmd_wifi_timeout_set (int argc, char *argv[])
+{
+	switch (argc)
+	{
+		case 0:
+			ATCMD_MSG_HELP("AT+WTIMEOUT=\"<command>\",<time>");
 			break;
 
 		case 2:
-		{
-			atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
-
-			if (!softap->active)
-				return ATCMD_ERROR_NOTSUPP;
-
-			switch (atoi(argv[1]))
-			{
-				case 0: channel_move = false; break;
-				case 1: channel_move = true; break;
-				default: return ATCMD_ERROR_INVAL;
-			}
-		}
-
-		case 1:
-			switch (atoi(argv[0]))
-			{
-				case 0: enable = false; break;
-				case 1: enable = true; break;
-				default: return ATCMD_ERROR_INVAL;
-			}
-
-			wifi_api_set_mic_scan(enable, channel_move);
-			break;
+			return _atcmd_basic_timeout_set(argc, argv);
 
 		default:
 			return ATCMD_ERROR_INVAL;
@@ -4831,100 +5789,20 @@ static int _atcmd_wifi_mic_scan_set (int argc, char *argv[])
 	return ATCMD_SUCCESS;
 }
 
-static atcmd_info_t g_atcmd_wifi_mic_scan =
+static atcmd_info_t g_atcmd_wifi_timeout =
 {
 	.list.next = NULL,
 	.list.prev = NULL,
 
 	.group = ATCMD_GROUP_WIFI,
 
-	.cmd = "MICSCAN",
-	.id = ATCMD_WIFI_MIC_SCAN,
+	.cmd = "TIMEOUT",
+	.id = ATCMD_WIFI_TIMEOUT,
 
 	.handler[ATCMD_HANDLER_RUN] = NULL,
-	.handler[ATCMD_HANDLER_GET] = _atcmd_wifi_mic_scan_get,
-	.handler[ATCMD_HANDLER_SET] = _atcmd_wifi_mic_scan_set,
+	.handler[ATCMD_HANDLER_GET] = _atcmd_wifi_timeout_get,
+	.handler[ATCMD_HANDLER_SET] = _atcmd_wifi_timeout_set,
 };
-
-#endif /* #if defined(CONFIG_ATCMD_WIFI_INTERNAL) */
-
-/**********************************************************************************************/
-
-#if defined(CONFIG_ATCMD_WIFI_INTERNAL)
-
-static int _atcmd_wifi_bmt_get (int argc, char *argv[])
-{
-	atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
-
-	if (softap->active)
-		return ATCMD_ERROR_NOTSUPP;
-
-	switch (argc)
-	{
-		case 0:
-		{
-			uint32_t threshold = 0;
-
-			wifi_api_get_bmt(&threshold);
-
-			ATCMD_MSG_INFO("WBMT", "%u", threshold);
-			break;
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static int _atcmd_wifi_bmt_set (int argc, char *argv[])
-{
-	atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
-
-	if (softap->active)
-		return ATCMD_ERROR_NOTSUPP;
-
-	switch (argc)
-	{
-		case 0:
-			ATCMD_MSG_HELP("AT+WBMT=<threshold>");
-			break;
-
-		case 1:
-		{
-			uint32_t threshold;
-
-			if (atcmd_param_to_uint32(argv[0], &threshold) == 0)
-			{
-				wifi_api_set_bmt(threshold);
-				break;
-			}
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static atcmd_info_t g_atcmd_wifi_bmt =
-{
-	.list.next = NULL,
-	.list.prev = NULL,
-
-	.group = ATCMD_GROUP_WIFI,
-
-	.cmd = "BMT",
-	.id = ATCMD_WIFI_BMT,
-
-	.handler[ATCMD_HANDLER_RUN] = NULL,
-	.handler[ATCMD_HANDLER_GET] = _atcmd_wifi_bmt_get,
-	.handler[ATCMD_HANDLER_SET] = _atcmd_wifi_bmt_set,
-};
-
-#endif /* #if defined(CONFIG_ATCMD_WIFI_INTERNAL) */
 
 /**********************************************************************************************/
 
@@ -4943,11 +5821,11 @@ static atcmd_group_t g_atcmd_group_wifi =
 	.cmd_list_head.prev = NULL,
 };
 
-static atcmd_info_t *g_atcmd_wifi[] =
+static atcmd_info_t *g_atcmd_info_wifi[] =
 {
 	&g_atcmd_wifi_macaddr,
-	&g_atcmd_wifi_macaddr0,
-	&g_atcmd_wifi_macaddr1,
+/*	&g_atcmd_wifi_macaddr0,
+	&g_atcmd_wifi_macaddr1, */
 	&g_atcmd_wifi_country,
 	&g_atcmd_wifi_tx_power,
 	&g_atcmd_wifi_rx_signal,
@@ -4961,6 +5839,12 @@ static atcmd_info_t *g_atcmd_wifi[] =
 	&g_atcmd_wifi_listen_interval,
 	&g_atcmd_wifi_scan,
 	&g_atcmd_wifi_scan_ssid,
+#ifdef CONFIG_ATCMD_BGSCAN
+	&g_atcmd_wifi_scan_background, 
+#endif	
+#if defined(CONFIG_ATCMD_WPA3) && defined(CONFIG_ATCMD_SAEPWE)
+	&g_atcmd_wifi_sae_pwe,
+#endif
 	&g_atcmd_wifi_connect,
 	&g_atcmd_wifi_disconnect,
 	&g_atcmd_wifi_ipaddr,
@@ -4976,7 +5860,9 @@ static atcmd_info_t *g_atcmd_wifi[] =
 	&g_atcmd_wifi_ping6,
 #endif
 	&g_atcmd_wifi_dns,
+#ifdef CONFIG_ATCMD_FOTA
 	&g_atcmd_wifi_fota,
+#endif	
 	&g_atcmd_wifi_deep_sleep,
 #ifdef CONFIG_ATCMD_SOFTAP
 	&g_atcmd_wifi_softap,
@@ -4984,22 +5870,22 @@ static atcmd_info_t *g_atcmd_wifi[] =
 	&g_atcmd_wifi_bss_max_idle,
 	&g_atcmd_wifi_stainfo,
 	&g_atcmd_wifi_max_sta,
-#endif
-	&g_atcmd_wifi_timeout,
 
-#if defined(INCLUDE_MANUAL_CONT_TX_SUPPORT)
+#if !defined(NRC7292) && defined(CONFIG_ATCMD_RELAY)
+	&g_atcmd_wifi_relay,
+#endif
+#endif
+#ifdef CONFIG_ATCMD_WPS
+	&g_atcmd_wifi_wps,
+#endif
+#ifdef INCLUDE_MANUAL_CONT_TX_SUPPORT
 	&g_atcmd_wifi_continuous_tx,
+#if defined(NRC7394)
+	&g_atcmd_wifi_sine_tx,
+#endif
 #endif
 
-	/*
-	 * Command for internal
-	 */
-#if defined(CONFIG_ATCMD_WIFI_INTERNAL)
-	&g_atcmd_wifi_rf_cal,
-	&g_atcmd_wifi_lbt,
-	&g_atcmd_wifi_mic_scan,
-	&g_atcmd_wifi_bmt,
-#endif
+	&g_atcmd_wifi_timeout,
 
 	NULL
 };
@@ -5008,6 +5894,7 @@ static int _atcmd_wifi_init_info (atcmd_wifi_info_t *info)
 {
 	atcmd_wifi_country_t country;
 	bool cal_use = false;
+	int id = -1;
 
 	memset(info, 0, sizeof(atcmd_wifi_info_t));
 
@@ -5024,30 +5911,24 @@ static int _atcmd_wifi_init_info (atcmd_wifi_info_t *info)
 
 	_atcmd_info("RF_CAL_INFO: cal_use=%d country=%s", cal_use, country);
 #else
-	cal_use = (RF_CAL_DATA.header.segment_valid) == 1 ? true : false;
-	if (cal_use)
+	if (wifi_api_get_rf_cal(&cal_use, country, &id) != 0)
+		cal_use = false;
+
+	_atcmd_info("RF_CAL_INFO: cal_use=%d country=%s id=%d", cal_use, country, id);
+
+	if (strcmp(country, "KR") == 0)
 	{
-		int id = RF_CAL_DATA.header.id;
-
-		memcpy(country, RF_CAL_DATA.header.country_code, 2);
-		country[2] = '\0';
-
-		_atcmd_info("RF_CAL_INFO: cal_use=%d country=%s id=%d", cal_use, country, id);
-
-		if (strcmp(country, "KR") == 0)
+		switch (id)
 		{
-			switch (id)
-			{
-				case 1:
-					_atcmd_debug("RF_CAL_INFO: KR -> K1");
-					strcpy(country, "K1");
-					break;
+			case 1:
+				_atcmd_info("RF_CAL_INFO: KR -> K1");
+				strcpy(country, "K1");
+				break;
 
-				case 2:
-					_atcmd_debug("RF_CAL_INFO: KR -> K2");
-					strcpy(country, "K2");
-					break;
-			}
+			case 2:
+				_atcmd_info("RF_CAL_INFO: KR -> K2");
+				strcpy(country, "K2");
+				break;
 		}
 	}
 #endif
@@ -5081,11 +5962,23 @@ static int _atcmd_wifi_init_info (atcmd_wifi_info_t *info)
 
 	if (1)
 	{
+		atcmd_wifi_bgscan_t *bgscan = &info->bgscan;
+
+		bgscan->scanning = false;
+		bgscan->short_interval = 0;
+		bgscan->long_interval = 0;
+		bgscan->signal_threshold = 0;
+	}
+
+	if (1)
+	{
 		atcmd_wifi_connect_t *connect = &info->connect;
 
+		connect->recovery = false;
 		connect->connected = false;
 		connect->connecting = false;
 		connect->disconnecting = false;
+
 		strcpy(connect->ssid, ATCMD_WIFI_INIT_SSID);
 		strcpy(connect->bssid, ATCMD_WIFI_INIT_BSSID);
 		strcpy(connect->security, ATCMD_WIFI_INIT_SECURITY);
@@ -5105,6 +5998,14 @@ static int _atcmd_wifi_init_info (atcmd_wifi_info_t *info)
 #ifdef CONFIG_ATCMD_SOFTAP
 	_atcmd_wifi_softap_init_info();
 #endif
+
+	if (1)
+	{
+		int i;
+
+		for (i = 0 ; i < 4 ; i++)
+			info->sae_pwe[i] = ATCMD_WIFI_INIT_SAE_PWE;
+	}
 
 	return 0;
 }
@@ -5148,7 +6049,7 @@ static int _atcmd_wifi_init (void)
 
 		if (wifi_api_register_event_callback(event_cb) == 0)
 		{
-			if (!_atcmd_wifi_country_valid(g_atcmd_wifi_info->country))
+			if (!wifi_api_valid_country(g_atcmd_wifi_info->country))
 			{
 				_atcmd_info("wifi_init: no country");
 				return 0;
@@ -5225,13 +6126,19 @@ int atcmd_wifi_enable (void)
 	if (atcmd_group_register(&g_atcmd_group_wifi) != 0)
 		return -1;
 
-	for (i = 0 ; g_atcmd_wifi[i] ; i++)
+	for (i = 0 ; g_atcmd_info_wifi[i] ; i++)
 	{
-		if (atcmd_info_register(ATCMD_GROUP_WIFI, g_atcmd_wifi[i]) != 0)
+		if (atcmd_info_register(ATCMD_GROUP_WIFI, g_atcmd_info_wifi[i]) != 0)
 			return -1;
 	}
 
-	netif = nrc_netif[ATCMD_NETIF_INDEX];
+#if defined(CONFIG_ATCMD_INTERNAL)	
+	for (i = 0 ; g_atcmd_info_wifi_internal[i] ; i++)
+	{
+		if (atcmd_info_register(ATCMD_GROUP_WIFI, g_atcmd_info_wifi_internal[i]) != 0)
+			return -1;
+	}
+#endif	
 
 	atcmd_info_print(&g_atcmd_group_wifi);
 
@@ -5242,10 +6149,13 @@ void atcmd_wifi_disable (void)
 {
 	int i;
 
-	netif = NULL;
+#if defined(CONFIG_ATCMD_INTERNAL)	
+	for (i = 0 ; g_atcmd_info_wifi_internal[i] ; i++)
+		atcmd_info_unregister(ATCMD_GROUP_WIFI, g_atcmd_info_wifi_internal[i]->id);
+#endif	
 
-	for (i = 0 ; g_atcmd_wifi[i] ; i++)
-		atcmd_info_unregister(ATCMD_GROUP_WIFI, g_atcmd_wifi[i]->id);
+	for (i = 0 ; g_atcmd_info_wifi[i] ; i++)
+		atcmd_info_unregister(ATCMD_GROUP_WIFI, g_atcmd_info_wifi[i]->id);
 
 	atcmd_group_unregister(ATCMD_GROUP_WIFI);
 
@@ -5256,3 +6166,11 @@ void atcmd_wifi_deep_sleep_send_event (void)
 {
 	_atcmd_wifi_deep_sleep_send_event();
 }
+
+bool atcmd_wifi_softap_active (void)
+{
+	atcmd_wifi_softap_t *softap = &g_atcmd_wifi_info->softap;
+
+	return softap->active;
+}
+

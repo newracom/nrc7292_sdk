@@ -8,20 +8,27 @@
 
 /***************************************************************************************/
 
+// Set UART Pins to GPIO except console UART : NRC7292(CH3), NRC7394(CH0)
 static void DEV_UART_Pins_Disable (void)
 {
 	gpio_io_t gpio;
 	uio_sel_t sel;
 
 	nrc_gpio_get_alt(&gpio);
+#if defined(NRC7292)
 	gpio.word &= ~((0x3 << 8) | 0x3f);
+#elif defined(NRC7394)
+	gpio.word &= ~((0x3 << 12));
+#endif
 	nrc_gpio_set_alt(&gpio);
 
 	memset(&sel, 0xff, sizeof(uio_sel_t));
-	nrc_gpio_set_uio_sel(UIO_SEL_UART0, &sel);
 #if defined(NRC7292)
+	nrc_gpio_set_uio_sel(UIO_SEL_UART0, &sel);
 	nrc_gpio_set_uio_sel(UIO_SEL_UART1, &sel);
 	nrc_gpio_set_uio_sel(UIO_SEL_UART2, &sel);
+#elif defined(NRC7394)
+	nrc_gpio_set_uio_sel(UIO_SEL_UART1, &sel);
 #endif
 }
 
@@ -32,6 +39,12 @@ static void DEV_GPIO_Config (int pin, bool output, int level)
 	nrc_gpio_get_alt(&gpio);
 	gpio.word &= ~(1 << pin);
 	nrc_gpio_set_alt(&gpio);
+
+#if !defined(NRC7292)
+	nrc_gpio_get_alt2(&gpio);
+	gpio.word &= ~(1 << pin);
+	nrc_gpio_set_alt2(&gpio);
+#endif
 
 	nrc_gpio_get_dir(&gpio);
 	gpio.word = (gpio.word & ~(1 << pin)) | (output ? (1 << pin) : 0);
@@ -65,7 +78,7 @@ static void DEV_SPI_Enable (int clk_pin, int mosi_pin, uint32_t clk_freq)
 	sel.bit.sel31_24 = 0xff;
 	nrc_gpio_set_uio_sel(UIO_SEL_SPI0, &sel);
 
-	nrc_ssp_init(0, CPOL_LO, CPHA_LO, SPI_MSB, (8 - 1), clk_freq);
+	nrc_ssp_init(0, CPOL_LO, CPHA_LO, SPI_MSB, (8 - 1), clk_freq, 0);
 	nrc_ssp_lb(0, false);
 	nrc_ssp(0, true);
 	nrc_ssp_flush(0);
@@ -164,6 +177,13 @@ void DEV_SPI_Write_nByte (UBYTE *pData, UDOUBLE Len)
 
 void DEV_Delay_ms (UDOUBLE xms)
 {
-	vTaskDelay(pdMS_TO_TICKS(xms));
+	const UDOUBLE delay_unit = 100; // ms
+	UDOUBLE remain = xms;
+
+	while (remain > 0) {
+		UDOUBLE delay = (remain >= delay_unit) ? delay_unit : remain;
+		vTaskDelay(pdMS_TO_TICKS(delay));
+		remain -= delay;
+	}
 }
 

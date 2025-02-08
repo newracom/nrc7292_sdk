@@ -32,6 +32,8 @@
 #include "wifi_connect_common.h"
 #include "sample_ps_schedule_version.h"
 
+#include "nrc_http_client.h"
+
 #include "cJSON.h"
 
 #include "fota_callback.h"
@@ -200,6 +202,7 @@ void fota_callback()
 	WIFI_CONFIG param;
 	nrc_usr_print("[%s] Sample App for fota (firmware over the air) \n",__func__);
 	uint32_t data_size = 0;
+	ssl_certs_t *certs_ptr = NULL;
 
 	memset(&param, 0x0, WIFI_CONFIG_SIZE);
 	nrc_wifi_set_config(&param);
@@ -209,7 +212,7 @@ void fota_callback()
 		return;
 	}
 
-#if defined( SUPPORT_MBEDTLS ) && defined( RUN_HTTPS )
+#if defined( SUPPORT_HTTPS_CLIENT ) && defined( RUN_HTTPS )
 	ssl_certs_t certs;
 	certs.client_cert = ssl_client_ca_crt;
 	certs.client_cert_length = sizeof(ssl_client_ca_crt);
@@ -217,6 +220,7 @@ void fota_callback()
 	certs.client_pk_length = sizeof(ssl_client_key);
 	certs.ca_cert = ssl_server_ca_crt;
 	certs.ca_cert_length = sizeof(ssl_server_ca_crt);
+	certs_ptr = &certs;
 #endif
 
 	if (!nrc_fota_is_support()) {
@@ -241,11 +245,7 @@ void fota_callback()
 	data.data_in = buf;
 	memset(buf, 0, CHUNK_SIZE);
 
-#if defined( SUPPORT_MBEDTLS ) && defined( RUN_HTTPS )
-	ret = nrc_httpc_get(&handle0, CHECK_VER_URL, NULL, &data, &certs);
-#else
-	ret = nrc_httpc_get(&handle0, CHECK_VER_URL, NULL, &data, NULL);
-#endif
+	ret = nrc_httpc_get(&handle0, CHECK_VER_URL, NULL, &data, certs_ptr);
 
 	while (ret == HTTPC_RET_OK) {
 		data.data_in += data.recved_size;
@@ -285,11 +285,7 @@ void fota_callback()
 	uint32_t total_length = 0;
 	uint32_t body_content_length = 0;
 
-#if defined( SUPPORT_MBEDTLS ) && defined( RUN_HTTPS )
-	ret = nrc_httpc_get(&handle2, update_info.fw_url, NULL, &data, &certs);
-#else //HTTP
-	ret = nrc_httpc_get(&handle2, update_info.fw_url, NULL, &data, NULL);
-#endif
+	ret = nrc_httpc_get(&handle2, update_info.fw_url, NULL, &data, certs_ptr);
 
 	char* http_start_index = NULL;
 	if ((http_start_index = strstr((char*)buf, "\r\n\r\n")) != NULL) {

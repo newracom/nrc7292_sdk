@@ -35,6 +35,7 @@
 #include "Debug.h"
 
 #define EPD_2IN66B_SEND_DATA_BURST
+#define ENABLE_EPD_EXIST_CHECK
 
 static UWORD Width = (EPD_2IN66B_WIDTH % 8 == 0)? (EPD_2IN66B_WIDTH / 8 ): (EPD_2IN66B_WIDTH / 8 + 1);
 static UWORD Height = EPD_2IN66B_HEIGHT;
@@ -87,6 +88,25 @@ static void EPD_2IN66B_SendData(UBYTE Data)
     DEV_Digital_Write(EPD_CS_PIN, 0);
     DEV_SPI_WriteByte(Data);
     DEV_Digital_Write(EPD_CS_PIN, 1);
+}
+#endif
+
+#ifdef ENABLE_EPD_EXIST_CHECK
+/******************************************************************************
+function :	Check the module is existed or not
+parameter:
+******************************************************************************/
+static int EPD_2IN66B_CHECK_MODULE(int waiting_time_ms)
+{
+	int i = waiting_time_ms;
+
+	while(DEV_Digital_Read(EPD_BUSY_PIN) == 1) {      //LOW: idle, HIGH: busy
+		DEV_Delay_ms(10);
+		i -= 10;
+		if(i <= 0)
+			return -1;
+	}
+	return 0;
 }
 #endif
 
@@ -186,14 +206,21 @@ function :	Initialize the e-Paper register
 parameter:
 ******************************************************************************/
 #if defined(EPD_2IN66B_SEND_DATA_BURST)
-void EPD_2IN66B_Init(void)
+int EPD_2IN66B_Init(void)
 {
 	UBYTE Data[2];
 
-    EPD_2IN66B_Reset();
-    EPD_2IN66B_ReadBusy();
-    EPD_2IN66B_SendCommand(0x12);//soft  reset
-    EPD_2IN66B_ReadBusy();
+	EPD_2IN66B_Reset();
+#ifdef ENABLE_EPD_EXIST_CHECK
+	const int epd_check_time_ms = 1000;
+	if(EPD_2IN66B_CHECK_MODULE(epd_check_time_ms) == -1)
+		return -1;
+#else
+	EPD_2IN66B_ReadBusy();
+#endif
+
+	EPD_2IN66B_SendCommand(0x12);//soft  reset
+	EPD_2IN66B_ReadBusy();
 
 	Data[0] = 0x03;
 	EPD_2IN66B_SendCommand(0x11); //data entry mode
@@ -208,14 +235,23 @@ void EPD_2IN66B_Init(void)
 
 	EPD_2IN66B_SetCursor(0, 0);
 	EPD_2IN66B_ReadBusy();
+	return 0;
 }
 #else
-void EPD_2IN66B_Init(void)
+int  EPD_2IN66B_Init(void)
 {
-    EPD_2IN66B_Reset();
-    EPD_2IN66B_ReadBusy();
-    EPD_2IN66B_SendCommand(0x12);//soft  reset
-    EPD_2IN66B_ReadBusy();
+	EPD_2IN66B_Reset();
+
+#ifdef ENABLE_EPD_EXIST_CHECK
+	const int epd_check_time_ms = 1000;
+	if(EPD_2IN66B_CHECK_MODULE(epd_check_time_ms) == -1)
+		return -1;
+#else
+	EPD_2IN66B_ReadBusy();
+#endif
+
+	EPD_2IN66B_SendCommand(0x12);//soft  reset
+	EPD_2IN66B_ReadBusy();
 
 	EPD_2IN66B_SendCommand(0x11); //data entry mode
 	EPD_2IN66B_SendData(0x03);
@@ -228,6 +264,7 @@ void EPD_2IN66B_Init(void)
 
 	EPD_2IN66B_SetCursor(0, 0);
 	EPD_2IN66B_ReadBusy();
+	return 0;
 }
 #endif
 

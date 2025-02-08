@@ -40,8 +40,10 @@ enum nrc_ps_wakeup_reason {
 	NRC_WAKEUP_REASON_GPIO,
 	NRC_WAKEUP_REASON_TIM,
 	NRC_WAKEUP_REASON_TIM_TIMER,
+	NRC_WAKEUP_REASON_NDP_PAGING,
 	NRC_WAKEUP_REASON_NOT_SUPPORTED
 };
+
 
 /**********************************************
  * @fn nrc_err_t nrc_ps_deep_sleep(uint64_t sleep_ms)
@@ -60,7 +62,7 @@ enum nrc_ps_wakeup_reason {
 nrc_err_t nrc_ps_deep_sleep(uint64_t sleep_ms);
 
 /**********************************************
- * @fn nrc_err_t nrc_ps_deepsleep(uint64_t sleep_ms)
+ * @fn nrc_err_t nrc_ps_sleep_alone(uint64_t sleep_ms)
  *
  * @brief Command the device to go to NONTIM deep sleep.
  * Unlike nrc_ps_deep_sleep, it will not save pairing information,
@@ -73,6 +75,18 @@ nrc_err_t nrc_ps_deep_sleep(uint64_t sleep_ms);
  * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
 nrc_err_t nrc_ps_sleep_alone(uint64_t sleep_ms);
+
+/**********************************************
+ * @fn nrc_err_t nrc_ps_sleep_forever()
+ *
+ * @brief Command the device to go to NONTIM deep sleep without timeout.
+ * Unlike nrc_ps_deep_sleep, it will not save pairing information,
+ * potentially leading to longer WiFi reconnection time.
+ * Caution, user should supply other mechamism (such as GPIO) to wake the device up.
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_ps_sleep_forever();
 
 /**********************************************
  * @fn nrc_ps_wifi_tim_deep_sleep(uint32_t idle_timout_ms, uint32_t sleep_ms)
@@ -93,7 +107,16 @@ nrc_err_t nrc_ps_sleep_alone(uint64_t sleep_ms);
 nrc_err_t nrc_ps_wifi_tim_deep_sleep(uint32_t idle_timout_ms, uint32_t sleep_ms);
 
 /**********************************************
- * @fn nrc_err_t nrc_ps_set_gpio_wakeup_pin(bool check_debounce, int pin_number)
+ * @fn nrc_err_t nrc_ps_clear_sleep_mode(void)
+ *
+ * @brief Clear sleep mode in retention.
+ *
+ * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_ps_clear_sleep_mode(void);
+
+/**********************************************
+ * @fn nrc_err_t nrc_ps_set_gpio_wakeup_pin(bool check_debounce, int pin_number, bool active_high)
  *
  * @brief   Configure a wakeup-gpio-pin when system state is uCode or deepsleep.
  *			Call this function before deepsleep if user want to config
@@ -103,9 +126,12 @@ nrc_err_t nrc_ps_wifi_tim_deep_sleep(uint32_t idle_timout_ms, uint32_t sleep_ms)
  *
  * @param pin_number: Select wakeup GPIO Pin number(0~31)
  *
+ * @param active_high: true - wakeup polarity is active high, false - active low
+ *
  * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
-nrc_err_t nrc_ps_set_gpio_wakeup_pin(bool check_debounce, int pin_number);
+nrc_err_t nrc_ps_set_gpio_wakeup_pin(bool check_debounce, int pin_number, bool active_high);
+
 
 /**********************************************
  * @fn nrc_err_t nrc_ps_set_wakeup_source(uint8_t wakeup_source)
@@ -125,11 +151,17 @@ nrc_err_t nrc_ps_set_wakeup_source(uint8_t wakeup_source);
  *
  * @brief   Get the wakeup reason
  *
- * @param reason: WAKEUP_SOURCE_RTC / WAKEUP_SOURCE_GPIO / WAKEUP_SOURCE_NO_SLEEP
+ * @param reason: NRC_WAKEUP_REASON_COLDBOOT : Device boot without sleep.
+ *                NRC_WAKEUP_REASON_RTC : NONTIM sleep wakeup after time expired.
+ *                NRC_WAKEUP_REASON_GPIO : Wakeup after GPIO asserted.
+ *                NRC_WAKEUP_REASON_TIM : TIM mode sleep wakeup.
+ *                NRC_WAKEUP_REASON_TIM_TIMER : TIM mode sleep wakeup after time expiration.
+ *                NRC_WAKEUP_REASON_NOT_SUPPORTED : error.
  *
  * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
 nrc_err_t nrc_ps_wakeup_reason(uint8_t *reason);
+
 
 /**********************************************
  * @fn void nrc_ps_set_gpio_mask(uint32_t mask)
@@ -218,6 +250,50 @@ nrc_err_t nrc_ps_start_schedule();
  * @return If success, then NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
  ***********************************************/
 nrc_err_t nrc_ps_resume_deep_sleep();
+
+/**********************************************
+ * @fn nrc_err_t nrc_ps_save_user_data(void* data, uint16_t size)
+ *
+ * @brief Saves user-specific data into the retention memory for later retrieval.
+ *        This function allows applications to store data that persists across
+ *        deep sleep or other power-saving states.
+ *
+ * @param data Pointer to the data to be saved.
+ * @param size Size of the data to be saved in bytes. It must not exceed the
+ *             available retention memory size for user data.
+ *
+ * @return If successful, returns NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_ps_save_user_data(void* data, uint16_t size);
+
+/**********************************************
+ * @fn nrc_err_t nrc_ps_load_user_data(void* data, uint16_t size)
+ *
+ * @brief Loads previously saved user-specific data from the retention memory.
+ *        This function retrieves data stored by `nrc_ps_save_user_data` and
+ *        copies it into the provided buffer.
+ *
+ * @param data Pointer to the buffer where the loaded data will be stored.
+ * @param size Size of the buffer in bytes. It must not exceed the size of the
+ *             available retention memory size for user data.
+ *
+ * @return If successful, returns NRC_SUCCESS. Otherwise, NRC_FAIL is returned.
+ ***********************************************/
+nrc_err_t nrc_ps_load_user_data(void* data, uint16_t size);
+
+/**********************************************
+ * @fn uint16_t nrc_ps_get_available_user_data_size(void)
+ *
+ * @brief Retrieves the maximum size of user data that can be saved in the
+ *        retention memory.
+ *
+ *        This function provides the size of the retention memory available
+ *        for storing user-specific data.
+ *
+ * @return The maximum size of user data in bytes.
+ ***********************************************/
+uint16_t nrc_ps_get_available_user_data_size(void);
+
 
 #ifdef __cplusplus
 }

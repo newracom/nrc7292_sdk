@@ -25,19 +25,26 @@
 
 #include <string.h>
 #include "nrc_sdk.h"
-#include "lwip/ip_addr.h"
+#include "nrc_lwip.h"
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
+
+#include "nrc_http_client.h"
 
 #if defined( SUPPORT_MBEDTLS )
 #include "http_certs.h"
 #endif
 
 #define RUN_HTTPS
-#if defined( SUPPORT_MBEDTLS ) && defined( RUN_HTTPS )
-	char *url = "https://192.168.10.199";
+#if defined( SUPPORT_HTTPS_CLIENT ) && defined( RUN_HTTPS )
+char *url = "https://192.168.200.1:4443/";
 #else
-	char *url = "http://192.168.10.199";
+char *url = "http://192.168.10.199";
+#endif
+
+#define ENABLE_POST_REQUEST 1
+#if ENABLE_POST_REQUEST
+char *url_post = "https://192.168.200.1:4443/";
 #endif
 
 /******************************************************************************
@@ -49,6 +56,7 @@
 nrc_err_t run_sample_http(WIFI_CONFIG *param)
 {
 	SCAN_RESULTS results;
+	ssl_certs_t *certs_ptr = NULL;
 
 	nrc_usr_print("[%s] Sample App for http \n",__func__);
 
@@ -102,18 +110,11 @@ nrc_err_t run_sample_http(WIFI_CONFIG *param)
 	}
 
 	/* check if IP is ready */
-	while(1){
-		if (nrc_addr_get_state(0) == NET_ADDR_SET) {
-			nrc_usr_print("[%s] IP ...\n",__func__);
-			break;
-		} else {
-			nrc_usr_print("[%s] IP Address setting State : %d != NET_ADDR_SET(%d) yet...\n",
-						  __func__, nrc_addr_get_state(0), NET_ADDR_SET);
-		}
-		_delay_ms(1000);
+	if (nrc_wait_for_ip(0, param->dhcp_timeout) == NRC_FAIL) {
+		return NRC_FAIL;
 	}
 
-#if defined( SUPPORT_MBEDTLS ) && defined( RUN_HTTPS )
+#if defined( SUPPORT_HTTPS_CLIENT ) && defined( RUN_HTTPS )
 	ssl_certs_t certs;
 	certs.client_cert = ssl_client_crt;
 	certs.client_cert_length = sizeof(ssl_client_crt);
@@ -121,6 +122,7 @@ nrc_err_t run_sample_http(WIFI_CONFIG *param)
 	certs.client_pk_length = sizeof(ssl_client_key);
 	certs.ca_cert = ssl_ca_crt;
 	certs.ca_cert_length = sizeof(ssl_ca_crt);
+	certs_ptr = &certs;
 #endif
 
 	con_handle_t handle;
@@ -131,11 +133,7 @@ nrc_err_t run_sample_http(WIFI_CONFIG *param)
 	data.data_in_length = 512;
 
 	httpc_ret_e ret;
-#if defined( SUPPORT_MBEDTLS ) && defined( RUN_HTTPS )
-	ret = nrc_httpc_get(&handle, url, NULL, &data, &certs);
-#else
-	ret = nrc_httpc_get(&handle, url, NULL, &data, NULL);
-#endif
+	ret = nrc_httpc_get(&handle, url, NULL, &data, certs_ptr);
 	nrc_usr_print("%s\n", data.data_in);
 
 	while (ret == HTTPC_RET_OK) {
@@ -147,6 +145,7 @@ nrc_err_t run_sample_http(WIFI_CONFIG *param)
 		}
 		memset(buf, 0, 512);
 	}
+	nrc_httpc_close(&handle);
 
 #if ENABLE_POST_REQUEST
 	con_handle_t handle2;
@@ -155,7 +154,7 @@ nrc_err_t run_sample_http(WIFI_CONFIG *param)
 	data.data_out = body;
 	data.data_out_length = 8;
 	memset(buf, 0, 512);
-	ret = nrc_httpc_post(&handle2, url_post, ct, &data, NULL);
+	ret = nrc_httpc_post(&handle2, url_post, ct, &data, certs_ptr);
 	nrc_usr_print("%s\n", data.data_in);
 
 	while (ret == HTTPC_RET_OK) {

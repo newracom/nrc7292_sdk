@@ -133,7 +133,7 @@ static void wps_pbc_softap_btn_pressed(int vector)
 	pre_gpio_value = input_high;
 }
 
-static void wps_pbc_softap_success(void *priv, uint8_t *ssid, uint8_t ssid_len, uint8_t security_mode, char *passphrase)
+static void wps_pbc_softap_success(void *priv, int net_id, uint8_t *ssid, uint8_t ssid_len, uint8_t security_mode, char *passphrase)
 {
     nrc_usr_print("[%s] WPS SUCCESS\n", __func__);
 	btn_pressed = false;

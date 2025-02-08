@@ -15,7 +15,9 @@ typedef struct _frag_tx_status {
 } frag_tx_status;
 #endif
 
+#if defined(INCLUDE_MANAGE_BLACKLIST)
 void lmac_clear_black_list(uint16_t aid);
+#endif
 void lmac_qm_configure();
 void lmac_qm_schedule(uint8_t ac, uint8_t mode);
 bool lmac_process_tx_report(uint8_t ac);

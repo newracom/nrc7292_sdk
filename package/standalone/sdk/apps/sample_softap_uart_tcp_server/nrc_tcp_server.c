@@ -31,8 +31,14 @@
 
 #include "nrc_tcp_server.h"
 
+#define MAX_SOCKETS MEMP_NUM_TCP_PCB
+
 static int run_loop = 1;
+
+/* FD_SETSIZE defined in toolchain select.h */
+#if MAX_SOCKETS <= FD_SETSIZE
 static int maxdesc = 0;
+#endif
 
 int write_to_socket(int sock, char *buffer, size_t length)
 {
@@ -90,10 +96,11 @@ static int new_client(tcp_client_t **client_list, int sock)
 	c_data->next = *client_list;
 	*client_list = c_data;
 
+#if MAX_SOCKETS <= FD_SETSIZE
 	if (client > maxdesc) {
 		maxdesc = client;
 	}
-
+#endif
 	nrc_usr_print("new client created (%d)...\n", client);
 	return 0;
 }
@@ -123,9 +130,11 @@ void close_socket(tcp_client_t **client_list, tcp_client_t *client)
 	nrc_usr_print("Closing socket %d...\n", client->sock);
 	close(client->sock);
 
+#if MAX_SOCKETS <= FD_SETSIZE
 	if (client->sock == maxdesc) {
 		maxdesc--;
 	}
+#endif
 
 	if (client == *client_list) {
 		*client_list = (*client_list)->next;
@@ -137,6 +146,7 @@ void close_socket(tcp_client_t **client_list, tcp_client_t *client)
 	nrc_mem_free(client);
 }
 
+#if MAX_SOCKETS <= FD_SETSIZE
 static void server_loop(tcp_client_t **client_list, int sock, tcp_input_handler input_handler)
 {
 	fd_set input_set, output_set, exec_set;
@@ -179,6 +189,55 @@ static void server_loop(tcp_client_t **client_list, int sock, tcp_input_handler 
 		}
 	}
 }
+#else
+static void server_poll_loop(tcp_client_t **client_list, int sock, tcp_input_handler input_handler)
+{
+	struct pollfd poll_fds[MAX_SOCKETS];
+	tcp_client_t *client;
+	tcp_client_t *next_client;
+	int nfds, i;
+
+	while (run_loop) {
+		nfds = 0;
+
+		poll_fds[nfds].fd = sock;
+		poll_fds[nfds].events = POLLIN;
+		nfds++;
+
+		for (client = *client_list; client; client = client->next) {
+			poll_fds[nfds].fd = client->sock;
+			poll_fds[nfds].events = POLLIN;
+			nfds++;
+		}
+
+		if (poll(poll_fds, nfds, -1) < 0) {
+			nrc_usr_print("error polling\n");
+			return;
+		}
+
+		if (poll_fds[0].revents & POLLIN) {
+			if (new_client(client_list, sock) < 0) {
+				nrc_usr_print("Error accepting new connection\n");
+			}
+		}
+
+		for (i = 1; i < nfds; i++) {
+			if (poll_fds[i].revents & POLLIN) {
+				client = *client_list;
+				while (client && client->sock != poll_fds[i].fd) {
+					client = client->next;
+				}
+
+				if (client) {
+					if (process_input(client, input_handler) < 0) {
+						close_socket(client_list, client);
+					}
+				}
+			}
+		}
+	}
+}
+#endif
 
 static int init_server_socket(unsigned short port)
 {
@@ -217,5 +276,9 @@ void start_server(unsigned short port, tcp_client_t **clients, tcp_input_handler
 	if ((server_socket = init_server_socket(port)) < 0) {
 		return;
 	}
+#if MAX_SOCKETS <= FD_SETSIZE
 	server_loop(clients, server_socket, input_handler);
+#else
+	server_poll_loop(clients, server_socket, input_handler);
+#endif
 }

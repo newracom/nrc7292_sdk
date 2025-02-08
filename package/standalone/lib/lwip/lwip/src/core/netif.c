@@ -607,6 +607,15 @@ netif_do_set_gw(struct netif *netif, const ip4_addr_t *gw, ip_addr_t *old_gw)
                 ip4_addr2_16(netif_ip4_gw(netif)),
                 ip4_addr3_16(netif_ip4_gw(netif)),
                 ip4_addr4_16(netif_ip4_gw(netif))));
+#if defined(NRC_LWIP)
+#if LWIP_IPV4 && LWIP_ARP
+    if (ip4_addr_isany(gw)) {
+      if (netif->flags & NETIF_FLAG_ETHARP) {
+        etharp_cleanup_netif(netif);
+      }
+    }
+#endif /* LWIP_IPV4 && LWIP_ARP */
+#endif
     return 1; /* gateway changed */
   }
   return 0; /* gateway unchanged */

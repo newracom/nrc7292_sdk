@@ -65,18 +65,17 @@ enum {
 const CHANNEL_MAPPING_TABLE *get_channel_mapping_tables(int country_index);
 
 uint8_t GetNumOfChannelCC(void);
-uint8_t GetNumOfChannel(uint8_t ccid);
-uint8_t GetS1GChannelNumber(uint8_t index);
 uint32_t GetS1GCenterFreq(uint8_t index);
-uint8_t CheckChannelIndex(uint8_t index);
 uint8_t GetChannelIndexByS1GFreq(uint16_t s1g_freq, uint8_t bw);
 uint8_t GetChannelSpacingByS1GFreq(uint16_t s1g_freq);
+uint8_t GetChannelSpacingByChannel(uint8_t s1g_chan_idx);
 uint16_t GetS1GFreqByChannelIndex(uint8_t index);
 uint16_t GetStartS1GFreqByChspacing(uint8_t spacing);
 uint16_t GetEndS1GFreqByChspacing(uint8_t spacing);
 uint16_t GetNonS1GDefaultFreq(void);
-uint16_t GetStartIndexByBW(bw_t bw);
+int16_t GetStartIndexByBW(bw_t bw);
 uint8_t GetS1GChIDFromS1GFreq(const uint16_t s1g_freq);
+uint8_t GetNumOfChannelByBw(bw_t bw);
 
 bool SetChannelConf(const CHANNEL_MAPPING_TABLE *item);
 uint16_t GetS1GFreq(const uint16_t nons1g_freq, int8_t* offset, int8_t* primary_loc);
@@ -85,7 +84,7 @@ const struct s1g_channel_table* GetS1GDefaulTable(void);
 const struct s1g_channel_table* GetS1GFirstTable(void);
 const struct s1g_channel_table* get_s1g_channel_item(uint8_t index);
 const struct s1g_channel_table* get_s1g_channel_item_by_s1g_freq(const uint16_t s1g_freq);
-const struct s1g_channel_table* get_s1g_channel_item_by_nons1g_freq(const uint16_t s1g_freq);
+const struct s1g_channel_table* get_s1g_channel_item_by_nons1g_freq(const uint16_t nons1g_freq);
 const struct s1g_channel_table* get_s1g_channel_item_by_channel_number(uint8_t index);
 #else
 const CHANNEL_MAPPING_TABLE* GetS1GDefaulTable(void);
@@ -103,6 +102,7 @@ uint16_t STAGetS1GFreq(const uint16_t nons1g_freq);
 uint8_t STAGetNonS1GChNum(uint8_t center_freq_index);
 uint16_t STAGetNonS1GFreq(const uint16_t s1g_freq);
 uint16_t STAGetNonS1GFreqWithBw(const uint16_t s1g_freq, bw_t bw);
+uint16_t STAGetNonS1GChNumWithBW(const uint16_t s1g_freq, bw_t bw);
 uint8_t GetS1GCCAType(uint16_t center_freq);
 uint16_t GetNonS1GFreqFromNonS1GChNum(uint16_t nons1g_freq_index);
 uint32_t get_non_s1g_center_freq_from_s1g_freq_index(uint8_t index);

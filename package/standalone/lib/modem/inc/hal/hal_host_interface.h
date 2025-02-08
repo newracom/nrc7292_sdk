@@ -51,6 +51,7 @@ void hal_host_interface_start();
 void hal_host_interface_stop();
 void hal_host_interface_reset();
 void hal_host_interface_reset_tx (void);
+void hal_host_interface_reset_rx (void);
 void hal_host_interface_update_credit(uint8_t ac, uint8_t value, bool inc);
 void hal_host_interface_update_slot(uint8_t value, bool inc);
 void hal_host_interface_tx_enable(bool enable);

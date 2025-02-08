@@ -11,6 +11,6 @@ NRC Tools Documentation
     :caption: Contents:
  
     requirements
-    board_operation_mode_selection
+    nrc7292_board_operation_mode_selection
     running_the_tools_on_mac_linux
     tool_usage_firmware_flash_tool

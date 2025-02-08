@@ -4,6 +4,9 @@
 #define PS_SIG_A    0x13579bdf
 #define PS_SIG_B    0x2468ace0
 
+#define PS_SIG_C    0x636f6e6e
+#define PS_SIG_D    0x72656376
+
 enum ps_event {
 	PS_EVT_COLDBOOT,
 	PS_EVT_BEFORE_DEEPSLEEP,
@@ -13,6 +16,10 @@ enum ps_event {
 	PS_EVT_WAKEUP_MODEMSLEEP,
 #if defined(W_DISABLE_GPIO_PIN)
 	PS_EVT_CHECK_W_DISABLE,
+#endif
+#if defined(INCLUDE_TWT_SUPPORT)
+	PS_EVT_TWT_SERVICE,
+	PS_EVT_TWT_QUIET,
 #endif
 	PS_EVT_MAX
 };
@@ -31,7 +38,9 @@ enum ps_ucode_wake_reason {
 	PS_WAKE_RTC_TIMEOUT,
 	PS_WAKE_HSPI,
 	PS_WAKE_USR_TIMER, //12 timer set by user
-	PS_WAKE_RSN_MAX, //13
+	PS_WAKE_WOWLAN,
+	PS_WAKE_RX_NDP_PAGING,
+	PS_WAKE_RSN_MAX, //15
 };
 
 enum ps_ucode_wake_source {
@@ -53,7 +62,8 @@ enum sys_operation {
 
 typedef enum {
 	POWER_SAVE_MODEM_SLEEP_MODE,
-	POWER_SAVE_DEEP_SLEEP_MODE
+	POWER_SAVE_DEEP_SLEEP_MODE,
+	POWER_SAVE_NONE_SLEEP_MODE
 } POWER_SAVE_SLEEP_MODE;
 
 typedef enum {

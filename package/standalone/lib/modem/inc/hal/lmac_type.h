@@ -24,7 +24,7 @@ enum key_cmd {
 	KEY_DELALL = 2,
 #if defined(NRC7292)
 	KEY_UNKNOWN = 8,
-#elif (defined(NRC7393) || defined(NRC7394))
+#elif defined(NRC7394)
 	KEY_MOREDATA = 4,
 	KEY_TWT = 5,
 	KEY_BOTH = 6,
@@ -155,8 +155,8 @@ enum {
 	/* Ownership bit */
 	DESC_SW = 0,
 	DESC_HW = 1,
-	/* Length limit (based on the size of control.length) */
-	DESC_MAX_LENGTH = (1 << 11)
+	/* Mximum MPDU Length 3895(S1G Capabilities Information field) */
+	DESC_MAX_LENGTH = 3895
 };
 
 enum {

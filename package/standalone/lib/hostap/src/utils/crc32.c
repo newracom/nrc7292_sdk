@@ -11,6 +11,13 @@
 #include "utils/common.h"
 #include "utils/crc32.h"
 
+#if 1 // Use util_crc_compute_crc32() in util_crc.h
+#include "util_crc.h"
+u32 crc32(const u8 *frame, size_t frame_len)
+{
+	return util_crc_compute_crc32((uint8_t*)frame, frame_len);
+}
+#else
 /*
  * IEEE 802.11 FCS CRC32
  * G(x) = x^32 + x^26 + x^23 + x^22 + x^16 + x^12 + x^11 + x^10 + x^8 + x^7 +
@@ -83,3 +90,4 @@ u32 crc32(const u8 *frame, size_t frame_len)
 
 	return ~crc;
 }
+#endif

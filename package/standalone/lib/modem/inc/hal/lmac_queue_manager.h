@@ -186,7 +186,9 @@ void lmac_qm_restore_queue(uint8_t ac);
 #if defined(CSPI)
 void lmac_qm_remove_sta(uint8_t *addr);
 #endif
-void lmac_qm_buffer_to_free(uint8_t ac, LMAC_TXBUF *buffer);
+void lmac_qm_flush_sta(uint8_t vif_id, const uint8_t *addr, bool protect);
+void lmac_qm_buffer_to_sched(uint8_t vif_id, LMAC_TXBUF *buffer);
+void lmac_qm_buffer_to_free(uint8_t ac, LMAC_TXBUF *buffer, bool success);
 void lmac_qm_buffer_to_free_all(uint8_t ac, uint8_t qtype);
 void lmac_qm_flush_buffer();
 void qm_init();

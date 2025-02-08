@@ -488,8 +488,10 @@ typedef struct fd_set
   unsigned char fd_bits [(FD_SETSIZE+7)/8];
 } fd_set;
 
-#elif FD_SETSIZE < (LWIP_SOCKET_OFFSET + MEMP_NUM_NETCONN)
-#error "external FD_SETSIZE too small for number of sockets"
+/* MEMP_NUM_NETCONN can be greater then FD_SETSIZE, but select can handle up to FD_SETSIZE */
+/* To handle more than FD_SETSIZE, use poll instead of select */
+//#elif FD_SETSIZE < (LWIP_SOCKET_OFFSET + MEMP_NUM_NETCONN)
+//#error "external FD_SETSIZE too small for number of sockets"
 #else
 #define LWIP_SELECT_MAXNFDS FD_SETSIZE
 #endif /* FD_SET */
@@ -552,6 +554,7 @@ void lwip_socket_thread_cleanup(void); /* LWIP_NETCONN_SEM_PER_THREAD==1: destro
 #define lwip_send         send
 #define lwip_sendmsg      sendmsg
 #define lwip_sendto       sendto
+#define lwip_sendto_if    sendto_if
 #define lwip_socket       socket
 #if LWIP_SOCKET_SELECT
 #define lwip_select       select
@@ -598,6 +601,8 @@ ssize_t lwip_send(int s, const void *dataptr, size_t size, int flags);
 ssize_t lwip_sendmsg(int s, const struct msghdr *message, int flags);
 ssize_t lwip_sendto(int s, const void *dataptr, size_t size, int flags,
     const struct sockaddr *to, socklen_t tolen);
+ssize_t lwip_sendto_if(int s, const void *dataptr, size_t size, int flags,
+    const struct sockaddr *to, socklen_t tolen, struct netif *netif);
 int lwip_socket(int domain, int type, int protocol);
 ssize_t lwip_write(int s, const void *dataptr, size_t size);
 ssize_t lwip_writev(int s, const struct iovec *iov, int iovcnt);
@@ -647,6 +652,8 @@ int lwip_inet_pton(int af, const char *src, void *dst);
 #define sendmsg(s,message,flags)                  lwip_sendmsg(s,message,flags)
 /** @ingroup socket */
 #define sendto(s,dataptr,size,flags,to,tolen)     lwip_sendto(s,dataptr,size,flags,to,tolen)
+/** @ingroup socket */
+#define sendto_if(s,dataptr,size,flags,to,tolen,netif)  lwip_sendto_if(s,dataptr,size,flags,to,tolen,netif)
 /** @ingroup socket */
 #define socket(domain,type,protocol)              lwip_socket(domain,type,protocol)
 #if LWIP_SOCKET_SELECT

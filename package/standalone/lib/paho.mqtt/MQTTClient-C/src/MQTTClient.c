@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include "nrc_sdk.h"
 #include "util_trace.h"
 
 static void NewMessageData(MessageData* md, MQTTString* aTopicName, MQTTMessage* aMessage) {
@@ -44,7 +45,7 @@ static int sendPacket(MQTTClient* c, int length, Timer* timer)
 		rc = c->ipstack->mqttwrite(c->ipstack, &c->buf[sent], length, TimerLeftMS(timer));
 #endif /* defined(INCLUDE_MQTT_FAST_CONN) */
 		if (rc < 0){  // there was an error writing the data
-			system_printf("%s sendPacket loop error %d %d %d\n", __func__, rc, sent, length);
+			nrc_usr_print("%s sendPacket loop error %d %d %d\n", __func__, rc, sent, length);
 			break;
 		}
 		sent += rc;
@@ -454,12 +455,12 @@ int MQTTConnectWithResults(MQTTClient* c, MQTTPacket_connectData* options, MQTTC
     c->cleansession = options->cleansession;
     TimerCountdown(&c->last_received, c->keepAliveInterval);
     if ((len = MQTTSerialize_connect(c->buf, c->buf_size, options)) <= 0) {
-        system_printf("[%s] MQTTSerialize_connect error %d\n", __func__, len);
+        nrc_usr_print("[%s] MQTTSerialize_connect error %d\n", __func__, len);
         goto exit;
     }
 
     if ((rc = sendPacket(c, len, &connect_timer)) != SUCCESS) {  // send the connect packet
-        system_printf("[%s] SendPacket error %d\n", __func__, rc);
+        nrc_usr_print("[%s] SendPacket error %d\n", __func__, rc);
         goto exit; // there was a problem
     }
 #if defined(INCLUDE_MQTT_FAST_CONN)
@@ -469,7 +470,7 @@ int MQTTConnectWithResults(MQTTClient* c, MQTTPacket_connectData* options, MQTTC
     if (waitfor(c, CONNACK, &connect_timer) == CONNACK)
     {
 #if !defined(INCLUDE_MEASURE_AIRTIME)        
-        system_printf("[%s] CONNACK received\n", __func__);
+        nrc_usr_print("[%s] CONNACK received\n", __func__);
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */        
         data->rc = 0;
         data->sessionPresent = 0;                
@@ -588,7 +589,7 @@ int MQTTSubscribeWithResults(MQTTClient* c, const char* topicFilter, int qos,
     if (waitfor(c, SUBACK, &timer) == SUBACK)      // wait for suback
     {
 #if !defined(INCLUDE_MEASURE_AIRTIME)        
-        system_printf("[%s] SUBACK received\n", __func__);
+        nrc_usr_print("[%s] SUBACK received\n", __func__);
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
         int count = 0;
         unsigned short mypacketid;
@@ -709,7 +710,7 @@ int MQTTPublish(MQTTClient* c, const char* topicName, MQTTMessage* message)
         if (waitfor(c, PUBACK, &timer) == PUBACK)
         {
 #if !defined(INCLUDE_MEASURE_AIRTIME)					            
-            system_printf("[%s] PUBACK received\n", __func__);
+            nrc_usr_print("[%s] PUBACK received\n", __func__);
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */
             unsigned short mypacketid;
             unsigned char dup, type;
@@ -724,7 +725,7 @@ int MQTTPublish(MQTTClient* c, const char* topicName, MQTTMessage* message)
         if (waitfor(c, PUBCOMP, &timer) == PUBCOMP)
         {
 #if !defined(INCLUDE_MEASURE_AIRTIME)		            
-            system_printf("[%s] PUBCOMP received\n", __func__);
+            nrc_usr_print("[%s] PUBCOMP received\n", __func__);
 #endif /* !defined(INCLUDE_MEASURE_AIRTIME) */            
             unsigned short mypacketid;
             unsigned char dup, type;

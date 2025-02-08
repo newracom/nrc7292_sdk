@@ -6,6 +6,7 @@
 #include "ctrl_iface_freeRTOS.h"
 #include "system_common.h"
 #include "driver_nrc.h"
+#include "eloop_freeRTOS.h"
 
 
 #ifdef CONFIG_NO_STDOUT_DEBUG
@@ -161,17 +162,34 @@ int ctrl_iface_receive(int vif_id, char *cmd)
 int wpa_cmd_receive(int vif_id, int argc, char *argv[])
 {
 	int i = 0;
-	char buf[512] = {0,};
 
 	if (argc <= 1)
+	{
 		return -1;
+	}
 
+	eloop_msg_t* eloop_msg = os_zalloc(ELOOP_MESSAGE_SIZE);
+	char *buf = os_zalloc(ELOOP_MESSAGE_BUF_SIZE);
+
+	if ((eloop_msg == NULL) || (buf == NULL))
+	{
+		return -2;
+	}
+
+	eloop_msg->vif_id = vif_id;
+	eloop_msg->wait_rsp = 0;
+	eloop_msg->buf = buf;
 	sprintf(buf, "%s", argv[1]);
+
+	//If there are additional strings separated by spaces,
+	//input them starting from 2.
 	for (i = 2; i < argc; i++) {
 		sprintf(buf + strlen(buf), " %s", argv[i]);
 	}
+	xQueueSend(eloop_message_queue_req, &eloop_msg, 0);
+	eloop_run_signal();
 
-	return ctrl_iface_receive(vif_id, buf);
+	return 0;
 }
 
 /***********************************************************************************************************/
@@ -183,11 +201,16 @@ ctrl_iface_resp_t *ctrl_iface_receive_response(int vif_id, const char *fmt, ...)
 	if (wpa_s)
 	{
 		va_list ap;
-		char cmd[256];
-
-		ASSERT(_ctrl_iface_lock());
-
 		va_start(ap, fmt);
+
+		va_list ap_copy;
+		va_copy(ap_copy, ap);
+		int cmd_len = os_strlen(fmt) + os_strlen(va_arg(ap_copy, char*)); /* for certificate length(256 and above) */
+		va_end(ap_copy);
+
+		cmd_len = cmd_len > 256 ? cmd_len : 256;
+		char cmd[cmd_len];
+		ASSERT(_ctrl_iface_lock());
 
 		if (vsnprintf(cmd, sizeof(cmd), fmt, ap) > 0)
 		{
@@ -205,6 +228,7 @@ ctrl_iface_resp_t *ctrl_iface_receive_response(int vif_id, const char *fmt, ...)
 				cmd[i] = toupper(cmd[i]);
 
 			reply = wpa_supplicant_ctrl_iface_process(wpa_s, cmd, &reply_len);
+			//wpa_printf(MSG_EXCESSIVE, "[%s] rep:0x%x len:%d", __func__, reply, reply_len);
 			if (reply && reply_len > 0)
 			{
 				if (reply[reply_len - 1] == '\n')
@@ -243,7 +267,6 @@ ctrl_iface_resp_t *ctrl_iface_receive_response(int vif_id, const char *fmt, ...)
 
 					if (strcmp(reply, "OK") == 0) {
 						os_free(reply);
-
 						reply_len = 0;
 						reply = NULL;
 					}
@@ -251,18 +274,19 @@ ctrl_iface_resp_t *ctrl_iface_receive_response(int vif_id, const char *fmt, ...)
 					resp.len = reply_len;
 					resp.msg = reply;
 
-	    			va_end(ap);
+					va_end(ap);
 					ASSERT(_ctrl_iface_unlock());
 
 					return &resp;
 				}
 			}
 
-			if (reply)
+			if (reply) {
 				os_free(reply);
+			}
 		}
 
-	    va_end(ap);
+		va_end(ap);
 		ASSERT(_ctrl_iface_unlock());
 	}
 
@@ -274,6 +298,7 @@ bool CTRL_IFACE_RESP_OK (ctrl_iface_resp_t *resp)
 	if (resp && resp->len == 0)
 		return true;
 
+	CTRL_IFACE_RESP_FREE(resp);
 	return false;
 }
 
@@ -282,6 +307,7 @@ bool CTRL_IFACE_RESP_MSG (ctrl_iface_resp_t *resp)
 	if (resp && resp->len > 0 && resp->msg)
 		return true;
 
+	CTRL_IFACE_RESP_FREE(resp);
 	return false;
 }
 
@@ -290,17 +316,19 @@ bool CTRL_IFACE_RESP_ERR (ctrl_iface_resp_t *resp)
 	if (!resp || resp->len < 0)
 		return true;
 
+	CTRL_IFACE_RESP_FREE(resp);
 	return false;
 }
 
 void CTRL_IFACE_RESP_FREE (ctrl_iface_resp_t *resp)
 {
 	if (resp) {
-		if (resp->msg)
+		if (resp->len > 0 && resp->len < 4096 && resp->msg) {
+			//wpa_printf(MSG_ERROR, "[1] free msg (len:%d msg:0x%x)", resp->len, resp->msg);
 			os_free(resp->msg);
-
-		resp->msg = NULL;
-		resp->len = 0;
+		}
+		//wpa_printf(MSG_ERROR, "[2] free resp (resp:0x%x)\n", resp);
+		os_free(resp);
 	}
 }
 
@@ -346,7 +374,8 @@ struct ctrl_iface_priv* wpa_supplicant_ctrl_iface_init(struct wpa_supplicant *wp
 	return priv;
 }
 
-void wpa_supplicant_ctrl_iface_deinit(struct ctrl_iface_priv *priv)
+void wpa_supplicant_ctrl_iface_deinit(struct wpa_supplicant *wpa_s,
+														struct ctrl_iface_priv *priv)
 {
 	os_free(priv);
 

@@ -115,10 +115,16 @@ not necessary for to use this port.  They are defined so the common demo files
 
 /*--------------------	Run Time Stats -----------------------*/
 #ifdef NRC_FREERTOS
-extern uint32_t drv_lmac_get_tsf_lo(int vif_id);
 #define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()
-#define portGET_RUN_TIME_COUNTER_VALUE() drv_lmac_get_tsf_lo(0)
-#define portALT_GET_RUN_TIME_COUNTER_VALUE(x) do {x = (uint32_t)drv_lmac_get_tsf_lo(0);} while(0)
+#if ( configGENERATE_RUN_TIME_STATS == 1 )
+	/* TSF counter is not functional with powersave or fast-connection
+	because the previous runtime counter is not going to be recovered */
+	#define portGET_RUN_TIME_COUNTER_VALUE()                        xTickCount
+	#define portSET_LAST_READY_TIME( pxTCB, ulReadyTime )           ( pxTCB )->ulLastReadyTime = ulReadyTime
+	#define portTASK_STARVATION_TIMEOUT                             ( pdMS_TO_TICKS( WDT_TIMEOUT_MS ) )
+	#define portTASK_STARVATION_HANDLER( xTaskHandle, uxPriority )  vPortStarvationHandler( xTaskHandle, uxPriority )
+#endif
+#define STACK_START_MARKER		0x95100344
 #endif /* NRC_FREERTOS */
 
 /* Tickless idle/low power functionality. */
@@ -196,6 +202,30 @@ BaseType_t xReturn;
 }
 
 /*-----------------------------------------------------------*/
+#ifdef NRC_FREERTOS
+portFORCE_INLINE static BaseType_t xPortIsMaskedInterrupt( void )
+{
+uint32_t ulCurrentPRIMASK;
+uint32_t ulCurrentBASEPRI;
+BaseType_t xReturn;
+
+	__asm volatile( "mrs %0, primask" : "=r" ( ulCurrentPRIMASK ) :: "memory" );
+	__asm volatile( "mrs %0, basepri" : "=r" ( ulCurrentBASEPRI ) :: "memory" );
+
+	if( ulCurrentBASEPRI > 0 || ulCurrentPRIMASK > 0 )
+	{
+		xReturn = pdTRUE;
+	}
+	else
+	{
+		xReturn = pdFALSE;
+	}
+
+	return xReturn;
+}
+
+/*-----------------------------------------------------------*/
+#endif
 
 portFORCE_INLINE static void vPortRaiseBASEPRI( void )
 {

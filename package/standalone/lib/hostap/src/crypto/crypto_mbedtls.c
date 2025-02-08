@@ -12,6 +12,7 @@
 #include "crypto.h"
 
 #include "mbedtls/md5.h"
+#include "mbedtls/md4.h"
 #include "mbedtls/des.h"
 
 #include "mbedtls/sha1.h"
@@ -150,13 +151,29 @@ int pbkdf2_sha1(const char *passphrase, const u8 *ssid, size_t ssid_len,
 
 int des_encrypt(const u8 *clear, const u8 *key, u8 *cypher)
 {
+	int ret;
 	mbedtls_des_context ctx;
+	u8 pkey[8], next, tmp;
+	int i;
+
+	/* Add parity bits to the key */
+	next = 0;
+	for (i = 0; i < 7; i++) {
+		tmp = key[i];
+		pkey[i] = (tmp >> i) | next | 1;
+		next = tmp << (7 - i);
+	}
+	pkey[i] = next | 1;
 
 	mbedtls_des_init(&ctx);
-	mbedtls_des_setkey_enc(&ctx, key);
-	mbedtls_des_crypt_ecb(&ctx, clear, cypher);
+	ret = mbedtls_des_setkey_enc(&ctx, pkey);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = mbedtls_des_crypt_ecb(&ctx, clear, cypher);
 	mbedtls_des_free(&ctx);
-	return 0;
+
+	return ret;
 }
 
 int md5_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
@@ -254,6 +271,23 @@ int sha384_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
 
 	mbedtls_sha512_finish(&ctx, mac);
 	mbedtls_sha512_free(&ctx);
+
+	return 0;
+}
+
+int md4_vector(size_t num_elem, const u8 *addr[], const size_t *len, u8 *mac)
+{
+	mbedtls_md4_context ctx;
+	size_t i;
+
+	mbedtls_md4_init(&ctx);
+	mbedtls_md4_starts(&ctx);
+
+	for (i = 0; i < num_elem; ++i)
+		mbedtls_md4_update(&ctx, addr[i], len[i]);
+
+	mbedtls_md4_finish(&ctx, mac);
+	mbedtls_md4_free(&ctx);
 
 	return 0;
 }
@@ -1034,6 +1068,97 @@ cleanup:
 	os_free(y_sqr_rhs);
 	return (ret == 0) && (on_curve == 1);
 }
+
+
+#if 1 //New functions added since v2.10.
+const struct crypto_bignum * crypto_ec_get_a(struct crypto_ec *e)
+{
+	return (const struct crypto_bignum *) &e->group.A;
+}
+
+const struct crypto_bignum * crypto_ec_get_b(struct crypto_ec *e)
+{
+	return (const struct crypto_bignum *) &e->group.B;
+}
+
+struct crypto_bignum * crypto_bignum_init_uint(unsigned int val)
+{
+	mbedtls_mpi *bn = os_zalloc(sizeof(mbedtls_mpi));
+	 if (bn == NULL) {
+		 return NULL;
+	 }
+
+	 mbedtls_mpi_init(bn);
+	 mbedtls_mpi_lset(bn, val);
+
+	 return (struct crypto_bignum *)bn;
+}
+
+/**
+ * crypto_bignum_sqrmod - c = a^2 (mod b)
+ * @a: Bignum
+ * @b: Bignum
+ * @c: Bignum; used to store the result of a^2 % b
+ * Returns: 0 on success, -1 on failure
+ */
+int crypto_bignum_sqrmod(const struct crypto_bignum *a,
+								 const struct crypto_bignum *b,
+									 struct crypto_bignum *c)
+{
+	int res;
+	struct crypto_bignum *tmp = crypto_bignum_init();
+	if (!tmp) {
+		return -1;
+	}
+
+	res = mbedtls_mpi_copy((mbedtls_mpi *) tmp,(const mbedtls_mpi *) a);
+	res = crypto_bignum_mulmod(a,tmp,b,c);
+
+	crypto_bignum_deinit(tmp, 0);
+	return res ? -1 : 0;
+}
+
+int crypto_bignum_addmod(const struct crypto_bignum *a,
+									 const struct crypto_bignum *b,
+									 const struct crypto_bignum *c,
+										 struct crypto_bignum *d)
+{
+	struct crypto_bignum *tmp = crypto_bignum_init();
+	int ret = -1;
+
+	if (mbedtls_mpi_add_mpi((mbedtls_mpi *) tmp, (const mbedtls_mpi *) a, (const mbedtls_mpi *) b) < 0)
+		goto fail;
+
+	if (mbedtls_mpi_mod_mpi( (mbedtls_mpi *) d, (const mbedtls_mpi *) tmp, (const mbedtls_mpi *) c) < 0)
+		goto fail;
+
+	ret = 0;
+fail:
+	crypto_bignum_deinit(tmp, 0);
+	return ret;
+}
+
+/**
+ * crypto_bignum_rshift - r = a >> n
+ * @a: Bignum
+ * @n: Number of bits
+ * @r: Bignum; used to store the result of a >> n
+ * Returns: 0 on success, -1 on failure
+ */
+int crypto_bignum_rshift(const struct crypto_bignum *a, int n,
+			 struct crypto_bignum *r)
+{
+	int res;
+	res = mbedtls_mpi_copy((mbedtls_mpi *) r,(const mbedtls_mpi *) a);
+	if (res) {
+		return -1;
+	}
+	res = mbedtls_mpi_shift_r((mbedtls_mpi *)r, n);
+	return res ? -1 : 0;
+}
+
+#endif //#if 1 New functions added since v2.10.
+
 
 struct crypto_bignum *crypto_bignum_init(void)
 {

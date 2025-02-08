@@ -25,7 +25,6 @@
 
 
 #include "raspi-hif.h"
-#include "nrc-hspi.h"
 
 /**********************************************************************************************/
 
@@ -121,13 +120,17 @@ int raspi_hif_open (int type, char *device, uint32_t speed, uint32_t flags)
 				{
 					hspi_ops_t ops;
 
-					raspi_hif_mutex_init();
+					memset(&ops, 0, sizeof(hspi_ops_t));
 
+					ops.printf = printf;
+					ops.delay = (void (*)(uint32_t))sleep;
 					ops.spi_transfer = raspi_spi_single_transfer;
 
 					ret = nrc_hspi_open(&ops, eirq_mode);
 					if (ret == 0)
 					{
+						raspi_hif_mutex_init();
+
 						hif->type = RASPI_HIF_SPI;
 						hif->flags = flags;
 						hif->read = nrc_hspi_read;

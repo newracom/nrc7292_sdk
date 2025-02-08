@@ -37,6 +37,7 @@
 #define IPERF_DEFAULT_UDP_RATE				(1024 * 1024) // bps
 #define IPERF_DEFAULT_DATA_BUF_LEN			1470
 #define IPERF_DEFAULT_UDP_DATAGRAM_SIZE		IPERF_DEFAULT_DATA_BUF_LEN // byte
+#define IPERF_DEFAULT_TCP_DATAGRAM_SIZE		(TCP_MSS - 20) // byte
 
 #define IPERF_UDP_MAX_RECV_SIZE       (4*1024)        // 4KB
 
@@ -95,6 +96,7 @@
 
 #define KILO 1000
 #define MEGA ( KILO * KILO )
+#define MAX_IPERF_THROUGHPUT 12*MEGA
 
 typedef double iperf_time_t ; // sec
 
@@ -200,9 +202,12 @@ typedef struct
 
 typedef struct
 {
-	uint32_t datagram_cnt;
+	uint64_t datagram_cnt;
+	uint64_t send_byte;
 	iperf_time_t start_time;
+	iperf_time_t duration;
 	iperf_time_t end_time;
+	TaskHandle_t periodic_report_task;
 } iperf_client_info_t;
 
 // server/client mode
@@ -235,6 +240,7 @@ typedef struct iperf_opt
 	uint32_t mAppRate; // -b
 	uint32_t mSock;
 	uint16_t mPort; // -p
+	uint32_t mSendInterval; // -g
 
 	ip_addr_t addr;
 	union {
@@ -244,8 +250,10 @@ typedef struct iperf_opt
 
 	uint8_t mTOS ;	// -S
 	enum ThreadMode mThreadMode;         // -s or -c
-	bool   mUDP;                    // -u
-	bool   mForceStop;
+	bool mUDP;                    // -u
+	bool mForceStop;
+	bool mNodelay; // -N
+	TaskHandle_t task_handle;
 } iperf_opt_t;
 
 
@@ -261,6 +269,7 @@ void nrc_iperf_spin_lock(void);
 void nrc_iperf_spin_unlock(void);
 
 int iperf_get_time (iperf_time_t *time);
+bool iperf_time_expried(iperf_time_t start_time, iperf_time_t duration);
 uint32_t byte_to_bps (iperf_time_t time, uint32_t byte);
 char *byte_to_string (uint32_t byte);
 char *bps_to_string (uint32_t bps);

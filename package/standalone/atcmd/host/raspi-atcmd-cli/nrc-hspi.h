@@ -27,8 +27,6 @@
 #define __NRC_HSPI_H__
 /**********************************************************************************************/
 
-#include "common.h"
-
 /**
  *	H-SPI Host-Side Registers
  **********************************************************************************************/
@@ -235,11 +233,19 @@ enum
 
 enum HSPI_EIRQ_MODE
 {
+	/* No interrupt */
 	HSPI_EIRQ_MODE_NONE = -1,
 
+	/* Low-level inerrupt */
 	HSPI_EIRQ_MODE_LOW = HSPI_EIRQ_LEVEL | HSPI_EIRQ_LOW,
+
+	/* High-level interrupt */
 	HSPI_EIRQ_MODE_HIGH = HSPI_EIRQ_LEVEL | HSPI_EIRQ_HIGH,
+
+	/* Faling-edge interrupt */
 	HSPI_EIRQ_MODE_FALLING = HSPI_EIRQ_EDGE | HSPI_EIRQ_LOW,
+
+	/* Rising-edge interrupt */
 	HSPI_EIRQ_MODE_RISING = HSPI_EIRQ_EDGE | HSPI_EIRQ_HIGH,
 };
 
@@ -287,12 +293,20 @@ typedef struct
 
 typedef struct
 {
+	/* Output formatted text (optional) */
+	int (*printf) (const char *fmt, ...);
+
+	/* Delay for a specified number of seconds (optional) */
+	void (*delay) (uint32_t seconds);
+
+	/* Perform an SPI data transfer of len bytes,              *
+	 * sending data from tx_buf and receiving data into rx_buf */
 	int (*spi_transfer) (char *tx_buf, char *rx_buf, int len);
 } hspi_ops_t;
 
 typedef struct
 {
-	bool active;
+	int active;
 
 	struct
 	{
@@ -312,6 +326,8 @@ typedef struct
 /**
  *	H-SPI Functions
  **********************************************************************************************/
+
+extern int nrc_hspi_reset (void);
 
 extern int nrc_hspi_open (hspi_ops_t *ops, enum HSPI_EIRQ_MODE mode);
 extern void nrc_hspi_close (void);

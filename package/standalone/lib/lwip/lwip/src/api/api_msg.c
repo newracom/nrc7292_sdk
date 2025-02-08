@@ -1562,9 +1562,15 @@ lwip_netconn_do_send(void *m)
           }
 #else /* LWIP_CHECKSUM_ON_COPY */
           if (ip_addr_isany_val(msg->msg.b->addr) || IP_IS_ANY_TYPE_VAL(msg->msg.b->addr)) {
-            err = udp_send(msg->conn->pcb.udp, msg->msg.b->p);
+            if (msg->netif)
+              err = udp_send_if(msg->conn->pcb.udp, msg->msg.b->p, msg->netif);
+            else
+              err = udp_send(msg->conn->pcb.udp, msg->msg.b->p);
           } else {
-            err = udp_sendto(msg->conn->pcb.udp, msg->msg.b->p, &msg->msg.b->addr, msg->msg.b->port);
+            if (msg->netif)
+              err = udp_sendto_if(msg->conn->pcb.udp, msg->msg.b->p, &msg->msg.b->addr, msg->msg.b->port, msg->netif);
+            else
+              err = udp_sendto(msg->conn->pcb.udp, msg->msg.b->p, &msg->msg.b->addr, msg->msg.b->port);
           }
 #endif /* LWIP_CHECKSUM_ON_COPY */
           break;

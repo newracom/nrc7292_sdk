@@ -22,6 +22,14 @@
 #endif /* defined(INCLUDE_TWT_SUPPORT) */
 #endif /* dot11TWTOptionActivated */
 
+#if !defined(dot11TWTGroupingSupport)
+#if defined(INCLUDE_TWT_SUPPORT)
+#define dot11TWTGroupingSupport					0
+#else
+#define dot11TWTGroupingSupport					0
+#endif /* defined(INCLUDE_TWT_SUPPORT) */
+#endif /* dot11TWTGroupingSupport */
+
 #if !defined(dot11AMPDUImplemented)
 #define dot11AMPDUImplemented 					1
 #endif /* dot11AMPDUImplemented */
@@ -63,6 +71,14 @@
 #if !defined(dot11ShortGIOptionIn4MActivated)
 #define dot11ShortGIOptionIn4MActivated 		1
 #endif /* dot11ShortGIOptionIn4MActivated */
+
+#if !defined(dot11S1GCentralizedAuthenticationControlActivated)
+#define dot11S1GCentralizedAuthenticationControlActivated	0
+#endif /* dot11S1GCentralizedAuthenticationControlActivated */
+
+#if !defined(dot11S1GDistributedAuthenticationControlActivated)
+#define dot11S1GDistributedAuthenticationControlActivated	1
+#endif
 
 // values, but not defined in MIB
 #if !defined(nrcAPStaTypeSupport)

@@ -39,14 +39,16 @@
 #endif
 
 #define ATCMD_VER_MAJOR			(1)
-#define ATCMD_VER_MINOR			(25)
-#define ATCMD_VER_REVISION		(0)
+#define ATCMD_VER_MINOR			(26)
+#define ATCMD_VER_REVISION		(9)
 
 /**********************************************************************************************/
 
 #if defined(CONFIG_SAE) && defined(CONFIG_OWE)
 #define CONFIG_ATCMD_WPA3
-/* #define CONFIG_ATCMD_SOFTAP_WPA3 */
+#if defined(NRC7394)
+#define CONFIG_ATCMD_SOFTAP_WPA3 
+#endif
 #endif
 
 #ifndef CONFIG_ATCMD_CLI
@@ -79,8 +81,6 @@
 #define CONFIG_ATCMD_DATA_LEN_MAX		(4 * 1024)
 
 /**********************************************************************************************/
-
-#define ATCMD_NETIF_INDEX				0
 
 #define ATCMD_MSG_LEN_MIN				2
 #define ATCMD_MSG_LEN_MAX				128
@@ -185,14 +185,21 @@ enum ATCMD_ID
 /* 	ATCMD_GROUP_BASIC
  *************************/
 	ATCMD_BASIC_VERSION = 0,
-	ATCMD_BASIC_HEAP,
+	ATCMD_BASIC_BOOT,
+#if defined(NRC7394)
+	ATCMD_BASIC_XTAL,
+#endif
 	ATCMD_BASIC_UART,
 	ATCMD_BASIC_GPIOCFG,
 	ATCMD_BASIC_GPIOVAL,
 	ATCMD_BASIC_ADC,
 	ATCMD_BASIC_FW_UPDATE,
 	ATCMD_BASIC_FW_DOWNLOAD,
+	ATCMD_BASIC_SF_USER,
+	ATCMD_BASIC_SF_SYS_USER,
 	ATCMD_BASIC_TIMEOUT,
+
+	ATCMD_BASIC_MAX,
 
 /* 	ATCMD_GROUP_WIFI
  *************************/
@@ -212,6 +219,8 @@ enum ATCMD_ID
 	ATCMD_WIFI_LISTEN_INTERVAL,
 	ATCMD_WIFI_SCAN,
 	ATCMD_WIFI_SCAN_SSID,
+	ATCMD_WIFI_SCAN_BACKGROUND,
+	ATCMD_WIFI_SAE_PWE,
 	ATCMD_WIFI_CONNECT,
 	ATCMD_WIFI_DISCONNECT,
 	ATCMD_WIFI_DHCP,
@@ -225,22 +234,25 @@ enum ATCMD_ID
 	ATCMD_WIFI_DNS,
 	ATCMD_WIFI_FOTA,
 	ATCMD_WIFI_DEEP_SLEEP,
+
+#ifdef CONFIG_ATCMD_SOFTAP	
 	ATCMD_WIFI_SOFTAP,
 	ATCMD_WIFI_SOFTAP_SSID,
 	ATCMD_WIFI_BSS_MAX_IDLE,
 	ATCMD_WIFI_STA_INFO,
 	ATCMD_WIFI_MAX_STA,
-	ATCMD_WIFI_TIMEOUT,
+
+	ATCMD_WIFI_RELAY,
+#endif
+
+	ATCMD_WIFI_WPS,
 
 	ATCMD_WIFI_CONTINUOUS_TX,
+	ATCMD_WIFI_SINE_TX,
 
-	/* Command for internal */
-#if defined(CONFIG_ATCMD_WIFI_INTERNAL)
-	ATCMD_WIFI_RF_CAL,
-	ATCMD_WIFI_LBT,
-	ATCMD_WIFI_MIC_SCAN,
-	ATCMD_WIFI_BMT,
-#endif	
+	ATCMD_WIFI_TIMEOUT,
+
+	ATCMD_WIFI_MAX,
 
 /* 	ATCMD_GROUP_SOCKET
  *************************/
@@ -251,6 +263,7 @@ enum ATCMD_ID
 	ATCMD_SOCKET_CLOSE,
 	ATCMD_SOCKET_LIST,
 	ATCMD_SOCKET_SEND,
+	ATCMD_SOCKET_SEND_EXIT,
 	ATCMD_SOCKET_RECV,
 	ATCMD_SOCKET_RECV_MODE,
 	ATCMD_SOCKET_RECV_INFO,
@@ -260,12 +273,7 @@ enum ATCMD_ID
 	ATCMD_SOCKET_TCP_NODELAY,
 	ATCMD_SOCKET_TIMEOUT,
 
-	/* Command for internal */
-#if defined(CONFIG_ATCMD_SOCKET_INTERNAL)
-	ATCMD_SOCKET_SEND_MODE,
-	ATCMD_SOCKET_SEND_DONE,
-	ATCMD_SOCKET_SEND_EXIT,
-#endif	
+	ATCMD_SOCKET_MAX,
 
 /* 	ATCMD_GROUP_USER
  *************************/
@@ -295,6 +303,16 @@ enum ATCMD_KEY
 	ATCMD_KEY_END,
 	ATCMD_KEY_PGUP,
 	ATCMD_KEY_PGDN,
+};
+
+enum ATCMD_DATA_TYPE
+{
+	ATCMD_DATA_NONE,
+	ATCMD_DATA_SSEND = 0,
+	ATCMD_DATA_FWBINDL,
+	ATCMD_DATA_SFUSER,
+
+	ATCMD_DATA_TYPE_MAX
 };
 
 /**********************************************************************************************/
@@ -337,6 +355,31 @@ typedef struct
 	atcmd_handler_t handler[ATCMD_HANDLER_NUM];
 } atcmd_info_t;
 
+typedef struct
+{
+	enum ATCMD_DATA_TYPE data_type;
+
+	int id;
+	uint32_t len;
+ 	uint32_t timeout; /* msec */	
+	bool done_event;
+	const char *exit_cmd;
+
+	union
+	{
+		struct
+		{
+			bool passthrough;
+		} socket;
+#if defined(CONFIG_ATCMD_SFUSER)
+		struct
+		{
+			uint32_t offset;
+		} sf_user;
+#endif	
+	};
+} atcmd_data_mode_params_t;
+
 /**********************************************************************************************/
 
 enum ATCMD_MSG_TYPE
@@ -369,10 +412,15 @@ extern int atcmd_msg_vsnprint (int type, char *buf, int len, const char *fmt, va
 
 #include "hif.h"
 
+#include "atcmd_param.h"
 #include "atcmd_basic.h"
 #include "atcmd_wifi.h"
 #include "atcmd_socket.h"
 #include "atcmd_user.h"
+
+#if defined(CONFIG_ATCMD_INTERNAL)
+#include "atcmd_internal.h"
+#endif
 
 /**********************************************************************************************/
 
@@ -380,20 +428,6 @@ inline uint32_t atcmd_sys_now (void)
 {
 	return xTaskGetTickCount() * portTICK_PERIOD_MS;
 }
-
-extern int atcmd_param_to_int8 (const char *param, int8_t *val);
-extern int atcmd_param_to_int16 (const char *param, int16_t *val);
-extern int atcmd_param_to_int32 (const char *param, int32_t *val);
-extern int atcmd_param_to_uint8 (const char *param, uint8_t *val);
-extern int atcmd_param_to_uint16 (const char *param, uint16_t *val);
-extern int atcmd_param_to_uint32 (const char *param, uint32_t *val);
-extern int atcmd_param_to_float (const char *param, float *val);
-extern int atcmd_param_to_hex (const char *param, uint32_t *val);
-extern char *atcmd_param_to_str (const char *param, char *str, int len);
-extern char *atcmd_str_to_param (const char *str, char *param, int len);
-
-extern int atcmd_data_mode_enable (atcmd_socket_t *socket, int32_t len, bool done_event, uint32_t timeout, char *exit_cmd);
-extern int atcmd_firmware_download_enable (int32_t len, uint32_t timeout);
 
 extern void atcmd_group_print (void);
 extern atcmd_group_t *atcmd_group_search (enum ATCMD_GROUP_ID id);
@@ -404,6 +438,9 @@ extern void atcmd_info_print (atcmd_group_t *group);
 extern atcmd_info_t *atcmd_search (atcmd_group_t *group, enum ATCMD_ID id);
 extern int atcmd_info_register (enum ATCMD_GROUP_ID gid, atcmd_info_t *info);
 extern void atcmd_info_unregister (enum ATCMD_GROUP_ID gid, enum ATCMD_ID id);
+
+extern void atcmd_data_mode_init_params (enum ATCMD_DATA_TYPE data_type, atcmd_data_mode_params_t *params);
+extern int atcmd_data_mode_enable (atcmd_data_mode_params_t *params);
 
 extern void atcmd_receive (char *data, int size);
 extern int atcmd_receive_command (char *data, int size);

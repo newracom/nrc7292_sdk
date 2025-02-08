@@ -24,6 +24,7 @@
  */
 
 #include "nrc_sdk.h"
+#include "nrc_lwip.h"
 #include "lwip/sys.h"
 #include "lwip/sockets.h"
 #include "lwip/errno.h"
@@ -31,14 +32,13 @@
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
 
-#include "hif.h"
+#include "api_uart_dma.h"
 #include "driver_nrc.h"
 #include "nvs.h"
 #include "nvs_config.h"
 #include "sample_uart_tcp_client_version.h"
 
 #include "nrc_tcp_server.h"
-#include "nrc_ctrl_cmds.h"
 
 #define UART_TEST_DATA
 
@@ -71,7 +71,6 @@ static SemaphoreHandle_t sync_sem;
 char test_data[128] = {0, };
 
 static bool upload_data_packet(char *remote_address, uint16_t port, char* data, int data_length);
-extern struct netif *nrc_netif[2];
 
 static void prepare_test_data()
 {
@@ -114,8 +113,8 @@ static void uart_transmit(char *buffer, int size)
 
 	while (remain > 0) {
 		ptr += bytes_sent;
-		/* _hif_uart_write sends maximum of 16 bytes at a time */
-		bytes_sent = _hif_uart_write(ptr, remain);
+		/* nrc_uart_write sends maximum of 16 bytes at a time */
+		bytes_sent = nrc_uart_write(ptr, remain);
 		if (remain == bytes_sent) {
 			break;
 		} else {
@@ -356,6 +355,8 @@ static void uart_to_tcp_task(void *pvParameters)
 			send_buffer_size = 0;
 		}
 		xSemaphoreGive(sync_sem);
+
+		_delay_ms(10);
 	}
 }
 
@@ -426,9 +427,8 @@ void uart_data_receive(char *buf, int len)
  *******************************************************************************/
 int uart_handler_init(void)
 {
-	_hif_info_t info;
+	uart_dma_info_t info;
 
-	info.type = _HIF_TYPE_UART;
 #if defined(NRC7292)
 	info.uart.channel = NRC_UART_CH2;
 #else
@@ -443,7 +443,7 @@ int uart_handler_init(void)
 	info.rx_params.buf.size = BUFFER_SIZE;
 	info.rx_params.cb = uart_data_receive;
 
-	return _hif_open(&info);
+	return nrc_uart_dma_open(&info);
 }
 
 
@@ -470,22 +470,7 @@ static void init_default_backoff()
 }
 #endif
 
-static void tcp_control_server_task(void *pvParameters)
-{
-	unsigned short port = *((unsigned short *)pvParameters);
-	nrc_usr_print("Control Server Port used : %d\n", port);
-	start_server(port, &ctrl_clients, handle_tlv_command);
-}
-
-static nrc_err_t start_ctrl_server()
-{
-	nrc_usr_print("[%s] Starting server at control port : %d\n", __func__, control_port);
-	xTaskCreate(tcp_control_server_task, "tcp_control_server_task", 2048,
-				(void *) &control_port, uxTaskPriorityGet(NULL), NULL);
-	return 0;
-}
-
-static int network_init()
+static nrc_err_t network_init()
 {
 	int i = 0, j = 0;
 	int scanning_retry_count = 0;
@@ -504,7 +489,7 @@ static int network_init()
 	/* set initial wifi configuration */
 	if (wifi_init(param) != WIFI_SUCCESS) {
 		nrc_usr_print ("[%s] ASSERT! Fail for init\n", __func__);
-		return -1;
+		return NRC_FAIL;
 	}
 
 	/* find AP */
@@ -560,17 +545,11 @@ static int network_init()
 	}
 
 	/* check if IP is ready */
-	while(1) {
-		if (nrc_addr_get_state(0) == NET_ADDR_SET) {
-			break;
-		} else {
-			nrc_usr_print("[%s] IP Address setting State : %d != NET_ADDR_SET(%d) yet...\n",
-						  __func__, nrc_addr_get_state(0), NET_ADDR_SET);
-		}
-		_delay_ms(1000);
+	if (nrc_wait_for_ip(0, param->dhcp_timeout) == NRC_FAIL) {
+		return NRC_FAIL;
 	}
 
-	return 0;
+	return NRC_SUCCESS;
 }
 
 /******************************************************************************
@@ -588,7 +567,7 @@ void user_init(void)
 	nrc_set_app_version(&app_version);
 	nrc_set_app_name(SAMPLE_UART_TCP_CLIENT_APP_NAME);
 
-	if (network_init() < 0) {
+	if (network_init() == NRC_FAIL) {
 		nrc_usr_print("** network init failed **\n");
 		return;
 	}
@@ -598,6 +577,5 @@ void user_init(void)
 		return;
 	}
 
-	start_ctrl_server();
 	start_tcp_client();
 }

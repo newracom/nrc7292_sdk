@@ -44,7 +44,7 @@ struct EPD_2IN66B_BMP
 };
 
 
-void EPD_2IN66B_Init(void);
+int EPD_2IN66B_Init(void);
 void EPD_2IN66B_Display(UBYTE *ImageBlack, UBYTE *ImageRed);
 void EPD_2IN66B_Clear(void);
 void EPD_2IN66B_Sleep(void);

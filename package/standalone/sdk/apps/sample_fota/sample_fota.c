@@ -27,10 +27,12 @@
 #include <string.h>
 
 #include "nrc_sdk.h"
-#include "lwip/ip_addr.h"
+#include "nrc_lwip.h"
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
 #include "sample_fota_version.h"
+
+#include "nrc_http_client.h"
 
 #include "cJSON.h"
 
@@ -39,7 +41,7 @@
 #endif
 
 //#define RUN_HTTPS
-#if defined( SUPPORT_MBEDTLS ) && defined( RUN_HTTPS )
+#if defined( SUPPORT_HTTPS_CLIENT ) && defined( RUN_HTTPS )
 #define SERVER_URL "https://192.168.200.1:4443/"
 #else
 #define SERVER_URL "http://192.168.200.1:8080/"
@@ -257,15 +259,8 @@ static void connect_to_ap(WIFI_CONFIG *param)
 	}
 
 	/* check if IP is ready */
-	while(1){
-		if (nrc_addr_get_state(0) == NET_ADDR_SET) {
-			nrc_usr_print("[%s] IP ...\n",__func__);
-			break;
-		} else {
-			nrc_usr_print("[%s] IP Address setting State : %d != NET_ADDR_SET(%d) yet...\n",
-						  __func__, nrc_addr_get_state(0), NET_ADDR_SET);
-		}
-		_delay_ms(1000);
+	if (nrc_wait_for_ip(0, param->dhcp_timeout) == NRC_FAIL) {
+		return;
 	}
 
 }
@@ -281,10 +276,11 @@ nrc_err_t run_sample_fota()
 	con_handle_t handle;
 	httpc_data_t data;
 	httpc_ret_e ret;
+	ssl_certs_t *certs_ptr = NULL;
 
 	char buf[CHUNK_SIZE];
 
-#if defined( SUPPORT_MBEDTLS ) && defined( RUN_HTTPS )
+#if defined( SUPPORT_HTTPS_CLIENT ) && defined( RUN_HTTPS )
 	ssl_certs_t certs;
 	certs.client_cert = ssl_client_crt;
 	certs.client_cert_length = sizeof(ssl_client_crt);
@@ -292,6 +288,7 @@ nrc_err_t run_sample_fota()
 	certs.client_pk_length = sizeof(ssl_client_key);
 	certs.ca_cert = ssl_ca_crt;
 	certs.ca_cert_length = sizeof(ssl_ca_crt);
+	certs_ptr = &certs;
 #endif
 
 	nrc_usr_print("[%s] Sample App for fota (firmware over the air) \n",__func__);
@@ -312,12 +309,7 @@ nrc_err_t run_sample_fota()
 		uint32_t data_size = 0;
 		data.data_in = buf;
 		memset(buf, 0, CHUNK_SIZE);
-
-#if defined( SUPPORT_MBEDTLS ) && defined( RUN_HTTPS )
-		ret = nrc_httpc_get(&handle, CHECK_VER_URL, NULL, &data, &certs);
-#else
-		ret = nrc_httpc_get(&handle, CHECK_VER_URL, NULL, &data, NULL);
-#endif
+		ret = nrc_httpc_get(&handle, CHECK_VER_URL, NULL, &data, certs_ptr);
 
 		while (ret == HTTPC_RET_OK) {
 			data.data_in += data.recved_size;
@@ -358,11 +350,7 @@ nrc_err_t run_sample_fota()
 	uint32_t total_length = 0;
 	uint32_t body_content_length = 0;
 
-#if defined( SUPPORT_MBEDTLS ) && defined( RUN_HTTPS )
-	ret = nrc_httpc_get(&handle, update_info.fw_url, NULL, &data, &certs);
-#else //HTTP
-	ret = nrc_httpc_get(&handle, update_info.fw_url, NULL, &data, NULL);
-#endif
+	ret = nrc_httpc_get(&handle, update_info.fw_url, NULL, &data, certs_ptr);
 
 	char* http_start_index = NULL;
 	if ((http_start_index = strstr((char*)buf, "\r\n\r\n")) != NULL) {

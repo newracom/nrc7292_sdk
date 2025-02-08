@@ -312,6 +312,9 @@ typedef struct tskTaskControlBlock
 
 	#if( configGENERATE_RUN_TIME_STATS == 1 )
 		uint32_t		ulRunTimeCounter;	/*< Stores the amount of time the task has spent in the Running state. */
+	#if defined( portTASK_STARVATION_HANDLER )
+		uint32_t		ulLastReadyTime;	/*< Stores the time the task was last in the Ready state. */
+	#endif
 	#endif
 
 	#if ( configUSE_NEWLIB_REENTRANT == 1 )
@@ -629,9 +632,6 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB ) PRIVILEGED_FUNCTION;
 		{
 			xReturn = NULL;
 		}
-#if defined(NRC_FREERTOS) && defined(UTIL_TRACE_STACK)
-        util_trace_stack_add_task(xReturn);
-#endif /* defined(NRC_FREERTOS) && defined(UTIL_TRACE_STACK) */
 		return xReturn;
 	}
 
@@ -960,6 +960,9 @@ UBaseType_t x;
 	#if ( configGENERATE_RUN_TIME_STATS == 1 )
 	{
 		pxNewTCB->ulRunTimeCounter = 0UL;
+	#if defined( portTASK_STARVATION_HANDLER )
+		portSET_LAST_READY_TIME( pxNewTCB, 0UL );
+	#endif /* portTASK_STARVATION_HANDLER */
 	}
 	#endif /* configGENERATE_RUN_TIME_STATS */
 
@@ -1022,6 +1025,9 @@ UBaseType_t x;
 		/* Pass the handle out in an anonymous way.  The handle can be used to
 		change the created task's priority, delete the created task, etc.*/
 		*pxCreatedTask = ( TaskHandle_t ) pxNewTCB;
+#if defined(NRC_FREERTOS) && defined(UTIL_TRACE_STACK)
+		util_trace_stack_add_task(( TaskHandle_t ) *pxCreatedTask );
+#endif /* defined(NRC_FREERTOS) && defined(UTIL_TRACE_STACK) */
 	}
 	else
 	{
@@ -1088,6 +1094,9 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB )
 		traceTASK_CREATE( pxNewTCB );
 
 		prvAddTaskToReadyList( pxNewTCB );
+		#if defined ( portTASK_STARVATION_HANDLER )
+			portSET_LAST_READY_TIME( pxNewTCB, portGET_RUN_TIME_COUNTER_VALUE() );
+		#endif
 
 		portSETUP_TCB( pxNewTCB );
 	}
@@ -1150,6 +1159,9 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB )
 			portPRE_TASK_DELETE_HOOK() as in the Windows port that macro will
 			not return. */
 			uxTaskNumber++;
+#if defined(NRC_FREERTOS) && defined(UTIL_TRACE_STACK)
+			util_trace_stack_remove_task( ( TaskHandle_t ) pxTCB );
+#endif /* defined(NRC_FREERTOS) && defined(UTIL_TRACE_STACK) */
 
 			if( pxTCB == pxCurrentTCB )
 			{
@@ -1605,6 +1617,9 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB )
 						mtCOVERAGE_TEST_MARKER();
 					}
 					prvAddTaskToReadyList( pxTCB );
+					#if defined ( portTASK_STARVATION_HANDLER )
+						portSET_LAST_READY_TIME( pxTCB, portGET_RUN_TIME_COUNTER_VALUE() );
+					#endif
 				}
 				else
 				{
@@ -1801,6 +1816,9 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB )
 					suspended because this is inside a critical section. */
 					( void ) uxListRemove(  &( pxTCB->xStateListItem ) );
 					prvAddTaskToReadyList( pxTCB );
+					#if defined ( portTASK_STARVATION_HANDLER )
+						portSET_LAST_READY_TIME( pxTCB, portGET_RUN_TIME_COUNTER_VALUE() );
+					#endif
 
 					/* A higher priority task may have just been resumed. */
 					if( pxTCB->uxPriority >= pxCurrentTCB->uxPriority )
@@ -1882,6 +1900,9 @@ static void prvAddNewTaskToReadyList( TCB_t *pxNewTCB )
 
 					( void ) uxListRemove( &( pxTCB->xStateListItem ) );
 					prvAddTaskToReadyList( pxTCB );
+					#if defined ( portTASK_STARVATION_HANDLER )
+						portSET_LAST_READY_TIME( pxTCB, portGET_RUN_TIME_COUNTER_VALUE() );
+					#endif
 				}
 				else
 				{
@@ -2138,6 +2159,9 @@ BaseType_t xAlreadyYielded = pdFALSE;
 					( void ) uxListRemove( &( pxTCB->xEventListItem ) );
 					( void ) uxListRemove( &( pxTCB->xStateListItem ) );
 					prvAddTaskToReadyList( pxTCB );
+					#if defined ( portTASK_STARVATION_HANDLER )
+						portSET_LAST_READY_TIME( pxTCB, portGET_RUN_TIME_COUNTER_VALUE() );
+					#endif
 
 					/* If the moved task has a priority higher than the current
 					task then a yield must be performed. */
@@ -2558,6 +2582,9 @@ implementations require configUSE_TICKLESS_IDLE to be set to a value other than
 
 				/* Place the unblocked task into the appropriate ready list. */
 				prvAddTaskToReadyList( pxTCB );
+				#if defined ( portTASK_STARVATION_HANDLER )
+					portSET_LAST_READY_TIME( pxTCB, portGET_RUN_TIME_COUNTER_VALUE() );
+				#endif
 
 				/* A task being unblocked cannot cause an immediate context
 				switch if preemption is turned off. */
@@ -2680,6 +2707,9 @@ BaseType_t xSwitchRequired = pdFALSE;
 					/* Place the unblocked task into the appropriate ready
 					list. */
 					prvAddTaskToReadyList( pxTCB );
+					#if defined ( portTASK_STARVATION_HANDLER )
+						portSET_LAST_READY_TIME( pxTCB, portGET_RUN_TIME_COUNTER_VALUE() );
+					#endif
 
 					/* A task being unblocked cannot cause an immediate
 					context switch if preemption is turned off. */
@@ -2902,6 +2932,26 @@ void vTaskSwitchContext( void )
 		taskSELECT_HIGHEST_PRIORITY_TASK();
 		traceTASK_SWITCHED_IN();
 
+		#if defined( portTASK_STARVATION_HANDLER )
+		#if ( configGENERATE_RUN_TIME_STATS == 1 )
+		{
+			/* Check for starvation. Find the non-blocked task during timeout */
+			if( ( pxCurrentTCB->uxPriority != 0U ) && ( pxCurrentTCB->ulLastReadyTime != 0UL ) )
+			{
+				/* Avoid checking for starvation when the runtime counter overflow */
+				if( ( ulTotalRunTime > pxCurrentTCB->ulLastReadyTime ) &&
+					( ulTotalRunTime - pxCurrentTCB->ulLastReadyTime > portTASK_STARVATION_TIMEOUT ) )
+				{
+					portTASK_STARVATION_HANDLER( ( TaskHandle_t ) pxCurrentTCB, pxCurrentTCB->uxPriority );
+
+					/* Reset the last ready time. */
+					portSET_LAST_READY_TIME( pxCurrentTCB, 0UL );
+				}
+			}
+		}
+		#endif /* configGENERATE_RUN_TIME_STATS */
+		#endif /* portTASK_STARVATION_HANDLER */
+
 		#if ( configUSE_NEWLIB_REENTRANT == 1 )
 		{
 			/* Switch Newlib's _impure_ptr variable to point to the _reent
@@ -3013,6 +3063,9 @@ BaseType_t xReturn;
 	{
 		( void ) uxListRemove( &( pxUnblockedTCB->xStateListItem ) );
 		prvAddTaskToReadyList( pxUnblockedTCB );
+		#if defined ( portTASK_STARVATION_HANDLER )
+			portSET_LAST_READY_TIME( pxUnblockedTCB, portGET_RUN_TIME_COUNTER_VALUE() );
+		#endif
 	}
 	else
 	{
@@ -3077,6 +3130,9 @@ TCB_t *pxUnblockedTCB;
 	lists. */
 	( void ) uxListRemove( &( pxUnblockedTCB->xStateListItem ) );
 	prvAddTaskToReadyList( pxUnblockedTCB );
+	#if defined ( portTASK_STARVATION_HANDLER )
+		portSET_LAST_READY_TIME( pxUnblockedTCB, portGET_RUN_TIME_COUNTER_VALUE() );
+	#endif
 
 	if( pxUnblockedTCB->uxPriority > pxCurrentTCB->uxPriority )
 	{
@@ -4238,11 +4294,12 @@ TCB_t *pxTCB;
 				pcWriteBuffer = prvWriteNameToBuffer( pcWriteBuffer, pxTaskStatusArray[ x ].pcTaskName );
 
 				/* Write the rest of the string. */
-				sprintf( pcWriteBuffer, "\t%c\t%u\t%u\t%u\r\n", 
+				sprintf( pcWriteBuffer, "\t%c\t%u\t%u\t%u\t%p\r\n", 
 						( ( cStatus == 0x00 ) ? '?' : cStatus ), 
 						( unsigned int ) pxTaskStatusArray[ x ].uxCurrentPriority, 
 						( unsigned int ) pxTaskStatusArray[ x ].usStackHighWaterMark, 
-						( unsigned int ) pxTaskStatusArray[ x ].xTaskNumber );
+						( unsigned int ) pxTaskStatusArray[ x ].xTaskNumber,
+						pxTaskStatusArray[ x ].pxStackBase); 
 				pcWriteBuffer += strlen( pcWriteBuffer );
 			}
 
@@ -4627,6 +4684,9 @@ TickType_t uxReturn;
 			{
 				( void ) uxListRemove( &( pxTCB->xStateListItem ) );
 				prvAddTaskToReadyList( pxTCB );
+				#if defined ( portTASK_STARVATION_HANDLER )
+					portSET_LAST_READY_TIME( pxTCB, portGET_RUN_TIME_COUNTER_VALUE() );
+				#endif
 
 				/* The task should not have been on an event list. */
 				configASSERT( listLIST_ITEM_CONTAINER( &( pxTCB->xEventListItem ) ) == NULL );
@@ -4757,6 +4817,9 @@ TickType_t uxReturn;
 				{
 					( void ) uxListRemove( &( pxTCB->xStateListItem ) );
 					prvAddTaskToReadyList( pxTCB );
+					#if defined ( portTASK_STARVATION_HANDLER )
+						portSET_LAST_READY_TIME( pxTCB, portGET_RUN_TIME_COUNTER_VALUE() );
+					#endif
 				}
 				else
 				{
@@ -4847,6 +4910,9 @@ TickType_t uxReturn;
 				{
 					( void ) uxListRemove( &( pxTCB->xStateListItem ) );
 					prvAddTaskToReadyList( pxTCB );
+					#if defined ( portTASK_STARVATION_HANDLER )
+						portSET_LAST_READY_TIME( pxTCB, portGET_RUN_TIME_COUNTER_VALUE() );
+					#endif
 				}
 				else
 				{
@@ -5048,5 +5114,93 @@ when performing module tests). */
 	}
 
 #endif
+/*-----------------------------------------------------------*/
 
+#if defined(NRC_FREERTOS)
+#define portINITIAL_XPSR                                        ( 0x01000000UL )
+void vIterateTaskStackHistory( TaskHandle_t xTask , void ( *pvFunc )( StackType_t * , BaseType_t ) )
+{
+#if ( configRECORD_STACK_HIGH_ADDRESS == 1 )
+TCB_t *pxTCB;
+TaskHandle_t xCurrentTask;
+StackType_t *pxEndOfStack, *pxStartOfStack, *pxTaskTopOfStack;
+StackType_t xStackFillWord;
 
+	if ( pvFunc == NULL )
+	{
+		return;
+	}
+
+	taskENTER_CRITICAL();
+	if ( ( xTask == NULL ) && ( xPortIsInsideInterrupt() ) )
+	{
+		asm volatile( "mov %0, sp" : "=r" (pxEndOfStack) );
+		pxTaskTopOfStack = pxEndOfStack;
+
+		while( *pxEndOfStack != portINITIAL_XPSR )
+		{
+			if ( pxEndOfStack == pxTaskTopOfStack )
+			{
+				pvFunc( (uint32_t *) pxEndOfStack , pdTRUE );
+			}
+			else
+			{
+				pvFunc( (uint32_t *) pxEndOfStack , pdFALSE );
+			}
+			pxEndOfStack -= portSTACK_GROWTH;
+		}
+	}
+	else
+	{
+		xCurrentTask = xTaskGetCurrentTaskHandle();
+		if ( xTask == NULL )
+		{
+			xTask = xCurrentTask;
+		}
+
+		pxTCB = prvGetTCBFromHandle( xTask );
+
+		if ( xTask == xCurrentTask )
+		{
+			asm volatile( "mrs %0, psp" : "=r" (pxTaskTopOfStack) );
+		}
+		else
+		{
+			pxTaskTopOfStack = (StackType_t *) pxTCB->pxTopOfStack;
+		}
+
+		#if portSTACK_GROWTH < 0
+		{
+			pxStartOfStack = pxTCB->pxEndOfStack;
+			pxEndOfStack = pxTCB->pxStack;
+		}
+		#else
+		{
+			pxStartOfStack = pxTCB->pxStack;
+			pxEndOfStack = pxTCB->pxEndOfStack;
+		}
+		#endif
+
+		memset( &xStackFillWord, ( uint8_t ) tskSTACK_FILL_BYTE, sizeof( StackType_t ) );
+		while ( *pxEndOfStack == xStackFillWord )
+		{
+			pxEndOfStack -= portSTACK_GROWTH;
+		}
+
+		while( pxEndOfStack != pxStartOfStack )
+		{
+			if ( pxEndOfStack == pxTaskTopOfStack )
+			{
+				pvFunc( (uint32_t *) pxEndOfStack , pdTRUE );
+			}
+			else
+			{
+				pvFunc( (uint32_t *) pxEndOfStack , pdFALSE );
+			}
+			pxEndOfStack -= portSTACK_GROWTH;
+		}
+	}
+	taskEXIT_CRITICAL();
+#endif
+}
+#endif

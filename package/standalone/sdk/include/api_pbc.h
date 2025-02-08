@@ -38,7 +38,7 @@ struct pbc_ops {
     int8_t     GPIO_PushButton[PBC_IF_NUM];
     void		(*nrc_wifi_wps_pbc_fail)(void *priv);
     void		(*nrc_wifi_wps_pbc_timeout)(void *priv);
-    void		(*nrc_wifi_wps_pbc_success)(void *priv, uint8_t *, uint8_t, uint8_t, char *);
+    void		(*nrc_wifi_wps_pbc_success)(void *priv, int, uint8_t *, uint8_t, uint8_t, char *);
     void        (*nrc_wifi_wps_pbc_pressed)(int v);
 };
 
@@ -72,6 +72,7 @@ static void wps_pbc_timeout_cb(void *priv);
  * @brief This callback is called when wps pbc operation succeeds
  *
  * @param[in]  priv          : wpa interface
+ * @param[in]  net_id        : network id
  * @param[in]  ssid          : Service set identifier (network name)
  * @param[in]  ssid_len      : Length of the SSID
  * @param[in]  security_mode : WIFI_SEC_OPEN=0, WIFI_SEC_WPA2=1,
@@ -81,7 +82,7 @@ static void wps_pbc_timeout_cb(void *priv);
  *
  * @return void
  ***********************************************/
-static void wps_pbc_success_cb(void *priv, uint8_t *ssid,
+static void wps_pbc_success_cb(void *priv, int net_id, uint8_t *ssid,
 	uint8_t ssid_len, uint8_t security_mode, char *passphrase);
 
 

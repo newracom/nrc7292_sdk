@@ -1,0 +1,8 @@
+INCLUDE += -I$(WEBSOCKET_CLIENT_BASE)
+VPATH   += $(WEBSOCKET_CLIENT_BASE)
+DEFINE	+= -DSUPPORT_WEBSOCKET_CLIENT
+
+CSRCS += \
+	wic.c\
+	transport.c\
+    http_parser.c

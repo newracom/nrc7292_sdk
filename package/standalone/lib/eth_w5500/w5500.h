@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "nrc_sdk.h"
+#include "api_spi.h"
 #include "eth_mac.h"
 #include "eth_phy.h"
 
@@ -82,13 +84,15 @@
 /**
 * @brief Create W5500 Ethernet MAC instance
 *
-* @param[in] mac_config: Ethernet MAC configuration
+* @param[in] eth_spi: SPI configuration.
+* @param[in] mac_config: Ethernet MAC configuration.
+* @param[in] gpio_int_pin: interrupt pin to be used.
 *
 * @return
 *      - instance: create MAC instance successfully
 *      - NULL: create MAC instance failed because some error occurred
 */
-esp_eth_mac_t *esp_eth_mac_new_w5500(const eth_mac_config_t *mac_config);
+esp_eth_mac_t *esp_eth_mac_new_w5500(spi_device_t *eth_spi, const eth_mac_config_t *mac_config, int gpio_int_pin);
 
 /**
 * @brief Create a PHY instance of ENC28J60

@@ -173,7 +173,6 @@ static void softap_tcp_server_task(void *pvParameters)
 				FD_CLR(sd, &rfds);
 				len = recv(sd , buffer, sizeof(buffer), 0);
 				if(len < 0) {
-					nrc_usr_print("recv failed: errno %d\n", errno);
 					shutdown(sd, 0);
 					close(sd);
 					conn_socket[i] = -1;
@@ -226,7 +225,9 @@ static void softap_tcp_server_task(void *pvParameters)
 								}
 								nrc_usr_print("send failed: errno %d\n", errno);
 							} else {
+#if SERVER_DATA_DEBUG
 								nrc_usr_print("socket %d, %d bytes sent...\n", sd, ret);
+#endif
 							}
 						}
 					}

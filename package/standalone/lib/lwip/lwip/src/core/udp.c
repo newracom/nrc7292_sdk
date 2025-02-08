@@ -464,7 +464,7 @@ chkerr:
  * @see udp_disconnect() udp_sendto()
  */
 err_t
-udp_send(struct udp_pcb *pcb, struct pbuf *p)
+_udp_send(struct udp_pcb *pcb, struct pbuf *p, struct netif *netif)
 {
   LWIP_ERROR("udp_send: invalid pcb", pcb != NULL, return ERR_ARG);
   LWIP_ERROR("udp_send: invalid pbuf", p != NULL, return ERR_ARG);
@@ -474,7 +474,22 @@ udp_send(struct udp_pcb *pcb, struct pbuf *p)
   }
 
   /* send to the packet using remote ip and port stored in the pcb */
-  return udp_sendto(pcb, p, &pcb->remote_ip, pcb->remote_port);
+  if (netif)
+    return udp_sendto_if(pcb, p, &pcb->remote_ip, pcb->remote_port, netif);
+  else
+    return udp_sendto(pcb, p, &pcb->remote_ip, pcb->remote_port);
+}
+
+err_t
+udp_send(struct udp_pcb *pcb, struct pbuf *p)
+{
+  return _udp_send(pcb, p, NULL);
+}
+
+err_t
+udp_send_if(struct udp_pcb *pcb, struct pbuf *p, struct netif *netif)
+{
+  return _udp_send(pcb, p, netif);
 }
 
 #if LWIP_CHECKSUM_ON_COPY && CHECKSUM_GEN_UDP

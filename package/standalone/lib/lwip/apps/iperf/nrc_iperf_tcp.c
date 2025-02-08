@@ -41,8 +41,13 @@ extern struct netif br_netif;
 
 struct client_data {
 	iperf_opt_t *option;
+	TaskHandle_t task_handle;
 };
 
+#define TCP_SND_RECV_TIMEOUT 15 /* in sec */
+#define TCP_SND_RECV_RETRY_MAX 4 /* Timeout retry max */
+
+#if !defined(DISABLE_IPERF_APP)
 #if defined(LWIP_IPERF) && (LWIP_IPERF == 1)
 
 extern void sys_arch_msleep(u32_t delay_ms);
@@ -54,7 +59,7 @@ static void iperf_tcp_client_report (iperf_opt_t * option )
 	iperf_time_t end_time = option->client_info.end_time - option->client_info.start_time;
 	iperf_time_t interval = end_time;
 
-	uint32_t byte = option->client_info.datagram_cnt * option->mBufLen;
+	uint32_t byte = option->client_info.send_byte;
 	uint32_t bps = byte_to_bps(interval, byte);
 
 	uint8_t snr = 0;
@@ -70,7 +75,7 @@ static void iperf_tcp_client_report (iperf_opt_t * option )
 		const ip4_addr_t *ip_addr;
 		struct eth_addr *mac_addr;
 		STA_INFO info;
-		
+
 		if (etharp_find_addr(nrc_netif[0], (const ip4_addr_t *) &option->addr, &mac_addr, &ip_addr) >= 0) {
 			if (nrc_wifi_softap_get_sta_by_addr(0, mac_addr->addr, &info) == WIFI_SUCCESS) {
 				snr = info.snr;
@@ -92,14 +97,14 @@ static void iperf_tcp_client_report (iperf_opt_t * option )
 			}
 #endif
 		} else {
-			A("##### [%s] etharp_find_addr failed\n", __func__);
+			CPA("##### [%s] etharp_find_addr failed\n", __func__);
 		}
 	}
 
 	nrc_iperf_spin_lock();
-	A("[iperf TCP Client Report for server %s, snr:%u, rssi:%d]\n", ipaddr_ntoa(&option->addr), snr, rssi);
-	A("     Interval        Transfer      Bandwidth\n");
-	A("  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec\n",
+	CPA("[iperf TCP Client Report for server %s, snr:%u, rssi:%d]\n", ipaddr_ntoa(&option->addr), snr, rssi);
+	CPA("     Interval        Transfer      Bandwidth\n");
+	CPA("  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec\n",
 					start_time, end_time,
 					byte_to_string(byte), bps_to_string(bps));
 	nrc_iperf_spin_unlock();
@@ -132,7 +137,7 @@ static void iperf_tcp_client_init_datagram (iperf_opt_t * option, iperf_tcp_data
 	iperf_tcp_client_init_payload(datagram, option->mBufLen);
 }
 
-#define MAX_IPERF_TCP_CLIENT_RETRY 10
+#define MAX_IPERF_TCP_CLIENT_RETRY 20
 
 void iperf_tcp_client(void *pvParameters)
 {
@@ -141,19 +146,25 @@ void iperf_tcp_client(void *pvParameters)
 	int flag;
 	int tosval;
 	uint8_t vif = 0;
-	iperf_time_t start_time, stop_time, now;
+	iperf_time_t start_time, now, duration;
 	struct timeval tv;
 	struct sockaddr_storage to;
 	int count = 0;
-
+	int err_retry = 0;
 	char buffer[IPERF_DEFAULT_DATA_BUF_LEN];
 	iperf_tcp_datagram_t *datagram = (iperf_tcp_datagram_t *) buffer;
 	iperf_opt_t * option  = pvParameters;
-	TaskHandle_t periodic_report_task = NULL;
+	TaskHandle_t task_handle = option->task_handle;
+
+#if DEBUG_IPERF_TASK_HANDLE
+	nrc_iperf_spin_lock();
+	CPA("%s Start [handle:%d]\n", __func__, task_handle);
+	nrc_iperf_spin_unlock();
+#endif
 
 #if LWIP_IPV6
 	if(IP_IS_V6(&option->addr) && !ip6_addr_isipv4mappedipv6(ip_2_ip6(&option->addr))) {
-		A("[%s] Unsupported IPV6\n", __func__);
+		CPA("[%s] Unsupported IPV6\n", __func__);
 		goto task_exit;
 	}
 #endif /* LWIP_IPV6 */
@@ -168,7 +179,7 @@ void iperf_tcp_client(void *pvParameters)
 
 		sock = socket(AF_INET, SOCK_STREAM, 0);
 		if (sock < 0) {
-			A("create socket failed!\n");
+			CPA("create socket failed!\n");
 			goto exit;
 		}
 
@@ -180,8 +191,10 @@ void iperf_tcp_client(void *pvParameters)
 #endif /* LWIP_IPV4 */
 
 	nrc_iperf_spin_lock();
-	A("Client connecting to %s, TCP port %d\n",
+	CPA("Client connecting to %s, TCP port %d\n",
 		ipaddr_ntoa(&option->addr), option->mPort);
+	if(option->mSendInterval > 0)
+		CPA("send interval %d ms\n", option->mSendInterval);
 	nrc_iperf_spin_unlock();
 
 	/* connect to TCP Server */
@@ -189,88 +202,110 @@ void iperf_tcp_client(void *pvParameters)
 		ret = connect(sock, (const struct sockaddr*)&to, sizeof(to));
 		if (ret == -1) {
 			if(count == MAX_IPERF_TCP_CLIENT_RETRY){
+				CPA("Connect to iperf server failed!\n");
 				goto exit;
-				A("Connect to iperf server failed!\n");
 			}
 			count++;
 			sys_arch_msleep(1000);
+			CPA("Retrying to connect to iperf server [%d]\n", count);
 		} else {
 			count = 0;
 			break;
 		}
 	}
 
-	ret = setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (void *) &flag, sizeof(int));
-	if (ret == -1) {
-		A("Set socket TCP_NODELAY option failed!\n");
-		goto exit;
+	if(option->mNodelay == true) {
+		flag = 1;
+		ret = setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (void *) &flag, sizeof(int));
+		if (ret == -1) {
+			CPA("Set socket TCP_NODELAY option failed!\n");
+			goto exit;
+		}
 	}
 
 	tosval = (int)option->mTOS;
 	ret = setsockopt(sock, IPPROTO_IP, IP_TOS, (void *) &tosval, sizeof(tosval));
 	if (ret == -1) {
-		A("Set socket IP_TOS option failed!\n");
+		CPA("Set socket IP_TOS option failed!\n");
 		goto exit;
 	}
 
-	tv.tv_sec = 5;
+	tv.tv_sec = TCP_SND_RECV_TIMEOUT;
 	tv.tv_usec = 0;
 	ret = setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (const char *)&tv, sizeof(tv));
 	if (ret < 0) {
-		A("Set socket SO_SNDTIMEO option failed!\n");
+		CPA("Set socket SO_SNDTIMEO option failed!\n");
 	}
 	ret = setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof(tv));
 	if (ret < 0) {
-		A("Set socket SO_RCVTIMEO option failed!\n");
+		CPA("Set socket SO_RCVTIMEO option failed!\n");
 	}
 
 	memset(datagram, 0, IPERF_DEFAULT_DATA_BUF_LEN);
 	iperf_tcp_client_init_datagram(option, datagram);
 
 	iperf_get_time(&start_time);
-
-	stop_time = start_time + (option->mAmount / 100.);
+	duration = (option->mAmount / 100.);
 
 	option->mSock = sock;
-	option->mBufLen = TCP_MSS;
+	option->mBufLen = IPERF_DEFAULT_DATA_BUF_LEN;
 	option->client_info.start_time = start_time;
+	option->client_info.duration= duration;
 
 	vif = wifi_get_vif_id(&option->addr);
 
 	if (option->mInterval > 0) {
-		xTaskCreate(nrc_iperf_periodic_report, "iperf periodic report",
-					1024, (void *) option, LWIP_IPERF_TASK_PRIORITY, &periodic_report_task);
+		xTaskCreate(nrc_iperf_periodic_report, "iperf_tcp_client_report", 1024,
+			(void *) option, LWIP_IPERF_TASK_PRIORITY, &option->client_info.periodic_report_task);
 	}
 
 	while (1) {
-		if(wpa_driver_get_associate_status(vif)== false){
-			iperf_get_time(&now);
-			option->client_info.end_time = now;
-			break;
-		}
-
-		ret = send(sock, datagram, option->mBufLen, 0);
-		if (ret > 0) {
-			option->client_info.datagram_cnt++;
-		}
-
-		if (ret == ERR_TIMEOUT || ret == ERR_WOULDBLOCK) {
-			taskYIELD();
-		} else if (ret < 0) {	//disconnected
-			option->mForceStop = 1;
-		}
-
 		iperf_get_time(&now);
 
-		if (option->mForceStop || (now >= stop_time)){
-			if (option->mForceStop) {
-				A("iperf stopped due to send error.\n");
-			}
+		if(wpa_driver_get_associate_status(vif)== false) {
+			CPA("Wi-Fi connection lost\n");
 			option->client_info.end_time = now;
 			break;
 		}
+
+		if(iperf_time_expried(start_time, duration)) {
+			option->client_info.end_time = now;
+			break;
+		}
+
+		if(option->mForceStop)  {
+			option->client_info.end_time = now;
+			if(ret < 0) {
+				CPA("%s stopped : %d(%s)\n", __func__, ret, lwip_strerr(ret));
+			} else if (ret == 0){
+				CPA("%s Connection closed by the peer.\n", __func__);
+			} else {
+				CPA("%s is stopped forcely\n", __func__);
+			}
+			break;
+		}
+
+		ret = send(sock, datagram, IPERF_DEFAULT_TCP_DATAGRAM_SIZE, 0);
+		if(ret > 0) {
+			option->client_info.send_byte += ret;
+			err_retry = 0;
+			if(option->mSendInterval > 0)
+				sys_arch_msleep(option->mSendInterval);
+		} else if(ret == 0) {
+			option->mForceStop = 1;
+		} else {
+			int err = errno;
+			if (err == EAGAIN || err == EWOULDBLOCK) {
+				if(err_retry++ < TCP_SND_RECV_RETRY_MAX) {
+					sys_arch_msleep(100);
+				} else {
+					option->mForceStop = 1;
+				}
+			} else {
+				option->mForceStop = 1;
+			}
+		}
 	}
-	iperf_tcp_client_report(option);
 
 exit:
 	nrc_iperf_task_list_del(option);
@@ -281,10 +316,18 @@ exit:
 	}
 
 task_exit:
-
-	if (periodic_report_task)
-		vTaskDelete(periodic_report_task);
+	if(option->client_info.periodic_report_task) {
+		sys_arch_msleep(100);
+		xTaskNotifyGive(option->client_info.periodic_report_task);
+		ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+	}
+	iperf_tcp_client_report(option);
 	iperf_option_free(option);
+#if DEBUG_IPERF_TASK_HANDLE
+	nrc_iperf_spin_lock();
+	CPA("%s END [handle:%d]\n", __func__, task_handle);
+	nrc_iperf_spin_unlock();
+#endif
 	vTaskDelete(NULL);
 }
 
@@ -335,17 +378,17 @@ static void iperf_tcp_server_report (struct client_data *client)
 			}
 #endif
 		} else {
-			A("##### [%s] etharp_find_addr failed\n", __func__);
+			CPA("##### [%s] etharp_find_addr failed\n", __func__);
 		}
 	}
 
 	nrc_iperf_spin_lock();
 	/* mode is 1 if softAP, 0 if station */
 	/* For SoftAP, rssi is meaningless */
-	A("\n[iperf TCP Server Report for client %s, snr:%u, rssi:%d]\n",
+	CPA("\n[iperf TCP Server Report for client %s, snr:%u, rssi:%d]\n",
 	  inet_ntop(AF_INET, client->option->server_info.clientaddr.s2_data2, peer_addr, INET_ADDRSTRLEN),
 	  snr, rssi);
-	A("[%3d]  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec\n",
+	CPA("[%3d]  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec\n",
 					client->option->server_info.client_sock,
 					start_time, stop_time,
 					byte_to_string(byte), bps_to_string(bps));
@@ -359,50 +402,90 @@ ATTR_NC __attribute__((optimize("O3"))) static void tcp_process_input(void *pvPa
 	int received = 0;
 	char buffer[IPERF_DEFAULT_DATA_BUF_LEN];
 	iperf_time_t now;
+	iperf_get_time(&now);
+	option->server_info.start_time = now;
+	option->server_info.recv_byte = 0;
+	int err_retry = 0;
+	bool exit_flag = false;
+	TaskHandle_t task_handle = client->task_handle;
 
-	while ((received = recv(option->server_info.client_sock, buffer, IPERF_DEFAULT_DATA_BUF_LEN, 0)) > 0) {
-		if (option->server_info.recv_byte == 0) {
-			iperf_tcp_datagram_t *datagram = (iperf_tcp_datagram_t *)buffer;
-			int32_t amount = ntohl(datagram->client_header.mAmount);
+#if DEBUG_IPERF_TASK_HANDLE
+	nrc_iperf_spin_lock();
+	CPA("%s Start [handle:%d]\n", __func__, task_handle);
+	nrc_iperf_spin_unlock();
+#endif
 
-			if (amount >= 0)
-				option->server_info.send_byte = amount;
-			else
-				option->server_info.send_time = -amount / 100; // sec
+	while (1) {
+		received = recv(option->server_info.client_sock, buffer, IPERF_DEFAULT_DATA_BUF_LEN, 0);
+		if(received > 0){
+			err_retry = 0;
+			if (option->server_info.recv_byte == 0 && option->server_info.start == false) {
+				iperf_tcp_datagram_t *datagram = (iperf_tcp_datagram_t *)buffer;
+				int32_t amount = ntohl(datagram->client_header.mAmount);
 
-			iperf_get_time(&now);
-			option->server_info.start_time = now;
-			option->server_info.start = true;
+				if (amount >= 0)
+					option->server_info.send_byte = amount;
+				else
+					option->server_info.send_time = -amount / 100; // sec
+
+				option->server_info.start = true;
+			}
+			option->server_info.recv_byte += received;
+		} else if (received == 0) {
+			CPA("%s Connection closed by the peer.\n", __func__);
+			break;
+		} else {
+			int err = errno;
+			if (err == EAGAIN || err == EWOULDBLOCK) {
+				if(err_retry++ < TCP_SND_RECV_RETRY_MAX) {
+					sys_arch_msleep(100);
+				} else {
+					CPA("recv failed with error: %s\n", strerror(err));
+					exit_flag = true;
+					break;
+				}
+			} else {
+				CPA("recv failed with error: %s\n", strerror(err));
+				exit_flag = true;
+				break;
+			}
 		}
-		option->server_info.recv_byte += received;
 
 		iperf_get_time(&now);
 		option->server_info.stop_time = now;
 		if (option->server_info.send_time) {
 			if ((option->server_info.stop_time - option->server_info.start_time) >= option->server_info.send_time) {
-				break;
+				exit_flag = true;
 			}
 		}
 
 		if (option->server_info.send_byte) {
 			if (option->server_info.recv_byte >= option->server_info.send_byte) {
-				break;
+				exit_flag = true;
 			}
 		}
-	}
 
+		if(exit_flag)
+			break;
+	}
 	close(option->server_info.client_sock);
 
-	iperf_tcp_server_report(client);
-
-	if (client->option->server_info.periodic_report_task) {
-		vTaskDelete(client->option->server_info.periodic_report_task);
+	if(option->server_info.periodic_report_task) {
+		sys_arch_msleep(100);
+		xTaskNotifyGive(option->server_info.periodic_report_task);
+		ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 	}
+	iperf_tcp_server_report(client);
 
 	mem_free(client->option);
 	mem_free(client);
-
+#if DEBUG_IPERF_TASK_HANDLE
+	nrc_iperf_spin_lock();
+	CPA("%s END [handle:%d]\n", __func__, task_handle);
+	nrc_iperf_spin_unlock();
+#endif
 	vTaskDelete(NULL);
+
 }
 
 ATTR_NC __attribute__((optimize("O3"))) static struct client_data *tcp_new_client(iperf_opt_t *option)
@@ -411,6 +494,7 @@ ATTR_NC __attribute__((optimize("O3"))) static struct client_data *tcp_new_clien
 	struct client_data *c_data = NULL;
 	char local_addr[INET_ADDRSTRLEN];
 	char client_addr[INET_ADDRSTRLEN];
+	struct timeval tv;
 	int flag = 1;
 
 	if ((option->server_info.client_sock
@@ -422,6 +506,17 @@ ATTR_NC __attribute__((optimize("O3"))) static struct client_data *tcp_new_clien
 		return NULL;
 	}
 
+	tv.tv_sec = TCP_SND_RECV_TIMEOUT;
+	tv.tv_usec = 0;
+	if (setsockopt(option->server_info.client_sock, SOL_SOCKET, SO_SNDTIMEO, (const char *)&tv, sizeof(tv)) < 0) {
+		CPA("Set socket SO_SNDTIMEO option failed!\n");
+		return NULL;
+	}
+	if (setsockopt(option->server_info.client_sock, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof(tv)) < 0) {
+		CPA("Set socket SO_RCVTIMEO option failed!\n");
+		return NULL;
+	}
+
 	c_data = (struct client_data *) mem_malloc(sizeof(struct client_data));
 	if (!c_data) {
 		return NULL;
@@ -429,10 +524,15 @@ ATTR_NC __attribute__((optimize("O3"))) static struct client_data *tcp_new_clien
 	memset(c_data, 0, sizeof(struct client_data));
 
 	c_data->option = (iperf_opt_t *) mem_malloc(sizeof(iperf_opt_t));
+	if(!c_data->option) {
+		CPA("[%s] option malloc failed\n", __func__);
+		mem_free(c_data);
+		return NULL;
+	}
 	memcpy(c_data->option, option, sizeof(iperf_opt_t));
 
 	nrc_iperf_spin_lock();
-	A("\n[%3d] local %s port %d connected with %s port %d\n",
+	CPA("\n[%3d] local %s port %d connected with %s port %d\n",
 	  c_data->option->server_info.client_sock,
 	  inet_ntop(AF_INET, &c_data->option->addr, local_addr, INET_ADDRSTRLEN),
 	  c_data->option->mPort,
@@ -441,8 +541,8 @@ ATTR_NC __attribute__((optimize("O3"))) static struct client_data *tcp_new_clien
 	nrc_iperf_spin_unlock();
 
 	if (c_data->option->mInterval > 0) {
-		xTaskCreate(nrc_iperf_periodic_report, "iperf periodic report",
-					1024, (void *) c_data->option, LWIP_IPERF_TASK_PRIORITY, &c_data->option->server_info.periodic_report_task);
+		xTaskCreate(nrc_iperf_periodic_report, "iperf_tcp_server_report", 1024,
+			(void *) c_data->option, LWIP_IPERF_TASK_PRIORITY, &c_data->option->server_info.periodic_report_task);
 	}
 	return c_data;
 }
@@ -462,10 +562,12 @@ ATTR_NC __attribute__((optimize("O3"))) static void tcp_server_loop(iperf_opt_t 
 
 		if (FD_ISSET(option->mSock, &input_set)) {
 			if ((client = tcp_new_client(option)) != NULL) {
-				xTaskCreate(tcp_process_input, "iperf server client task",
-							LWIP_IPERF_TASK_STACK_SIZE, (void *) client, LWIP_IPERF_TASK_PRIORITY + 1, NULL);
+				xTaskCreate(tcp_process_input, "iperf_tcp_process_input",
+							LWIP_IPERF_TASK_STACK_SIZE, (void *) client, LWIP_IPERF_TASK_PRIORITY + 1,
+							&client->task_handle);
+				client->option->task_handle = client->task_handle;
 			} else {
-				system_printf("error new connection\n");
+				CPA("error new connection\n");
 			}
 		}
 	}
@@ -513,13 +615,16 @@ void tcp_start_server(iperf_opt_t *option)
 void iperf_tcp_server(void *pvParameters)
 {
 	iperf_opt_t * option  = pvParameters;
+	TaskHandle_t task_handle = option->task_handle;
 
+#if DEBUG_IPERF_TASK_HANDLE
 	nrc_iperf_spin_lock();
-	A("%s Start\n", __func__);
+	CPA("%s Start [handle:%d]\n", __func__, task_handle);
 	nrc_iperf_spin_unlock();
+#endif
 #if LWIP_IPV6
 	if(IP_IS_V6(&option->addr) && !ip6_addr_isipv4mappedipv6(ip_2_ip6(&option->addr))) {
-		A("[%s] Unsupported IPV6\n", __func__);
+		CPA("[%s] Unsupported IPV6\n", __func__);
 		goto task_exit;
 	}
 #endif /* LWIP_IPV6 */
@@ -537,10 +642,13 @@ void iperf_tcp_server(void *pvParameters)
 	nrc_iperf_task_list_del(option);
 
 task_exit:
+#if DEBUG_IPERF_TASK_HANDLE
 	nrc_iperf_spin_lock();
-	A("%s End\n", __func__);
+	CPA("%s END [handle:%d]\n", __func__, task_handle);
 	nrc_iperf_spin_unlock();
+#endif
 	iperf_option_free(option);
 	vTaskDelete(NULL);
 }
 #endif /* LWIP_IPERF */
+#endif /*!defined(DISABLE_IPERF_APP) */

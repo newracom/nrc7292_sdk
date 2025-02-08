@@ -248,9 +248,8 @@ static int _atcmd_socket_event_handler (int type, int id, ...)
 			uint32_t done = va_arg(ap, uint32_t);
 			uint32_t drop = va_arg(ap, uint32_t);
 			uint32_t wait = va_arg(ap, uint32_t);
-			uint32_t time = va_arg(ap, uint32_t);
 
-			_atcmd_info("SEVENT: SEND_IDLE, id=%d done=%u drop=%u wait=%u time=%u", id, done, drop, wait, time);
+			_atcmd_info("SEVENT: SEND_IDLE, id=%d done=%u drop=%u wait=%u", id, done, drop, wait);
 			ATCMD_MSG_SEVENT("\"SEND_IDLE\",%d,%u,%u,%u", id, done, drop, wait);
 			break;
 		}
@@ -335,14 +334,25 @@ static struct
 	.task = NULL
 };
 
+static bool g_atcmd_socket_sending = false;
+
 static int _atcmd_socket_send_request (atcmd_socket_t *socket, char *data, int len, int *done)
 {
 	int ret = -EBUSY;
 
+	if (done)
+		*done = 0;
+
 	if (g_atcmd_socket_event_send.socket)
-		_atcmd_error("busy, id=%d", g_atcmd_socket_event_send.socket->id);
+	{
+		socket = g_atcmd_socket_event_send.socket;
+
+		_atcmd_error("busy, id=%d", socket->id);
+	}
 	else
 	{
+		uint32_t timeout_ms = _atcmd_timeout_value("SSEND");
+
 		g_atcmd_socket_event_send.socket = socket;
 		g_atcmd_socket_event_send.data = data;
 		g_atcmd_socket_event_send.len = len;
@@ -350,7 +360,7 @@ static int _atcmd_socket_send_request (atcmd_socket_t *socket, char *data, int l
 		g_atcmd_socket_event_send.done = 0;
 		g_atcmd_socket_event_send.task = xTaskGetCurrentTaskHandle();
 
-		ret = _lwip_socket_send_request(socket->id);
+		ret = _lwip_socket_send_request(socket->id, timeout_ms);
 		if (ret == 0)
 		{
 			ret = g_atcmd_socket_event_send.ret;
@@ -362,25 +372,55 @@ static int _atcmd_socket_send_request (atcmd_socket_t *socket, char *data, int l
 		memset(&g_atcmd_socket_event_send, 0, sizeof(g_atcmd_socket_event_send));
 	}
 
+/*	if (ret < 0)
+		_atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_ERROR, socket->id, ret); */
+
 	return ret;
 }
 
 static int __atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len, int *done)
 {
+	struct netif *netif = NULL;
 	const int retry_max = (60 * (1000 / 10));
 	int retry = 0;
 	int ret = 0;
 	int i;
+
+	if (done)
+		*done = 0;
+
+	if (socket->protocol == ATCMD_SOCKET_PROTO_UDP && IP_IS_V4(&socket->remote_addr))
+	{
+#if defined(CONFIG_ATCMD_IPV6)
+		if (socket->remote_addr.u_addr.ip4.addr == IPADDR_BROADCAST)
+#else
+		if (socket->remote_addr.addr == IPADDR_BROADCAST)
+#endif
+		{
+			netif = wifi_api_get_netif();
+
+/*			_atcmd_debug("%s_send: broadcast, id=%d netif=%p",
+							str_proto_lwr[socket->protocol], socket->id, netif); */
+
+			if (netif)
+			{
+#if defined(CONFIG_ATCMD_IPV6)
+				if (socket->remote_addr.u_addr.ip4.addr == IPADDR_ANY)
+#else
+				if (netif->ip_addr.addr != IPADDR_ANY)
+#endif
+					netif = NULL;
+			}
+		}
+	}
 
 	for (i = 0 ; i < len ; )
 	{
 		if (socket->protocol == ATCMD_SOCKET_PROTO_TCP)
 			ret = _lwip_socket_send_tcp(socket->id, data + i, len - i);
 		else
-		{
-			ret = _lwip_socket_send_udp(socket->id,
-						&socket->remote_addr, socket->remote_port, data + i, len - i);
-		}
+			ret = _lwip_socket_send_udp(socket->id, &socket->remote_addr, socket->remote_port,
+										data + i, len - i, netif);
 
 		if (ret > 0)
 		{
@@ -416,13 +456,13 @@ static int __atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len
 				_atcmd_info("%s_send: id=%d len=%d/%d retry=%d",
 						str_proto_lwr[socket->protocol], socket->id, i, len, retry);
 
-			default:
-				_atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_ERROR, socket->id, ret);
+/*			default:
+				_atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_ERROR, socket->id, ret); */
 		}
 
-		break;		
+		break;
 	}
-		
+
 /*	if (retry > 0 && retry < retry_max)
 	{
 		_atcmd_debug("%s_send: %d %d %d",
@@ -437,12 +477,12 @@ static int __atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len
 		if (g_cmd_socket_log.send)
 		{
 			_atcmd_info("%s_send: id=%d len=%d (%u, %u)",
-						str_proto_lwr[socket->protocol], socket->id, 
+						str_proto_lwr[socket->protocol], socket->id,
 						len, g_cmd_socket_send.cnt, g_cmd_socket_send.len);
 		}
 		else
 		{
-			_atcmd_socket_send("%s_send: id=%d len=%d done\n", 
+			_atcmd_socket_send("%s_send: id=%d len=%d done\n",
 							str_proto_lwr[socket->protocol], socket->id, len);
 		}
 	}
@@ -511,10 +551,14 @@ static int _atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len,
 						cnt[socket->protocol]++);
 	}
 
+	g_atcmd_socket_sending = true;
+
 	if (g_atcmd_socket_send_config.event_send)
 		ret = _atcmd_socket_send_request(socket, data, len, done);
 	else
 		ret = __atcmd_socket_send_data (socket, data, len, done);
+
+	g_atcmd_socket_sending = false;
 
 socket_send_data_fail:
 
@@ -524,13 +568,15 @@ socket_send_data_fail:
 
 		if (_str_proto_lwr)
 		{
-			_atcmd_info("%s_send: id=%d len=%d/%d err=%d,%s",
-					_str_proto_lwr, socket->id, ret, len, err, strerror(err));
+			_atcmd_info("%s_send: id=%d len=%d err=%d,%s",
+					_str_proto_lwr, socket->id, len, err, strerror(err));
 		}
 		else
 		{
 			_atcmd_info("socket_send: id=%d err=%d,%s", socket->id, err, strerror(err));
 		}
+
+/*		_atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_ERROR, socket->id, ret); */
 	}
 
 	return ret;
@@ -560,9 +606,9 @@ static void _atcmd_socket_send_handler (int id)
 			g_atcmd_socket_event_send.len = 0;
 			g_atcmd_socket_event_send.ret = ret;
 			g_atcmd_socket_event_send.done = done;
-
-			_lwip_socket_send_done(id);
 		}
+
+		_lwip_socket_send_done(id);
 	}
 }
 
@@ -581,13 +627,13 @@ static void _atcmd_socket_recv_data (atcmd_socket_rxd_t *rxd)
 
 	if (g_atcmd_socket_recv_config.verbose)
 	{
-		rxd->len.msg = ATCMD_MSG_SRXD(msg, sizeof(msg), "%d,%d,\"%s\",%u",
+		rxd->len.msg = ATCMD_MSG_RXD(msg, sizeof(msg), "%d,%d,\"%s\",%u",
 						rxd->socket.id, rxd->len.data,
 						ipaddr_ntoa(&rxd->socket.remote_addr), rxd->socket.remote_port);
 	}
 	else
 	{
-		rxd->len.msg = ATCMD_MSG_SRXD(msg, sizeof(msg) - 1, "%d,%d", rxd->socket.id, rxd->len.data);
+		rxd->len.msg = ATCMD_MSG_RXD(msg, sizeof(msg) - 1, "%d,%d", rxd->socket.id, rxd->len.data);
 	}
 
 	buf = rxd->buf.msg + sizeof(rxd->buf.msg) - rxd->len.msg;
@@ -628,12 +674,12 @@ static int __atcmd_socket_recv_handler (int id, int len, bool passive)
 	switch (socket->protocol)
 	{
 		case ATCMD_SOCKET_PROTO_UDP:
-			ret = _lwip_socket_recv(id, &socket->remote_addr, &socket->remote_port,
+			ret = _lwip_socket_recv_udp(id, &socket->remote_addr, &socket->remote_port,
 										rxd->buf.data, len);
 			break;
 
 		case ATCMD_SOCKET_PROTO_TCP:
-			ret = _lwip_socket_recv(id, NULL, NULL, rxd->buf.data, len);
+			ret = _lwip_socket_recv_tcp(id, rxd->buf.data, len);
 			break;
 
 		default:
@@ -779,6 +825,7 @@ static int _atcmd_socket_init (void)
 	memset(&cb, 0, sizeof(lwip_socket_cb_t));
 
 	_atcmd_info("%s_SOCKET_SEND", g_atcmd_socket_send_config.event_send ? "EVENT" : "DIRECT");
+	_atcmd_info("MAX_SOCKET_OPEN: lwip=%d atcmd=%d", LWIP_SOCKET_NUM_MAX, ATCMD_SOCKET_NUM_MAX);
 
 	cb.send_ready = _atcmd_socket_send_handler;
 	cb.recv_ready = _atcmd_socket_recv_handler;
@@ -912,6 +959,8 @@ static int _atcmd_socket_close (int id, int err)
 
 		if (id < 0 || id == socket->id)
 		{
+			_lwip_socket_send_done(socket->id);
+
 			ret = _lwip_socket_close(socket->id);
 
 			_atcmd_info("%s_close: id=%d port=%d err=%d,%s",
@@ -1215,8 +1264,6 @@ static atcmd_info_t g_atcmd_socket_close =
 
 static int __atcmd_socket_list_get (enum ATCMD_SOCKET_PROTO proto)
 {
-	char param_protocol[ATCMD_STR_PARAM_SIZE(3)];
-	char param_remote_addr[ATCMD_STR_PARAM_SIZE(ATCMD_SOCKET_IPADDR_LEN_MAX)];
 	atcmd_socket_t *socket;
 	int i;
 
@@ -1230,13 +1277,9 @@ static int __atcmd_socket_list_get (enum ATCMD_SOCKET_PROTO proto)
 		if (proto != ATCMD_SOCKET_PROTO_ALL && socket->protocol != proto)
 			continue;
 
-		if (!atcmd_str_to_param(str_proto[socket->protocol], param_protocol, sizeof(param_protocol)) ||
-			!atcmd_str_to_param(ipaddr_ntoa(&socket->remote_addr), param_remote_addr, sizeof(param_remote_addr)))
-			continue;
-
-		ATCMD_MSG_INFO("SLIST", "%d,%s,%s,%d,%d",
-						socket->id, param_protocol,
-						param_remote_addr, socket->remote_port,
+		ATCMD_MSG_INFO("SLIST", "%d,\"%s\",\"%s\",%d,%d",
+						socket->id, str_proto[socket->protocol],
+						ipaddr_ntoa(&socket->remote_addr), socket->remote_port,
 						socket->local_port);
 	}
 
@@ -1320,6 +1363,7 @@ static int _atcmd_socket_send_set (int argc, char *argv[])
 				int32_t len = 0;
 				bool done_event = false;
 				char *exit_cmd = NULL;
+				atcmd_data_mode_params_t data_mode_params;
 				uint32_t timeout_msec;
 
 				if (argc >= 3)
@@ -1388,15 +1432,20 @@ static int _atcmd_socket_send_set (int argc, char *argv[])
 				if (strlen(str_atcmd_socket_send_exit) > 0)
 				   exit_cmd = str_atcmd_socket_send_exit;
 
-				timeout_msec = _atcmd_timeout_value("SSEND");
-				if (timeout_msec == 0)
-					timeout_msec = 1000;
-
 /*				_atcmd_debug("ssend: id=%d remote=%s,%d len=%d done_event=%d timeout_msec=%u",
 								socket->id, ipaddr_ntoa(&socket->remote_addr), socket->remote_port,
-								len, done_event, timeout_msec); */
+								len, done_event); */
 
-				if (atcmd_data_mode_enable(socket, len, done_event, timeout_msec, exit_cmd)  != 0)
+				atcmd_data_mode_init_params(ATCMD_DATA_SSEND, &data_mode_params);
+
+				data_mode_params.id = socket->id;
+				data_mode_params.len = abs(len);
+				data_mode_params.timeout = 1000;
+				data_mode_params.done_event = done_event;
+				data_mode_params.exit_cmd = exit_cmd;
+				data_mode_params.socket.passthrough = len <= 0 ? true : false;
+
+				if (atcmd_data_mode_enable(&data_mode_params) != 0)
 					return ATCMD_ERROR_FAIL;
 
 				break;
@@ -1423,6 +1472,91 @@ static atcmd_info_t g_atcmd_socket_send =
 	.handler[ATCMD_HANDLER_RUN] = NULL,
 	.handler[ATCMD_HANDLER_GET] = NULL,
 	.handler[ATCMD_HANDLER_SET] = _atcmd_socket_send_set,
+};
+
+/**********************************************************************************************/
+
+static int _atcmd_socket_send_exit_get (int argc, char *argv[])
+{
+	switch (argc)
+	{
+		case 0:
+			if (strcmp(str_atcmd_socket_send_exit, "AT\r\n") == 0)
+			{
+				ATCMD_MSG_INFO("SSENDEXIT", "\"\"");
+				break;
+			}
+			else if (memcmp(str_atcmd_socket_send_exit, "AT+", 3) == 0)
+			{
+				char *exit_cmd = str_atcmd_socket_send_exit + 3;
+				int len = strlen(str_atcmd_socket_send_exit) - 3;
+
+				exit_cmd[len - 2] = '\0';
+
+				ATCMD_MSG_INFO("SSENDEXIT", "\"%s\"", exit_cmd);
+
+				exit_cmd[len - 2] = '\r';
+				break;
+			}
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+
+static int _atcmd_socket_send_exit_set (int argc, char *argv[])
+{
+	switch (argc)
+	{
+		case 0:
+			ATCMD_MSG_HELP("AT+SSENDEXIT=\"<cmd>\"");
+			break;
+
+		case 1:
+		{
+			char exit_cmd[sizeof(str_atcmd_socket_send_exit)];
+
+			if (strcmp(argv[0], "\"\"") == 0)
+			{
+				strcpy(str_atcmd_socket_send_exit, "AT\r\n");
+				break;
+			}
+			else if (atcmd_param_to_str(argv[0], exit_cmd, sizeof(exit_cmd)))
+			{
+				int len = strlen(exit_cmd);
+
+				if (len > 0 && len <= 32)
+				{
+					strcpy(str_atcmd_socket_send_exit, "AT+");
+					strcpy(str_atcmd_socket_send_exit + 3, exit_cmd);
+					strcpy(str_atcmd_socket_send_exit + 3 + len, "\r\n");
+					break;
+				}
+			}
+		}
+
+		default:
+			return ATCMD_ERROR_INVAL;
+	}
+
+	return ATCMD_SUCCESS;
+}
+
+static atcmd_info_t g_atcmd_socket_send_exit =
+{
+	.list.next = NULL,
+	.list.prev = NULL,
+
+	.group = ATCMD_GROUP_SOCKET,
+
+	.cmd = "SENDEXIT",
+	.id = ATCMD_SOCKET_SEND_EXIT,
+
+	.handler[ATCMD_HANDLER_RUN] = NULL,
+	.handler[ATCMD_HANDLER_GET] = _atcmd_socket_send_exit_get,
+	.handler[ATCMD_HANDLER_SET] = _atcmd_socket_send_exit_set,
 };
 
 /**********************************************************************************************/
@@ -1516,6 +1650,37 @@ static int _atcmd_socket_recv_set (int argc, char *argv[])
 				if (len > 0)
 				{
 					int ret;
+
+					ret = _lwip_socket_recv_len(id);
+					if (ret < 0)
+						return ATCMD_ERROR_FAIL;
+					else if (ret == 0)
+					{
+						if (argc == 2)
+							return ATCMD_ERROR_FAIL;
+						else
+						{
+							uint32_t timeout_ms = _atcmd_timeout_value("SRECV");
+							uint32_t t;
+
+							if (timeout_ms == 0)
+								timeout_ms = ~0;
+
+							for (t = 0 ; t < timeout_ms ; t++)
+							{
+								ret = _lwip_socket_recv_len(id);
+								if (ret > 0)
+									break;
+								else if (ret < 0)
+									return ATCMD_ERROR_FAIL;
+
+								_delay_ms(1);
+							}
+
+							if (t >= timeout_ms)
+								return ATCMD_ERROR_TIMEOUT;
+						}	
+					}
 
 					ret = __atcmd_socket_recv_handler(id, len, true);
 
@@ -2138,229 +2303,6 @@ static atcmd_info_t g_atcmd_socket_timeout =
 
 /**********************************************************************************************/
 
-#if defined(CONFIG_ATCMD_SOCKET_INTERNAL)
-
-static int _atcmd_socket_send_mode_get (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-			ATCMD_MSG_INFO("SSENDMODE", "%d", g_atcmd_socket_send_config.event_send ? 1 : 0);
-			break;
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static int _atcmd_socket_send_mode_set (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-			/*
-			 * 0 : direct send
-			 * 1 : event send
-			 */
-			ATCMD_MSG_HELP("AT+SSENDMODE={0|1}");
-			break;
-
-		case 1:
-		{
-			int mode = atoi(argv[0]);
-
-			if (mode == 0 || mode == 1)
-			{
-				_atcmd_info("send_mode : %s", mode ? "event" : "direct");
-
-				g_atcmd_socket_send_config.event_send = mode;
-				break;
-			}
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static atcmd_info_t g_atcmd_socket_send_mode =
-{
-	.list.next = NULL,
-	.list.prev = NULL,
-
-	.group = ATCMD_GROUP_SOCKET,
-
-	.cmd = "SENDMODE",
-	.id = ATCMD_SOCKET_SEND_MODE,
-
-	.handler[ATCMD_HANDLER_RUN] = NULL,
-	.handler[ATCMD_HANDLER_GET] = _atcmd_socket_send_mode_get,
-	.handler[ATCMD_HANDLER_SET] = _atcmd_socket_send_mode_set,
-};
-
-#endif /* #if defined(CONFIG_ATCMD_SOCKET_INTERNAL) */
-
-/**********************************************************************************************/
-
-#if defined(CONFIG_ATCMD_SOCKET_INTERNAL)
-
-static int _atcmd_socket_send_done_get (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-			ATCMD_MSG_INFO("SSENDDONE", "%d", g_atcmd_socket_send_config.done_event ? 1 : 0);
-			break;
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static int _atcmd_socket_send_done_set (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-			/*
-			 * 0 : disable
-			 * 1 : enable
-			 */
-			ATCMD_MSG_HELP("AT+SSENDDONE={0|1}");
-			break;
-
-		case 1:
-		{
-			int param = atoi(argv[0]);
-
-			if (param == 0 || param == 1)
-			{
-				g_atcmd_socket_send_config.done_event = param;
-				break;
-			}
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static atcmd_info_t g_atcmd_socket_send_done =
-{
-	.list.next = NULL,
-	.list.prev = NULL,
-
-	.group = ATCMD_GROUP_SOCKET,
-
-	.cmd = "SENDDONE",
-	.id = ATCMD_SOCKET_SEND_DONE,
-
-	.handler[ATCMD_HANDLER_RUN] = NULL,
-	.handler[ATCMD_HANDLER_GET] = _atcmd_socket_send_done_get,
-	.handler[ATCMD_HANDLER_SET] = _atcmd_socket_send_done_set,
-};
-
-#endif /* #if defined(CONFIG_ATCMD_SOCKET_INTERNAL) */
-
-/**********************************************************************************************/
-
-#if defined(CONFIG_ATCMD_SOCKET_INTERNAL)
-
-static int _atcmd_socket_send_exit_get (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-			if (strcmp(str_atcmd_socket_send_exit, "AT\r\n") == 0)
-			{
-				ATCMD_MSG_INFO("SSENDEXIT", "\"\"");
-				break;
-			}
-			else if (memcmp(str_atcmd_socket_send_exit, "AT+", 3) == 0)
-			{
-				char *exit_cmd = str_atcmd_socket_send_exit + 3;
-				int len = strlen(str_atcmd_socket_send_exit) - 3;
-
-				exit_cmd[len - 2] = '\0';
-
-				ATCMD_MSG_INFO("SSENDEXIT", "\"%s\"", exit_cmd);
-
-				exit_cmd[len - 2] = '\r';
-				break;
-			}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static int _atcmd_socket_send_exit_set (int argc, char *argv[])
-{
-	switch (argc)
-	{
-		case 0:
-			ATCMD_MSG_HELP("AT+SSENDEXIT=\"<cmd>\"");
-			break;
-
-		case 1:
-		{
-			char exit_cmd[sizeof(str_atcmd_socket_send_exit)];
-
-			if (strcmp(argv[0], "\"\"") == 0)
-			{
-				strcpy(str_atcmd_socket_send_exit, "AT\r\n");
-				break;
-			}
-			else if (atcmd_param_to_str(argv[0], exit_cmd, sizeof(exit_cmd)))
-			{
-				int len = strlen(exit_cmd);
-
-				if (len > 0 && len <= 32)
-				{
-					strcpy(str_atcmd_socket_send_exit, "AT+");
-					strcpy(str_atcmd_socket_send_exit + 3, exit_cmd);
-					strcpy(str_atcmd_socket_send_exit + 3 + len, "\r\n");
-					break;
-				}
-			}
-		}
-
-		default:
-			return ATCMD_ERROR_INVAL;
-	}
-
-	return ATCMD_SUCCESS;
-}
-
-static atcmd_info_t g_atcmd_socket_send_exit =
-{
-	.list.next = NULL,
-	.list.prev = NULL,
-
-	.group = ATCMD_GROUP_SOCKET,
-
-	.cmd = "SENDEXIT",
-	.id = ATCMD_SOCKET_SEND_EXIT,
-
-	.handler[ATCMD_HANDLER_RUN] = NULL,
-	.handler[ATCMD_HANDLER_GET] = _atcmd_socket_send_exit_get,
-	.handler[ATCMD_HANDLER_SET] = _atcmd_socket_send_exit_set,
-};
-
-#endif /* #if defined(CONFIG_ATCMD_SOCKET_INTERNAL) */
-
-/**********************************************************************************************/
-
 static atcmd_group_t g_atcmd_group_socket =
 {
 	.list.next = NULL,
@@ -2385,6 +2327,7 @@ static atcmd_info_t *g_atcmd_info_socket[] =
 	&g_atcmd_socket_close,
 	&g_atcmd_socket_list,
 	&g_atcmd_socket_send,
+	&g_atcmd_socket_send_exit,
 	&g_atcmd_socket_recv,
 	&g_atcmd_socket_recv_mode,
 	&g_atcmd_socket_recv_info,
@@ -2393,15 +2336,6 @@ static atcmd_info_t *g_atcmd_info_socket[] =
 	&g_atcmd_socket_tcp_keepalive,
 	&g_atcmd_socket_tcp_nodelay,
 	&g_atcmd_socket_timeout,
-
-	/*
-	 * Command for internal
-	 */
-#if defined(CONFIG_ATCMD_SOCKET_INTERNAL)
-	&g_atcmd_socket_send_mode,
-	&g_atcmd_socket_send_done,
-	&g_atcmd_socket_send_exit,
-#endif
 
 	NULL
 };
@@ -2462,33 +2396,36 @@ void atcmd_socket_disable (void)
 	_atcmd_free(g_atcmd_socket);
 }
 
-int atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len)
+int atcmd_socket_send_data (int id, char *data, int len)
 {
-	int done;
+	atcmd_socket_t *socket = _atcmd_socket_search_id(id);
+	int done = 0;
 
-	_atcmd_socket_send_data(socket, data, len, &done);
+	if (socket)
+		_atcmd_socket_send_data(socket, data, len, &done);
 
 	return done;
 }
 
-int atcmd_socket_event_send_done (int id, uint32_t done)
+void atcmd_socket_event_send_done (int id, uint32_t done)
 {
-	return _atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_DONE, id, done);
+	_atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_DONE, id, done);
 }
 
-int atcmd_socket_event_send_idle (int id, uint32_t done, uint32_t drop, uint32_t wait, uint32_t time)
+void atcmd_socket_event_send_idle (int id, uint32_t done, uint32_t drop, uint32_t wait, uint32_t time)
 {
-	return _atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_IDLE, id, done, drop, wait, time);
+	if (!g_atcmd_socket_sending)
+		_atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_IDLE, id, done, drop, wait, time);
 }
 
-int atcmd_socket_event_send_drop (int id, uint32_t drop)
+void atcmd_socket_event_send_drop (int id, uint32_t drop)
 {
-	return _atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_DROP, id, drop);
+	_atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_DROP, id, drop);
 }
 
-int atcmd_socket_event_send_exit (int id, uint32_t done, uint32_t drop)
+void atcmd_socket_event_send_exit (int id, uint32_t done, uint32_t drop)
 {
-	return _atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_EXIT, id, done, drop);
+	_atcmd_socket_event_handler(ATCMD_SOCKET_EVENT_SEND_EXIT, id, done, drop);
 }
 
 /**********************************************************************************************/
@@ -2584,6 +2521,60 @@ static int cmd_atcmd_socket_data (cmd_tbl_t *t, int argc, char *argv[])
 	return ret;
 }
 
+static int cmd_atcmd_socket_event_send (cmd_tbl_t *t, int argc, char *argv[])
+{
+	switch (argc)
+	{
+		case 0:
+			break;
+
+		case 1:
+		{
+			int event_send = atoi(argv[0]);
+
+			if (event_send == 0 || event_send == 1)
+			{
+				g_atcmd_socket_send_config.event_send = event_send;
+				break;
+			}
+		}
+
+		default:
+			return CMD_RET_USAGE;
+	}
+
+	_atcmd_printf(" event_send : %s\n", g_atcmd_socket_send_config.event_send ? "on" : "off");
+
+	return CMD_RET_SUCCESS;
+}
+
+static int cmd_atcmd_socket_done_event (cmd_tbl_t *t, int argc, char *argv[])
+{
+	switch (argc)
+	{
+		case 0:
+			break;
+
+		case 1:
+		{
+			int done_event = atoi(argv[0]);
+
+			if (done_event == 0 || done_event == 1)
+			{
+				g_atcmd_socket_send_config.done_event = done_event;
+				break;
+			}
+		}
+
+		default:
+			return CMD_RET_USAGE;
+	}
+
+	_atcmd_printf(" send_done_event : %s\n", g_atcmd_socket_send_config.done_event ? "on" : "off");
+
+	return CMD_RET_SUCCESS;
+}
+
 static int cmd_atcmd_socket (cmd_tbl_t *t, int argc, char *argv[])
 {
 	int ret = CMD_RET_USAGE;
@@ -2594,10 +2585,16 @@ static int cmd_atcmd_socket (cmd_tbl_t *t, int argc, char *argv[])
 			ret = cmd_atcmd_socket_log(t, argc - 2, argv + 2);
 		else if (strcmp(argv[1], "data") == 0)
 			ret = cmd_atcmd_socket_data(t, argc - 2, argv + 2);
+		else if (strcmp(argv[1], "event_send") == 0)
+			ret = cmd_atcmd_socket_event_send(t, argc - 2, argv + 2);
+		else if (strcmp(argv[1], "done_event") == 0)
+			ret = cmd_atcmd_socket_done_event(t, argc - 2, argv + 2);
 		else if (strcmp(argv[1], "help") == 0)
 		{
 			_atcmd_printf("atcmd socket log {all|recv|send|send_done} {0|1}\n");
 			_atcmd_printf("atcmd socket data [{clear}]\n");
+			_atcmd_printf("atcmd socket event_send {0|1}\n");
+			_atcmd_printf("atcmd socket done_event {0|1}\n");
 
 			return CMD_RET_SUCCESS;
 		}

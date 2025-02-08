@@ -55,7 +55,7 @@ CONFIG_AVOID_FRAG_ATTACK=n
 
 # Fragmentation on target to support low MCS
 # Disable until SAM FW support assemble of fragmented frame
-CONFIG_DYNAMIC_FRAG=n
+CONFIG_DYNAMIC_FRAG=y
 
 # Support defragmentation at lmac for both HM & SAM mode
 CONFIG_DEFRAG=y
@@ -123,7 +123,7 @@ CONFIG_MEASURE_AIRTIME=n
 CONFIG_PS_DEBUG_ALWAYSONMEM=n
 
 # For use of Authentication control
-CONFIG_AUTH_CONTROL=n
+CONFIG_AUTH_CONTROL=y
 
 # For use of broadcast fota in STA side
 CONFIG_BCAST_FOTA_STA=y
@@ -147,6 +147,9 @@ CONFIG_STA_CSA_SUPPORT=y
 
 # Support Scanning mode
 CONFIG_SCAN_MODE=y
+
+# TWT
+CONFIG_TWT=y
 
 # RELEASE FW
 CONFIG_CLI=n
@@ -223,6 +226,37 @@ CONFIG_RF_RECOVERY_BY_BCM=n
 # Manual Continuous Tx support
 CONFIG_MANUAL_CONT_TX_SUPPORT=y
 
+# Short GI is adaptively activated by Rate Control
+CONFIG_ADAPTIVE_GI=y
+
+#// --------------------------------------------------
+#// Flash Memory size
+#// --------------------------------------------------
+# Set the default flash size
+CONFIG_DEFAULT_FLASH_SIZE = 2M
+
+# Convert ALIAS to lowercase for case-insensitive matching
+ALIAS_LOWER := $(shell echo $(ALIAS) | tr '[:upper:]' '[:lower:]')
+
+ifneq ($(findstring 4m, $(ALIAS_LOWER)), )
+CONFIG_FLASH_SIZE = 4M
+else ifneq ($(findstring 2m, $(ALIAS_LOWER)), )
+CONFIG_FLASH_SIZE = 2M
+else
+CONFIG_FLASH_SIZE = $(CONFIG_DEFAULT_FLASH_SIZE)
+endif
+
+#// --------------------------------------------------
+#// Flash MAP Profile
+#// --------------------------------------------------
+# Extend Flash size to maximize code/data region (only for 2MB Flash)
+# factory :  916KB (FOTA/100KB_USER_DATA)
+# profile1:  968KB (FOTA/8KB_USER_DATA)
+# profile2:  972KB (FOTA/NO_USER_DATA)
+# profile3: 1936KB (NO_FOTA/8KB_USER_DATA)
+# profile4: 1944KB (NO_FOTA/NO_USER_DATA)
+CONFIG_FLASH_PROFILE=profile1
+
 #// --------------------------------------------------
 #// 3rd party library
 #// --------------------------------------------------
@@ -241,6 +275,8 @@ endif
 ifneq ($(findstring ipv6, $(ALIAS)), )
 # Support IPV6
 CONFIG_IPV6=y
+else
+CONFIG_IPV6=n
 endif
 
 #// --------------------------------------------------
@@ -294,7 +330,7 @@ DEFINE				+=	-DCACHE_XIP
 DEFINE				+=	-DSF_WRITABLE
 DEFINE				+=	-DSDK_SYSTEM_NAME=\"$(SYSTEM)\"
 DEFINE				+=	-DSDK_TARGET_NAME=\"$(TARGET)\"
-OUTPUT				=	$(SYSTEM)_$(TARGET)_$(APP_NAME)
+OUTPUT				=	$(SYSTEM)_$(TARGET)_$(APP_NAME)_$(CONFIG_FLASH_SIZE)
 
 #// -------------------------------------------------
 #// 11AH Features (common)
@@ -316,7 +352,7 @@ DEFINE				+=	-DINCLUDE_ACCESS_POINT
 DEFINE				+=	-DINCLUDE_UMAC_BEACON
 DEFINE                          +=      -DINCLUDE_BEACON_AP_BEACON
 #DEFINE                          +=      -DINCLUDE_BEACON_BCMC
-DEFINE				+=	-DMAX_STA=10
+DEFINE				+=	-DMAX_STA=50
 else
 DEFINE				+=	-DMAX_STA=1
 endif
@@ -399,7 +435,11 @@ DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM1=8
 DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM2=8
 DEFINE 				+=	-DLMAC_CONFIG_CREDIT_QM3=9
 
+ifeq ($(CONFIG_AUTH_CONTROL),y)
+DEFINE				+=	-DLMAC_MODEM_RECOVERY_TIME_MS=120000
+else
 DEFINE				+=	-DLMAC_MODEM_RECOVERY_TIME_MS=10000
+endif
 DEFINE				+=	-DLMAC_WDT_RESET_TIME_MS=20000
 DEFINE				+=	-DLMAC_BMT_LOSS_CNT=30
 
@@ -427,12 +467,12 @@ LIB_MODEM_PATH		=	$(LIB_PATH)/modem
 LIB_MODEM_INC_PATH		=	$(LIB_MODEM_PATH)/inc
 LIB_MODEM_SRC_PATH		=	$(LIB_MODEM_PATH)/src
 
-SYSTEM_INC_PATH	= $(LIB_MODEM_INC_PATH)/system
-WLAN_INC_PATH		= $(LIB_MODEM_INC_PATH)/wlan
-HAL_INC_PATH		= $(LIB_MODEM_INC_PATH)/hal
-HOST_INC_PATH		= $(LIB_MODEM_INC_PATH)/host
-UTIL_INC_PATH		= $(LIB_MODEM_INC_PATH)/util
-UMAC_INC_PATH		= $(LIB_MODEM_INC_PATH)/umac
+LIB_MODEM_SYSTEM_INC_PATH			=	$(LIB_MODEM_INC_PATH)/system
+LIB_MODEM_WLAN_INC_PATH			=	$(LIB_MODEM_INC_PATH)/wlan
+LIB_MODEM_HAL_INC_PATH			=	$(LIB_MODEM_INC_PATH)/hal
+LIB_MODEM_HOST_INC_PATH			=	$(LIB_MODEM_INC_PATH)/host
+LIB_MODEM_UTIL_INC_PATH			=	$(LIB_MODEM_INC_PATH)/util
+LIB_MODEM_UMAC_INC_PATH			=	$(LIB_MODEM_INC_PATH)/umac
 
 #// BDF_PATH
 BDF_PATH	=	bdf
@@ -444,15 +484,16 @@ VPATH	+= $(BDF_PATH)
 #// --------------------------------------------------
 INCLUDE += -I$(LIB_MODEM_PATH)
 INCLUDE	+= -I$(LIB_MODEM_INC_PATH)
-INCLUDE	+= -I$(SYSTEM_INC_PATH)
-INCLUDE	+= -I$(WLAN_INC_PATH)
-INCLUDE	+= -I$(HAL_INC_PATH)
-INCLUDE	+= -I$(HOST_INC_PATH)
-INCLUDE	+= -I$(UTIL_INC_PATH)
-INCLUDE	+= -I$(UMAC_INC_PATH)
+INCLUDE	+= -I$(LIB_MODEM_SYSTEM_INC_PATH)
+INCLUDE	+= -I$(LIB_MODEM_WLAN_INC_PATH)
+INCLUDE	+= -I$(LIB_MODEM_HAL_INC_PATH)
+INCLUDE	+= -I$(LIB_MODEM_HOST_INC_PATH)
+INCLUDE	+= -I$(LIB_MODEM_UTIL_INC_PATH)
+INCLUDE	+= -I$(LIB_MODEM_UMAC_INC_PATH)
 
 
 include make/configure-in.os
+
 #// --------------------------------------------------
 #// Specific LD File
 #// --------------------------------------------------
@@ -470,6 +511,8 @@ LD_FILE_NAME		= $(LD_FILE_NAME_NORMAL)
 endif
 LD_CM_FILE		=	$(LIB_MODEM_PATH)/$(LD_CM_FILE_NAME)
 LD_FILE			=	$(LIB_MODEM_PATH)/$(LD_FILE_NAME)
+
+include make/configure-in.flash
 
 #// --------------------------------------------------
 #// Source Files
@@ -490,7 +533,7 @@ else
 ifeq ($(CONFIG_IPV6),y)
 DEFINE	+= -DconfigTOTAL_HEAP_SIZE=190000
 else
-DEFINE	+= -DconfigTOTAL_HEAP_SIZE=250000
+DEFINE	+= -DconfigTOTAL_HEAP_SIZE=240000
 endif #ipv6
 endif #small ram
 

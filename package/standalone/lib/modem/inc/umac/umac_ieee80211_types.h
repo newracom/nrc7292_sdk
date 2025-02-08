@@ -37,6 +37,7 @@
 #define WLAN_FC_STYPE_NDP_PSPOLL		1
 #define WLAN_FC_STYPE_NDP_ACK			2
 #define WLAN_FC_STYPE_NDP_PSPOLL_ACK	3
+#define WLAN_FC_STYPE_NDP_PAGING		6
 #define WLAN_FC_STYPE_NDP_PROBE_REQ		7
 
 /* Extension */
@@ -192,6 +193,13 @@ typedef enum  {
     SENSOR = 1,
     NON_SENSOR = 2,
 } STA_TYPE_SUPPORT_STA;
+
+
+typedef enum {
+	MAC_AUTH_CENTRALIZED = 0,
+	MAC_AUTH_DISTRIBUTED = 1,
+	MAC_AUTH_MAX
+} MAC_AUTH_TYPE;
 
 #define HT_CTL_SIZE		(4)
 /************************************************************************************************
@@ -452,6 +460,14 @@ typedef struct {
 	uint8_t la_per_normal_control_response_capable  : 1;
 	uint8_t reserved                				: 7;
 } s1g_capabilities_info;
+
+// EID 222 : Authentication Control
+typedef struct {
+	uint8_t control									: 1;
+	uint8_t auth_slot_duration						: 7;
+	uint8_t max_trans_interval;
+	uint8_t min_trans_interval;
+} auth_control_info;
 
 typedef struct {
 	uint16_t rxs1g_mcs_map                        			: 8;
@@ -822,62 +838,6 @@ typedef struct {
 	uint16_t    short_beacon_interval;
 } ie_short_beacon_interval;
 
-#if defined(INCLUDE_TWT_SUPPORT)
-#define IE_LENGTH_TWT 15
-// EID 216 : TWT
-typedef struct {
-	uint32_t		pid: 9;
-	uint32_t		max_ndp_paging_period: 8;
-	uint32_t		partial_tsf_offset: 4;
-	uint32_t		action: 3;
-	uint32_t		min_sleep_duration: 6;
-	uint32_t		reserved: 2;
-} twt_ndp_paging;
-
-typedef struct {
-	uint8_t		twt_group_id: 7;
-	uint8_t		zero_offset_present: 1;
-	uint8_t		zero_offset[6];
-	uint16_t		twt_unit: 4;
-	uint16_t		twt_offset: 12;
-} twt_group_assignment;
-
-typedef struct {
-	uint16_t	twt_request: 1;
-	uint16_t	twt_setup_command: 3;
-	uint16_t	reserved: 1;
-	uint16_t	implicit: 1;
-	uint16_t	flow_type: 1;
-	uint16_t	twt_flow_id: 3;
-	uint16_t	twt_wake_interval_exp: 5;
-	uint16_t	twt_protection: 1;
-} twt_request_type;
-
-typedef struct {
-	uint8_t		ndp_paging_indicator: 1;
-	uint8_t		responder_pm_mode: 1;
-	uint8_t		reserved: 6;
-} twt_control;
-
-typedef struct {
-	uint8_t 	eid;
-	uint8_t 	length;
-	twt_control		control;
-	twt_request_type		request_type;
-	uint32_t	target_wake_time_lo;
-	uint32_t	target_wake_time_hi;
-	/* Remove field because of Non-support
-	twt_group_assignment	twt_group;
-	*/
-	uint8_t		nom_min_twt_wake_duration;
-	uint16_t 	twt_wake_int_mantissa;
-	uint8_t		twt_channel;
-	/* Remove field because of Non-support
-	twt_ndp_paging	ndp_paging;
-	*/
-} ie_twt;
-#endif /* defined(INCLUDE_TWT_SUPPORT) */
-
 // EID 217 : S1G Capabilities
 #define IE_LENGTH_S1G_CAPABILITIES      15
 typedef struct {
@@ -887,6 +847,13 @@ typedef struct {
 	supported_s1g_msc_nss_set s1g_supp_mcs_nss_set;
 } ie_s1g_capabilities;
 
+// EID 222 : Authentication Control
+#define IE_LENGTH_AUTH_CONTROL   	3
+typedef struct {
+	uint8_t		eid;
+	uint8_t 	length;
+	auth_control_info auth_info;
+} ie_auth_control;
 
 // EID 232 : S1G Operation
 #define IE_LENGTH_S1G_OPERATION						6

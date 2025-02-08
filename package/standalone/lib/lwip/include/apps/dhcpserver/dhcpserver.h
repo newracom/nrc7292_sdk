@@ -96,7 +96,7 @@ extern u32_t dhcps_lease_time;
 #define DHCP_OPTION_REQ_LIST     55
 #define DHCP_OPTION_END         255
 
-#define MAX_STATION_NUM      20
+#define MAX_STATION_NUM      75
 
 #define DHCPS_STATE_OFFER 1
 #define DHCPS_STATE_DECLINE 2
@@ -112,6 +112,8 @@ void dhcps_stop(void);
 
 void dhcps_coarse_tmr(void);
 
+/* Get IP address with matching mac address */
+bool dhcps_get_ip(u8_t *mac, ip4_addr_t *ip);
 int dhcps_status(void);
 struct netif *dhcps_get_interface(void);
 bool wifi_softap_set_dhcps_lease_time(u32_t minute);

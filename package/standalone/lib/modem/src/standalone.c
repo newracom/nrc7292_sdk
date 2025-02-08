@@ -72,32 +72,6 @@ int standalone_main()
 	bool ps_callback = false;
 	initVersion();
 
-#if defined(SUPPORT_NVS_FLASH)
-	nvs_handle_t tmp_nvs_handle;
-	nvs_err_t err = NVS_OK;
-	/* initialize Non-volatile storage key/value subsystem */
-	/* Application will need to call nvs_open to utilize NVS. */
-	/* There's no need to call nvs_flash_deinit() */
-	/* since the system will never return. */
-	I(TT_SYS, "Initializing NVS...\n");
-	err = nvs_flash_init();
-	if (err == NVS_ERR_NVS_NO_FREE_PAGES || err == NVS_ERR_NVS_NEW_VERSION_FOUND) {
-		if ((err = nvs_flash_erase()) == NVS_OK) {
-			err = nvs_flash_init();
-		}
-	} else {
-		/* make sure that there's a default namespace set by opening with NVS_READWRITE, */
-		/* so that subsequent nvs_open with NVS_READONLY for default name space succeeds. */
-		I(TT_SYS, "Try opening NVS with read/write for default namespace (%s)...\n", NVS_DEFAULT_NAMESPACE);
-		if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &tmp_nvs_handle) == NVS_OK) {
-			I(TT_SYS, "NVS Open successful, continue...\n");
-			nvs_close(tmp_nvs_handle);
-		} else {
-			E(TT_SYS, "Fatal error, nvs_open\n");
-		}
-	}
-#endif
-
 #if defined (INCLUDE_PS_SCHEDULE)
 	system_modem_api_ps_check_network_init(&net_init, &ps_callback);
 #endif /* INCLUDE_PS_SCHEDULE */
@@ -184,12 +158,23 @@ void get_standalone_macaddr(int vif_id, uint8_t *mac) {
 #error "Consider one method to assign MAC address."
 #endif
 
-	/* Step 1. check mac address in serial flash for vif_id.
+	/* Step 0. check mac address in macsw for vif_id.
+	 * Step 1. check mac address in serial flash for vif_id.
 	 * Step 2. if vif_id's mac address doesn't exist in serial flash,
 	 * then check the other vif_id's mac address.
 	 * Step 3. both mac addresses are not written in serial flash,
 	 * then use FW generated mac address.
 	 * */
+	tmp = system_modem_api_get_mac_address(vif_id);
+	if (system_modem_api_get_mac_address(vif_id)) {
+		const uint16_t *a = (uint16_t *) tmp;
+		if ((a[0] | a[1] | a[2]) != 0) {
+			memcpy(mac, tmp, MAC_ADDR_LEN);
+			return;
+		}
+	}
+	tmp = mac;
+
 	if (lmac_check_sf_macaddr(mac, vif_id)) {
 		I(TT_WPAS, "%s%d MAC address: "MACSTR"\n",
 			module_name(), vif_id, MAC2STR(mac));
@@ -250,3 +235,16 @@ int set_standalone_hook_static(int vif_id)
 	WPA_DRIVER_PS_HOOK(WPA_PS_HOOK_TYPE_STATIC, &vif_id, NULL, 0);
 	return -1;
 }
+
+#ifdef USE_EEPROM
+#include "nrc_config.h"
+#include "system_eeprom.h"
+
+void update_sysconfig_location(void)
+{
+	nrc_config_set_config_location(CONFIG_IN_EEPROM);
+	system_eeprom_set_config(EEPROM_I2C_CH, EEPROM_I2C_SCL,EEPROM_I2C_SDA,
+		EEPROM_I2C_CLK, EEPROM_I2C_DEV_ADDR, EEPROM_WP_PIN, EEPROM_PAGE_WRITE_BUF_SIZE);
+	system_eeprom_init();
+}
+#endif

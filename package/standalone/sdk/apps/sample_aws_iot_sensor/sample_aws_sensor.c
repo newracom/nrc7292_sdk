@@ -24,6 +24,7 @@
  */
 
 #include "nrc_sdk.h"
+#include "lwip/netif.h"
 #include "lwip/errno.h"
 
 #include <stdio.h>
@@ -32,6 +33,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <string.h>
+#include "nrc_lwip.h"
 
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
@@ -208,6 +210,9 @@ static void connect_to_ap(WIFI_CONFIG *param)
 		}
 	}
 
+	/* wait for ip indefinitely */
+	param->dhcp_timeout = 0;
+
 	/* find AP */
 	while(1){
 		if (nrc_wifi_scan(0) == WIFI_SUCCESS){
@@ -242,15 +247,8 @@ static void connect_to_ap(WIFI_CONFIG *param)
 	}
 
 	/* check if IP is ready */
-	while(1){
-		if (nrc_addr_get_state(0) == NET_ADDR_SET) {
-			nrc_usr_print("[%s] IP ...\n",__func__);
-			break;
-		} else {
-			nrc_usr_print("[%s] IP Address setting State : %d != NET_ADDR_SET(%d) yet...\n",
-						  __func__, nrc_addr_get_state(0), NET_ADDR_SET);
-		}
-		_delay_ms(1000);
+	if (nrc_wait_for_ip(0, param->dhcp_timeout) == NRC_FAIL) {
+		return;
 	}
 }
 

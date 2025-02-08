@@ -19,24 +19,34 @@
 #include "w5500.h"
 #include "nrc_sdk.h"
 #include "util_trace.h"
-#ifdef SUPPORT_ETHERNET_SPI_DMA
-#include "nrc_spi_dma.h"
-#endif
+
+#include "api_dma.h"
+#include "api_spi_dma.h"
+
 #define W5500_SPI_LOCK_TIMEOUT_MS (50)
 #define W5500_TX_MEM_SIZE (0x4000)
 #define W5500_RX_MEM_SIZE (0x4000)
 
-#ifdef NRC7394
-#define GPIO_INT_PIN  GPIO_20
-#else
-#define GPIO_INT_PIN  GPIO_10
-#endif
+#define W5500_ADDRESS_PHASE_SIZE_BYTES (W5500_ADDR_OFFSET/8)
+#define W5500_CONTROL_PHASE_SIZE_BYTES (1)
+#define W5500_DATA_OFFSET_BYTES (W5500_ADDRESS_PHASE_SIZE_BYTES + W5500_CONTROL_PHASE_SIZE_BYTES)
+
+static int interrupt_pin = -1;
+
 static void *isr_arg;
 #ifdef ENABLE_ETHERNET_INTERRUPT
 static int interrupt_vector = -1;
 #endif
 
-spi_device_t w5500_spi;
+//#define ETH_LED_TRX_BLINK
+#ifdef ETH_LED_TRX_BLINK
+#define GPIO_RX_LED GPIO_16
+#define GPIO_TX_LED GPIO_17
+#define GPIO_LED_ON 0
+#define GPIO_LED_OFF 1
+#endif /* ETH_LED_TRX_BLINK */
+
+#define MAX_RETRY_COUNT 10
 
 typedef struct {
     esp_eth_mac_t parent;
@@ -82,44 +92,46 @@ ATTR_NC __attribute__((optimize("O3"))) static nrc_err_t w5500_write(emac_w5500_
     nrc_err_t ret = NRC_SUCCESS;
     uint8_t *buffer = NULL;
     uint8_t addr[4];
+    int retry_cnt = 0;
 
-	buffer = pvPortMalloc(len + 3);
+    do {
+        if (retry_cnt > MAX_RETRY_COUNT) {
+            nrc_usr_print("[%s] failed to allocate size %d\n", __func__, len + W5500_DATA_OFFSET_BYTES);
+            return NRC_FAIL;
+        }
+        buffer = pvPortMalloc(len + W5500_DATA_OFFSET_BYTES);
+        if (!buffer) {
+            // Memory allocation failed, wait for a short period before retrying
+            _delay_ms(1);
+        }
+        retry_cnt++;
+    } while (!buffer);
+
     buffer[0] = (address >> W5500_ADDR_OFFSET) >> 8;
     buffer[1] = address >> W5500_ADDR_OFFSET;
     buffer[2] = ((address & 0xFFFF) | (W5500_ACCESS_MODE_WRITE << W5500_RWB_OFFSET) | W5500_SPI_OP_MODE_VDM);
 
-    memcpy(buffer + 3, value, len);
+    memcpy(buffer + W5500_DATA_OFFSET_BYTES, value, len);
     V(TT_NET, "[%s] addr[0] = 0x%02x; addr[1] = 0x%02x; addr[2] = 0x%02x; addr[3] = 0x%02x; len = %d\n",
       __func__, buffer[0], buffer[1], buffer[2], buffer[3], len);
     if (w5500_lock(emac)) {
-#ifdef SUPPORT_ETHERNET_SPI_DMA
-        spi_dma_write(buffer, len + 3);
-#else
-        nrc_spi_start_xfer(&w5500_spi);
-        nrc_spi_xfer(&w5500_spi, buffer, NULL, len + 3);
-        nrc_spi_stop_xfer(&w5500_spi);
-#endif
+        spi_dma_write(buffer, len + W5500_DATA_OFFSET_BYTES);
         w5500_unlock(emac);
     } else {
         ret = NRC_FAIL;
     }
 
-	vPortFree(buffer);
+    vPortFree(buffer);
     return ret;
 }
 
 ATTR_NC __attribute__((optimize("O3"))) static nrc_err_t w5500_read(emac_w5500_t *emac, uint32_t address, void *value, uint32_t len)
 {
     nrc_err_t ret = NRC_SUCCESS;
-    uint8_t addr[3];
-#ifdef SUPPORT_ETHERNET_SPI_DMA
-	uint8_t *buffer = NULL;
-#else
-    uint8_t rx[4] = {0xff, 0xff, 0xff, 0xff};
-    uint8_t transfer_bytes = 4;
-    uint32_t loop = (len - 1)/ transfer_bytes;
-    uint32_t remain = (len - 1) % transfer_bytes;
-#endif // SUPPORT_ETHERNET_SPI_DMA
+    uint8_t addr[W5500_DATA_OFFSET_BYTES];
+    int retry_cnt = 0;
+    uint8_t *buffer = NULL;
+
     addr[0] = (address >> W5500_ADDR_OFFSET) >> 8;
     addr[1] = address >> W5500_ADDR_OFFSET;
     addr[2] = ((address & 0xFFFF) | (W5500_ACCESS_MODE_READ << W5500_RWB_OFFSET) | W5500_SPI_OP_MODE_VDM);
@@ -128,30 +140,26 @@ ATTR_NC __attribute__((optimize("O3"))) static nrc_err_t w5500_read(emac_w5500_t
       __func__, addr[0], addr[1], addr[2], len);
 
     if (w5500_lock(emac)) {
-#ifdef SUPPORT_ETHERNET_SPI_DMA
-		buffer = pvPortMalloc(len + 3);
-        spi_dma_read(addr, buffer, len);
-        memcpy(value, &buffer[3], len);
+        do {
+            if (retry_cnt > MAX_RETRY_COUNT) {
+                nrc_usr_print("[%s] failed to allocate size %d\n", __func__, len + W5500_DATA_OFFSET_BYTES);
+                return NRC_FAIL;
+            }
+            buffer = pvPortMalloc(len + W5500_DATA_OFFSET_BYTES);
+            if (!buffer) {
+                // Memory allocation failed, wait for a short period before retrying
+                _delay_ms(1);
+            }
+            retry_cnt++;
+        } while (!buffer);
+
+        /* read 3 more bytes for addr length */
+        spi_dma_read(addr, buffer, len + W5500_DATA_OFFSET_BYTES);
+        memcpy(value, &buffer[W5500_DATA_OFFSET_BYTES], len);
         V(TT_NET, "[%s] rx[0] = 0x%02x, rx[1] = 0x%02x, rx[2] = 0x%02x, rx[3] = 0x%02x\n\n",
           __func__, buffer[0], buffer[1], buffer[2], buffer[3]);
 
-		vPortFree(buffer);
-#else // SUPPORT_ETHERNET_SPI_DMA
-        nrc_spi_start_xfer(&w5500_spi);
-        nrc_spi_xfer(&w5500_spi, addr, rx, 4);
-        for (int i = 0; i < loop; i++) {
-            nrc_spi_xfer(&w5500_spi, NULL, (value + 1) + (i * transfer_bytes), transfer_bytes);
-        }
-        if (remain) {
-            nrc_spi_xfer(&w5500_spi, NULL, (value + 1) + (loop * transfer_bytes), remain);
-        }
-        nrc_spi_stop_xfer(&w5500_spi);
-
-        V(TT_NET, "[%s] rx[0] = 0x%02x, rx[1] = 0x%02x, rx[2] = 0x%02x, rx[3] = 0x%02x\n",
-          __func__, rx[0], rx[1], rx[2], rx[3]);
-
-        memcpy(value, &rx[3], 1);
-#endif // SUPPORT_ETHERNET_SPI_DMA
+        vPortFree(buffer);
         w5500_unlock(emac);
     } else {
         ret = NRC_FAIL;
@@ -356,43 +364,36 @@ ATTR_NC __attribute__((optimize("O3"))) static void w5500_intr_handler(int vecto
 {
     int input_high;
 
-    if (nrc_gpio_inputb(GPIO_INT_PIN, &input_high) < 0) {
+    if (nrc_gpio_inputb(interrupt_pin, &input_high) < 0) {
         return;
     }
 
 #ifdef NRC7292
     if (input_high) {
         V(TT_NET, "[%s] input high\n", __func__);
-        V(TT_NET, "[%s] system_irq_mask. vector = 0x%x\n", __func__, interrupt_vector);
+#else
+    if (!input_high) {
+        V(TT_NET, "[%s] input low\n", __func__);
 #endif
         interrupt_vector = vector;
         system_irq_mask(interrupt_vector);
-//        w5500_isr_handler(isr_arg);
-		emac_w5500_t *emac = (emac_w5500_t *)isr_arg;
-		BaseType_t high_task_wakeup = pdFALSE;
-		/* notify w5500 task */
-		vTaskNotifyGiveFromISR(emac->rx_task_hdl, &high_task_wakeup);
-		if (high_task_wakeup != pdFALSE) {
-			V(TT_NET, "[%s] calling portYIELD_FROM_ISR\n", __func__);
-			portYIELD_FROM_ISR(high_task_wakeup);
-		}
 
-#ifdef NRC7394
-		V(TT_NET, "[%s] Clear EINT00STAT...\n", __func__);
-		volatile uint32_t *eint0_stat;
-		if (vector == EV_EXT0) {
-			eint0_stat = (uint32_t *) (0x40005000 + 0x844);
-		} else {
-			eint0_stat = (uint32_t *) (0x40005000 + 0x84C);
-		}
-		*eint0_stat |= 1;
-		system_irq_unmask(vector);
-#endif
-#ifdef NRC7292
+        emac_w5500_t *emac = (emac_w5500_t *)isr_arg;
+        BaseType_t high_task_wakeup = pdFALSE;
+        /* notify w5500 task */
+        vTaskNotifyGiveFromISR(emac->rx_task_hdl, &high_task_wakeup);
+        if (high_task_wakeup != pdFALSE) {
+            V(TT_NET, "[%s] calling portYIELD_FROM_ISR\n", __func__);
+            portYIELD_FROM_ISR(high_task_wakeup);
+        }
+
     } else {
+#ifdef NRC7292
         V(TT_NET, "[%s] input low\n", __func__);
-    }
+#else
+        V(TT_NET, "[%s] input high\n", __func__);
 #endif
+    }
 }
 #endif
 
@@ -408,19 +409,22 @@ ATTR_NC __attribute__((optimize("O3"))) static void emac_w5500_task(void *arg)
 #ifdef ENABLE_ETHERNET_INTERRUPT
         // check if the task receives any notification
         if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000)) == 0) {    // if no notification for 1 sec...
-//        if (ulTaskNotifyTake(pdTRUE, portMAX_DELAY) == 0) {
-            nrc_gpio_inputb(GPIO_INT_PIN, &int_bit);
+            nrc_gpio_inputb(interrupt_pin, &int_bit);
 #ifdef NRC7292
-            if (int_bit == 0) {                                      // ...and no interrupt asserted
+            if (int_bit == 0)
+#else
+            if (int_bit == 1)
+#endif
+            {
+                // ...and no interrupt asserted
                 V(TT_NET, "[%s] continue int_bit = %d\n", __func__, int_bit);
                 continue;                                            // -> just continue to check again
             }
-#endif
         }
 #else
         /* Polling Interrupt GPIO.*/
         vTaskDelay(pdMS_TO_TICKS(1000) / 20);
-        nrc_gpio_inputb(GPIO_INT_PIN, &int_bit);
+        nrc_gpio_inputb(interrupt_pin, &int_bit);
         if (int_bit == 1) {
             continue;
         }
@@ -434,12 +438,10 @@ ATTR_NC __attribute__((optimize("O3"))) static void emac_w5500_task(void *arg)
             // clear interrupt status
             w5500_write(emac, W5500_REG_SOCK_IR(0), &status, sizeof(status));
 #ifdef ENABLE_ETHERNET_INTERRUPT
-#ifdef NRC7292
             if (interrupt_vector != -1) {
                 V(TT_NET, "[%s] system_irq_UNmask vector 0x%x\n", __func__, interrupt_vector);
                 system_irq_unmask(interrupt_vector);
             }
-#endif
 #endif
             do {
                 /* read while there's packets remain in w5500 */
@@ -644,6 +646,9 @@ ATTR_NC  __attribute__((optimize("O3"))) static nrc_err_t emac_w5500_transmit(es
     if (emac->link == ETH_LINK_DOWN) {
         return NRC_FAIL;
     }
+#ifdef ETH_LED_TRX_BLINK
+    nrc_gpio_outputb(GPIO_TX_LED, GPIO_LED_ON);
+#endif /* ETH_LED_TRX_BLINK */
     // check if there're free memory to store this packet
     uint16_t free_size = 0;
     MAC_CHECK(w5500_get_tx_free_size(emac, &free_size), err, "get free size failed\n");
@@ -667,13 +672,18 @@ ATTR_NC  __attribute__((optimize("O3"))) static nrc_err_t emac_w5500_transmit(es
         MAC_CHECK(w5500_read(emac, W5500_REG_SOCK_IR(0), &status, sizeof(status)), err, "read SOCK0 IR failed\n");
         if ((retry++ > 3 && !is_w5500_sane_for_rxtx(emac)) || retry > 10) {
             V(TT_NET, "[%s] error transmission, retry = %d...\n", __func__, retry);
+#ifdef ETH_LED_TRX_BLINK
+            nrc_gpio_outputb(GPIO_TX_LED, GPIO_LED_OFF);
+#endif /* ETH_LED_TRX_BLINK */
             return NRC_FAIL;
         }
     }
     // clear the event bit
     status  = W5500_SIR_SEND;
     MAC_CHECK(w5500_write(emac, W5500_REG_SOCK_IR(0), &status, sizeof(status)), err, "write SOCK0 IR failed\n");
-
+#ifdef ETH_LED_TRX_BLINK
+    nrc_gpio_outputb(GPIO_TX_LED, GPIO_LED_OFF);
+#endif /* ETH_LED_TRX_BLINK */
 err:
     return ret;
 }
@@ -687,6 +697,9 @@ ATTR_NC __attribute__((optimize("O3"))) static nrc_err_t emac_w5500_receive(esp_
     uint16_t remain_bytes = 0;
     emac->packets_remain = false;
 
+#ifdef ETH_LED_TRX_BLINK
+    nrc_gpio_outputb(GPIO_RX_LED, GPIO_LED_ON);
+#endif /*ETH_LED_TRX_BLINK */
     w5500_get_rx_received_size(emac, &remain_bytes);
     if (remain_bytes) {
         // get current read pointer
@@ -710,74 +723,12 @@ ATTR_NC __attribute__((optimize("O3"))) static nrc_err_t emac_w5500_receive(esp_
     }
 
     *length = rx_len;
+#ifdef ETH_LED_TRX_BLINK
+    nrc_gpio_outputb(GPIO_RX_LED, GPIO_LED_OFF);
+#endif /* ETH_LED_TRX_BLINK */
 err:
     return ret;
 }
-
-#ifdef ENABLE_ETHERNET_INTERRUPT
-#ifdef NRC7394
-nrc_err_t eth_gpio_register_interrupt_handler(int intr_src, int pin, intr_handler_fn cb)
-{
-	volatile uint32_t *gpio_ctrl;
-	gpio_io_t gpio;
-	gpio_io_t dir;
-	uio_sel_t uio;
-	int ext_intr_src;
-	int ret;
-
-	if (!cb)
-		return NRC_FAIL;
-
-	A("[%s] Registering interrupt handler for pin %d...\n", __func__, pin);
-	nrc_gpio_get_int_enable(&gpio);
-	gpio.word |=  (0x00000001L << pin);
-	nrc_gpio_set_int_enable(&gpio);
-
-	nrc_gpio_get_alt(&gpio);
-	gpio.word |=  (0x00000001L << pin);
-	nrc_gpio_set_alt(&gpio);
-
-	nrc_gpio_get_dir(&dir);
-	gpio.word &=  ~(0x00000001L << pin);
-	nrc_gpio_config_dir(&dir);
-
-	A("[%s] interrupt src : %d\n", __func__, intr_src);
-	switch(intr_src){
-	case EV_EXT0:
-		nrc_gpio_get_uio_sel(UIO_SEL_EINT3_EINT0, &uio);
-		uio.bit.sel7_0 = pin;
-		nrc_gpio_set_uio_sel(UIO_SEL_EINT3_EINT0, &uio);
-		system_register_isr(EV_EXT0, cb);
-
-		/* set EINT01CTL */
-		gpio_ctrl = (uint32_t *) (0x40005000 + 0x840);
-		*gpio_ctrl |= ((1 << 1) | 1);
-		system_printf("GPIO_EINT02CTL_U : %p = 0x%x\n", gpio_ctrl, *gpio_ctrl);
-
-		system_irq_unmask(EV_EXT0);
-		break;
-
-	case EV_EXT1:
-		nrc_gpio_get_uio_sel(UIO_SEL_EINT3_EINT0, &uio);
-		uio.bit.sel15_8 = pin;
-		nrc_gpio_set_uio_sel(UIO_SEL_EINT3_EINT0, &uio);
-		system_register_isr(EV_EXT1, cb);
-
-		/* set EINT01CTL */
-		gpio_ctrl = (uint32_t *) (0x40005000 + 0x848);
-		*gpio_ctrl |= ((1 << 1) | 1);
-
-		system_irq_unmask(EV_EXT1);
-		break;
-
-	default:
-		E(TT_SDK_GPIO, "[%s] Failed!! Not available external interrupt\n", __func__);
-	}
-
-	return NRC_SUCCESS;
-}
-#endif
-#endif
 
 static void emac_gpio_interrupt_init()
 {
@@ -785,30 +736,47 @@ static void emac_gpio_interrupt_init()
 
     V(TT_NET, "[%s] init ...\n", __func__);
 #ifdef ENABLE_ETHERNET_INTERRUPT
-#ifdef NRC7394
-    if (eth_gpio_register_interrupt_handler(EV_EXT0, GPIO_INT_PIN, w5500_intr_handler) == NRC_SUCCESS) {
-#else // NRC7394
-    gpio_config.gpio_pin = GPIO_INT_PIN;
+    gpio_config.gpio_pin = interrupt_pin;
     gpio_config.gpio_dir = GPIO_INPUT;
-	gpio_config.gpio_mode = GPIO_PULL_DOWN;
     gpio_config.gpio_alt = GPIO_FUNC;
     nrc_gpio_config(&gpio_config);
 
-	if (nrc_gpio_register_interrupt_handler(INT_VECTOR0, GPIO_INT_PIN, w5500_intr_handler) == NRC_SUCCESS) {
+#ifdef NRC7394
+    nrc_gpio_trigger_config(INT_VECTOR0, TRIGGER_LEVEL, TRIGGER_LOW, true);
 #endif
-        system_printf("[%s] Interrupt handler installed...\n", __func__);
+
+    if (nrc_gpio_register_interrupt_handler(INT_VECTOR0, interrupt_pin, w5500_intr_handler) == NRC_SUCCESS) {
+        V(TT_NET, "[%s] Interrupt handler installed...\n", __func__);
     } else {
-        system_printf("[%s] Interrupt handler install failed...\n", __func__);
+        V(TT_NET, "[%s] Interrupt handler install failed...\n", __func__);
     }
 #else // ENABLE_ETHERNET_INTERRUPT
-    gpio_config.gpio_pin = GPIO_INT_PIN;
+    gpio_config.gpio_pin = interrupt_pin;
     gpio_config.gpio_dir = GPIO_INPUT;
-	gpio_config.gpio_mode = GPIO_PULL_UP;
+    gpio_config.gpio_mode = GPIO_PULL_UP;
     gpio_config.gpio_alt = GPIO_FUNC;
     nrc_gpio_config(&gpio_config);
 #endif
     V(TT_NET, "[%s] return ...\n", __func__);
 }
+
+#ifdef ETH_LED_TRX_BLINK
+static void emac_led_init(void)
+{
+    NRC_GPIO_CONFIG gpio_config;
+    gpio_config.gpio_pin = GPIO_TX_LED;
+    gpio_config.gpio_dir = GPIO_OUTPUT;
+    gpio_config.gpio_mode = GPIO_PULL_DOWN;
+    gpio_config.gpio_alt = GPIO_FUNC;
+    nrc_gpio_config(&gpio_config);
+
+    gpio_config.gpio_pin = GPIO_RX_LED;
+    gpio_config.gpio_dir = GPIO_OUTPUT;
+    gpio_config.gpio_mode = GPIO_PULL_DOWN;
+    gpio_config.gpio_alt = GPIO_FUNC;
+    nrc_gpio_config(&gpio_config);
+}
+#endif /* ETH_LED_TRX_BLINK */
 
 static nrc_err_t emac_w5500_init(esp_eth_mac_t *mac)
 {
@@ -819,6 +787,10 @@ static nrc_err_t emac_w5500_init(esp_eth_mac_t *mac)
     isr_arg = (void *) emac;
     /* Initialize GPIO for interrupt or polling */
     emac_gpio_interrupt_init();
+
+#ifdef ETH_LED_TRX_BLINK
+    emac_led_init();
+#endif /* ETH_LED_TRX_BLINK */
 
     V(TT_NET, "[%s] call on_state_changed\n", __func__);
     MAC_CHECK(eth->on_state_changed(eth, ETH_STATE_LLINIT, NULL), err, "lowlevel init failed\n");
@@ -859,38 +831,15 @@ static nrc_err_t emac_w5500_del(esp_eth_mac_t *mac)
     return NRC_SUCCESS;
 }
 
-esp_eth_mac_t *esp_eth_mac_new_w5500(const eth_mac_config_t *mac_config)
+esp_eth_mac_t *esp_eth_mac_new_w5500(spi_device_t *w5500_spi, const eth_mac_config_t *mac_config, int gpio_int_pin)
 {
     esp_eth_mac_t *ret = NULL;
     emac_w5500_t *emac = NULL;
 
-#ifdef SUPPORT_ETHERNET_SPI_DMA
+    interrupt_pin = gpio_int_pin;
+
     I(TT_NET, "[%s] spi_dma_init ....\n", __func__);
-    spi_dma_init();
-#else // SUPPORT_ETHERNET_SPI_DMA
-    I(TT_NET, "[%s] nrc_spi_master_init ....\n", __func__);
-
-#ifdef NRC7394
-    spi_dma.pin_miso = 30;
-    spi_dma.pin_mosi = 29;
-    spi_dma.pin_cs =25;
-    spi_dma.pin_sclk = 28;
-#else
-    w5500_spi.pin_miso = 12;
-    w5500_spi.pin_mosi = 13;
-    w5500_spi.pin_cs =14;
-    w5500_spi.pin_sclk = 15;
-#endif
-    w5500_spi.frame_bits = SPI_BIT8;
-    w5500_spi.clock = 6000000;
-    w5500_spi.mode = SPI_MODE0;
-    w5500_spi.controller = SPI_CONTROLLER_SPI0;
-    w5500_spi.irq_save_flag = 0;
-    w5500_spi.isr_handler = NULL;
-
-    nrc_spi_master_init(&w5500_spi);
-    nrc_spi_enable(&w5500_spi, true);
-#endif // SUPPORT_ETHERNET_SPI_DMA
+    spi_dma_init(w5500_spi);
     _delay_ms(100);
 
     MAC_CHECK_ON_FALSE(mac_config, NULL, err, "invalid argument\n");

@@ -101,4 +101,28 @@ SocketStatus_t Sockets_Connect( int32_t * pTcpSocket,
  */
 SocketStatus_t Sockets_Disconnect( int32_t tcpSocket );
 
+
+/**
+ * @brief Sends data over an established TCP connection.
+ *
+ * @param[in] s The socket descriptor.
+ * @param[in] pBuffer Buffer containing the bytes to send over the network.
+ * @param[in] bytesToSend Number of bytes to send over the network.
+ *
+ * @return Number of bytes sent if successful; negative value on error.
+ */
+int32_t Sockets_Send(int s, const void * pBuffer, size_t bytesToSend );
+
+
+/**
+ * @brief Receives data over an established TCP connection.
+ *
+ * @param[in] s The socket descriptor.
+ * @param[out] pBuffer Buffer to receive network data into.
+ * @param[in] bytesToRecv Number of bytes requested from the network.
+ *
+ * @return Number of bytes received if successful; negative value on error.
+ */
+int32_t Sockets_Recv(int s, void * pBuffer, size_t bytesToRecv );
+
 #endif /* ifndef SOCKETS_POSIX_H_ */

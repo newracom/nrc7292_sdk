@@ -38,6 +38,8 @@
 #define CONFIG_TASK_PRIORITY_IPERF		LWIP_IPERF_TASK_PRIORITY
 #define CONFIG_TASK_STACKSIZE_IPERF		LWIP_IPERF_TASK_STACK_SIZE
 
+#define IPERF_SUPPORT_MULTIPLE_PORT 0
+
 extern void sys_arch_msleep(u32_t delay_ms);
 
 /********************************************************************************/
@@ -46,7 +48,7 @@ extern void sys_arch_msleep(u32_t delay_ms);
 ({ \
 	 int warn_on = !!(condition); \
 	 if(warn_on) \
-		 A("[WARN] %s at %s:%d\n", __FUNCTION__, __FILE__, __LINE__); \
+		 CPA("[WARN] %s at %s:%d\n", __FUNCTION__, __FILE__, __LINE__); \
 	 warn_on; \
  })
 
@@ -134,7 +136,7 @@ static void list_del (struct list_head *entry)
 			pos = n, n = list_next_entry(n, member))
 
 /********************************************************************************/
-
+#if !defined(DISABLE_IPERF_APP)
 #if defined(LWIP_IPERF) && (LWIP_IPERF == 1)
 
 static spinlock_t iperf_lock = {
@@ -221,9 +223,21 @@ int iperf_get_time (iperf_time_t *time)
 	return 0;
 }
 
+bool iperf_time_expried(iperf_time_t start_time, iperf_time_t duration)
+{
+	iperf_time_t now;
+	iperf_get_time(&now);
+
+	if(now >= start_time+duration)
+		return true;
+	else
+		return false;
+}
+
 uint32_t byte_to_bps (iperf_time_t time, uint32_t byte)
 {
-	return (8 * byte) / time;
+	iperf_time_t divide_time = (time == 0.0) ? (1.0) : time;
+	return (8 * byte) / divide_time;
 }
 
 char *byte_to_string (uint32_t byte)
@@ -256,65 +270,76 @@ char *bps_to_string (uint32_t bps)
 
 static void iperf_option_help (char *cmd)
 {
-	A("Usage: %s <-s|-c host> [options]\n", cmd);
-	A("\r\n");
-	A("Client/Server:\n");
-	A("  -b, --bandwidth #[kmKM]  bandwidth to send at in bits/sec or packets per second\n");
-	A("  -p, --port #          server port to listen on/connect to (default: %d)\n", IPERF_DEFAULT_SERVER_PORT);
-	A("  -u, --udp             use UDP rather than TCP\n");
-	A("  -S, --tos #           set the socket's IP_TOS (byte) field\n");
-	A("  -i, --interval  #        seconds between periodic bandwidth reports\n");
-	A("\r\n");
+	CPA("Usage: %s <-s|-c host> [options]\n", cmd);
+	CPA("\r\n");
+	CPA("Client/Server:\n");
+	CPA("  -b, --bandwidth #[kmKM]  bandwidth to send at in bits/sec or packets per second\n");
+	CPA("  -p, --port #          server port to listen on/connect to (default: %d)\n", IPERF_DEFAULT_SERVER_PORT);
+	CPA("  -u, --udp             use UDP rather than TCP\n");
+	CPA("  -S, --tos #           set the socket's IP_TOS (byte) field\n");
+	CPA("  -i, --interval  #     seconds between periodic bandwidth reports\n");
+	CPA("  -g, --sendInterval #    use TCP data send interval(ms)\n");
+	CPA("  -N, --nodelay         set TCP no delay, disabling Nagle's Algorithm\n");
+	CPA("\r\n");
 
-	A("Server specific:\n");
-	A("  -s, --server          run in server mode\n");
-	A("\r\n");
+	CPA("Server specific:\n");
+	CPA("  -s, --server          run in server mode\n");
+	CPA("\r\n");
 
-	A("Client specific:\n");
-	A("  -c, --client <host>   run in client mode, connecting to <host>\n");
-	A("  -t, --time #          time in seconds to transmit for (default: %d sec)\n", IPERF_DEFAULT_SEND_TIME);
-	A("\r\n");
+	CPA("Client specific:\n");
+	CPA("  -c, --client <host>   run in client mode, connecting to <host>\n");
+	CPA("  -t, --time #          time in seconds to transmit for (default: %d sec)\n", IPERF_DEFAULT_SEND_TIME);
+	CPA("\r\n");
 
-	A("Miscellaneous:\n");
-	A("  -h, --help            print this message and quit\n");
-	A("\r\n");
+	CPA("Miscellaneous:\n");
+	CPA("  -h, --help            print this message and quit\n");
+	CPA("\r\n");
 }
 
 #if 0
 static void iperf_option_print (iperf_opt_t *option)
 {
 
-	A("[ IPERF OPTION ]\n");
-	A(" - Role: %s\n", (option->mThreadMode == kMode_Server)? "Server" :
+	CPA("[ IPERF OPTION ]\n");
+	CPA(" - Role: %s\n", (option->mThreadMode == kMode_Server)? "Server" :
 		 (option->mThreadMode == kMode_Client)? "Client"  : "unknown");
-	A(" - Protocol: %s\n", option->mUDP ? "UDP" : "TCP");
-	A(" - mPort: %d\n", option->mPort);
+	CPA(" - Protocol: %s\n", option->mUDP ? "UDP" : "TCP");
+	CPA(" - mPort: %d\n", option->mPort);
 
 	if (option->mThreadMode == kMode_Server){
-		A(" - server_ip: %s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&option->addr)));
+		CPA(" - server_ip: %s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&option->addr)));
 	} else if (option->mThreadMode == kMode_Client){
-		A(" - remote ip: %s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&option->addr)));
+		CPA(" - remote ip: %s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&option->addr)));
 	}
 
 	if (option->mUDP) {
-		A(" - Datagram_size: %ld\n", option->mBufLen);
+		CPA(" - Datagram_size: %ld\n", option->mBufLen);
 		if (option->mThreadMode == kMode_Client)
-			A(" - Data Rate[bps]: %ld\n", option->mAppRate);
+			CPA(" - Data Rate[bps]: %ld\n", option->mAppRate);
 	}
-	A(" - Time: %ld [sec]\n",(option->mAmount)/100);
-	A(" - TOS: %d\n", option->mTOS);
-	A("\r\n\n");
+	CPA(" - Time: %ld [sec]\n",(option->mAmount)/100);
+	CPA(" - TOS: %d\n", option->mTOS);
+	CPA("\r\n\n");
 }
 #endif
 
 iperf_opt_t * iperf_option_alloc(void)
 {
 	iperf_opt_t* option = NULL;
+	int i = 0;
 
-	option = (iperf_opt_t *)mem_malloc(sizeof(iperf_opt_t));
-	if (option == NULL) {
-		A("%s memory allocation fail!\n", module_name());
-		return NULL;
+	while(1) {
+		option = (iperf_opt_t *)mem_malloc(sizeof(iperf_opt_t));
+		if(option)
+			break;
+
+		if(i == 50){
+			CPA("%s memory allocation fail!\n", module_name());
+			return NULL;
+		} else {
+			sys_arch_msleep(100);
+			i++;
+		}
 	}
 	memset(option, 0x0, sizeof(iperf_opt_t));
 	return option;
@@ -365,9 +390,9 @@ static void nrc_iperf_list_print(void)
 	struct iperf_task *cur, *next;
 
 	list_for_each_entry_safe(cur, next, &iperf_head, list) {
-		A("%s ", (cur->option->mUDP == 1) ?  "UDP" : "TCP");
-		A("%s :", (cur->option->mThreadMode == kMode_Server) ?  "Server" : "Client");
-		A("%s\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&cur->option->addr)));
+		CPA("%s ", (cur->option->mUDP == 1) ?  "UDP" : "TCP");
+		CPA("%s :", (cur->option->mThreadMode == kMode_Server) ?  "Server" : "Client");
+		CPA("%s:%d\n", ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&cur->option->addr)),cur->option->mPort);
 	}
 }
 
@@ -375,10 +400,14 @@ int nrc_iperf_task_list_add(iperf_opt_t* option)
 {
 	struct iperf_task *task;
 	struct iperf_task *cur, *next;
+	int i = 0;
 
 	nrc_iperf_spin_lock();
 	list_for_each_entry_safe(cur, next, &iperf_head, list) {
 		if ((option->mThreadMode == cur->option->mThreadMode) &&
+#if IPERF_SUPPORT_MULTIPLE_PORT
+				(option->mPort == cur->option->mPort) &&
+#endif
 				(option->mUDP == cur->option->mUDP) &&
 				(ip_addr_cmp(&cur->option->addr,&option->addr))) {
 			nrc_iperf_spin_unlock();
@@ -387,10 +416,19 @@ int nrc_iperf_task_list_add(iperf_opt_t* option)
 	}
 	nrc_iperf_spin_unlock();
 
-	task = mem_malloc(sizeof(struct iperf_task));
-	if (!task)
-		return -1;
+	while(1) {
+		task = mem_malloc(sizeof(struct iperf_task));
+		if(task)
+			break;
 
+		if(i == 50){
+			CPA("%s memory allocation fail!\n", module_name());
+			return -1;
+		} else {
+			sys_arch_msleep(100);
+			i++;
+		}
+	}
 	task->option = option;
 	INIT_LIST_HEAD(&task->list);
 
@@ -409,6 +447,9 @@ int nrc_iperf_task_list_del(iperf_opt_t* option)
 	nrc_iperf_spin_lock();
 	list_for_each_entry_safe(cur, next, &iperf_head, list) {
 		if ((option->mThreadMode == cur->option->mThreadMode) &&
+#if IPERF_SUPPORT_MULTIPLE_PORT
+				(option->mPort == cur->option->mPort) &&
+#endif
 				(option->mUDP == cur->option->mUDP) &&
 				(ip_addr_cmp(&cur->option->addr,&option->addr))) {
 			list_del(&cur->list);
@@ -427,14 +468,17 @@ void nrc_iperf_periodic_report(void *pvParameters)
 	iperf_opt_t *option = (iperf_opt_t *) pvParameters;
 	iperf_time_t last_report = 0.0;
 	uint64_t last_byte_count_reported = 0;
-	uint64_t sleep_start = 0;
-	uint64_t sleep_end = 0;
-	uint64_t sleep_adjustment = 0;
+	uint64_t processing_start_time = 0;
+	uint64_t processing_end_time = 0;
+	uint64_t processing_time = 0;
+	uint64_t processing_sleep_duration = 0;
+
 	char peer_addr[INET_ADDRSTRLEN];
 
 	while (1) {
 		uint64_t byte = 0;
 		uint32_t bps = 0;
+		processing_start_time = system_get_time();
 
 		if (last_report > 0.0) {
 			iperf_time_t current_time = 0;
@@ -449,18 +493,25 @@ void nrc_iperf_periodic_report(void *pvParameters)
 				last_byte_count_reported = option->server_info.recv_byte;
 			} else if (option->mThreadMode == kMode_Client) {
 				inet_ntop(AF_INET, (struct sockaddr_in *) &option->addr, peer_addr, INET_ADDRSTRLEN);
-				byte = (option->client_info.datagram_cnt * option->mBufLen) - last_byte_count_reported;
-				last_byte_count_reported = option->client_info.datagram_cnt * option->mBufLen;
+				if(option->mUDP == 1) {
+					byte = (option->client_info.datagram_cnt * option->mBufLen) - last_byte_count_reported;
+					last_byte_count_reported = option->client_info.datagram_cnt * option->mBufLen;
+				} else {
+					byte = (option->client_info.send_byte) - last_byte_count_reported;
+					last_byte_count_reported = option->client_info.send_byte;
+				}
 			} else {
 				break;
 			}
 
+			nrc_iperf_spin_lock();
 			bps = (byte * 8)/(option->mInterval / 1000.0);
-			A("[%15s]  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec\n",
-			  peer_addr,
+			CPA("[%15s][%c]  %4.1f - %4.1f sec  %7sBytes  %7sbits/sec\n",
+			  peer_addr, (option->mThreadMode == kMode_Server) ? 'S' : 'C',
 			  (last_report - option->mInterval) / 1000,
 			  last_report / 1000,
 			  byte_to_string(byte), bps_to_string(bps));
+			nrc_iperf_spin_unlock();
 
 			if (option->mThreadMode == kMode_Server) {
 				if (option->server_info.send_time) {
@@ -477,18 +528,16 @@ void nrc_iperf_periodic_report(void *pvParameters)
 				}
 			}
 		}
-
+		processing_end_time = system_get_time();
+		processing_time = processing_end_time - processing_start_time;
+		processing_sleep_duration = (option->mInterval > processing_time) ? (option->mInterval - processing_time) : 1;
 		last_report += option->mInterval;
 
-		sleep_start = system_get_time();
-		sys_arch_msleep(option->mInterval - sleep_adjustment);
-		sleep_end = system_get_time();
-		sleep_adjustment = (sleep_end - sleep_start) - option->mInterval;
+		if (ulTaskNotifyTake(pdTRUE, processing_sleep_duration) == pdTRUE) {
+			break;
+		}
 	}
-
-	if (option->mThreadMode == kMode_Server) {
-		option->server_info.periodic_report_task = NULL;
-	}
+	xTaskNotifyGive(option->task_handle);
 	vTaskDelete(NULL);
 }
 
@@ -500,6 +549,9 @@ static iperf_opt_t* nrc_iperf_task_get(iperf_opt_t* option)
 	nrc_iperf_spin_lock();
 	list_for_each_entry_safe(cur, next, &iperf_head, list) {
 		if ((option->mThreadMode == cur->option->mThreadMode) &&
+#if IPERF_SUPPORT_MULTIPLE_PORT
+				(option->mPort == cur->option->mPort) &&
+#endif
 				(option->mUDP == cur->option->mUDP) &&
 				(ip_addr_cmp(&cur->option->addr,&option->addr))) {
 			ret_opt = cur->option;
@@ -539,13 +591,15 @@ static int check_destination_address(iperf_opt_t* option)
 
 static int iperf_start_session(iperf_opt_t* option, void *report_cb)
 {
+	BaseType_t task_ret;
+
 	if(check_destination_address(option) < 0){
-		A("%s Destination address is own address\n",	module_name());
+		CPA("%s Destination address is own address\n",	module_name());
 		return -1;
 	}
 
 	if(nrc_iperf_task_get(option)){
-		A("Failed : %s %s : %s\n", (option->mUDP == 1) ?  "UDP" : "TCP",
+		CPA("Failed : %s %s : %s\n", (option->mUDP == 1) ?  "UDP" : "TCP",
 				(option->mThreadMode == kMode_Server) ?  "Server" : "Client",
 				(ip4addr_ntoa((const ip4_addr_t*)ip_2_ip4(&option->addr))));
 		return -1;
@@ -553,26 +607,29 @@ static int iperf_start_session(iperf_opt_t* option, void *report_cb)
 
 	if(option->mThreadMode == kMode_Server){
 		if(option->mUDP){
-			A("%s udp server\n", __func__);
-			xTaskCreate(iperf_udp_server, "udp_server_task",
-				CONFIG_TASK_STACKSIZE_IPERF, (void*)option, CONFIG_TASK_PRIORITY_IPERF, NULL);
+			task_ret = xTaskCreate(iperf_udp_server, "iperf_udp_server_task",
+				CONFIG_TASK_STACKSIZE_IPERF, (void*)option, CONFIG_TASK_PRIORITY_IPERF, &option->task_handle);
 		}else{
-			A("%s tcp server\n", __func__);
-			xTaskCreate(iperf_tcp_server, "tcp_server_task",
-				CONFIG_TASK_STACKSIZE_IPERF, (void*)option, CONFIG_TASK_PRIORITY_IPERF, NULL);
+			task_ret = xTaskCreate(iperf_tcp_server, "iperf_tcp_server_task",
+				CONFIG_TASK_STACKSIZE_IPERF, (void*)option, CONFIG_TASK_PRIORITY_IPERF, &option->task_handle);
 		}
 	}else{
 		if(option->mUDP){
-			A("%s udp client\n", __func__);
-			xTaskCreate(iperf_udp_client, "udp_client_task",
-				CONFIG_TASK_STACKSIZE_IPERF, (void*)option, CONFIG_TASK_PRIORITY_IPERF, NULL);
+			task_ret = xTaskCreate(iperf_udp_client, "iperf_udp_client_task",
+				CONFIG_TASK_STACKSIZE_IPERF, (void*)option, CONFIG_TASK_PRIORITY_IPERF, &option->task_handle);
 		}else{
-			A("%s tcp client\n", __func__);
-			xTaskCreate(iperf_tcp_client, "tcp_client_task",
-				CONFIG_TASK_STACKSIZE_IPERF, (void*)option, CONFIG_TASK_PRIORITY_IPERF, NULL);
+			task_ret = xTaskCreate(iperf_tcp_client, "iperf_tcp_client_task",
+				CONFIG_TASK_STACKSIZE_IPERF, (void*)option, CONFIG_TASK_PRIORITY_IPERF, &option->task_handle);
 		}
 	}
-	return 0;
+
+	nrc_iperf_spin_lock();
+	CPA("%s %s %s : %s", __func__,(option->mUDP) ? "udp":"tcp",
+		(option->mThreadMode == kMode_Server)?"server":"client" ,
+		(task_ret == pdFAIL) ? "Failed!\n" : "Started!\n" );
+	nrc_iperf_spin_unlock();
+
+	return (task_ret == pdFAIL) ? -1: 0;
 }
 
 static int iperf_stop_session(iperf_opt_t* option)
@@ -589,8 +646,6 @@ static int iperf_option_parse (int argc, char *argv[], iperf_opt_t *option)
 {
 	int i;
 	int val = 0;
-	int len = 0;
-	char suffix = '\0';
 	char *str = NULL;
 #if LWIP_IPV4
 	ip4_addr_t ip4;
@@ -624,20 +679,31 @@ static int iperf_option_parse (int argc, char *argv[], iperf_opt_t *option)
 			str = argv[++i];
 			option->mInterval = atoi(str)*1000; // interval in ms
 		}else if(strcmp(str, "-b") == 0){
+			double value = 0.0;
+			int len = 0;
+			char suffix = '\0';
 			str = argv[++i];
+
 			len = strlen(str);
-			suffix = str[len-1];
+			if(str[len-1] == 'm' || str[len-1] == 'M'||str[len-1] == 'k'|| str[len-1] == 'K') {
+				if(len > 1) {
+					suffix = str[len-1];
+					str[len-1] = '\0';
+					value = atof(str);
+				}
+			} else {
+				value = atof(str);
+			}
+
 			switch(suffix) {
 				case 'm': case 'M':
-					str[len-1]='\0';
-					option->mAppRate = atof(str)*MEGA;
+					option->mAppRate = (value == 0.0) ? MAX_IPERF_THROUGHPUT : (value*MEGA);
 					break;
 				case 'k': case 'K':
-					str[len-1]='\0';
-					option->mAppRate = atof(str)*KILO;
+					option->mAppRate = (value == 0.0) ? MAX_IPERF_THROUGHPUT : (value*KILO);
 					break;
 				default:
-					option->mAppRate = atof(str);
+					option->mAppRate = (value == 0.0) ? MAX_IPERF_THROUGHPUT : value;
 					break;
 			}
 		}else if(strcmp(str, "-p") == 0){
@@ -650,6 +716,11 @@ static int iperf_option_parse (int argc, char *argv[], iperf_opt_t *option)
 		}else if(strcmp(str, "-l") == 0){
 			str = argv[++i];
 			option->mBufLen = atoi(str);
+		}else if(strcmp(str, "-g") == 0){
+			str = argv[++i];
+			option->mSendInterval = atoi(str);
+		}else if(strcmp(str, "-N") == 0){
+			option->mNodelay = true;
 		}else if(strcmp(str , "stop") == 0) {
 			option->mForceStop = true;
 			return 0;
@@ -660,7 +731,7 @@ static int iperf_option_parse (int argc, char *argv[], iperf_opt_t *option)
 			iperf_option_help(argv[0]);
 			return -2;
 		}else{
-			A("%s unknown options : %s\n",
+			CPA("%s unknown options : %s\n",
 				module_name(), str);
 			return -1;
 		}
@@ -677,6 +748,9 @@ static void iperf_init_parameters(iperf_opt_t * option)
 	option->mAmount       = IPERF_DEFAULT_SEND_TIME*100;          // -t,  10 seconds
 	option->mTOS          = 0;           // -S,  ie. don't set type of service
 	option->mAppRate       = 1000*1000;          // -b,  1 Mbps
+	option->mSendInterval        = 0;          // -g
+	option->mNodelay        = false;          // -N
+	option->task_handle    = NULL;
 	memset(&option->addr, 0, sizeof(ip_addr_t));
 }
 
@@ -723,11 +797,11 @@ int  iperf_run(int argc, char *argv[], void *report_cb)
 
 	// Make thread info structure & set default value
 	option = iperf_option_alloc();
-	iperf_init_parameters(option);
 	if(option == NULL){
-		A("iperf parameter init fail!!\n");
+		CPA("iperf parameter init fail!!\n");
 		return false;
 	}
+	iperf_init_parameters(option);
 
 	ret = iperf_option_parse(argc, argv, option);
 	if(ret <0){
@@ -779,17 +853,29 @@ int  iperf_run(int argc, char *argv[], void *report_cb)
 int iperf_send(int fd, const char *buf, int count,
 	const struct sockaddr *to, socklen_t tolen)
 {
-    int r;
-    int nleft = count;
+	int r;
+	int nleft = count;
 	int flags = 0;
-    while (nleft > 0) {
+	int err_retry = 0;
+
+	while (nleft > 0) {
 		r = sendto(fd, buf, nleft, flags, to, tolen);
-		if (r >= 0) {
+		if(r < 0){
+			if (r == ERR_TIMEOUT || r == ERR_WOULDBLOCK) {
+				if(err_retry++ < 3) {
+					sys_arch_msleep(100);
+				} else {
+					return -1;
+				}
+			}
+		} else {
+			err_retry = 0;
 			nleft -= r;
 			buf += r;
 		}
-    }
-    return count;
+	}
+	return count;
 }
 
 #endif /* LWIP_IPERF */
+#endif /*!defined(DISABLE_IPERF_APP) */

@@ -229,8 +229,7 @@ static SocketStatus_t attemptConnection( struct addrinfo * pListHead,
     ( void ) pHostName;
     ( void ) hostNameLength;
 
-    LogDebug(( "Attempting to connect to: Host=%.*s.",
-                ( int32_t ) hostNameLength,
+    LogDebug(( "Attempting to connect to: Host=%s.",
                pHostName ));
 
     /* Attempt to connect to one of the retrieved DNS records. */
@@ -257,8 +256,7 @@ static SocketStatus_t attemptConnection( struct addrinfo * pListHead,
 
     if( returnStatus == SOCKETS_SUCCESS )
     {
-        LogDebug(( "Established TCP connection: Server=%.*s.\n",
-                   ( int32_t ) hostNameLength,
+        LogDebug(( "Established TCP connection: Server=%s.\n",
                    pHostName ));
     }
     else
@@ -394,7 +392,7 @@ SocketStatus_t Sockets_Disconnect( int32_t tcpSocket )
 {
     SocketStatus_t returnStatus = SOCKETS_SUCCESS;
 
-    if( tcpSocket > 0 )
+    if( tcpSocket >= 0 )
     {
         ( void ) shutdown( tcpSocket, SHUT_RDWR );
         ( void ) close( tcpSocket );
@@ -407,4 +405,77 @@ SocketStatus_t Sockets_Disconnect( int32_t tcpSocket )
 
     return returnStatus;
 }
+
+int32_t Sockets_Send(int s, const void * pBuffer, size_t bytesToSend )
+{
+	int32_t bytesSent = -1, selectStatus = -1, getTimeoutStatus = -1;
+	struct timeval sendTimeout;
+	socklen_t sendTimeoutLen;
+	fd_set writefds;
+
+	sendTimeoutLen = ( socklen_t ) sizeof( sendTimeout );
+	getTimeoutStatus = getsockopt( s, SOL_SOCKET, SO_SNDTIMEO, &sendTimeout, &sendTimeoutLen );
+	if( getTimeoutStatus < 0 ) {
+	    sendTimeout.tv_sec = 0;
+	    sendTimeout.tv_usec = 0;
+	}
+
+	FD_SET( s, &writefds );
+
+	selectStatus = select(s+ 1, NULL, &writefds, NULL, &sendTimeout );
+
+	if( selectStatus > 0 ) {
+	    bytesSent = ( int32_t ) send( s, pBuffer, bytesToSend, 0 );
+	} else if( selectStatus < 0 ) {
+	    bytesSent = -1;
+	} else {
+	    bytesSent = 0;
+	}
+
+	if( ( selectStatus > 0 ) && ( bytesSent == 0 ) ) {
+	    bytesSent = -1;
+	} else if( bytesSent < 0 ) {
+		LogError(( "Sockets_Send: %d.", errno));
+	}
+
+	return bytesSent;
+}
+
+
+int32_t Sockets_Recv(int s, void * pBuffer, size_t bytesToRecv )
+{
+    int32_t bytesReceived = -1, selectStatus = -1, getTimeoutStatus = -1;
+    struct timeval recvTimeout;
+    socklen_t recvTimeoutLen;
+    fd_set readfds;
+
+    recvTimeoutLen = ( socklen_t ) sizeof( recvTimeout );
+    getTimeoutStatus = getsockopt(s, SOL_SOCKET,  SO_RCVTIMEO,  &recvTimeout,  &recvTimeoutLen );
+    if( getTimeoutStatus < 0 ) {
+        recvTimeout.tv_sec = 0;
+        recvTimeout.tv_usec = 0;
+    }
+
+    FD_ZERO( &readfds );
+    FD_SET(s, &readfds );
+
+    selectStatus = select(s + 1, &readfds, NULL, NULL, &recvTimeout );
+
+    if( selectStatus > 0 ) {
+        bytesReceived = ( int32_t ) recv(s,  pBuffer,  bytesToRecv,  0 );
+    } else if( selectStatus < 0 ) {
+        bytesReceived = -1;
+    } else {
+        bytesReceived = 0;
+    }
+
+    if( ( selectStatus > 0 ) && ( bytesReceived == 0 ) ) {
+        bytesReceived = -1;
+    } else if( bytesReceived < 0 ){
+		LogError(( "Sockets_Recv: %d.", errno));
+    }
+	printf("Sockets_Recv\n");
+    return bytesReceived;
+}
+
 /*-----------------------------------------------------------*/

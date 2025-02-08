@@ -45,7 +45,7 @@
 #define ATCMD_WIFI_SECURITY_LEN_MAX		8
 
 #define ATCMD_WIFI_PASSWORD_LEN_MIN		8
-#define ATCMD_WIFI_PASSWORD_LEN_MAX		63
+#define ATCMD_WIFI_PASSWORD_LEN_MAX		64
 
 #define ATCMD_WIFI_IPADDR_LEN_MIN		ATCMD_IPADDR_LEN_MIN
 #define ATCMD_WIFI_IPADDR_LEN_MAX		ATCMD_IPADDR_LEN_MAX
@@ -64,6 +64,7 @@
 #define ATCMD_WIFI_INIT_BSSID			"00:00:00:00:00:00"
 #define ATCMD_WIFI_INIT_SECURITY		"open"
 #define ATCMD_WIFI_INIT_PASSWORD		""
+#define ATCMD_WIFI_INIT_SAE_PWE			2 /* 0:hunting-and-packing, 1:hash-to-element, 2:both */
 
 #define ATCMD_WIFI_INIT_PING_INTERVAL	1000
 #define ATCMD_WIFI_INIT_PING_COUNT		5
@@ -119,6 +120,14 @@ enum ATCMD_WIFI_EVENT
 	ATCMD_WIFI_EVT_MAX
 };
 
+enum ATCMD_DHCPC_EVENT
+{
+	ATCMD_DHCPC_EVT_RELEASE = 0,
+	ATCMD_DHCPC_EVT_RENEW,
+
+	ATCMD_DHCPC_EVT_MAX,
+};
+
 /**********************************************************************************************/
 
 typedef uint8_t atcmd_wifi_power_t;
@@ -151,6 +160,16 @@ typedef struct
 
 typedef struct
 {
+	bool scanning;
+	int short_interval;
+	int long_interval;
+	int signal_threshold;
+} atcmd_wifi_bgscan_t;
+
+typedef struct
+{
+	bool recovery;
+
 	bool connected;
 	bool connecting;
 	bool disconnecting;
@@ -213,11 +232,25 @@ typedef struct
 	atcmd_wifi_txpower_t txpower;
 
 	atcmd_wifi_scan_t scan;
+	atcmd_wifi_bgscan_t bgscan;
 	atcmd_wifi_connect_t connect;
 	atcmd_wifi_ping_t ping;
 #ifdef CONFIG_ATCMD_SOFTAP
 	atcmd_wifi_softap_t softap;
 #endif
+
+	union
+	{
+		int sae_pwe[4];
+
+		struct
+		{
+			int sae_pwe_sta;
+			int sae_pwe_ap;
+			int sae_pwe_relay_sta;
+			int sae_pwe_relay_ap;
+		};
+	};
 } atcmd_wifi_info_t;
 
 /**********************************************************************************************/
@@ -234,6 +267,8 @@ extern bool atcmd_wifi_lock (void);
 extern bool atcmd_wifi_unlock (void);
 
 extern void atcmd_wifi_deep_sleep_send_event (void);
+
+extern bool atcmd_wifi_softap_active (void);
 
 /**********************************************************************************************/
 #endif /* #ifndef __NRC_ATCMD_WIFI_H__ */

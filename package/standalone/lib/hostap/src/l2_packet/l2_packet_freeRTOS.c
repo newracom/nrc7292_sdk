@@ -109,7 +109,9 @@ int l2_packet_send(struct l2_packet_data *l2, const u8 *dst_addr, u16 proto,
 	if (os_strcmp(l2->ifname, "wlan1") == 0)
 		vif_id = 1;
 
-	if (!l2 || !buf || len < sizeof(struct l2_ethhdr))
+	/* removed : "|| len < sizeof(struct l2_ethhdr)" */
+	/* Some frames without l2 hdr are small in length. (ex eap)*/
+	if (!l2 || !buf)
 		return -1;
 
 	if (l2->l2_hdr){

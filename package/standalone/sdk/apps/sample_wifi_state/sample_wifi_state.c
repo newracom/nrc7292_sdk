@@ -24,9 +24,9 @@
  */
 
 #include "nrc_sdk.h"
+#include "nrc_lwip.h"
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
-
 
 #define MAX_RETRY 10
 
@@ -116,15 +116,8 @@ nrc_err_t run_sample_wifi_state(WIFI_CONFIG *param)
 	}
 
 	/* check if IP is ready */
-	while(1){
-		if (nrc_addr_get_state(0) == NET_ADDR_SET) {
-			nrc_usr_print("[%s] IP ...\n",__func__);
-			break;
-		} else {
-			nrc_usr_print("[%s] IP Address setting State : %d != NET_ADDR_SET(%d) yet...\n",
-						  __func__, nrc_addr_get_state(0), NET_ADDR_SET);
-		}
-		_delay_ms(1000);
+	if (nrc_wait_for_ip(0, param->dhcp_timeout) == NRC_FAIL) {
+		return NRC_FAIL;
 	}
 
 	ap_info = nrc_mem_malloc(sizeof(AP_INFO));
@@ -149,18 +142,22 @@ nrc_err_t run_sample_wifi_state(WIFI_CONFIG *param)
 	}
 
 	for(i = 0 ; i < count ; i++) {
-		/* Repete connection and disconnection every 3 seconds */
+		/* Repeat connection and disconnection every 3 seconds */
 		_delay_ms(interval);
 		if (nrc_wifi_get_state(0) == WIFI_STATE_CONNECTED) {
 			nrc_usr_print("[%s] Trying to DISCONNECT...\n",__func__);
-			if (nrc_wifi_disconnect(0, 5000) != WIFI_SUCCESS) {
+			int try_disconnect = 0;
+			while(nrc_wifi_disconnect(0, 5000) != WIFI_SUCCESS) {
 				nrc_usr_print ("[%s] Fail for Wi-Fi disconnection\n", __func__);
-				return -1;
+				try_disconnect++;
+				if (try_disconnect > MAX_RETRY) {
+					break;
+				}
 			}
 			_delay_ms(2000);
 		} else if (nrc_wifi_get_state(0) == WIFI_STATE_DISCONNECTED) {
 			nrc_usr_print("[%s] Trying to CONNECT... (cnt:%d)\n",__func__, i);
-			for(retry_count=0; retry_count<MAX_RETRY; retry_count++){
+			for(retry_count=0; retry_count < MAX_RETRY; retry_count++){
 				if (wifi_connect(param)!= WIFI_SUCCESS) {
 					nrc_usr_print ("[%s] Fail for Wi-Fi connection, retry:%d\n", __func__, retry_count);
 					_delay_ms(1000);
@@ -171,18 +168,11 @@ nrc_err_t run_sample_wifi_state(WIFI_CONFIG *param)
 				}
 			}
 			if(retry_count == MAX_RETRY)
-				return -1;
+				return NRC_FAIL;
 
 			/* check if IP is ready */
-			while(1){
-				if (nrc_addr_get_state(0) == NET_ADDR_SET) {
-					nrc_usr_print("[%s] IP ...\n",__func__);
-					break;
-				} else {
-					nrc_usr_print("[%s] IP Address setting State : %d != NET_ADDR_SET(%d) yet...\n",
-								  __func__, nrc_addr_get_state(0), NET_ADDR_SET);
-				}
-				_delay_ms(1000);
+			if (nrc_wait_for_ip(0, param->dhcp_timeout) == NRC_FAIL) {
+				return NRC_FAIL;
 			}
 		}
 	}
@@ -191,13 +181,12 @@ nrc_err_t run_sample_wifi_state(WIFI_CONFIG *param)
 		nrc_usr_print("[%s] Trying to DISCONNECT... for exit\n",__func__);
 		if (nrc_wifi_disconnect(0, 5000) != WIFI_SUCCESS) {
 			nrc_usr_print ("[%s] Fail for Wi-Fi disconnection\n", __func__);
-			return -1;
+			return NRC_FAIL;
 		}
 	}
-
 	nrc_usr_print("[%s] End of run_sample_wifi_state!! \n",__func__);
 
-	return 0;
+	return NRC_SUCCESS;
 }
 
 /******************************************************************************

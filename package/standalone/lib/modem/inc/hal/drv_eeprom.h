@@ -1,30 +1,31 @@
 #ifndef __DRV_EEPROM_H__
 #define __DRV_EEPROM_H__
 
-#define EEPROM_I2C_CHANNEL			(I2C_2)
+#define EEPROM_I2C_CHANNEL			(0)
 #define EEPROM_I2C_CLOCK			(400000)
 #define EEPROM_I2C_WIDTH			(I2C_8BIT)
 #define EEPROM_I2C_CLOCK_SOURCE		(0) /* 0:clock controller, 1:PCLK */
 
-#if 1
 #ifndef EEPROM_DEFAULT_SCL
+#ifdef NRC7394
+#define EEPROM_DEFAULT_SCL			(6)
+#else
 #define EEPROM_DEFAULT_SCL			(30)
 #endif
+#endif
 
 #ifndef EEPROM_DEFAULT_SDA
-#define EEPROM_DEFAULT_SDA			(31)
-#endif
+#ifdef NRC7394
+#define EEPROM_DEFAULT_SDA			(7)
 #else
-#ifndef EEPROM_DEFAULT_SCL
-#define EEPROM_DEFAULT_SCL			(17)
-#endif
-
-#ifndef EEPROM_DEFAULT_SDA
-#define EEPROM_DEFAULT_SDA			(16)
+#define EEPROM_DEFAULT_SDA			(31)
 #endif
 #endif
 
 #define CAT24C64_SLAVE_ADDRESS		(0xA0)
+#define EEPROM24FC256_SLAVE_ADDRESS		(0xAE)
+
+#define EEPROM_SLAVE_ADDRESS EEPROM24FC256_SLAVE_ADDRESS
 
 enum i2c_eeprom_type {
 	EEPROM_TYPE_CAT24C64,
@@ -36,6 +37,10 @@ typedef struct _eeprom {
 	int index;
 	uint8_t  slave_address;
 } eeprom_t;
+
+//#define EEPROM_VALIDATION_CHECK_ADDRESS 0x1FFFF
+#define EEPROM_SIZE 4096
+#define EEPROM_VALIDATION_CHECK_ADDRESS (4096-4)
 
 static eeprom_t eeprom_list[EEPROM_TYPE_MAX] = {
 	/**

@@ -47,7 +47,9 @@ static WIFI_CONFIG* g_wifi_config;
  **********************************************************************/
  static nrc_err_t set_wifi_defaults(WIFI_CONFIG* wifi_config)
 {
+#if defined(INCLUDE_TRACE_WAKEUP)
 	nrc_usr_print("[%s]\n", __func__);
+#endif
 
 	if (!wifi_config)
 		return NRC_FAIL;
@@ -62,6 +64,7 @@ static WIFI_CONFIG* g_wifi_config;
 	memset(wifi_config->pmk_pw,  0x0,  (MAX_PW_LENGTH+1));
 	nrc_set_default_scan_channel(wifi_config);
 	wifi_config->channel = NRC_WIFI_CHANNEL;
+	wifi_config->nons1g_freq = STAGetNonS1GFreq(wifi_config->channel);
 	wifi_config->bw = NRC_AP_SET_CHANNEL_BW;
 	wifi_config->bcn_interval =  NRC_WIFI_BCN_INTERVAL;
 	wifi_config->ip_mode = NRC_WIFI_IP_MODE;
@@ -78,6 +81,7 @@ static WIFI_CONFIG* g_wifi_config;
 	wifi_config->dhcp_server = NRC_WIFI_SOFTAP_DHCP_SERVER;
 	wifi_config->conn_timeout = WIFI_CONN_TIMEOUT;
 	wifi_config->disconn_timeout = WIFI_DISCONN_TIMEOUT;
+	wifi_config->dhcp_timeout = NRC_DHCP_TIMEOUT;
 	wifi_config->bss_max_idle = WIFI_BSS_MAX_IDLE;
 	wifi_config->bss_retry_cnt = WIFI_BSS_RETRY_CNT;
 	wifi_config->device_mode = WIFI_DEVICE_MODE;
@@ -89,10 +93,25 @@ static WIFI_CONFIG* g_wifi_config;
 	wifi_config->ignore_broadcast_ssid = NRC_WIFI_IGNORE_BROADCAST_SSID_DEFAULT;
 	wifi_config->max_num_sta = NRC_WIFI_SOFTAP_MAX_NUM_STA_DEFAULT;
 	wifi_config->listen_interval = NRC_WIFI_LISTEN_INTERVAL_DEFAULT;
+	wifi_config->scan_mode = NRC_WIFI_SCAN_MODE;
+	wifi_config->eap_type = NRC_WIFI_EAP_TYPE;
+	memcpy(wifi_config->identity,  NRC_WIFI_IDENTITY,  sizeof(NRC_WIFI_IDENTITY));
+	memcpy(wifi_config->private_key_password,  NRC_WIFI_PRIVATE_KEY_PASSWORD,  sizeof(NRC_WIFI_PRIVATE_KEY_PASSWORD));
+	wifi_config->eap_ca_cert = (strcmp(NRC_WIFI_EAP_CA_CERT, "") == 0) ? NULL : NRC_WIFI_EAP_CA_CERT;
+	wifi_config->eap_client_cert = (strcmp(NRC_WIFI_EAP_CLIENT_CERT, "") == 0) ? NULL : NRC_WIFI_EAP_CLIENT_CERT;
+	wifi_config->eap_private_key = (strcmp(NRC_WIFI_EAP_PRIVATE_KEY, "") == 0) ? NULL : NRC_WIFI_EAP_PRIVATE_KEY;
+	wifi_config->sae_pwe = NRC_WIFI_SAE_PWE;
+	wifi_config->bgscan_enable = NRC_WIFI_BGSCAN_ENABLE;
+	wifi_config->bgscan_short = NRC_WIFI_BGSCAN_SHORT_INTERVAL;
+	wifi_config->bgscan_thresh = NRC_WIFI_BGSCAN_THRSHOLD;
+	wifi_config->bgscan_long = NRC_WIFI_BGSCAN_LONG_INTERVAL;
+	wifi_config->auth_control = NRC_WIFI_AUTH_CONTROL;
+	wifi_config->ps_mode = NRC_WIFI_PS_MODE_DEFAULT;
+	wifi_config->ps_idle = NRC_WIFI_PS_IDLE_TIMEOUT_DEFAULT;
+	wifi_config->ps_sleep = NRC_WIFI_PS_SLEEP_TIME_DEFAULT;
 
 	return NRC_SUCCESS;
 }
-
 
 /*********************************************************************
  * @brief save wifi configration data
@@ -159,6 +178,7 @@ nrc_err_t nrc_save_wifi_config(WIFI_CONFIG* wifi_config, int rewrite)
 	nvs_set_u8(nvs_handle, NVS_DHCP_SERVER_ON_WLAN, (uint8_t)wifi_config->dhcp_server);
 	nvs_set_i32(nvs_handle, NVS_WIFI_CONN_TIMEOUT, (int32_t)wifi_config->conn_timeout);
 	nvs_set_i32(nvs_handle, NVS_WIFI_DISCONN_TIMEOUT, (int32_t)wifi_config->disconn_timeout);
+	nvs_set_i32(nvs_handle, NVS_DHCP_TIMEOUT, (int32_t)wifi_config->dhcp_timeout);
 	nvs_set_i32(nvs_handle, NVS_BSS_MAX_IDLE, (int32_t)wifi_config->bss_max_idle);
 	nvs_set_u8(nvs_handle, NVS_DEVICE_MODE, (uint8_t)wifi_config->device_mode);
 	nvs_set_u8(nvs_handle, NVS_NETWORK_MODE, (uint8_t)wifi_config->network_mode);
@@ -169,6 +189,34 @@ nrc_err_t nrc_save_wifi_config(WIFI_CONFIG* wifi_config, int rewrite)
 	nvs_set_u8(nvs_handle, NVS_WIFI_IGNORE_BROADCAST_SSID , (uint8_t)wifi_config->ignore_broadcast_ssid);
 	nvs_set_u8(nvs_handle, NVS_WIFI_SOFTAP_MAX_NUM_STA, (uint8_t)wifi_config->max_num_sta);
 	nvs_set_u16(nvs_handle, NVS_WIFI_LISTEN_INTERVAL, (uint16_t)wifi_config->listen_interval);
+	nvs_set_u8(nvs_handle, NVS_WIFI_SCAN_MODE, (uint8_t)wifi_config->scan_mode);
+	nvs_set_u8(nvs_handle, NVS_EAP_TYPE, (uint8_t)wifi_config->eap_type);
+	nvs_set_str(nvs_handle, NVS_EAP_IDENTITY, (char*)wifi_config->identity);
+	nvs_set_str(nvs_handle, NVS_EAP_PRIVATE_KEY_PASSWORD, (char*)wifi_config->private_key_password);
+	nvs_set_u8(nvs_handle, NVS_SAE_PWE, (uint8_t)wifi_config->sae_pwe);
+	nvs_set_u8(nvs_handle, NVS_BGSCAN_ENABLE, (uint8_t)wifi_config->bgscan_enable);
+	nvs_set_u16(nvs_handle, NVS_BGSCAN_SHORT_INTERVAL, (uint16_t)wifi_config->bgscan_short);
+	nvs_set_i16(nvs_handle, NVS_BGSCAN_THRESHOLD, (int16_t)wifi_config->bgscan_thresh);
+	nvs_set_u16(nvs_handle, NVS_BGSCAN_LONG_INTERVAL, (uint16_t)wifi_config->bgscan_long);
+	nvs_set_u8(nvs_handle, NVS_WIFI_AUTH_CTRL, (uint8_t)wifi_config->auth_control);
+	nvs_set_u8(nvs_handle, NVS_PS_DEEPSLEEP_MODE, (uint8_t)wifi_config->ps_mode);
+	nvs_set_u16(nvs_handle, NVS_PS_IDLE_TIMEOUT, (uint8_t)wifi_config->ps_idle);
+	nvs_set_u32(nvs_handle, NVS_PS_SLEEP_TIME, (uint8_t)wifi_config->ps_sleep);
+
+	if(wifi_config->eap_ca_cert != NULL) {
+		size_t cert_size = strlen(wifi_config->eap_ca_cert) + 1;  // +1 for the null terminator
+		nvs_set_blob(nvs_handle, NVS_EAP_CA_CERT, (char*)wifi_config->eap_ca_cert, cert_size);
+	}
+
+	if(wifi_config->eap_client_cert != NULL) {
+		size_t client_cert_size = strlen(wifi_config->eap_client_cert) + 1;  // +1 for the null terminator
+		nvs_set_blob(nvs_handle, NVS_EAP_CLIENT_CERT, (char*)wifi_config->eap_client_cert, client_cert_size);
+	}
+
+	if(wifi_config->eap_private_key != NULL) {
+		size_t private_key_size = strlen(wifi_config->eap_private_key) + 1;	// +1 for the null terminator
+		nvs_set_blob(nvs_handle, NVS_EAP_PRIVATE_KEY, (char*)wifi_config->eap_private_key, private_key_size);
+	}
 
 	err = nvs_commit(nvs_handle);
 	if (NVS_OK != err)
@@ -204,6 +252,8 @@ failed:
 void print_settings(WIFI_CONFIG* wifi_config)
 {
 #if defined(DISPLAY_WIFI_CONFIG_SETTING) && (DISPLAY_WIFI_CONFIG_SETTING == 1)
+	const char *eap_type[WIFI_EAP_MAX] = {"NONE", "TLS", "TTLS", "PEAP"};
+
 	nrc_usr_print("\n-----------------------------------------------\n");
 	nrc_usr_print("[%s] wifi settings:\n\n", __func__);
 	nrc_usr_print("ssid %s\n", wifi_config->ssid);
@@ -214,6 +264,11 @@ void print_settings(WIFI_CONFIG* wifi_config)
 	nrc_usr_print("pmk %s\n", wifi_config->pmk);
 	nrc_usr_print("pmk_ssid %s\n", wifi_config->pmk_ssid);
 	nrc_usr_print("pmk_pw %s\n", wifi_config->pmk_pw);
+	nrc_usr_print("sae_pwe %s\n", wifi_config->sae_pwe);
+	nrc_usr_print("bgscan_enable %d\n", wifi_config->bgscan_enable);
+	nrc_usr_print("bgscan_short %d\n", wifi_config->bgscan_short);
+	nrc_usr_print("bgscan_thresh %d\n", wifi_config->bgscan_thresh);
+	nrc_usr_print("bgscan_long %d\n", wifi_config->bgscan_long);
 	nrc_usr_print("scan_freq_num %d\n", wifi_config->scan_freq_num);
 	for(int i=0; i<wifi_config->scan_freq_num; i++) {
 		nrc_usr_print("%d \n", wifi_config->scan_freq_list[i]);
@@ -222,7 +277,7 @@ void print_settings(WIFI_CONFIG* wifi_config)
 	nrc_usr_print("channel %d\n", wifi_config->channel);
 	nrc_usr_print("bw %d\n", wifi_config->bw);
 	nrc_usr_print("bcn interval %d\n", wifi_config->bcn_interval);
-	nrc_usr_print("short bcn interval %d\n", wifi_config->short_bcn_interval);
+	nrc_usr_print("short bcn interval %d\n", wifi_config->bcn_interval);
 	nrc_usr_print("ip_mode %d [%s]\n", wifi_config->ip_mode,
 		( wifi_config->ip_mode == 0) ? "Static IP" : "Dynamic IP");
 	nrc_usr_print("static ip %s\n", wifi_config->static_ip);
@@ -238,6 +293,7 @@ void print_settings(WIFI_CONFIG* wifi_config)
 	nrc_usr_print("dhcp_server %d\n", wifi_config->dhcp_server);
 	nrc_usr_print("conn_timeout %d\n", wifi_config->conn_timeout);
 	nrc_usr_print("disconn_timeout %d\n", wifi_config->disconn_timeout);
+	nrc_usr_print("dhcp_timeout %d\n", wifi_config->dhcp_timeout);
 	nrc_usr_print("bss_max_idle %d\n", wifi_config->bss_max_idle);
 	nrc_usr_print("bss_retry_cnt %d\n", wifi_config->bss_retry_cnt);
 	nrc_usr_print("device_mode %d [%s]\n",wifi_config->device_mode,
@@ -250,7 +306,19 @@ void print_settings(WIFI_CONFIG* wifi_config)
 	nrc_usr_print("cca threshol %d\n", wifi_config->cca_thres);
 	nrc_usr_print("ssid_type %d\n", wifi_config->ignore_broadcast_ssid);
 	nrc_usr_print("max_num_sta %d\n", wifi_config->max_num_sta);
-	nrc_usr_print("beacon_cnt %d\n", wifi_config->beacon_cnt);
+	nrc_usr_print("scan_mode %d\n", wifi_config->scan_mode);
+	nrc_usr_print("eap_type %s\n", eap_type[wifi_config->eap_type]);
+	nrc_usr_print("identity %s\n", wifi_config->identity);
+	nrc_usr_print("private_key_password %s\n", wifi_config->private_key_password);
+	nrc_usr_print("eap_ca_cert : %s\n", (wifi_config->eap_ca_cert == NULL) ? "None" : "Exist");
+	nrc_usr_print("eap_client_cert %s\n", (wifi_config->eap_ca_cert == NULL) ? "None" : "Exist");
+	nrc_usr_print("eap_private_key %s\n", (wifi_config->eap_private_key == NULL) ? "None" : "Exist");
+	nrc_usr_print("auth_control %d [%s]\n",wifi_config->auth_control,
+		( wifi_config->auth_control == 0) ? "DISABLE" : "ENABLE");
+	nrc_usr_print("ps_mode %d [%s]\n",wifi_config->ps_mode,
+		( wifi_config->ps_mode == 0) ? "NonTIM" : "TIM");
+	nrc_usr_print("ps_idle %d\n", wifi_config->ps_idle);
+	nrc_usr_print("ps_sleep %d\n", wifi_config->ps_sleep);
 	nrc_usr_print("-----------------------------------------------\n\n");
 #endif
 }
@@ -400,29 +468,18 @@ static int nrc_generate_pmk(char* ssid, const char *passphrase, char *pmk)
 	return true;
 }
 
-
-/*********************************************************************
- * @FunctionName : nrc_wifi_set_config
- * @brief           : set wifi configration data
- * @param wifi configuration ptr
- * @returns nrc_err_t
- **********************************************************************/
-nrc_err_t nrc_wifi_set_config(WIFI_CONFIG* wifi_config)
-{
-	nrc_usr_print("[%s]\n", __func__);
-
-	if (!wifi_config){
-		nrc_usr_print("[%s] wifi_config in NULL\n", __func__);
-	}
-
-	memset(wifi_config, 0x0, sizeof(WIFI_CONFIG));
-	set_wifi_defaults(wifi_config);
-
 #ifdef SUPPORT_NVS_FLASH
-	nvs_err_t err = NVS_OK;
+static nrc_err_t load_wifi_config_from_nvs(WIFI_CONFIG *wifi_config)
+{
 	nvs_handle_t nvs_handle = 0;
-	int32_t nvs_signed_int = 0;
+	nvs_err_t err;
 	size_t length = 0;
+	char *ca_cert = NULL, *client_cert = NULL, *private_key = NULL;
+
+	if (!wifi_config) {
+		nrc_usr_print("[%s] Error: wifi_config is NULL\n", __func__);
+		return NRC_FAIL;
+	}
 
 	err = nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle);
 	if (NVS_OK != err) {
@@ -482,6 +539,7 @@ nrc_err_t nrc_wifi_set_config(WIFI_CONFIG* wifi_config)
 	nvs_get_u8(nvs_handle, NVS_DHCP_SERVER_ON_WLAN, (uint8_t*)&wifi_config->dhcp_server);
 	nvs_get_i32(nvs_handle, NVS_WIFI_CONN_TIMEOUT, (int32_t*)&wifi_config->conn_timeout);
 	nvs_get_i32(nvs_handle, NVS_WIFI_DISCONN_TIMEOUT, (int32_t*)&wifi_config->disconn_timeout);
+	nvs_get_i32(nvs_handle, NVS_DHCP_TIMEOUT, (int32_t*)&wifi_config->dhcp_timeout);
 	nvs_get_i32(nvs_handle, NVS_BSS_MAX_IDLE, (int32_t*)&wifi_config->bss_max_idle);
 	nvs_get_i32(nvs_handle, NVS_BSS_RETRY_CNT, (int32_t*)&wifi_config->bss_retry_cnt);
 	nvs_get_u8(nvs_handle, NVS_DEVICE_MODE, (uint8_t*)&wifi_config->device_mode);
@@ -493,19 +551,128 @@ nrc_err_t nrc_wifi_set_config(WIFI_CONFIG* wifi_config)
 	nvs_get_u8(nvs_handle, NVS_WIFI_IGNORE_BROADCAST_SSID, (uint8_t*)&wifi_config->ignore_broadcast_ssid);
 	nvs_get_u8(nvs_handle, NVS_WIFI_SOFTAP_MAX_NUM_STA, (uint8_t*)&wifi_config->max_num_sta);
 	nvs_get_u16(nvs_handle, NVS_WIFI_LISTEN_INTERVAL, (uint16_t*)&wifi_config->listen_interval);
+	nvs_get_u8(nvs_handle, NVS_WIFI_SCAN_MODE, (uint8_t*)&wifi_config->scan_mode);
+	nvs_get_u8(nvs_handle, NVS_EAP_TYPE, (uint8_t*)&wifi_config->eap_type);
+	length = sizeof(wifi_config->identity);
+	nvs_get_str(nvs_handle, NVS_EAP_IDENTITY, (char *) wifi_config->identity, &length);
+	length = sizeof(wifi_config->private_key_password);
+	nvs_get_str(nvs_handle, NVS_EAP_PRIVATE_KEY_PASSWORD, (char *) wifi_config->private_key_password, &length);
+	nvs_get_u8(nvs_handle, NVS_SAE_PWE, (uint8_t*)&wifi_config->sae_pwe);
+	nvs_get_u8(nvs_handle, NVS_BGSCAN_ENABLE, (uint8_t*)&wifi_config->bgscan_enable);
+	nvs_get_u16(nvs_handle, NVS_BGSCAN_SHORT_INTERVAL, (uint16_t*)&wifi_config->bgscan_short);
+	nvs_get_i16(nvs_handle, NVS_BGSCAN_THRESHOLD, (int16_t*)&wifi_config->bgscan_thresh);
+	nvs_get_u16(nvs_handle, NVS_BGSCAN_LONG_INTERVAL, (uint16_t*)&wifi_config->bgscan_long);
+	nvs_get_u8(nvs_handle, NVS_WIFI_AUTH_CTRL, (uint8_t*)&wifi_config->auth_control);
+	nvs_get_u8(nvs_handle, NVS_PS_DEEPSLEEP_MODE, (uint8_t*)&wifi_config->ps_mode);
+	nvs_get_u16(nvs_handle, NVS_PS_IDLE_TIMEOUT, (uint16_t*)&wifi_config->ps_idle);
+	nvs_get_u32(nvs_handle, NVS_PS_SLEEP_TIME, (uint32_t*)&wifi_config->ps_sleep);
+	err = nvs_get_blob(nvs_handle, NVS_EAP_CA_CERT, NULL, &length);
+	if (err == NVS_OK && length > 0) {
+		ca_cert = nrc_mem_malloc(length);
+		if (ca_cert != NULL) {
+			err = nvs_get_blob(nvs_handle, NVS_EAP_CA_CERT, ca_cert, &length);
+			if (err == NVS_OK) {
+				wifi_config->eap_ca_cert = ca_cert;
+			} else {
+				nrc_mem_free(ca_cert);
+			}
+		}
+	}
+
+	err = nvs_get_blob(nvs_handle, NVS_EAP_CLIENT_CERT, NULL, &length);
+	if (err == NVS_OK && length > 0) {
+		client_cert = nrc_mem_malloc(length);
+		if (client_cert != NULL) {
+			err = nvs_get_blob(nvs_handle, NVS_EAP_CLIENT_CERT, client_cert, &length);
+			if (err == NVS_OK) {
+				wifi_config->eap_client_cert = client_cert;
+			} else {
+				nrc_mem_free(client_cert);
+			}
+		}
+	}
+
+	err = nvs_get_blob(nvs_handle, NVS_EAP_PRIVATE_KEY, NULL, &length);
+	if (err == NVS_OK && length > 0) {
+		private_key = nrc_mem_malloc(length);
+		if (private_key != NULL) {
+			err = nvs_get_blob(nvs_handle, NVS_EAP_PRIVATE_KEY, private_key, &length);
+			if (err == NVS_OK) {
+				wifi_config->eap_private_key = private_key;
+			} else {
+				nrc_mem_free(private_key);
+			}
+		}
+	}
 
 	if (nvs_handle)
 		nvs_close(nvs_handle);
-#else
-	nrc_usr_print("[%s] NVS is not enabled\n", __func__);
+
+	return NRC_SUCCESS;
+}
 #endif /* SUPPORT_NVS_FLASH */
 
+/*********************************************************************
+ * @FunctionName : nrc_wifi_set_config
+ * @brief        : Sets Wi-Fi configuration data.
+ * @param        : wifi_config - Pointer to the Wi-Fi configuration structure.
+ * @returns      : nrc_err_t - NRC_SUCCESS on success, NRC_FAIL on failure.
+ **********************************************************************/
+nrc_err_t nrc_wifi_set_config(WIFI_CONFIG* wifi_config)
+{
+	uint8_t boot = NRC_WAKEUP_REASON_COLDBOOT;
+	uint16_t ret_user_data_size = nrc_ps_get_available_user_data_size();
+
+#if defined(INCLUDE_TRACE_WAKEUP)
+	nrc_usr_print("[%s]\n", __func__);
+#endif
+
+	if (!wifi_config) {
+		nrc_usr_print("[%s] Error: wifi_config is NULL\n", __func__);
+		return NRC_FAIL;
+	}
+
+	memset(wifi_config, 0, sizeof(WIFI_CONFIG));
+	set_wifi_defaults(wifi_config);
+
+	if (nrc_ps_wakeup_reason(&boot) == NRC_SUCCESS) {
+		nrc_usr_print("[%s] Boot reason retrieval success: %d\n", __func__, boot);
+	}
+
+	if(boot == NRC_WAKEUP_REASON_COLDBOOT) {
+#ifdef SUPPORT_NVS_FLASH
+		// Load configuration from NVS flash
+		if (load_wifi_config_from_nvs(wifi_config) != NRC_SUCCESS) {
+			nrc_usr_print("[%s] Error loading Wi-Fi config from NVS\n", __func__);
+		}
+#endif /* SUPPORT_NVS_FLASH */
+
+		// Save configuration to retention memory if space is available
+		if (ret_user_data_size > 0 && ret_user_data_size >= sizeof(WIFI_CONFIG)) {
+			if(nrc_ps_save_user_data(wifi_config, sizeof(WIFI_CONFIG)) != NRC_SUCCESS) {
+				nrc_usr_print("[%s] Error saving Wi-Fi config to retention memory\n", __func__);
+			}
+		}
+	}else {
+		// Load configuration from retention memory if space is available
+		if (ret_user_data_size > 0 && ret_user_data_size >= sizeof(WIFI_CONFIG)) {
+			if(nrc_ps_load_user_data(wifi_config, sizeof(WIFI_CONFIG)) != NRC_SUCCESS) {
+				nrc_usr_print("[%s] Error loading Wi-Fi config from retention memory\n", __func__);
+			}
+		} else {
+#ifdef SUPPORT_NVS_FLASH
+			// Fallback to loading configuration from NVS flash
+			if (load_wifi_config_from_nvs(wifi_config) != NRC_SUCCESS) {
+				nrc_usr_print("[%s] Error loading Wi-Fi config from NVS\n", __func__);
+			}
+#endif /* SUPPORT_NVS_FLASH */
+		}
+	}
 	g_wifi_config = wifi_config;
 
 	print_settings(wifi_config);
 	return NRC_SUCCESS;
 }
-
 
 /*********************************************************************
  * @brief nrc_erase_all_wifi_nvs
@@ -549,6 +716,7 @@ nrc_err_t nrc_erase_all_wifi_nvs(void)
 	nvs_erase_key(nvs_handle, NVS_BSSID);
 	nvs_erase_key(nvs_handle, NVS_WIFI_CONN_TIMEOUT);
 	nvs_erase_key(nvs_handle, NVS_WIFI_DISCONN_TIMEOUT);
+	nvs_erase_key(nvs_handle, NVS_DHCP_TIMEOUT);
 	nvs_erase_key(nvs_handle, NVS_WIFI_BCN_INTERVAL);
 	nvs_erase_key(nvs_handle, NVS_DEVICE_MODE);
 	nvs_erase_key(nvs_handle, NVS_NETWORK_MODE);
@@ -557,6 +725,21 @@ nrc_err_t nrc_erase_all_wifi_nvs(void)
 	nvs_erase_key(nvs_handle, NVS_WIFI_GI);
 	nvs_erase_key(nvs_handle, NVS_WIFI_CCA_THRES);
 	nvs_erase_key(nvs_handle, NVS_WIFI_IGNORE_BROADCAST_SSID);
+	nvs_erase_key(nvs_handle, NVS_WIFI_SOFTAP_MAX_NUM_STA);
+	nvs_erase_key(nvs_handle, NVS_WIFI_LISTEN_INTERVAL);
+	nvs_erase_key(nvs_handle, NVS_WIFI_SCAN_MODE);
+	nvs_erase_key(nvs_handle, NVS_EAP_TYPE);
+	nvs_erase_key(nvs_handle, NVS_EAP_IDENTITY);
+	nvs_erase_key(nvs_handle, NVS_EAP_PRIVATE_KEY_PASSWORD);
+	nvs_erase_key(nvs_handle, NVS_SAE_PWE);
+	nvs_erase_key(nvs_handle, NVS_BGSCAN_ENABLE);
+	nvs_erase_key(nvs_handle, NVS_BGSCAN_SHORT_INTERVAL);
+	nvs_erase_key(nvs_handle, NVS_BGSCAN_THRESHOLD);
+	nvs_erase_key(nvs_handle, NVS_BGSCAN_LONG_INTERVAL);
+	nvs_erase_key(nvs_handle, NVS_WIFI_AUTH_CTRL);
+	nvs_erase_key(nvs_handle, NVS_PS_DEEPSLEEP_MODE);
+	nvs_erase_key(nvs_handle, NVS_PS_IDLE_TIMEOUT);
+	nvs_erase_key(nvs_handle, NVS_PS_SLEEP_TIME);
 
 	if (nvs_handle)
 		nvs_close(nvs_handle);
@@ -569,6 +752,38 @@ nrc_err_t nrc_erase_all_wifi_nvs(void)
 #endif
 }
 
+ /*********************************************************************
+  * @brief nrc_erase_eap_certificate_nvs
+  *
+  * Erase certificate configuration for EAP in NVS
+  *
+  * @param void
+  * @returns nrc_err_t
+  **********************************************************************/
+ nrc_err_t nrc_erase_eap_certificate_nvs(void)
+ {
+#ifdef SUPPORT_NVS_FLASH
+	 nvs_handle_t nvs_handle;
+
+	 if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) != NVS_OK) {
+		 A("nvs open failed.\n");
+		 return NRC_FAIL;
+	 }
+
+	 nvs_erase_key(nvs_handle, NVS_EAP_CA_CERT);
+	 nvs_erase_key(nvs_handle, NVS_EAP_CLIENT_CERT);
+	 nvs_erase_key(nvs_handle, NVS_EAP_PRIVATE_KEY);
+
+	 if (nvs_handle)
+		 nvs_close(nvs_handle);
+
+	 A("Erased certificate related EAP in nvs.\n");
+	 return NRC_SUCCESS;
+#else
+	 nrc_usr_print("[%s] NVS is not enabled\n", __func__);
+	 return NRC_FAIL;
+#endif
+ }
 
  /*********************************************************************
  * @brief get global config

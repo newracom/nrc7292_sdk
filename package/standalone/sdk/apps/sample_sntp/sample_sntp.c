@@ -24,62 +24,19 @@
  */
 
 #include "nrc_sdk.h"
+#include "nrc_lwip.h"
 #include "lwip/sys.h"
 #include "lwip/sockets.h"
 #include "lwip/errno.h"
 #include "wifi_config_setup.h"
 #include "wifi_connect_common.h"
-#include "nrc_lwip.h"
 
 #ifndef MAX_RETRY
 #define MAX_RETRY 30
 #endif
 
-
-extern const char *SNTP_FORMAT_TIME (s32_t sec);
-
-static int month(const char *m)
-{
-    static const char *months[] = {"Jan", "Feb", "Mar", "Apr","May",
-		"Jun", "Jul", "Aug","Sep", "Oct", "Nov", "Dec"};
-
-    for (int i = 0; i < 12; i++) {
-        if (strcmp(m, months[i]) == 0) {
-            return i + 1;
-        }
-    }
-    return 0;
-}
-
-static void get_real_time(char *time)
-{
-    char sntp_time[32];
-    char *ptr[5];
-    char *time_of_day;
-
-    strcpy(sntp_time, SNTP_FORMAT_TIME(get_utc_time()));
-    sntp_time[strlen(sntp_time) - 1] = '\0';
-
-    A("%s: sntp_time %s\n", __func__, sntp_time);
-
-    ptr[0] = strtok(sntp_time, " ");
-    int i = 0;
-
-    while (ptr[i] != NULL && i < 4) {
-        i++;
-        ptr[i] = strtok(NULL, " ");
-    }
-
-    int year = atoi(ptr[4]) % 100;
-    int mon = month(ptr[1]);
-    int day = atoi(ptr[2]);
-    time_of_day = ptr[3];
-
-    sprintf(time, "%02d/%02d/%02d,%s", year, mon, day, time_of_day);
-
-    A("%s: %s\n", __func__, time);
-}
-
+#define SNTP_SERVER "pool.ntp.org"
+#define SNTP_TIMEOUT 60
 
 /****************************************************************************
  * FunctionName : run_sample_sntp
@@ -91,7 +48,7 @@ nrc_err_t run_sample_sntp(WIFI_CONFIG *param)
 {
 	int count;
 	u64_t utc_time = 0;
-	char time[20];
+	char utc_buf[26];
 
 	nrc_usr_print("==========================\n");
 	nrc_usr_print("SNTP Test - Client\n");
@@ -119,25 +76,20 @@ nrc_err_t run_sample_sntp(WIFI_CONFIG *param)
 	}
 
 	/* check if IP is ready */
-	while(1){
-		if (nrc_addr_get_state(0) == NET_ADDR_SET) {
-			nrc_usr_print("[%s] IP ...\n",__func__);
-			break;
-		} else {
-			nrc_usr_print("[%s] IP Address setting State : %d != NET_ADDR_SET(%d) yet...\n",
-						  __func__, nrc_addr_get_state(0), NET_ADDR_SET);
-		}
-		_delay_ms(1000);
+	if (nrc_wait_for_ip(0, param->dhcp_timeout) == NRC_FAIL) {
+		return NRC_FAIL;
 	}
 
-	initialize_sntp();
-	count = MAX_RETRY;
-	while(count-- > 0){
-		utc_time = get_utc_time();
-		A("UTC : %lld\n", utc_time);
-		get_real_time(time);
+	if (initialize_sntp(SNTP_SERVER, SNTP_TIMEOUT) != 0) {
+		nrc_usr_print("%s: timeout %ds", __func__, SNTP_TIMEOUT);
+		return -1;
+	}
+
+	for(int i = 0; i<10; i++) {
+		nrc_usr_print("%s: UTC %s\n", __func__, get_utc_time_str(utc_buf, sizeof(utc_buf)));
 		_delay_ms(2000);
 	}
+
 	return 0;
 }
 

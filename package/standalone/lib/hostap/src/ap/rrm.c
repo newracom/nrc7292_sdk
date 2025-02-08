@@ -152,7 +152,6 @@ static u16 hostapd_parse_location_lci_req_age(const u8 *buf, size_t len)
 	return 0;
 }
 
-
 static int hostapd_check_lci_age(struct hostapd_neighbor_entry *nr, u16 max_age)
 {
 	struct os_time curr, diff;

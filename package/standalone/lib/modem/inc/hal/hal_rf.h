@@ -78,6 +78,7 @@ void nrf_rffe_config(uint8_t rffe);
 void nrf_dcoc_config(uint8_t mode);
 uint8_t hal_rf_set_txpwr(uint8_t txpwr);
 uint8_t hal_rf_get_txpwr(void);
+uint8_t hal_rf_recover_txpwr(uint8_t txpwr);
 void hal_rf_update_txpwr(void);
 uint8_t* hal_rf_get_country(void);
 uint8_t hal_get_rf_cal_use(void);

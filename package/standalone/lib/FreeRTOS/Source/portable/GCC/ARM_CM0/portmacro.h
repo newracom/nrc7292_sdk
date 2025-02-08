@@ -88,6 +88,7 @@ extern void vPortYield( void );
 
 
 /* Critical section management. */
+extern BaseType_t xPortIsInsideInterrupt( void );
 extern void vPortEnterCritical( void );
 extern void vPortExitCritical( void );
 extern uint32_t ulSetInterruptMaskFromISR( void ) __attribute__((naked));
@@ -114,6 +115,26 @@ extern uint32_t drv_lmac_get_tsf_lo(int vif_id);
 #define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()
 #define portGET_RUN_TIME_COUNTER_VALUE() drv_lmac_get_tsf_lo(0)
 #define portALT_GET_RUN_TIME_COUNTER_VALUE(x) do {x = (uint32_t)drv_lmac_get_tsf_lo(0);} while(0)
+#define STACK_START_MARKER      0x95100344
+
+inline __attribute__(( always_inline)) static BaseType_t xPortIsMaskedInterrupt( void )
+{
+uint32_t ulCurrentPRIMASK;
+BaseType_t xReturn;
+
+	__asm volatile( "mrs %0, primask" : "=r" ( ulCurrentPRIMASK ) :: "memory" );
+
+	if( ulCurrentPRIMASK > 0 )
+	{
+		xReturn = pdTRUE;
+	}
+	else
+	{
+		xReturn = pdFALSE;
+	}
+
+	return xReturn;
+}
 #endif /* NRC_FREERTOS */
 
 #ifdef __cplusplus

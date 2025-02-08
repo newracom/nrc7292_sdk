@@ -37,7 +37,7 @@
 /**********************************************************************************************/
 
 #define CONFIG_HIF_RX_TASK_PRIORITY			CONFIG_ATCMD_TASK_PRIORITY
-#define CONFIG_HIF_RX_TASK_STACK_SIZE		((4 * 1024) / sizeof(StackType_t))
+#define CONFIG_HIF_RX_TASK_STACK_SIZE		((8 * 1024) / sizeof(StackType_t))
 
 /**********************************************************************************************/
 

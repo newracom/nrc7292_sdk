@@ -31,8 +31,8 @@ VPATH += $(WPA_SUPP_ROOT)/src/drivers
 VPATH += $(WPA_SUPP_ROOT)/src/ap
 VPATH += $(WPA_SUPP_ROOT)/wpa_supplicant
 
-CONFIG_WPA_SUPP_CRYPTO = mbedtls
-CONFIG_SOFT_AP = y
+CONFIG_WPA_SUPP_CRYPTO=mbedtls
+CONFIG_SOFT_AP=y
 
 include wpa_supplicant/FreeRTOS.config
 include wpa_supplicant/FreeRTOS.make

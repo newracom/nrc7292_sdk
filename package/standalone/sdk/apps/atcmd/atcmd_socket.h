@@ -30,7 +30,11 @@
 #include "lwip_socket.h"
 
 
-#define ATCMD_SOCKET_NUM_MAX			LWIP_SOCKET_NUM_MAX
+#if LWIP_SOCKET_NUM_MAX <= LWIP_SOCKET_EVENT_BIT_MAX
+#define ATCMD_SOCKET_NUM_MAX	LWIP_SOCKET_NUM_MAX
+#else
+#define ATCMD_SOCKET_NUM_MAX	LWIP_SOCKET_EVENT_BIT_MAX
+#endif
 
 #define ATCMD_SOCKET_IPADDR_LEN_MIN		ATCMD_IPADDR_LEN_MIN
 #define ATCMD_SOCKET_IPADDR_LEN_MAX		ATCMD_IPADDR_LEN_MAX
@@ -93,18 +97,18 @@ typedef struct
 #define ATCMD_MSG_SEVENT(fmt, ...)	\
 		ATCMD_MSG_EVENT("SEVENT", fmt, ##__VA_ARGS__)
 
-#define ATCMD_MSG_SRXD(buf, len, fmt, ...)	\
+#define ATCMD_MSG_RXD(buf, len, fmt, ...)	\
 		atcmd_msg_snprint(ATCMD_MSG_TYPE_EVENT, buf, len, "RXD:" fmt, ##__VA_ARGS__)
 
 extern void atcmd_socket_reset (atcmd_socket_t *socket);
 extern int atcmd_socket_enable (void);
 extern void atcmd_socket_disable (void);
-extern int atcmd_socket_send_data (atcmd_socket_t *socket, char *data, int len);
+extern int atcmd_socket_send_data (int id, char *data, int len);
 
-extern int atcmd_socket_event_send_done (int id, uint32_t done);
-extern int atcmd_socket_event_send_idle (int id, uint32_t done, uint32_t drop, uint32_t wait, uint32_t time);
-extern int atcmd_socket_event_send_drop (int id, uint32_t drop);
-extern int atcmd_socket_event_send_exit (int id, uint32_t done, uint32_t drop);
+extern void atcmd_socket_event_send_done (int id, uint32_t done);
+extern void atcmd_socket_event_send_idle (int id, uint32_t done, uint32_t drop, uint32_t wait, uint32_t time);
+extern void atcmd_socket_event_send_drop (int id, uint32_t drop);
+extern void atcmd_socket_event_send_exit (int id, uint32_t done, uint32_t drop);
 
 /**********************************************************************************************/
 #endif /* #ifndef __NRC_ATCMD_SOCKET_H__ */

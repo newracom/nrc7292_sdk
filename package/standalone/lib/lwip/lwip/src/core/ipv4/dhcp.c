@@ -226,6 +226,50 @@ static u16_t dhcp_option_hostname(u16_t options_out_len, u8_t *options, struct n
 /* always add the DHCP options trailer to end and pad */
 static void dhcp_option_trailer(u16_t options_out_len, u8_t *options, struct pbuf *p_out);
 
+
+#if LWIP_DHCP_EVENT
+static dhcp_event_handler_t dhcp_event_handler = NULL;
+
+err_t
+dhcp_event_enable (struct netif *netif, dhcp_event_handler_t handler)
+{
+  LWIP_ERROR("dhcp_event_enable: handler != NULL",
+		  (handler != NULL), return ERR_ARG;);
+  LWIP_ERROR("dhcp_event_enable: dhcp_event_handler == NULL",
+		  (dhcp_event_handler == NULL), return ERR_USE;);
+
+  LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_event_enable()\n"));
+  dhcp_event_handler = handler;
+  return ERR_OK;
+}
+
+void
+dhcp_event_disable (struct netif *netif)
+{
+  LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_event_disable()\n"));
+  dhcp_event_handler = NULL;
+}
+
+static void dhcp_event_send (struct netif *netif, dhcp_event_t event)
+{
+	switch (event)
+	{
+		case DHCP_EVENT_RENEWING:
+		case DHCP_EVENT_RELEASED:
+		case DHCP_EVENT_BOUND:
+			if (dhcp_event_handler)
+				dhcp_event_handler(netif, event);
+			else
+				LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_event_send(): no handler\n"));
+	}
+}
+#else
+static void dhcp_event_send (struct netif *netif, dhcp_event_t event)
+{
+   return;
+}
+#endif /* #if LWIP_DHCP_EVENT */
+
 /** Ensure DHCP PCB is allocated and bound */
 static err_t
 dhcp_inc_pcb_refcount(void)
@@ -1136,6 +1180,8 @@ dhcp_bind(struct netif *netif)
 
   netif_set_addr(netif, &dhcp->offered_ip_addr, &sn_mask, &gw_addr);
   /* interface is used by routing now that an address is set */
+
+  dhcp_event_send(netif, DHCP_EVENT_BOUND);
 }
 
 /**
@@ -1181,6 +1227,8 @@ dhcp_renew(struct netif *netif)
     pbuf_free(p_out);
 
     LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_STATE, ("dhcp_renew: RENEWING\n"));
+
+    dhcp_event_send(netif, DHCP_EVENT_RENEWING);
   } else {
     LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_LEVEL_SERIOUS, ("dhcp_renew: could not allocate DHCP request\n"));
     result = ERR_MEM;
@@ -1367,6 +1415,8 @@ dhcp_release_and_stop(struct netif *netif)
 
     /* remove IP address from interface (prevents routing from selecting this interface) */
     netif_set_addr(netif, IP4_ADDR_ANY4, IP4_ADDR_ANY4, IP4_ADDR_ANY4);
+
+    dhcp_event_send(netif, DHCP_EVENT_RELEASED);
   } else {
      dhcp_set_state(dhcp, DHCP_STATE_OFF);
   }
@@ -1412,10 +1462,38 @@ dhcp_stop(struct netif *netif)
  *
  * If the state changed, reset the number of tries.
  */
+#if DHCP_DEBUG
+static void
+dhcp_print_state (u8_t old, u8_t new)
+{
+	const char *str_dhcp_state[] = {
+		[DHCP_STATE_OFF] = "OFF",
+		[DHCP_STATE_REQUESTING] = "REQUESTING",
+		[DHCP_STATE_INIT] = "INIT",
+		[DHCP_STATE_REBOOTING] = "REBOOTING",
+		[DHCP_STATE_REBINDING] = "REBINDING",
+		[DHCP_STATE_RENEWING] = "RENEWING",
+		[DHCP_STATE_SELECTING] = "SELECTING",
+		[DHCP_STATE_INFORMING] = "INFORMING",
+		[DHCP_STATE_CHECKING] = "CHECKING",
+		[DHCP_STATE_PERMANENT] = "PERMANENT",
+		[DHCP_STATE_BOUND] = "BOUND",
+		[DHCP_STATE_RELEASING] = "RELEASING",
+		[DHCP_STATE_BACKING_OFF] = "BACKING_OFF"
+	};
+
+	LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE, ("dhcp_set_state: %s -> %s\n",
+				str_dhcp_state[old], str_dhcp_state[new]));
+}
+#endif
+
 static void
 dhcp_set_state(struct dhcp *dhcp, u8_t new_state)
 {
   if (new_state != dhcp->state) {
+#if DHCP_DEBUG
+	dhcp_print_state(dhcp->state, new_state);
+#endif
     dhcp->state = new_state;
     dhcp->tries = 0;
     dhcp->request_timeout = 0;
@@ -1929,6 +2007,12 @@ dhcp_create_msg(struct netif *netif, struct dhcp *dhcp, u8_t message_type, u16_t
   msg_out->htype = LWIP_IANA_HWTYPE_ETHERNET;
   msg_out->hlen = netif->hwaddr_len;
   msg_out->xid = lwip_htonl(dhcp->xid);
+
+#ifdef NRC_DHCP_SET_BROADCAST_FLAG
+// Set the broadcast bit in flags.
+  msg_out->flags = htons(0x8000);  // Set the broadcast flag
+#endif
+
   /* we don't need the broadcast flag since we can receive unicast traffic
      before being fully configured! */
   /* set ciaddr to netif->ip_addr based on message_type and state */

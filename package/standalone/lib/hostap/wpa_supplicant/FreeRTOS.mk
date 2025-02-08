@@ -10,6 +10,8 @@ else
 CONFIG_TLS=internal
 endif #CONFIG_MBEDTLS
 
+
+
 ifeq ($(CONFIG_SOFT_AP), y)
 CONFIG_AP=y
 NEED_AP_MLME=y
@@ -36,6 +38,8 @@ CONFIG_NO_RANDOM_POOL=
 CONFIG_OPENSSL_CMAC=y
 endif
 
+
+
 WPA_SUPP_CSRCS += config.c
 WPA_SUPP_CSRCS += notify.c
 WPA_SUPP_CSRCS += bss.c
@@ -44,8 +48,10 @@ WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/utils/common.c
 WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/utils/wpa_debug.c
 WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/utils/wpabuf.c
 WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/utils/bitfield.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/utils/crc32.c
 WPA_SUPP_CSRCS += op_classes.c
 WPA_SUPP_CSRCS_p = rrm.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/wpa_supplicant/rrm_.c
 WPA_SUPP_CSRCS_p += wpa_passphrase.c
 WPA_SUPP_CSRCS_p += $(WPA_SUPP_ROOT)/src/utils/common.c
 WPA_SUPP_CSRCS_p += $(WPA_SUPP_ROOT)/src/utils/wpa_debug.c
@@ -53,6 +59,7 @@ WPA_SUPP_CSRCS_p += $(WPA_SUPP_ROOT)/src/utils/wpabuf.c
 WPA_SUPP_CSRCS_c = wpa_cli.c $(WPA_SUPP_ROOT)/src/common/wpa_ctrl.c
 WPA_SUPP_CSRCS_c += $(WPA_SUPP_ROOT)/src/utils/wpa_debug.c
 WPA_SUPP_CSRCS_c += $(WPA_SUPP_ROOT)/src/utils/common.c
+
 WPA_SUPP_CSRCS_c += $(WPA_SUPP_ROOT)/src/common/cli.c
 WPA_SUPP_CSRCS += wmm_ac.c
 
@@ -306,10 +313,6 @@ ifeq ($(CONFIG_TLS), internal)
 NEED_SHA1=y
 NEED_MD5=y
 endif
-endif
-
-ifeq ($(CONFIG_TLS), mbedtls)
-WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/crypto_mbedtls.c
 endif
 
 ifdef CONFIG_IBSS_RSN
@@ -699,6 +702,15 @@ NEED_ECC=y
 NEED_DRAGONFLY=y
 endif
 
+ifeq ($(CONFIG_TLS), mbedtls)
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/crypto_mbedtls.c
+ifdef TLS_FUNCS
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/tls_mbedtls.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/sha384-tlsprf.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/sha256-tlsprf.c
+endif
+endif
+
 ifdef CONFIG_EAP_EKE
 # EAP-EKE
 ifeq ($(CONFIG_EAP_EKE), dyn)
@@ -1026,8 +1038,7 @@ ifdef TLS_FUNCS
 NEED_DES=y
 # Shared TLS functions (needed for EAP_TLS, EAP_PEAP, EAP_TTLS, EAP_FAST, and
 # EAP_TEAP)
-OWPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/eap_peer/eap_tls_common.c
-OBJS += ../src/eap_peer/eap_tls_common.o
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/eap_peer/eap_tls_common.c
 ifndef CONFIG_FIPS
 NEED_TLS_PRF=y
 NEED_SHA1=y
@@ -1051,7 +1062,7 @@ endif
 ifeq ($(CONFIG_TLS), wolfssl)
 ifdef TLS_FUNCS
 CFLAGS += -DWOLFSSL_DER_LOAD -I/usr/local/include/wolfssl
-OBJS += ../src/crypto/tls_wolfssl.o
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/tls_wolfssl.c
 endif
 OBJS += ../src/crypto/crypto_wolfssl.o
 OBJS_p += ../src/crypto/crypto_wolfssl.o
@@ -1205,21 +1216,21 @@ ifeq ($(CONFIG_TLS), linux)
 OBJS += ../src/crypto/crypto_linux.o
 OBJS_p += ../src/crypto/crypto_linux.o
 ifdef TLS_FUNCS
-OBJS += ../src/crypto/crypto_internal-rsa.o
-OBJS += ../src/crypto/tls_internal.o
-OBJS += ../src/tls/tlsv1_common.o
-OBJS += ../src/tls/tlsv1_record.o
-OBJS += ../src/tls/tlsv1_cred.o
-OBJS += ../src/tls/tlsv1_client.o
-OBJS += ../src/tls/tlsv1_client_write.o
-OBJS += ../src/tls/tlsv1_client_read.o
-OBJS += ../src/tls/tlsv1_client_ocsp.o
-OBJS += ../src/tls/asn1.o
-OBJS += ../src/tls/rsa.o
-OBJS += ../src/tls/x509v3.o
-OBJS += ../src/tls/pkcs1.o
-OBJS += ../src/tls/pkcs5.o
-OBJS += ../src/tls/pkcs8.o
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/crypto_internal-rsa.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/tls_internal.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/tls/tlsv1_common.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/tls/tlsv1_record.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/tls/tlsv1_cred.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/tls/tlsv1_client.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/tls/tlsv1_client_write.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/tls/tlsv1_client_read.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/tls/tlsv1_client_ocsp.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/tls/asn1.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/tls/rsa.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/tls/x509v3.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/tls/pkcs1.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/tls/pkcs5.c
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/tls/pkcs8.c
 NEED_SHA256=y
 NEED_BASE64=y
 NEED_TLS_PRF=y
@@ -1242,6 +1253,7 @@ OBJS += ../src/crypto/fips_prf_internal.o
 OBJS += ../src/crypto/sha1-internal.o
 endif
 endif
+
 
 ifeq ($(CONFIG_TLS), none)
 ifdef TLS_FUNCS
@@ -1466,6 +1478,8 @@ ifdef NEED_DH_GROUPS
 WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/dh_group5.c
 endif
 endif
+
+WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/crypto/sha512-prf.c
 
 ifdef NEED_ECC
 CFLAGS += -DCONFIG_ECC
@@ -1727,7 +1741,8 @@ endif
 WPA_SUPP_CSRCS += $(WPA_SUPP_ROOT)/src/drivers/driver_common.c
 WPA_SUPP_CSRCS_priv += $(WPA_SUPP_ROOT)/src/drivers/driver_common.c
 
-WPA_SUPP_CSRCS += wpa_supplicant.c events.c blacklist.c wpas_glue.c scan.c
+#WPA_SUPP_CSRCS += wpa_supplicant.c events.c blacklist.c wpas_glue.c scan.c
+WPA_SUPP_CSRCS += wpa_supplicant.c events.c wpas_glue.c scan.c robust_av.c bssid_ignore.c
 WPA_SUPP_CSRCS_t := $(WPA_SUPP_CSRCS) $(WPA_SUPP_CSRCS_l2) eapol_test.c
 WPA_SUPP_CSRCS_t += $(WPA_SUPP_ROOT)/src/radius/radius_client.c
 WPA_SUPP_CSRCS_t += $(WPA_SUPP_ROOT)/src/radius/radius.c
@@ -1804,4 +1819,8 @@ endif
 
 ifdef CONFIG_WPA_MSG
 CFLAGS += -DCONFIG_WPA_MSG
+endif
+
+ifdef CONFIG_SCAN_IGNORE
+CFLAGS += -DCONFIG_SCAN_IGNORE
 endif

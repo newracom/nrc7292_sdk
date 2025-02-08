@@ -1115,6 +1115,24 @@ u32_t wifi_softap_get_dhcps_lease_time(void) // minute
 	return dhcps_lease_time;
 }
 
+bool dhcps_get_ip (u8_t *mac, ip4_addr_t *ip)
+{
+	struct dhcps_pool *pdhcps_pool = NULL;
+	list_node *pnode = plist;
+
+	while (pnode != NULL) {
+		pdhcps_pool = pnode->pnode;
+		if (memcmp(pdhcps_pool->mac, mac, 6) == 0) {
+			memcpy(ip, &pdhcps_pool->ip, sizeof(ip4_addr_t));
+			return true;
+		}
+
+		pnode = pnode->pnext;
+	}
+
+	return false;
+}
+
 int dhcps_status(void)
 {
 	u8_t num_dhcps_pool = 0;

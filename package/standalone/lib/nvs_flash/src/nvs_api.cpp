@@ -222,6 +222,16 @@ extern "C" nvs_err_t nvs_open_from_partition(const char *part_name, const char* 
     NVSHandleSimple *handle;
     nvs_err_t result = NVSPartitionManager::get_instance()->open_handle(part_name, name, open_mode, &handle);
 	NVS_LOGD(TAG, "[%s]  open_handle result : %d", __func__, result);
+	if (result == NVS_ERR_NVS_NOT_INITIALIZED) {
+		result = nvs_flash_init();
+		if (result == NVS_ERR_NVS_NO_FREE_PAGES || result == NVS_ERR_NVS_NEW_VERSION_FOUND) {
+			if ((result = nvs_flash_erase()) == NVS_OK) {
+				result = nvs_flash_init();
+			}
+		}
+		result = NVSPartitionManager::get_instance()->open_handle(part_name, name, open_mode, &handle);
+	}
+
     if (result == NVS_OK) {
         NVSHandleEntry *entry = new (std::nothrow) NVSHandleEntry(handle, part_name);
         if (entry) {

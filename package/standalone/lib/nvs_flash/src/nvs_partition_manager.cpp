@@ -42,7 +42,7 @@ nvs_err_t NVSPartitionManager::init_partition(const char *partition_label)
     uint32_t size;
     Storage* mStorage;
 
-	NVS_LOGD(TAG, "[%s] calling lookup_storage_from_name with %s", __func__, partition_label);
+    NVS_LOGD(TAG, "[%s] calling lookup_storage_from_name with %s", __func__, partition_label);
     mStorage = lookup_storage_from_name(partition_label);
     if (mStorage) {
 		NVS_LOGD(TAG, "[%s] Storage found...", __func__);
@@ -50,7 +50,7 @@ nvs_err_t NVSPartitionManager::init_partition(const char *partition_label)
     }
 
     assert(SPI_FLASH_SEC_SIZE != 0);
-	NVS_LOGD(TAG, "[%s] calling lookup_nvs_partition with %s", __func__, partition_label);
+    NVS_LOGD(TAG, "[%s] calling lookup_nvs_partition with %s", __func__, partition_label);
     NVSPartition *p = nullptr;
     nvs_err_t result = partition_lookup::lookup_nvs_partition(partition_label, &p);
 
@@ -79,18 +79,18 @@ nvs_err_t NVSPartitionManager::init_custom(Partition *partition, uint32_t baseSe
     Storage* new_storage = nullptr;
     Storage* storage = lookup_storage_from_name(partition->get_partition_name());
     if (storage == nullptr) {
-		NVS_LOGD(TAG, "[%s] Allocating new Storage...", __func__);
+        NVS_LOGD(TAG, "[%s] Allocating new Storage...", __func__);
 		new_storage = new (std::nothrow) Storage(partition);
 
         if (new_storage == nullptr) {
-			NVS_LOGD(TAG, "[%s] Storage allocation failed, no memory...", __func__);
+            NVS_LOGD(TAG, "[%s] Storage allocation failed, no memory...", __func__);
             return NVS_ERR_NO_MEM;
         }
 
         storage = new_storage;
     } else {
         // if storage was initialized already, we don't need partition and hence delete it
-		NVS_LOGD(TAG, "[%s] storage already initialized, delete it...", __func__);
+        NVS_LOGD(TAG, "[%s] storage already initialized, delete it...", __func__);
         for (auto it = nvs_partition_list.begin(); it != nvs_partition_list.end(); ++it) {
             if (partition == it) {
                 nvs_partition_list.erase(it);
@@ -99,11 +99,11 @@ nvs_err_t NVSPartitionManager::init_custom(Partition *partition, uint32_t baseSe
             }
         }
     }
-	NVS_LOGD(TAG, "[%s] Initialize storage by calling storage->init(%d, %d)...", __func__, baseSector, sectorCount);
+    NVS_LOGD(TAG, "[%s] Initialize storage by calling storage->init(%d, %d)...", __func__, baseSector, sectorCount);
     nvs_err_t err = storage->init(baseSector, sectorCount);
     if (new_storage != nullptr) {
         if (err == NVS_OK) {
-			NVS_LOGD(TAG, "[%s] Storage to list ...", __func__);
+            NVS_LOGD(TAG, "[%s] Storage to list ...", __func__);
             nvs_storage_list.push_back(new_storage);
         } else {
             delete new_storage;
@@ -192,29 +192,29 @@ nvs_err_t NVSPartitionManager::open_handle(const char *part_name,
     Storage* sHandle;
 
     if (nvs_storage_list.empty()) {
-		NVS_LOGD(TAG, "[%s] nvs_storage_list.empty, NVS_ERR_NVS_NOT_INITIALIZED...", __func__);
+        NVS_LOGD(TAG, "[%s] nvs_storage_list.empty, NVS_ERR_NVS_NOT_INITIALIZED...", __func__);
         return NVS_ERR_NVS_NOT_INITIALIZED;
     }
 
     sHandle = lookup_storage_from_name(part_name);
     if (sHandle == nullptr) {
-		NVS_LOGD(TAG, "[%s] lookup_storage_from_name(%s) failed, NVS_ERR_NVS_PART_NOT_FOUND...", __func__, part_name);
+        NVS_LOGD(TAG, "[%s] lookup_storage_from_name(%s) failed, NVS_ERR_NVS_PART_NOT_FOUND...", __func__, part_name);
         return NVS_ERR_NVS_PART_NOT_FOUND;
     }
 
     nvs_err_t err = sHandle->createOrOpenNamespace(ns_name, open_mode == NVS_READWRITE, nsIndex);
     if (err != NVS_OK) {
-		NVS_LOGD(TAG, "[%s] createOrOpenNamespace failed...", __func__);
+        NVS_LOGD(TAG, "[%s] createOrOpenNamespace failed...", __func__);
         return err;
     }
 
     *handle = new (std::nothrow) NVSHandleSimple(open_mode==NVS_READONLY, nsIndex, sHandle);
 
     if (handle == nullptr) {
-		NVS_LOGD(TAG, "[%s] NVSHandleSimple failed, no mem...", __func__);
+        NVS_LOGD(TAG, "[%s] NVSHandleSimple failed, no mem...", __func__);
         return NVS_ERR_NO_MEM;
     }
-	NVS_LOGD(TAG, "[%s] nvs_handles.push_back(*handle)", __func__);
+    NVS_LOGD(TAG, "[%s] nvs_handles.push_back(*handle)", __func__);
     nvs_handles.push_back(*handle);
 
     return NVS_OK;
@@ -238,14 +238,14 @@ size_t NVSPartitionManager::open_handles_size()
 
 Storage* NVSPartitionManager::lookup_storage_from_name(const char* name)
 {
-	NVS_LOGD(TAG, "[%s] name : %s", __func__, name);
+    NVS_LOGD(TAG, "[%s] name : %s", __func__, name);
     auto it = find_if(begin(nvs_storage_list), end(nvs_storage_list), [=](Storage& e) -> bool {
-         NVS_LOGD(TAG, "[%s] e.getPartName() = %s, name = %s", __func__, e.getPartName(), name);
+        NVS_LOGD(TAG, "[%s] e.getPartName() = %s, name = %s", __func__, e.getPartName(), name);
         return (strcmp(e.getPartName(), name) == 0);
     });
 
     if (it == end(nvs_storage_list)) {
-		NVS_LOGD(TAG, "[%s] Storage name not found in nvs_storage_list...", __func__);
+        NVS_LOGD(TAG, "[%s] Storage name not found in nvs_storage_list...", __func__);
         return nullptr;
     }
     return it;

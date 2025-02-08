@@ -35,14 +35,17 @@
 
 /* Wifi pairwise master key calculated */
 /* (type string) */
+/* CLI : nvs set wifi_pmk <pmk> */
 #define NVS_WIFI_PMK "wifi_pmk"
 
 /* SSID used for calculating PMK */
 /* (type string) */
+/* CLI : nvs set wifi_pmk_ssid <wifi_pmk_ssid> */
 #define NVS_WIFI_PMK_SSID  "wifi_pmk_ssid"
 
 /* password used for calculating PMK */
 /* (type string) */
+/* CLI : nvs set wifi_pmk_pw <wifi_pmk_pw> */
 #define NVS_WIFI_PMK_PASSWORD "wifi_pmk_pw"
 
 /* Wifi Channel */
@@ -102,18 +105,22 @@
 
 /* bss max idle */
 /* (type i32) */
+/* CLI : nvs set_i32 bss_max_idle <bss_max_idle> */
 #define NVS_BSS_MAX_IDLE "bss_max_idle"
 
 /* bss retry count */
 /* (type i32) */
+/* CLI : nvs set_i32 bss_retry_cnt <bss_retry_cnt> */
 #define NVS_BSS_RETRY_CNT "bss_retry_cnt"
 
 /* Tx Power (dbm) */
 /* (type u8) */
+/* CLI : nvs set_u8 tx_power <tx_power> */
 #define NVS_WIFI_TX_POWER "tx_power"
 
 /* Tx Power type : Auto(0), Limit(1), Fixed(2) */
 /* (type u8) */
+/* CLI : nvs set_u8 tx_power_type <tx_power_type> */
 #define NVS_WIFI_TX_POWER_TYPE "tx_power_type"
 
 /* BSSID to be used */
@@ -123,11 +130,18 @@
 
 /*WIFI Connection timeout */
 /* (type i32) */
+/* CLI : nvs set_i32 conn_timeout <conn_timeout> */
 #define NVS_WIFI_CONN_TIMEOUT  "conn_timeout"
 
 /*WIFI Disonnection timeout */
 /* (type i32) */
+/* CLI : nvs set_i32 disconn_timeout <disconn_timeout> */
 #define NVS_WIFI_DISCONN_TIMEOUT  "disconn_timeout"
+
+/* DHCP timeout */
+/* (type i32) */
+/* CLI : nvs set_i32 dhcp_timeout <dhcp_timeout> */
+#define NVS_DHCP_TIMEOUT "dhcp_timeout"
 
 /*WIFI beacon interval */
 /* CLI : nvs set_i32 wifi_bcn <15-65535> */
@@ -190,9 +204,84 @@
 /* (type u16) */
 #define NVS_WIFI_LISTEN_INTERVAL "listen_interval"
 
+/* SCAN MODE */
+/* CLI : nvs set_u8 scan_mode [scan_mode] */
+/* [scan_mode] WIFI_SCAN_NORMAL = 0, WIFI_SCAN_PASSIVE = 1 */
+/* (type u8) */
+#define NVS_WIFI_SCAN_MODE "scan_mode"
+
+/* Background Scan Enable */
+/* CLI : nvs set_u8 bgscan_enable [0 or 1] */
+/* Enables or disables background scanning.
+ *    0 = Disabled (default)
+ *    1 = Enabled
+ */
+#define NVS_BGSCAN_ENABLE "bgscan_enable"
+
+/* Background Scan Short Interval */
+/* CLI : nvs set_u16 bgscan_short [seconds] */
+/* Defines the interval (in seconds) for background scans when the signal strength
+ * of the current access point is weaker than the specified threshold.
+ * Shorter intervals ensure that the device can search for a better connection more frequently.
+ */
+#define NVS_BGSCAN_SHORT_INTERVAL "bgscan_short"
+
+/* Background Scan Signal Strength Threshold */
+/* CLI : nvs set_i8 bgscan_thres [dBm] */
+/* Defines a signal strength threshold (in dBm) that determines whether the short or long
+ * interval will be used for background scans:
+ *    - If the signal is weaker than this threshold, the short interval will apply.
+ *    - If the signal is stronger, the long interval will apply.
+ */
+#define NVS_BGSCAN_THRESHOLD "bgscan_thresh"
+
+/* Background Scan Long Interval */
+/* CLI : nvs set_u16 bgscan_long [seconds] */
+/* Defines the interval (in seconds) for background scans when the signal strength
+ * of the current access point is stronger than the specified threshold.
+ * Longer intervals reduce scan frequency to save power when the connection is stable.
+ */
+#define NVS_BGSCAN_LONG_INTERVAL "bgscan_long"
+
+/* AUTH MODE */
+/* CLI : nvs set_u8 auth_ctrl [auth_mode] */
+/* [auth_mode] WIFI_DISABLE_AUTH_CONTROL = 0, WIFI_ENABLE_AUTH_CONTROL = 1 */
+/* (type u8) */
+#define NVS_WIFI_AUTH_CTRL "auth_ctrl"
+
+/* PS MODE */
+/* [ps_mode] TIM (1) NonTIM(0) */
+/* (type u8) */
+/* CLI : nvs set_u8 ps_mode [ps_mode] */
+#define NVS_PS_DEEPSLEEP_MODE "ps_mode"
+
+/* PS idle timeout */
+/* idle_timout_ms: wait time before entering the modem sleep. */
+/*                    The unit is ms.  (0 <= time < 10000ms) */
+/* (type u16) */
+/* CLI : nvs set_u32 ps_idle [idle_timout_ms] */
+#define NVS_PS_IDLE_TIMEOUT "ps_idle"
+
+/* PS sleep time */
+/* sleep_ms: duration for deep sleep. The unit is ms. (0(not use) or time >= 1000ms) */
+/*             Listen interval should be greater than sleep duration */
+/* (type u32) */
+/* CLI : nvs set_u32 ps_sleep [sleep_ms] */
+#define NVS_PS_SLEEP_TIME "ps_sleep"
+
 #ifdef INCLUDE_SCAN_BACKOFF
 
 #define NVS_SCAN_BACKOFF_START_COUNT "backoff_cnt"
 #define NVS_SCAN_MAX_INTERVAL "backoff_max"
 #endif
+
+#define NVS_EAP_TYPE "eap_type"
+#define NVS_EAP_IDENTITY "eap_id"
+#define NVS_EAP_PRIVATE_KEY_PASSWORD "eap_pri_key_pw"
+#define NVS_EAP_CA_CERT "eap_ca_cert"
+#define NVS_EAP_CLIENT_CERT "eap_client_cert"
+#define NVS_EAP_PRIVATE_KEY "eap_pri_key"
+
+#define NVS_SAE_PWE "sae_pwe"
+
 #endif

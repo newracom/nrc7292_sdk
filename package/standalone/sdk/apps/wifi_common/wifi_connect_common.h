@@ -77,6 +77,16 @@ tWIFI_STATUS wifi_start_softap(WIFI_CONFIG *param);
  **********************************************************************/
 tWIFI_STATUS wifi_init_with_vif(int vif, WIFI_CONFIG *param);
 
+/*********************************************************************
+ * @fn wifi_deinit_with_vif
+ *
+ * @brief deinitialize the wifi configurations
+ *
+ * @param vif
+ *
+ * @return If success, then WIFI_SUCCESS. Otherwise, error code(tWIFI_STATUS) is returned.
+ **********************************************************************/
+tWIFI_STATUS wifi_deinit(void);
 
 /*********************************************************************
  * @fn wifi_connect_with_vif
@@ -105,26 +115,18 @@ tWIFI_STATUS wifi_connect_with_vif(int vif, WIFI_CONFIG *param);
  **********************************************************************/
 tWIFI_STATUS wifi_start_softap_with_vif(int vif, WIFI_CONFIG *param);
 
+/*********************************************************************
+ * @fn nrc_wait_for_ip
+ *
+ * @brief Wait for IP to be assigned.
+ *
+ * @param vif
+ *
+ * @param timeout : DHCP timeout in sec.
+ *
+ * @return NRC_SUCCESS if IP is assigned.
+ *         NRC_FAIL if timeout occurred without getting IP.
+ **********************************************************************/
+nrc_err_t nrc_wait_for_ip(int vif, uint32_t timeout);
 
-/**********************************************
- * @fn wifi_set_ip_to_static
- *
- * @brief Override IP setting mode to static if mode set to 1.
- *
- * @param mode 1 to override IP setting to static, regardless of initial setting
- *
- * @return None
- ***********************************************/
-void wifi_set_ip_to_static(uint8_t mode);
-
-
-/**********************************************
- * @fn wifi_get_ip_override
- *
- * @brief Returns IP mode overriden value.
- *
- * @return 1 indicating static IP setting used.
- *         0 system initial setting will be used.
- ***********************************************/
-uint8_t wifi_get_ip_override();
 #endif /* __WIFI_CONNECT_COMMON_H__ */

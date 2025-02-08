@@ -27,12 +27,14 @@
 
 #include "atcmd.h"
 #include "atcmd_fota.h"
+#include "nrc_http_client.h"
 
 #define _atcmd_fota_debug(fmt, ...)		/* _atcmd_debug("FOTA: " fmt, ##__VA_ARGS__) */
 #define _atcmd_fota_log(fmt, ...)		_atcmd_info("FOTA: " fmt, ##__VA_ARGS__)
 
 /**********************************************************************************************/
 
+#if defined(CONFIG_ATCMD_FOTA_HTTPS)
 static const char g_https_ssl_server_ca_crt[] =
 "-----BEGIN CERTIFICATE-----\r\n"
 "MIIDBjCCAe4CCQCWOp1NpvxjzDANBgkqhkiG9w0BAQsFADBFMQswCQYDVQQGEwJB\r\n"
@@ -114,6 +116,7 @@ static ssl_certs_t g_https_ssl_certs =
 	.client_cert_length = sizeof(g_https_ssl_client_ca_crt),
 	.client_pk_length = sizeof(g_https_ssl_client_key),
 };
+#endif
 
 static atcmd_fota_t g_atcmd_fota =
 {
@@ -278,7 +281,7 @@ static int _atcmd_fota_httpc_get (const char *server_url, const char *file_path,
 									int (*cb)(char *, int, int))
 {
 	static char url[ATCMD_FOTA_SERVER_URL_LEN_MAX + ATCMD_FOTA_BIN_NAME_LEN_MAX];
-	ssl_certs_t *certs;
+	ssl_certs_t *certs = NULL;
 	con_handle_t handle;
 	httpc_data_t data;
 	httpc_resp_t resp;
@@ -322,9 +325,14 @@ static int _atcmd_fota_httpc_get (const char *server_url, const char *file_path,
 		sprintf(url, "%s/%s", server_url, file_path);
 
 	if (memcmp(url, "https://", 8) == 0)
+	{
+#if defined(CONFIG_ATCMD_FOTA_HTTPS)
 		certs = &g_https_ssl_certs;
-	else
-		certs = NULL;
+#else
+		_atcmd_fota_log("httpc_get: !!! not support https !!!");
+		return -1;
+#endif		
+	}
 
 	_atcmd_fota_log("httpc_get: %s", url);
 
@@ -889,9 +897,11 @@ static bool _atcmd_fota_valid_params (atcmd_fota_params_t *params)
 		if (len > ATCMD_FOTA_SERVER_URL_LEN_MAX)
 			return false;
 
-		if (strncmp(params->server_url, "http://", 7) != 0 &&
-			strncmp(params->server_url, "https://", 8) != 0)
-			return false;
+		if (strncmp(params->server_url, "http://", 7) != 0)
+#if defined(CONFIG_ATCMD_FOTA_HTTPS)
+			if (strncmp(params->server_url, "https://", 8) != 0)
+#endif				
+				return false;
 	}
 
 	len = strlen(params->bin_name);

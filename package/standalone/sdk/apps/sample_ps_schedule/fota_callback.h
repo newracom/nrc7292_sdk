@@ -6,7 +6,7 @@
 /* Firmware version checked against version json file see below */
 
 //#define RUN_HTTPS
-#if defined( SUPPORT_MBEDTLS ) && defined( RUN_HTTPS )
+#if defined( SUPPORT_HTTPS_CLIENT ) && defined( RUN_HTTPS )
 #define SERVER_URL "https://192.168.10.199:4443/"
 #else
 #define SERVER_URL "http://10.198.1.214:80/"

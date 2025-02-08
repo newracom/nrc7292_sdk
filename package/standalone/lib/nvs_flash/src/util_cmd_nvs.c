@@ -19,18 +19,21 @@
 
 extern void nvs_dump(const char *partName);
 
-static void nvs_cli_info()
+static void nvs_cli_info(char *key, char *value)
 {
+	(void)key;
+	(void)value;
+
 	nvs_stats_t nvs_stats;
 	if (nvs_get_stats(NULL, &nvs_stats) != NVS_OK) {
-		system_printf("nvs info failed.\n");
+		CPA("nvs info failed.\n");
 	} else {
-		system_printf("=== nvs information ===\n");
-		system_printf("used entries    : %d\n", nvs_stats.used_entries);
-		system_printf("free entries    : %d\n", nvs_stats.free_entries);
-		system_printf("total entries   : %d\n", nvs_stats.total_entries);
-		system_printf("namespace count : %d\n", nvs_stats.namespace_count);
-		system_printf("=======================\n");
+		CPA("=== nvs information ===\n");
+		CPA("used entries    : %d\n", nvs_stats.used_entries);
+		CPA("free entries    : %d\n", nvs_stats.free_entries);
+		CPA("total entries   : %d\n", nvs_stats.total_entries);
+		CPA("namespace count : %d\n", nvs_stats.namespace_count);
+		CPA("=======================\n");
 	}
 }
 
@@ -39,13 +42,13 @@ static void nvs_cli_set(char *key, char *value)
  	nvs_handle_t nvs_handle;
  	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		if (nvs_set_str(nvs_handle, key, value) != NVS_OK) {
-			system_printf("nvs set %s failed.\n", key);
+			CPA("nvs set %s failed.\n", key);
 		} else {
-			system_printf("Added key : \"%s\", value: \"%s\" successfully.\n", key, value);
+			CPA("Added key : \"%s\", value: \"%s\" successfully.\n", key, value);
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
@@ -55,13 +58,13 @@ static void nvs_cli_set_u8(char *key, char *value)
 	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		uint8_t number = (uint8_t) strtoul(value, NULL, 0);
 		if (nvs_set_u8(nvs_handle, key, number) != NVS_OK) {
-			system_printf("nvs set %s failed.\n", key);
+			CPA("nvs set %s failed.\n", key);
 		} else {
-			system_printf("Added key : \"%s\", value: %u (0x%x) successfully.\n", key, number, number);
+			CPA("Added key : \"%s\", value: %u (0x%x) successfully.\n", key, number, number);
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
@@ -71,13 +74,13 @@ static void nvs_cli_set_i8(char *key, char *value)
 	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		int8_t number = (int8_t) strtol(value, NULL, 0);
 		if (nvs_set_i8(nvs_handle, key, number) != NVS_OK) {
-			system_printf("nvs set %s failed.\n", key);
+			CPA("nvs set %s failed.\n", key);
 		} else {
-			system_printf("Added key : \"%s\", value: %d (0x%x) successfully.\n", key, number, number);
+			CPA("Added key : \"%s\", value: %d (0x%x) successfully.\n", key, number, number);
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
@@ -87,13 +90,13 @@ static void nvs_cli_set_u16(char *key, char *value)
 	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		uint16_t number = (uint16_t) strtoul(value, NULL, 0);
 		if (nvs_set_u16(nvs_handle, key, number) != NVS_OK) {
-			system_printf("nvs set %s failed.\n", key);
+			CPA("nvs set %s failed.\n", key);
 		} else {
-			system_printf("Added key : \"%s\", value: %u (0x%x) successfully.\n", key, number, number);
+			CPA("Added key : \"%s\", value: %u (0x%x) successfully.\n", key, number, number);
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
@@ -103,13 +106,13 @@ static void nvs_cli_set_i16(char *key, char *value)
 	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		int16_t number = (int16_t) strtol(value, NULL, 0);
 		if (nvs_set_i16(nvs_handle, key, number) != NVS_OK) {
-			system_printf("nvs set %s failed.\n", key);
+			CPA("nvs set %s failed.\n", key);
 		} else {
-			system_printf("Added key : \"%s\", value: %d (0x%x) successfully.\n", key, number, number);
+			CPA("Added key : \"%s\", value: %d (0x%x) successfully.\n", key, number, number);
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
@@ -119,13 +122,13 @@ static void nvs_cli_set_u32(char *key, char *value)
 	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		uint32_t number = (uint32_t) strtoul(value, NULL, 0);
 		if (nvs_set_u32(nvs_handle, key, number) != NVS_OK) {
-			system_printf("nvs set %s failed.\n", key);
+			CPA("nvs set %s failed.\n", key);
 		} else {
-			system_printf("Added key : \"%s\", value: %u (0x%x) successfully.\n", key, number, number);
+			CPA("Added key : \"%s\", value: %u (0x%x) successfully.\n", key, number, number);
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
@@ -135,13 +138,13 @@ static void nvs_cli_set_i32(char *key, char *value)
 	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		int32_t number = (int32_t) strtol(value, NULL, 0);
 		if (nvs_set_i32(nvs_handle, key, number) != NVS_OK) {
-			system_printf("nvs set %s failed.\n", key);
+			CPA("nvs set %s failed.\n", key);
 		} else {
-			system_printf("Added key : \"%s\", value: %d (0x%x) successfully.\n", key, number, number);
+			CPA("Added key : \"%s\", value: %d (0x%x) successfully.\n", key, number, number);
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
@@ -151,13 +154,13 @@ static void nvs_cli_set_u64(char *key, char *value)
 	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		uint64_t number = (uint64_t) strtoull(value, NULL, 0);
 		if (nvs_set_u64(nvs_handle, key, number) != NVS_OK) {
-			system_printf("nvs set %s failed.\n", key);
+			CPA("nvs set %s failed.\n", key);
 		} else {
-			system_printf("Added key : \"%s\", value: %llu (0x%llx) successfully.\n", key, number, number);
+			CPA("Added key : \"%s\", value: %llu (0x%llx) successfully.\n", key, number, number);
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
@@ -167,183 +170,204 @@ static void nvs_cli_set_i64(char *key, char *value)
 	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		int64_t number = (int64_t) strtoll(value, NULL, 0);
 		if (nvs_set_i64(nvs_handle, key, number) != NVS_OK) {
-			system_printf("nvs set %s failed.\n", key);
+			CPA("nvs set %s failed.\n", key);
 		} else {
-			system_printf("Added key : \"%s\", value: %lld (0x%llx) successfully.\n", key, number, number);
+			CPA("Added key : \"%s\", value: %lld (0x%llx) successfully.\n", key, number, number);
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
-static void nvs_cli_get(char *key)
+static void nvs_cli_get(char *key, char *value)
 {
+	(void)value;
+
 	nvs_handle_t nvs_handle;
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		char value[256];
 		size_t length = sizeof(value);
 
 		if (nvs_get_str(nvs_handle, key, value, &length) != NVS_OK) {
-			system_printf("nvs get \"%s\" failed.\n", key);
+			CPA("nvs get \"%s\" failed.\n", key);
 		} else {
-			system_printf("key: \"%s\", value: \"%s\", size: %d\n", key, value, length);
+			CPA("key: \"%s\", value: \"%s\", size: %d\n", key, value, length);
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
-static void nvs_cli_get_u8(char *key)
+static void nvs_cli_get_u8(char *key, char *value)
 {
+	(void)value;
+
 	nvs_handle_t nvs_handle;
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		uint8_t value;
 
 		if (nvs_get_u8(nvs_handle, key, &value) != NVS_OK) {
-			system_printf("nvs get \"%s\" failed.\n", key);
+			CPA("nvs get \"%s\" failed.\n", key);
 		} else {
-			system_printf("key: \"%s\", value: %u (0x%x)\n", key, value, value);
+			CPA("key: \"%s\", value: %u (0x%x)\n", key, value, value);
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
-static void nvs_cli_get_i8(char *key)
+static void nvs_cli_get_i8(char *key, char *value)
 {
+	(void)value;
+
 	nvs_handle_t nvs_handle;
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		int8_t value;
 
 		if (nvs_get_i8(nvs_handle, key, &value) != NVS_OK) {
-			system_printf("nvs get \"%s\" failed.\n", key);
+			CPA("nvs get \"%s\" failed.\n", key);
 		} else {
-			system_printf("key: \"%s\", value: %d (0x%x)\n", key, value, value);
+			CPA("key: \"%s\", value: %d (0x%x)\n", key, value, value);
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
-static void nvs_cli_get_u16(char *key)
+static void nvs_cli_get_u16(char *key, char *value)
 {
+	(void)value;
+
 	nvs_handle_t nvs_handle;
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		uint16_t value;
 
 		if (nvs_get_u16(nvs_handle, key, &value) != NVS_OK) {
-			system_printf("nvs get \"%s\" failed.\n", key);
+			CPA("nvs get \"%s\" failed.\n", key);
 		} else {
-			system_printf("key: \"%s\", value: %u (0x%x)\n", key, value, value);
+			CPA("key: \"%s\", value: %u (0x%x)\n", key, value, value);
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
-static void nvs_cli_get_i16(char *key)
+static void nvs_cli_get_i16(char *key, char *value)
 {
+	(void)value;
+
 	nvs_handle_t nvs_handle;
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		int16_t value;
 
 		if (nvs_get_i16(nvs_handle, key, &value) != NVS_OK) {
-			system_printf("nvs get \"%s\" failed.\n", key);
+			CPA("nvs get \"%s\" failed.\n", key);
 		} else {
-			system_printf("key: \"%s\", value: %d (0x%x)\n", key, value, value);
+			CPA("key: \"%s\", value: %d (0x%x)\n", key, value, value);
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
-static void nvs_cli_get_u32(char *key)
+static void nvs_cli_get_u32(char *key, char *value)
 {
+	(void)value;
+
 	nvs_handle_t nvs_handle;
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		uint32_t value;
 
 		if (nvs_get_u32(nvs_handle, key, &value) != NVS_OK) {
-			system_printf("nvs get \"%s\" failed.\n", key);
+			CPA("nvs get \"%s\" failed.\n", key);
 		} else {
-			system_printf("key: \"%s\", value: %u (0x%x)\n", key, value, value);
+			CPA("key: \"%s\", value: %u (0x%x)\n", key, value, value);
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
-static void nvs_cli_get_i32(char *key)
+static void nvs_cli_get_i32(char *key, char *value)
 {
+	(void)value;
+
 	nvs_handle_t nvs_handle;
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		int32_t value;
 
 		if (nvs_get_i32(nvs_handle, key, &value) != NVS_OK) {
-			system_printf("nvs get \"%s\" failed.\n", key);
+			CPA("nvs get \"%s\" failed.\n", key);
 		} else {
-			system_printf("key: \"%s\", value: %d (0x%x)\n", key, value, value);
+			CPA("key: \"%s\", value: %d (0x%x)\n", key, value, value);
 		}
 		nvs_close(nvs_handle);
 	} else {
-	system_printf("nvs open failed.\n");
+	CPA("nvs open failed.\n");
 	}
 }
 
-static void nvs_cli_get_u64(char *key)
+static void nvs_cli_get_u64(char *key, char *value)
 {
+	(void)value;
+
 	nvs_handle_t nvs_handle;
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		uint64_t value;
 
 		if (nvs_get_u64(nvs_handle, key, &value) != NVS_OK) {
-			system_printf("nvs get \"%s\" failed.\n", key);
+			CPA("nvs get \"%s\" failed.\n", key);
 		} else {
-			system_printf("key: \"%s\", value: %llu (0x%llx)\n", key, value, value);
+			CPA("key: \"%s\", value: %llu (0x%llx)\n", key, value, value);
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
-static void nvs_cli_get_i64(char *key)
+static void nvs_cli_get_i64(char *key, char *value)
 {
+	(void)value;
+
 	nvs_handle_t nvs_handle;
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		int64_t value;
 
 		if (nvs_get_i64(nvs_handle, key, &value) != NVS_OK) {
-			system_printf("nvs get \"%s\" failed.\n", key);
+			CPA("nvs get \"%s\" failed.\n", key);
 		} else {
-			system_printf("key: \"%s\", value: %lld (0x%llx)\n", key, value, value);
+			CPA("key: \"%s\", value: %lld (0x%llx)\n", key, value, value);
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
-static void nvs_cli_show()
+static void nvs_cli_show(char *key, char *value)
 {
+	(void)key;
+	(void)value;
+
 	nvs_handle_t nvs_handle;
 	size_t used_entries = 0;
 
-	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READONLY, &nvs_handle) == NVS_OK) {
+	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		if (nvs_get_used_entry_count(nvs_handle, &used_entries) == NVS_OK) {
 		} else {
-			system_printf("nvs show failed.\n");
+			CPA("nvs show failed.\n");
 			return;
 		}
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 		return;
 	}
 
@@ -355,263 +379,187 @@ static void nvs_cli_show()
 			size_t length = sizeof(value);
 			nvs_entry_info(it, &info);
 			it = nvs_entry_next(it);
-			system_printf("key '%s', type ", info.key);
+			CPA("key '%s', type ", info.key);
 			switch(info.type) {
 			case NVS_TYPE_U8:
 				nvs_get_u8(nvs_handle, info.key, (uint8_t *) value);
-				system_printf("'u8', value '%u' \n", *((uint8_t *) value));
+				CPA("'u8', value '%u' \n", *((uint8_t *) value));
 				break;
 			case NVS_TYPE_I8:
 				nvs_get_i8(nvs_handle, info.key, (int8_t *) value);
-				system_printf("'i8', value '%d' \n", *((int8_t *) value));
+				CPA("'i8', value '%d' \n", *((int8_t *) value));
 				break;
 			case NVS_TYPE_U16:
 				nvs_get_u16(nvs_handle, info.key, (uint16_t *) value);
-				system_printf("'u16', value '%u' \n", *((uint16_t *) value));
+				CPA("'u16', value '%u' \n", *((uint16_t *) value));
 				break;
 			case NVS_TYPE_I16:
 				nvs_get_i16(nvs_handle, info.key, (int16_t *) value);
-				system_printf("'i16', value '%d' \n", *((int16_t *) value));
+				CPA("'i16', value '%d' \n", *((int16_t *) value));
 				break;
 			case NVS_TYPE_U32:
 				nvs_get_u32(nvs_handle, info.key, (uint32_t *) value);
-				system_printf("'u32', value '%u' \n", *((uint32_t *) value));
+				CPA("'u32', value '%u' \n", *((uint32_t *) value));
 				break;
 			case NVS_TYPE_I32:
 				nvs_get_i32(nvs_handle, info.key, (int32_t *) value);
-				system_printf("'i32', value '%d' \n", *((int32_t *) value));
+				CPA("'i32', value '%d' \n", *((int32_t *) value));
 				break;
 			case NVS_TYPE_U64:
 				nvs_get_u64(nvs_handle, info.key, (uint64_t *) value);
-				system_printf("'u64', value '%llu' \n", *((uint8_t *) value));
+				CPA("'u64', value '%llu' \n", *((uint8_t *) value));
 				break;
 			case NVS_TYPE_I64:
 				nvs_get_i64(nvs_handle, info.key, (int64_t *) value);
-				system_printf("'i64', value '%ll' \n", *((int64_t *) value));
+				CPA("'i64', value '%ll' \n", *((int64_t *) value));
 				break;
 			case NVS_TYPE_STR:
 				nvs_get_str(nvs_handle, info.key, (char *) value, &length);
-				system_printf("'string', value '%s' \n", (char *) value);
+				CPA("'string', value '%s' \n", (char *) value);
 				break;
 			case NVS_TYPE_BLOB:
-				system_printf("'blob' \n");
+				CPA("'blob' \n");
 				break;
 			default:
-				system_printf("'unknown' \n");
+				CPA("'unknown' \n");
 				break;
 			}
 		};
 	} else {
-		system_printf("nvs show: no entry found...\n");
+		CPA("nvs show: no entry found...\n");
 	}
 
 	nvs_close(nvs_handle);
 }
 
-static void nvs_cli_delete(char *key)
+static void nvs_cli_delete(char *key, char *value)
 {
+	(void)value;
+
 	nvs_handle_t nvs_handle;
 	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		if (nvs_erase_key(nvs_handle, key) != NVS_OK) {
-			system_printf("nvs delete failed for key \"%s\".\n", key);
+			CPA("nvs delete failed for key \"%s\".\n", key);
 		} else {
-			system_printf("key - \"%s\" has been removed successfully.\n", key);
+			CPA("key - \"%s\" has been removed successfully.\n", key);
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
-static void nvs_cli_commit()
+static void nvs_cli_commit(char *key, char *value)
 {
+	(void)key;
+	(void)value;
+
 	nvs_handle_t nvs_handle;
 	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		if (nvs_commit(nvs_handle) != NVS_OK) {
-			system_printf("nvs commit failed.\n");
+			CPA("nvs commit failed.\n");
 		} else {
-			system_printf("nvs committed successfully.\n");
+			CPA("nvs committed successfully.\n");
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
-static void	nvs_cli_erase()
+static void	nvs_cli_erase(char *key, char *value)
 {
+	(void)key;
+	(void)value;
+
 	nvs_handle_t nvs_handle;
 	if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
 		if (nvs_erase_all(nvs_handle) != NVS_OK) {
-			system_printf("nvs erase failed.\n");
+			CPA("nvs erase failed.\n");
 		} else {
-			system_printf("nvs erased all.\n");
+			CPA("nvs erased all.\n");
 		}
 		nvs_close(nvs_handle);
 	} else {
-		system_printf("nvs open failed.\n");
+		CPA("nvs open failed.\n");
 	}
 }
 
-static void	nvs_cli_reset()
+static void	nvs_cli_reset(char *key, char *value)
 {
+	(void)key;
+	(void)value;
+
 	if (nvs_flash_erase_partition(NVS_DEFAULT_PART_NAME) != NVS_OK) {
-		system_printf("nvs reset config partition failed.\n");
+		CPA("nvs reset config partition failed.\n");
 	} else {
-		system_printf("nvs config partition reset, restart system...\n");
+		CPA("nvs config partition reset, restart system...\n");
 	}
 }
 
-static void nvs_cli_dump()
+static void nvs_cli_dump(char *key, char *value)
 {
+	(void)key;
+	(void)value;
 	nvs_dump(NVS_DEFAULT_PART_NAME);
 }
 
-int nvs_cli_handler(cmd_tbl_t *t, int argc, char *argv[])
-{
-	if (argc < 2 || strcmp(argv[0], "nvs") != 0) {
-		system_printf("Usage: %s\n", NVS_CLI_USAGE);
-		return CMD_RET_SUCCESS;
-	}
-	if (strcmp(argv[1], "info") == 0) {
-		nvs_cli_info();
-	} else if (strcmp(argv[1], "set") == 0) {
-		if (argc < 4) {
-			system_printf("Usage: nvs set <key> <value>\n");
-		} else {
-			char buf[256] = {0,};
-			char *tmp = buf;
-			for(int i = 3; i < argc; i++){
-				sprintf(tmp + strlen(tmp), "%s ", argv[i]);
-			}
-			*(tmp + strlen(tmp)-1) = '\0';
+int nvs_cli_handler(cmd_tbl_t *t, int argc, char *argv[]) {
+    if (argc < 2 || argc > 4 || strcmp(argv[0], "nvs") != 0 ) {
+        CPA("Usage: %s\n", NVS_CLI_USAGE);
+        return CMD_RET_SUCCESS;
+    }
 
-			nvs_cli_set(argv[2], buf);
-		}
-	} else if (strcmp(argv[1], "set_u8") == 0) {
-		if (argc < 4) {
-			system_printf("Usage: nvs set_u8 <key> <value>\n");
-		} else {
-			nvs_cli_set_u8(argv[2], argv[3]);
-		}
-	} else if (strcmp(argv[1], "set_i8") == 0) {
-		if (argc < 4) {
-			system_printf("Usage: nvs set_i8 <key> <value>\n");
-		} else {
-			nvs_cli_set_i8(argv[2], argv[3]);
-		}
-	} else if (strcmp(argv[1], "set_u16") == 0) {
-		if (argc < 4) {
-			system_printf("Usage: nvs set_u16 <key> <value>\n");
-		} else {
-			nvs_cli_set_u16(argv[2], argv[3]);
-		}
-	} else if (strcmp(argv[1], "set_i16") == 0) {
-		if (argc < 4) {
-			system_printf("Usage: nvs set_i16 <key> <value>\n");
-		} else {
-			nvs_cli_set_i16(argv[2], argv[3]);
-		}
-	} else if (strcmp(argv[1], "set_u32") == 0) {
-		if (argc < 4) {
-			system_printf("Usage: nvs set_u32 <key> <value>\n");
-		} else {
-			nvs_cli_set_u32(argv[2], argv[3]);
-		}
-	} else if (strcmp(argv[1], "set_i32") == 0) {
-		if (argc < 4) {
-			system_printf("Usage: nvs set_i32 <key> <value>\n");
-		} else {
-			nvs_cli_set_i32(argv[2], argv[3]);
-		}
-	} else if (strcmp(argv[1], "set_u64") == 0) {
-		if (argc < 4) {
-			system_printf("Usage: nvs set_u64 <key> <value>\n");
-		} else {
-			nvs_cli_set_u64(argv[2], argv[3]);
-		}
-	} else if (strcmp(argv[1], "set_i64") == 0) {
-		if (argc < 4) {
-			system_printf("Usage: nvs set_i64 <key> <value>\n");
-		} else {
-			nvs_cli_set_i64(argv[2], argv[3]);
-		}
-	} else if (strcmp(argv[1], "get") == 0) {
-		if (argc != 3) {
-			system_printf("Usage: nvs get <key>\n");
-		} else {
-			nvs_cli_get(argv[2]);
-		}
-	} else if (strcmp(argv[1], "get_u8") == 0) {
-		if (argc != 3) {
-			system_printf("Usage: nvs get_u8 <key>\n");
-		} else {
-			nvs_cli_get_u8(argv[2]);
-		}
-	} else if (strcmp(argv[1], "get_i8") == 0) {
-		if (argc != 3) {
-			system_printf("Usage: nvs get_i8 <key>\n");
-		} else {
-			nvs_cli_get_i8(argv[2]);
-		}
-	} else if (strcmp(argv[1], "get_u16") == 0) {
-		if (argc != 3) {
-			system_printf("Usage: nvs get_u16 <key>\n");
-		} else {
-			nvs_cli_get_u16(argv[2]);
-		}
-	} else if (strcmp(argv[1], "get_i16") == 0) {
-		if (argc != 3) {
-			system_printf("Usage: nvs get_i16 <key>\n");
-		} else {
-			nvs_cli_get_i16(argv[2]);
-		}
-	} else if (strcmp(argv[1], "get_u32") == 0) {
-		if (argc != 3) {
-			system_printf("Usage: nvs get_u32 <key>\n");
-		} else {
-			nvs_cli_get_u32(argv[2]);
-		}
-	} else if (strcmp(argv[1], "get_i32") == 0) {
-		if (argc != 3) {
-			system_printf("Usage: nvs get_i32 <key>\n");
-		} else {
-			nvs_cli_get_i32(argv[2]);
-		}
-	} else if (strcmp(argv[1], "get_u64") == 0) {
-		if (argc != 3) {
-			system_printf("Usage: nvs get_u64 <key>\n");
-		} else {
-			nvs_cli_get_u64(argv[2]);
-		}
-	} else if (strcmp(argv[1], "get_i64") == 0) {
-		if (argc != 3) {
-			system_printf("Usage: nvs get_i64 <key>\n");
-		} else {
-			nvs_cli_get_i64(argv[2]);
-		}
-	} else if (strcmp(argv[1], "show") == 0) {
-		nvs_cli_show();
-	} else if (strcmp(argv[1], "delete") == 0) {
-		if (argc != 3) {
-			system_printf("Usage: nvs delete <key>\n");
-		} else {
-			nvs_cli_delete(argv[2]);
-		}
-	} else if (strcmp(argv[1], "commit") == 0) {
-		nvs_cli_commit();
-	} else if (strcmp(argv[1], "erase") == 0) {
-		nvs_cli_erase();
-	} else if (strcmp(argv[1], "reset") == 0) {
-		nvs_cli_reset();
-	} else if (strcmp(argv[1], "dump") == 0) {
-		nvs_cli_dump();
-	} else {
-		system_printf("nvs invalid command\n");
-		system_printf("%s\n", NVS_CLI_USAGE);
-	}
-	return CMD_RET_SUCCESS;
+    static const struct {
+        const char *cmd;
+        void (*func)(char *, char *);
+        const char *usage;
+        int argc_num;
+    } commands[] = {
+        {"info", nvs_cli_info,  "nvs info", 2},
+        {"set", nvs_cli_set, "nvs set <key> <value>", 4},
+        {"set_u8", nvs_cli_set_u8, "nvs set_u8 <key> <value>", 4},
+        {"set_i8", nvs_cli_set_i8, "nvs set_i8 <key> <value>", 4},
+        {"set_u16", nvs_cli_set_u16, "nvs set_u16 <key> <value>", 4},
+        {"set_i16", nvs_cli_set_i16, "nvs set_i16 <key> <value>", 4},
+        {"set_u32", nvs_cli_set_u32, "nvs set_u32 <key> <value>", 4},
+        {"set_i32", nvs_cli_set_i32, "nvs set_i32 <key> <value>", 4},
+        {"set_u64", nvs_cli_set_u64, "nvs set_u64 <key> <value>", 4},
+        {"set_i64", nvs_cli_set_i64, "nvs set_i64 <key> <value>", 4},
+        {"get", nvs_cli_get, "nvs get <key>", 3},
+        {"get_u8", nvs_cli_get_u8, "nvs get_u8 <key>", 3},
+        {"get_i8", nvs_cli_get_i8, "nvs get_i8 <key>", 3},
+        {"get_u16", nvs_cli_get_u16, "nvs get_u16 <key>", 3},
+        {"get_i16", nvs_cli_get_i16, "nvs get_i16 <key>", 3},
+        {"get_u32", nvs_cli_get_u32, "nvs get_u32 <key>", 3},
+        {"get_i32", nvs_cli_get_i32, "nvs get_i32 <key>", 3},
+        {"get_u64", nvs_cli_get_u64, "nvs get_u64 <key>", 3},
+        {"get_i64", nvs_cli_get_i64, "nvs get_i64 <key>", 3},
+        {"show", nvs_cli_show, "nvs show", 2},
+        {"delete", nvs_cli_delete, "nvs delete <key>", 3},
+        {"commit", nvs_cli_commit, "nvs commit", 2},
+        {"erase", nvs_cli_erase, "nvs erase", 2},
+        {"reset", nvs_cli_reset, "nvs reset", 2},
+        {"dump", nvs_cli_dump, "nvs dump", 2}
+    };
+
+    for (size_t i = 0; i < sizeof(commands) / sizeof(commands[0]); i++) {
+        if (strcmp(argv[1], commands[i].cmd) == 0) {
+            if (argc != commands[i].argc_num) {
+                if (commands[i].usage) {
+                    CPA("Usage : %s\n", commands[i].usage);
+                }
+            } else if (commands[i].func) {
+                commands[i].func(argc > 2 ? argv[2] : NULL, argc > 3 ? argv[3] : NULL);
+            }
+            return CMD_RET_SUCCESS;
+        }
+    }
+    CPA("nvs invalid command\n");
+    CPA("Usage: %s\n", NVS_CLI_USAGE);
+    return CMD_RET_SUCCESS;
 }
+
 
 /* Declaration moved to util_cmd.c */
 /*

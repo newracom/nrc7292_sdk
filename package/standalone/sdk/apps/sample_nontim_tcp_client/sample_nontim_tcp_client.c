@@ -29,29 +29,24 @@
 
 #include "lwip/sockets.h"
 
-//#define NVS_USE 1
-
-#if defined(NVS_USE) && (NVS_USE == 1)
-#include "nrc_sdk.h"
-#include "nvs.h"
-#include "nvs_flash.h"
-nvs_handle_t nvs_handle;
-#endif
+/* If the server echos back the data sent, enable HANDLE_SERVER_ECHO */
+#define HANDLE_SERVER_ECHO 1
+#define CLIENT_DATA_DEBUG 0
 
 #define MAX_RETRY 10
-
-/* TIM or NonTIM deep sleep (select one depending on services)*/
-#define TIM_DEEPSLEEP 0 //TIM (1) NonTIM(0)
-/* in ms. STA can enter deep sleep if there is no traffic during timeout */
-#define IDLE_TIMEOUT 100 // ms
-/* in ms. STA wakes up if sleep time is expired during deep sleep*/
-#define SLEEP_TIME_MS 60000 // ms
 
 /* tcp send operation */
 #define TCP_SEND 1 // Send TCP data : 1 or 0 (1:enable, 0:disable)
 #define TCP_SEND_SIZE 128 // Bytes
 
+#ifdef NRC7292
 //#define WAKEUP_GPIO_PIN 15
+#else
+//#define WAKEUP_GPIO_PIN 25
+#endif
+
+#define TCP_SND_RECV_TIMEOUT 15 /* in sec */
+#define TCP_SND_RECV_RETRY_MAX 4 /* Timeout retry max */
 
 static void user_operation(uint32_t delay_ms)
 {
@@ -68,86 +63,13 @@ static bool _ready_ip_address(void)
 	}
 }
 
-#if defined(NVS_USE) && (NVS_USE == 1)
-#define NVS_PS_DEEPSLEEP_MODE "ps_mode"
-#define NVS_PS_IDLE_TIMEOUT "ps_idle"
-#define NVS_PS_SLEEP_TIME "ps_sleep"
-#define NVS_TCP_SEND "tcp_send"
-#define NVS_TCP_SEND_SIZE "tcp_send_size"
-
-int set_nvs_ps_setting(uint8_t ps_mode, uint32_t idle_time, uint32_t sleep_time,
-	uint8_t tcp_send, uint32_t tcp_send_size)
-{
-	int retry_cnt = 0;
-	while(1){
-		if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
-			break;
-		} else {
-			_delay_ms(1000);
-			if(retry_cnt == 10)
-				return -1;
-		}
-	}
-	nvs_set_u8(nvs_handle, NVS_PS_DEEPSLEEP_MODE, ps_mode);
-	nvs_set_u32(nvs_handle, NVS_PS_IDLE_TIMEOUT, idle_time);
-	nvs_set_u32(nvs_handle, NVS_PS_SLEEP_TIME, sleep_time);
-	nvs_set_u8(nvs_handle, NVS_TCP_SEND, tcp_send);
-	nvs_set_u32(nvs_handle, NVS_TCP_SEND_SIZE, tcp_send_size);
-	nvs_close(nvs_handle);
-
-	return 0;
-}
-
-int get_nvs_ps_setting(uint8_t *ps_mode, uint32_t *idle_time, uint32_t *sleep_time,
-	uint8_t * tcp_send, uint32_t * tcp_send_size)
-{
-	nvs_err_t err = NVS_OK;
-	int retry_cnt = 0;
-	while(1){
-		if (nvs_open(NVS_DEFAULT_NAMESPACE, NVS_READWRITE, &nvs_handle) == NVS_OK) {
-			break;
-		} else {
-			_delay_ms(1000);
-			if(retry_cnt == 10)
-				return -1;
-		}
-	}
-
-	err = nvs_get_u8(nvs_handle, NVS_PS_DEEPSLEEP_MODE, ps_mode);
-	if (NVS_ERR_NVS_NOT_FOUND == err) { /* no configuration set */
-		return -1;
-	}
-
-	err = nvs_get_u32(nvs_handle, NVS_PS_IDLE_TIMEOUT, idle_time);
-	if (NVS_ERR_NVS_NOT_FOUND == err) { /* no configuration set */
-		return -1;
-	}
-
-	err = nvs_get_u32(nvs_handle, NVS_PS_SLEEP_TIME, sleep_time);
-	if (NVS_ERR_NVS_NOT_FOUND == err) { /* no configuration set */
-		return -1;
-	}
-
-	err = nvs_get_u8(nvs_handle, NVS_TCP_SEND, tcp_send);
-	if (NVS_ERR_NVS_NOT_FOUND == err) { /* no configuration set */
-		return -1;
-	}
-
-	err = nvs_get_u32(nvs_handle, NVS_TCP_SEND_SIZE, tcp_send_size);
-	if (NVS_ERR_NVS_NOT_FOUND == err) { /* no configuration set */
-		return -1;
-	}
-
-	nvs_close(nvs_handle);
-
-	return 0;
-}
-#endif
-
 static int connect_to_server(WIFI_CONFIG *param)
 {
 	int sockfd;
 	struct sockaddr_in dest_addr;
+	int ret = 0;
+	int flag;
+	struct timeval tv;
 
 	/* build the destination's Internet address */
 	memset(&dest_addr, 0, sizeof(dest_addr));
@@ -163,6 +85,14 @@ static int connect_to_server(WIFI_CONFIG *param)
 	}
 	nrc_usr_print("Connecting to server %s:%d\n", param->remote_addr, param->remote_port);
 
+	flag = 1;
+	setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (void *) &flag, sizeof(int));
+
+	tv.tv_sec = TCP_SND_RECV_TIMEOUT;
+	tv.tv_usec = 0;
+	setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, (const char *)&tv, sizeof(tv));
+	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof(tv));
+
 	if (connect(sockfd, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) != 0) {
 		nrc_usr_print("Connecttion to server failed.\n");
 		close(sockfd);
@@ -174,6 +104,47 @@ static int connect_to_server(WIFI_CONFIG *param)
 	return sockfd;
 }
 
+struct client_data {
+	int sockfd;
+	size_t send_size;
+};
+
+#if HANDLE_SERVER_ECHO
+static void echo_client_task(void *pvParameters)
+{
+	struct client_data *client = (struct client_data *) pvParameters;
+	char* buf = NULL;
+	int received = 0;
+	int total = 0;
+
+	buf = (char*)nrc_mem_malloc(client->send_size);
+	if(!buf) {
+		nrc_usr_print("%s: buffer allocation failed! size:%d\n", __func__, client->send_size);
+		return;
+	}
+
+#if CLIENT_DATA_DEBUG
+	nrc_usr_print("Waiting for Echo.\n");
+#endif
+	do {
+		if ((received = recv(client->sockfd , buf + received, client->send_size, 0)) > 0) {
+#if CLIENT_DATA_DEBUG
+			nrc_usr_print("Echo received : %d\n", received);
+#endif
+			total += received;
+		}
+		if (total >= client->send_size) {
+			break;
+		}
+	} while (1);
+#if CLIENT_DATA_DEBUG
+	nrc_usr_print("Finished Echo handling.\n");
+#endif
+	nrc_mem_free(buf);
+	vTaskDelete(NULL);
+}
+#endif
+
 static void send_data_to_server(WIFI_CONFIG *param, uint32_t send_data_size)
 {
 	int sockfd = -1;
@@ -181,6 +152,8 @@ static void send_data_to_server(WIFI_CONFIG *param, uint32_t send_data_size)
 	size_t length = send_data_size;
 	int i = 0;
 	int data_index = 0;
+	int ret;
+	int err_retry = 0;
 
 	buf = (char*)nrc_mem_malloc(send_data_size);
 	if(!buf)
@@ -198,8 +171,36 @@ static void send_data_to_server(WIFI_CONFIG *param, uint32_t send_data_size)
 
 	if ((sockfd = connect_to_server(param)) >= 0) {
 		nrc_usr_print ("Sending data to server...\n");
-		if (send(sockfd, buf, length, 0) < 0) {
-			nrc_usr_print("Error occurred during sending\n");
+
+#if HANDLE_SERVER_ECHO
+		struct client_data client = {.sockfd = sockfd, .send_size = send_data_size};
+		xTaskCreate(echo_client_task, "echo_client_task", 4096,
+						(void*)&client, uxTaskPriorityGet(NULL), NULL);
+#endif
+
+		while (1) {
+			ret = send(sockfd, buf, length, 0);
+			if(ret > 0) {
+				nrc_usr_print("%s sent %d bytes\n", __func__, length);
+				break;
+			} else if(ret == 0) {
+				nrc_usr_print("%s Connection closed by the peer.\n", __func__);
+				break;
+			} else {
+				int err = errno;
+				if (err == EAGAIN || err == EWOULDBLOCK) {
+					if(err_retry++ < TCP_SND_RECV_RETRY_MAX) {
+						_delay_ms(100);
+						nrc_usr_print("%s sent retry %d\n", __func__, err_retry);
+					} else {
+						nrc_usr_print("%s stopped : %d(%s)\n", __func__, ret, lwip_strerr(ret));
+						break;
+					}
+				} else {
+					nrc_usr_print("%s stopped : %d(%s)\n", __func__, ret, lwip_strerr(ret));
+					break;
+				}
+			}
 		}
 	}
 
@@ -214,10 +215,30 @@ static void send_data_to_server(WIFI_CONFIG *param, uint32_t send_data_size)
 		   it is necessary to give some delay to wait for FIN ACK from server and send ACK for it. */
 		/* One can remove below delay and the server will eventually clean up the server socket
 		   when the TCP FIN timeout reached. */
-		_delay_ms(100);
+		_delay_ms(300);
 		if(buf)
 			nrc_mem_free(buf);
 	}
+}
+
+void enter_gpio_wakeup_mode(int wakeup_gpio)
+{
+#ifdef NRC7292
+	/* Below configuration is for NRC7292 EVK Revision B board */
+	nrc_ps_set_gpio_direction(0x07FFFF7F);
+	nrc_ps_set_gpio_out(0x0);
+	nrc_ps_set_gpio_pullup(0x0);
+#elif defined(NRC7394)
+	/* Below configuration is for NRC7394 EVK Revision board */
+	nrc_ps_set_gpio_direction(0xFFF7FDC7);
+	nrc_ps_set_gpio_out(0x0);
+	nrc_ps_set_gpio_pullup(0x0);
+#endif
+
+	nrc_ps_set_gpio_wakeup_pin(false, wakeup_gpio, true);
+	nrc_ps_set_wakeup_source(WAKEUP_SOURCE_GPIO);
+
+	nrc_ps_sleep_forever();
 }
 
 /******************************************************************************
@@ -233,20 +254,13 @@ nrc_err_t run_sample_wifi_power_save(WIFI_CONFIG *param)
 	char* ip_addr = NULL;
 	uint32_t wakeup_source = 0;
 
-	uint8_t ps_mode = TIM_DEEPSLEEP;
-	uint32_t ps_idle_timeout_ms = IDLE_TIMEOUT;
-	uint32_t ps_sleep_time_ms = SLEEP_TIME_MS;
+	uint8_t ps_mode = param->ps_mode;
+	uint32_t ps_idle_timeout_ms =   param->ps_idle;
+	uint32_t ps_sleep_time_ms =   param->ps_sleep;
 	uint8_t tcp_send = TCP_SEND;
 	uint32_t tcp_send_size = TCP_SEND_SIZE;
 
 	nrc_usr_print("[%s] Sample App for Wi-Fi  \n",__func__);
-
-#if defined(NVS_USE) && (NVS_USE == 1)
-	if(get_nvs_ps_setting(&ps_mode, &ps_idle_timeout_ms, &ps_sleep_time_ms, &tcp_send, &tcp_send_size) < 0){
-		set_nvs_ps_setting(TIM_DEEPSLEEP, IDLE_TIMEOUT,   SLEEP_TIME_MS, TCP_SEND, TCP_SEND_SIZE);
-	}
-#endif
-
 	nrc_usr_print("[%s] ps_mode(%s) idle_timeout(%d) sleep_time(%d)\n",
 		__func__, (ps_mode == 1) ? "TIM" : "NON-TIM", ps_idle_timeout_ms, ps_sleep_time_ms);
 
@@ -305,7 +319,7 @@ check_again:
 	}
 
 #if defined(WAKEUP_GPIO_PIN)
-	nrc_ps_set_gpio_wakeup_pin(false, WAKEUP_GPIO_PIN);
+	nrc_ps_set_gpio_wakeup_pin(false, WAKEUP_GPIO_PIN, true);
 	wakeup_source |= WAKEUP_SOURCE_GPIO;
 #endif /* defined(WAKEUP_GPIO_PIN) */
 
@@ -322,9 +336,9 @@ check_again:
 	nrc_ps_set_gpio_pullup(0x0);
 #elif defined(NRC7394)
 	/* Below configuration is for NRC7394 EVK Revision board */
-	nrc_ps_set_gpio_direction(0xFFFFFDFF);
-	nrc_ps_set_gpio_out(0x00000100);
-	nrc_ps_set_gpio_pullup(0xFFFFFFFF);
+	nrc_ps_set_gpio_direction(0xFFF7FDC7);
+	nrc_ps_set_gpio_out(0x0);
+	nrc_ps_set_gpio_pullup(0x0);
 #endif
 
 	while (1) {

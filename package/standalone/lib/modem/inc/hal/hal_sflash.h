@@ -16,7 +16,9 @@ extern "C" {
 #define XT25Q16D_JEDEC_ID (0x0B6015)
 #define XT25W16F_JEDEC_ID (0x0B6515)
 #define IS25LP080D_JEDEC_ID (0x9D6014)
+#define IS25LP016D_JEDEC_ID (0x9D6015)
 #define IS25LP128D_JEDEC_ID (0x9D6018)
+#define IS25WP016D_JEDEC_ID (0x9D7015)
 #define EN25S16B_JEDEC_ID (0x1C3815)
 #define EN25QH16B_JEDEC_ID (0x1C7015)
 #define W25Q16FW_JEDEC_ID (0xEF6015)
@@ -31,6 +33,7 @@ extern "C" {
 #define MX25U1633F_JEDEC_ID (0xC22535)
 #define MX25R3235F_JEDEC_ID (0xC22816)
 #define MX25R1635F_JEDEC_ID (0xC22815)
+#define MX25R8035F_JEDEC_ID (0xC22814)
 #define EN25QW32A_JEDEC_ID (0x1C6116)
 #define EN25S32A_JEDEC_ID (0x1C3816)
 #define EN25SE32A_JEDEC_ID (0x1C4816)
@@ -41,6 +44,8 @@ extern "C" {
 #define GT25Q32A_JEDEC_ID (0xC46016)
 #define FM25W16A_JEDEC_ID (0xA12815)
 #define FM25W32A_JEDEC_ID (0xA12816)
+#define ZB25WQ16A_JEDEC_ID (0x5E3415)
+#define BY25Q32ES_JEDEC_ID (0x684016)
 
 /* ----------------------------------
  * W26XX JEDEC ID
@@ -81,7 +86,8 @@ uint32_t nrc_sf_get_size(void);
 static uint32_t half_addr_sf = 0;
 static bool mem_map_valid = 0;
 typedef struct {
-	uint32_t MAP_VERSION;
+	uint32_t PROFILE:16;
+	uint32_t MAP_VERSION:16;
 	uint32_t FW;
 	uint32_t FW_INFO;
 	uint32_t CORE_DUMP;
@@ -98,24 +104,6 @@ typedef struct {
 } sf_mem_map_t;
 
 enum sf_store_area_e {
-#if defined(SUPPORT_DEVICEWORX)
-	SF_BOOTLOADER_4MB = 0x0,
-	SF_FW_4MB = 0x10000,
-	SF_FW_INFO_4MB = 0x190000,
-	SF_CORE_DUMP_4MB = 0x191000,
-	SF_USER_CONFIG_1_4MB = 0x195000,/*200KB*/
-	SF_USER_CONFIG_2_4MB = 0x1C7000,/*200KB*/
-	SF_USER_CONFIG_3_4MB = 0x1F9000,/*200KB*/
-	SF_USER_CONFIG_4_4MB = 0x22B000,/*200KB*/
-	SF_DEVICE_INFO_4MB = 0x25D000,/*4KB*/
-	SF_USER_DATA_4MB = 0x25E000,/*120KB*/
-	SF_SYSTEM_CONFIG_4MB = 0x27C000,
-	SF_MAC_ADDR_4MB = 0x27C000, /*not used*/
-	SF_MAC_ADDR_MC_4MB = 0x27C008,/*not used*/
-	SF_RF_CAL_4MB = 0x27D000,
-	SF_FOTA_4MB = 0x27E000,
-	SF_FOTA_INFO_4MB = 0x3FE000,
-#else
 	SF_BOOTLOADER_4MB = 0x0,
 	SF_FW_4MB = 0x10000,
 	SF_USER_DATA_4MB = 0x3DA000,/*100KB*/
@@ -130,7 +118,6 @@ enum sf_store_area_e {
 	SF_RF_CAL_4MB = 0x3FD000,
 	SF_FOTA_4MB = 0x1F5000,
 	SF_FOTA_INFO_4MB = 0x3FF000,
-#endif
 	SF_BOOTLOADER_2MB = 0x0,
 	SF_FW_2MB = 0x10000,
 	SF_FW_INFO_2MB = 0xF5000,
@@ -184,7 +171,6 @@ enum sf_reg_override_ctrl {
 #define SYSCONFIG_SECTOR_SIZE               4096
 #define SYSCONFIG_PRE_USER_FACTORY_SIZE      256
 #define SYSCONFIG_USER_FACTORY_SIZE          512
-
 #define SF_DEVICE_INFO_SIZE 4096
 
 typedef struct {
@@ -200,16 +186,9 @@ struct sf_reg_override {
 };
 
 typedef struct {
-	uint32_t BI;
-	uint32_t T_SLOT;
-	uint32_t TI_MIN;
-	uint32_t TI_MAX;
-} sf_auth_ctrl_t;
-
-typedef struct {
 	uint32_t version; /* sys_config structure version*/
-	uint8_t mac_addr[6]; /*mac address for interface 0*/
-	uint8_t mac_addr_1[6]; /*mac address for interface 1*/
+	uint8_t mac_addr0[6]; /*mac address for interface 0*/
+	uint8_t mac_addr1[6]; /*mac address for interface 1*/
 	uint32_t cal_use :8; /*enable/disable the usage of calibration data*/
 	uint32_t reserved0 :8;
 	uint32_t hw_version:16; /* HW Version */
@@ -274,6 +253,7 @@ bool nrc_sf_update_rf_pllldo12_tr(uint32_t control, uint32_t value);
 void nrc_sf_get_pllldo(uint32_t *value);
 bool nrc_sf_valid_pllldo(void);
 uint32_t nrc_sf_get_size(void);
+int32_t nrc_sf_get_size_memmap(uint32_t mem_map_entry, bool is_boot_xip);
 bool nrc_sf_userconfig_erase(uint32_t address);
 bool nrc_sf_userconfig_read(uint32_t address, uint8_t *data, size_t size);
 bool nrc_sf_userconfig_write(uint32_t address, uint8_t *data, size_t size);
@@ -283,7 +263,8 @@ enum sf_migration_res_e {
 	SF_MIGRATION_RES_ALREADY = 1,
 	SF_MIGRATION_RES_ORG_FAIL = 2,
 	SF_MIGRATION_RES_INVALID_SIZE = 3,
-	SF_MIGRATION_RES_ERROR = 4
+	SF_MIGRATION_RES_ERROR = 4,
+	SF_MIGRATION_RES_NEED_FWINFO = 5
 };
 uint8_t nrc_sf_migration_1m_to_2m(void);
 uint8_t nrc_sf_migration_2m_to_1m(void);
@@ -292,20 +273,25 @@ bool nrc_sf_update_memory_map(sf_mem_map_t *mem_map);
 bool nrc_sf_set_etag_id(uint16_t etag_id);
 uint16_t nrc_sf_get_etag_id(void);
 uint8_t nrc_sf_get_cal_use(void);
-#if defined(INCLUDE_AUTH_CONTROL)
-bool nrc_sf_set_auth_ctrl(sf_auth_ctrl_t  *auth_ctrl);
-bool nrc_sf_get_auth_ctrl(sf_auth_ctrl_t  *auth_ctrl);
-#endif /* defined(INCLUDE_AUTH_CONTROL) */
+uint16_t nrc_sf_get_esl_ch(void);
 bool nrc_sf_update_user_factory(char* data, uint16_t len);
 bool nrc_sf_get_user_factory(char* data, uint16_t buf_len);
 
 bool nrc_sf_write_common(uint32_t mem_map_entry, uint32_t user_data_offset, uint8_t* data, uint32_t size);
 bool nrc_sf_read_common(uint32_t mem_map_entry, uint8_t* data, uint32_t user_data_offset, uint32_t size);
+
+uint32_t nrc_sf_get_user_data_area_address(void);
 uint32_t nrc_sf_get_user_data_area_size(void);
+bool nrc_sf_erase_user_data_area(void);
 bool nrc_sf_write_user_data(uint32_t user_data_offset, uint8_t* data, uint32_t size);
 bool nrc_sf_read_user_data(uint8_t* data, uint32_t user_data_offset, uint32_t size);
 bool nrc_sf_write_device_info(uint8_t* data, uint16_t size);
 bool nrc_sf_read_device_info(uint8_t* data, uint16_t size);
+bool nrc_sf_fota_support(void);
+uint32_t nrc_sf_fota_max_fw_size(void);
+uint32_t nrc_sf_fota_addr(void);
+uint32_t nrc_sf_fota_info_addr(void);
+uint32_t nrc_sf_max_flash_size(uint32_t offset);
 
 
 #define NRC_SF_VERIFY_SLOT_OKAY           0

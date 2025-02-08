@@ -316,6 +316,9 @@ static int iperf_socket_open (iperf_socket_t *socket, bool ipv6)
 	if (nrc_atcmd_send_cmd("AT+SRXLOGLEVEL=1") != ATCMD_RET_OK)
 		return -1;
 
+	if (nrc_atcmd_send_cmd("AT+SCLOSE") != ATCMD_RET_OK)
+		return -1;
+
 	switch (socket->protocol)
 	{
 		case IPERF_PROTO_UDP:
@@ -609,7 +612,13 @@ static void iperf_udp_server_report_to_client (iperf_udp_server_info_t *info)
 	iperf_time_t total_time;
 	uint64_t total_len;
 
-//	iperf_log(" Report to client\n");
+	if (ntohl(info->last_datagram.id) != (-1 * info->datagram_seq))
+	{
+		iperf_debug(" Report to client: last_id=%d seq=%d cnt=%d\n", 
+			ntohl(info->last_datagram.id), info->datagram_seq, info->datagram_cnt);
+
+		info->last_datagram.id = htonl(-1 * info->datagram_seq);
+	}
 
 	total_time = info->stop_time - info->start_time;
 	total_len = info->datagram_cnt;
@@ -707,8 +716,8 @@ static int iperf_udp_server_run (iperf_opt_t *option)
 
 	report_time = info->report_interval;
 
-	for (report_total = report_success = report_error = report_outoforder = 0;
-			!info->done && (elapse_time < info->send_time) && (info->recv_byte < info->send_byte) ; )
+	for (report_total = report_success = report_error = report_outoforder = 0 ;
+		!info->done && (elapse_time < info->send_time) && (info->recv_byte < info->send_byte) ; )
 	{
 		iperf_get_time(&current_time);
 
@@ -731,9 +740,19 @@ static int iperf_udp_server_run (iperf_opt_t *option)
 		}
 	}
 
-	if (!info->done)
-		info->stop_time = current_time;	
+	info->stop_time = current_time;	
 
+	if (!info->done)
+	{
+		const int timeout = (3 * 1000); /* msec */
+
+		for (i = 0 ; i < timeout && !info->done ; i++)
+			usleep(1000);
+
+		if (i >= timeout)
+			iperf_log(" Last datagram from client: timeout %d sec\n", i / 1000); 
+	}
+			
 	elapse_time = info->stop_time - info->start_time;	
 
 	if (info->report_interval > 0 && elapse_time > (report_time - info->report_interval))
@@ -753,11 +772,9 @@ static int iperf_udp_server_run (iperf_opt_t *option)
 							info->error_cnt,
 							info->outoforder_cnt);
 
-	iperf_log(" Done: %d/%d\n", info->datagram_cnt, info->datagram_seq);
-
 	iperf_udp_server_report_to_client(info);
 
-	sleep(1);
+	iperf_log(" Done: %d/%d\n", info->datagram_cnt, info->datagram_seq);
 
 	return 0;
 }
@@ -779,7 +796,7 @@ static void iperf_udp_server_recv (iperf_socket_t *socket, char *buf, int len)
 /*		iperf_debug("id: %d, cnt=%d, seq=%d\n", id, info->datagram_cnt, info->datagram_seq); */
 /*		iperf_client_header_print (&datagram->client_header, true); */
 
-		if (id == 0)
+		if (id == 0 || (id > 0 && !info->start))
 		{
 			int32_t port = ntohl(datagram->client_header.mPort);
 			int32_t amount = ntohl(datagram->client_header.mAmount);
@@ -887,7 +904,7 @@ static void iperf_udp_server_recv_callback (atcmd_rxd_t *rxd, char *data)
 /*	iperf_debug("server_rx, id=%d len=%d remote=%s,%d\n",
 				rxd->id, rxd->len, rxd->remote_addr, rxd->remote_port); */
 
-	iperf_udp_server_recv(&socket, data, rxd->len);
+	iperf_udp_server_recv(&socket, data, rxd->length);
 }
 
 /**********************************************************************************************/
@@ -899,6 +916,8 @@ static void iperf_udp_client_init_info (iperf_udp_client_info_t *info, iperf_opt
 	memset(info, 0, sizeof(iperf_udp_client_info_t));
 
 	info->done = false;
+	info->socket_closed = false;
+	info->server_report = false;
 	info->datagram_cnt = 0;
 
 	info->server_port = IPERF_DEFAULT_SERVER_PORT;
@@ -984,7 +1003,7 @@ static void iperf_udp_client_report (iperf_time_t start_time, iperf_time_t end_t
 					byte_to_string(byte), bps_to_string(bps));
 }
 
-/* static void iperf_udp_client_report_from_server (iperf_server_header_t *header)
+static void iperf_udp_client_report_from_server (iperf_server_header_t *header)
 {
 	iperf_time_t time = ntohl(header->stop_sec) + (ntohl(header->stop_usec) / 1000000.);
 	int32_t byte = ntohl(header->total_len2);
@@ -1000,7 +1019,7 @@ static void iperf_udp_client_report (iperf_time_t start_time, iperf_time_t end_t
 					jitter / 1000.,
 					errors, datagrams,
 					(errors * 100.) / datagrams);
-} */
+}
 
 static int iperf_udp_client_run (iperf_socket_t *socket, iperf_opt_t *option)
 {
@@ -1039,13 +1058,16 @@ static int iperf_udp_client_run (iperf_socket_t *socket, iperf_opt_t *option)
 
 		elapse_time = current_time - start_time;
 
-		if (current_time >= stop_time)
+		if (current_time >= stop_time || info->socket_closed)
 		{
 			iperf_udp_client_report(report_time - info->report_interval, elapse_time, i - info->datagram_cnt);
 			info->datagram_cnt = i;
 
 			iperf_udp_client_report(0, elapse_time, info->datagram_cnt);
 			iperf_log(" Sent %u datagrams\n", info->datagram_cnt);
+
+			if (info->socket_closed)
+				iperf_log(" Closed\n");
 
 			if (i == 0)
 				break;
@@ -1074,21 +1096,19 @@ static int iperf_udp_client_run (iperf_socket_t *socket, iperf_opt_t *option)
 			i++;
 	}
 
-	for (i = 0 ; i < 10 ; i++)
-	{
-		if (info->done)
-		{
-			iperf_log(" Done\n");
-			break;
-		}
+	info->done = true;
 
-		usleep(100 * 1000);
-	}
+	iperf_log(" Done\n");
 
-	if (i >= 10)
+	if (!info->server_report)
 	{
-		iperf_log("Report from server: timeout\n");
-		info->done = true;
+		const int timeout = (1 * 1000); /* msec */
+
+		for (i = 0 ; i < timeout && !info->server_report ; i++)
+			usleep(1000);
+
+/*		if (i >= timeout)
+			iperf_debug(" Report from server: timeout %d sec\n", i / 1000); */
 	}
 
 	free((char *)datagram);
@@ -1106,11 +1126,17 @@ static void iperf_udp_client_recv (iperf_socket_t *socket, char *buf, int len)
 		if (info->datagram_cnt > 0)
 		{
 			iperf_udp_datagram_t *datagram = (iperf_udp_datagram_t *)&buf[0];
-
-			if (ntohl(datagram->id) == -info->datagram_cnt)
+			int32_t id = ntohl(datagram->id);
+		
+			if (id < 0)
 			{
-/*				iperf_udp_client_report_from_server(&datagram->server_header); */
 				info->done = true;
+				info->server_report = true;
+
+				iperf_udp_client_report_from_server(&datagram->server_header); 
+
+				if (ntohl(datagram->id) != -info->datagram_cnt)
+					iperf_log(" Report from server: client_sent=%d server_received=%d\n", info->datagram_cnt, -id);
 			}
 		}
 	}
@@ -1131,7 +1157,7 @@ static void iperf_udp_client_recv_callback (atcmd_rxd_t *rxd, char *data)
 /*	iperf_debug("client_rx, id=%d len=%d remote=%s,%d\n",
 				rxd->id, rxd->len, rxd->remote_addr, rxd->remote_port); */
 
-	iperf_udp_client_recv(&socket, data, rxd->len);
+	iperf_udp_client_recv(&socket, data, rxd->length);
 }
 
 static void iperf_udp_client_event_callback (enum ATCMD_EVENT event, int argc, char *argv[])
@@ -1140,18 +1166,29 @@ static void iperf_udp_client_event_callback (enum ATCMD_EVENT event, int argc, c
 
 	switch (event)
 	{
+		case ATCMD_SEVENT_CLOSE:
+/*			iperf_debug("SEVENT_CLOSE: argc=%d\n", argc); */
+
+			if (argc == 3)
+			{
+/*				iperf_debug("SEVENT_CLOSE: id=%s err=%s,%s\n", argv[0], argv[1], argv[2]); */
+
+				info->socket_closed = true;
+			}
+			break;
+
 		case ATCMD_SEVENT_SEND_IDLE:
 /*			iperf_debug("SEVENT_SEND_IDLE: argc=%d\n", argc); */
 
 			if (argc == 4)
 			{
+/*				iperf_debug("SEVENT_SEND_IDLE: id=%s done=%s drop=%s wait=%s\n", 
+								argv[0], argv[1], argv[2], argv[3]); */
+
 				if (!info->done)
 					break;
 
 				g_iperf_socket_send_idle = true;
-
-/*				iperf_debug("SEVENT_SEND_IDLE: id=%s done=%s drop=%s wait=%s\n", 
-								argv[0], argv[1], argv[2], argv[3]); */
 			}
 			break;
 
@@ -1242,8 +1279,20 @@ static int iperf_tcp_server_run (iperf_opt_t *option)
 		}
 	}
 
-	if (info->done)
-		elapse_time = info->stop_time - info->start_time;
+	info->stop_time = current_time;	
+
+	if (!info->done)
+	{
+		const int timeout = (3 * 1000); /* msec */
+
+		for (i = 0 ; i < timeout && !info->done ; i++)
+			usleep(1000);
+
+		if (i >= timeout)
+			iperf_log(" Disconnection from client: timeout %d sec\n", i / 1000); 
+	}
+
+	elapse_time = info->stop_time - info->start_time;
 
 	if (info->report_interval > 0 && elapse_time > (report_time - info->report_interval))
 	{
@@ -1339,7 +1388,7 @@ static void iperf_tcp_server_recv_callback (atcmd_rxd_t *rxd, char *data)
 /*		iperf_debug("server_rx, id=%d len=%d remote=%s,%d\n",
 			rxd->id, rxd->len, rxd->remote_addr, rxd->remote_port); */
 
-		iperf_tcp_server_recv(&socket, data, rxd->len);
+		iperf_tcp_server_recv(&socket, data, rxd->length);
 	}
 }
 
@@ -1422,6 +1471,8 @@ static void iperf_tcp_client_init_info (iperf_tcp_client_info_t *info, iperf_opt
 	memset(info, 0, sizeof(iperf_tcp_client_info_t));
 
 	info->done = false;
+	info->socket_closed = false;
+	info->server_report= false;
 	info->datagram_cnt = 0;
 
 	info->server_port = IPERF_DEFAULT_SERVER_PORT;
@@ -1525,25 +1576,31 @@ static int iperf_tcp_client_run (iperf_socket_t *socket, iperf_opt_t *option) //
 
 		elapse_time = current_time - start_time;
 
-		if (current_time >= stop_time)
+		if (current_time >= stop_time || info->socket_closed)
 		{
-			iperf_tcp_client_report(report_time - info->report_interval, elapse_time, i - info->datagram_cnt, info->datagram_size);
+			iperf_tcp_client_report(report_time - info->report_interval, elapse_time, 
+									i - info->datagram_cnt, info->datagram_size);
 			info->datagram_cnt = i;
 
 			iperf_tcp_client_report(0, elapse_time, info->datagram_cnt, info->datagram_size);
-			iperf_log(" Sent %u datagrams\n", info->datagram_cnt);
+/*			iperf_log(" Sent %u datagrams\n", info->datagram_cnt); */
+
+			if (info->socket_closed)
+				iperf_log(" Closed\n");
 
 			break;
 		}
 		else if (info->report_interval > 0 && elapse_time >= report_time)
 		{
-			iperf_tcp_client_report(report_time - info->report_interval, elapse_time, i - info->datagram_cnt, info->datagram_size);
+			iperf_tcp_client_report(report_time - info->report_interval, elapse_time, 
+									i - info->datagram_cnt, info->datagram_size);
 			report_time = elapse_time + info->report_interval;
 			info->datagram_cnt = i;
 		}
 
 		if (option->passthrough)
-			ret = iperf_socket_send_passthrough(socket, (char *)datagram, info->datagram_size, option->negative, option->done_event);
+			ret = iperf_socket_send_passthrough(socket, (char *)datagram, info->datagram_size, 
+												option->negative, option->done_event);
 		else
 			ret = iperf_socket_send(socket, (char *)datagram, info->datagram_size, option->done_event);
 
@@ -1551,9 +1608,9 @@ static int iperf_tcp_client_run (iperf_socket_t *socket, iperf_opt_t *option) //
 			i++;
 	}
 
-	iperf_log(" Done\n");
-
 	info->done = true;
+
+	iperf_log(" Done\n");
 
 	free((char *)datagram);
 	datagram = NULL;
@@ -1574,7 +1631,7 @@ static void iperf_tcp_client_recv_callback (atcmd_rxd_t *rxd, char *data)
 	nrc_atcmd_param_to_str(rxd->remote_addr, socket.remote_addr, sizeof(socket.remote_addr));
 
 	iperf_debug("client_rx, id=%d len=%d remote=%s,%d\n",
-				rxd->id, rxd->len, rxd->remote_addr, rxd->remote_port);
+				rxd->id, rxd->length, rxd->remote_addr, rxd->remote_port);
 }
 
 static void iperf_tcp_client_event_callback (enum ATCMD_EVENT event, int argc, char *argv[])
@@ -1583,18 +1640,29 @@ static void iperf_tcp_client_event_callback (enum ATCMD_EVENT event, int argc, c
 
 	switch (event)
 	{
+		case ATCMD_SEVENT_CLOSE:
+/*			iperf_debug("SEVENT_CLOSE: argc=%d\n", argc); */
+
+			if (argc == 3)
+			{
+/*				iperf_debug("SEVENT_CLOSE: id=%s err=%s,%s\n", argv[0], argv[1], argv[2]); */
+
+				info->socket_closed = true;
+			}
+			break;
+
 		case ATCMD_SEVENT_SEND_IDLE:
 /*			iperf_debug("SEVENT_SEND_IDLE: argc=%d\n", argc); */
 
 			if (argc == 4)
 			{
+/*				iperf_debug("SEVENT_SEND_IDLE: id=%s done=%s drop=%s wait=%s\n", 
+								argv[0], argv[1], argv[2], argv[3]); */
+
 				if (!info->done)
 					break;
 
 				g_iperf_socket_send_idle = true;
-
-/*				iperf_debug("SEVENT_SEND_IDLE: id=%s done=%s drop=%s wait=%s\n", 
-								argv[0], argv[1], argv[2], argv[3]); */
 			}
 			break;
 

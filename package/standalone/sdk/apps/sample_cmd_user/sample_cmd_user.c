@@ -267,11 +267,15 @@ void user_init(void)
 		return;
 	}
 
+	/* wait for ip indefinitely */
+	param.dhcp_timeout = 0;
+
 	nrc_usr_print("\nusr: Wi-Fi connection success.\n");
 
 	/* check the IP is ready */
-	while (nrc_addr_get_state(0) != NET_ADDR_SET)
-		_delay_ms(1000);
+	if (nrc_wait_for_ip(0, param.dhcp_timeout) == NRC_FAIL) {
+		return;
+	}
 
 	nrc_usr_print("\nusr: You can use iperf command. (iperf -h)\n");
 	nrc_usr_print("\nusr: Press ENTER key\n");

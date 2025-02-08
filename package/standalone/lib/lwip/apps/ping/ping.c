@@ -231,7 +231,11 @@ void ping_thread(void *arg)
 {
 	int s;
 	int ret;
-	int timeout = PING_RCV_TIMEO;
+	struct timeval tv;
+
+	tv.tv_sec = PING_RCV_TIMEO / 1000;
+	tv.tv_usec =(PING_RCV_TIMEO % 1000) * 1000;
+
 	ping_parm_t* ping_info = (ping_parm_t*)arg;
 
 	s = lwip_socket(AF_INET,  SOCK_RAW, IP_PROTO_ICMP);
@@ -241,7 +245,7 @@ void ping_thread(void *arg)
 		return;
 	}
 
-	ret = lwip_setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+	ret = lwip_setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof(tv));
 	LWIP_ASSERT("setting receive timeout failed", ret == 0);
 	LWIP_UNUSED_ARG(ret);
 

@@ -47,19 +47,15 @@
 #endif
 
 
-static void nrc_atcmd_build_info (void)
+static void nrc_atcmd_firmware_info (void)
 {
-	_atcmd_info("BUILD: %s,%s,%s (%s, %s)",
-					ATCMD_CHIP_NAME,
-					ATCMD_CPU_TYPE,
-					ATCMD_IP_VER,
-					__TIME__,
-					__DATE__
-					);
-}
+	_atcmd_info("FLASH: %s, %s", 
+					ATCMD_FLASH_SIZE, ATCMD_FLASH_PROFILE);
 
-static void nrc_atcmd_version_info (void)
-{
+	_atcmd_info("BUILD: %s,%s,%s (%s, %s)", 
+					ATCMD_CHIP_NAME, ATCMD_CPU_TYPE, ATCMD_IP_VER,
+					__TIME__, __DATE__);
+
 #if defined(SDK_VER_DESCRIPTION)
 	_atcmd_info("VERSION: %d.%d.%d (SDK-%d.%d.%d-%s)",
 					ATCMD_VER_MAJOR, ATCMD_VER_MINOR, ATCMD_VER_REVISION,
@@ -148,8 +144,7 @@ static int nrc_atcmd_enable_hspi (bool *console_enable)
 	*console_enable = true;
 	nrc_uart_console_enable(true);
 
-	nrc_atcmd_build_info();
-	nrc_atcmd_version_info();
+	nrc_atcmd_firmware_info();
 
 	return nrc_atcmd_enable(_HIF_TYPE_HSPI, sw_id, bd_id);
 }
@@ -183,8 +178,7 @@ static int nrc_atcmd_enable_uart (bool *console_enable)
 		*console_enable = true;
 		nrc_uart_console_enable(true);
 
-		nrc_atcmd_build_info();
-		nrc_atcmd_version_info();
+		nrc_atcmd_firmware_info();
 	}
 
 	return nrc_atcmd_enable((hfc ? _HIF_TYPE_UART_HFC : _HIF_TYPE_UART), channel, baudrate);
@@ -230,8 +224,7 @@ static int cmd_atcmd_info (cmd_tbl_t *t, int argc, char *argv[])
 	switch (--argc)
 	{
 		case 0:
-			nrc_atcmd_build_info();
-			nrc_atcmd_version_info();
+			nrc_atcmd_firmware_info();
 			break;
 
 		default:

@@ -19,6 +19,7 @@ typedef struct {
 
 	bool enabled;
 	bool is_tx;
+	bool has_no_ehook;
 	int ie_offset;
 
 	framehook fhook;
@@ -48,6 +49,7 @@ void umac_s1g_deregister_framehook(int i);
 
 void umac_s1g_register_elementhook(int i, uint8_t eid, ELEMENT_CHECKER fp, bool ap_sta);
 void umac_s1g_deregister_elementhook(int i, uint8_t eid);
+void umac_s1g_register_no_elementhook(int i, uint8_t eid, ELEMENT_CHECKER fp, bool ap_sta);
 
 bool umac_s1g_process_ul(struct _SYS_BUF **buf);
 bool umac_s1g_process_dl(struct _SYS_BUF **buf);

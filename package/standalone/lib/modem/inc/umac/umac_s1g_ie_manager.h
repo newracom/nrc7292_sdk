@@ -6,6 +6,34 @@
 #include "system_type.h"
 #include "umac_ieee80211_types.h"
 #include "../util/util_byte_stream.h"
+#include "umac_info.h"
+
+#if defined(INCLUDE_AUTH_CONTROL) && defined(INCLUDE_STANDALONE)
+typedef struct _auth_ctrl_info {
+	uint8_t bssid[6];
+	uint8_t ssid[MAX_SSID_LEN];
+	uint8_t ssid_len:6;
+	uint8_t cac:1;
+	uint8_t dac:1;
+	uint16_t bi;
+	uint8_t slot;
+	uint8_t ti_min;
+	uint8_t ti_max;
+} auth_ctrl_info;
+	
+typedef struct Node {
+	auth_ctrl_info *data;
+	struct Node* next;
+} Node;
+	
+typedef struct LinkedList {
+	Node* head;
+} LinkedList;
+	
+Node* searchByBSSID(uint8_t* bssid);
+void freeNodeByBSSID(uint8_t* bssid);
+void freeList(void);
+#endif
 
 #if defined(UMAC_CONFIG_WTS)
 #include "umac_ie_config.h"
@@ -18,24 +46,6 @@
 		return false;								\
 	}												\
 } while (0)
-
-typedef enum {
-	TWT_RESPONDER = 0,
-	TWT_REQUESTER,
-	TWT_REQUEST_MAX
-} S1G_TWT_REQUEST_TYPE;
-
-typedef enum {
-	TWT_REQUEST = 0,
-	TWT_SUGGEST,
-	TWT_DEMAND,
-	TWT_GROUPING,
-	TWT_ACCEPT,
-	TWT_ALTERNATE,
-	TWT_DICTATE,
-	TWT_REJECT,
-	TWT_MAX
-} S1G_TWT_SETUP_COMMAND;
 
 #if defined (INCLUDE_STA_CSA_SUPPORT)
  struct external_csa_info {
@@ -93,9 +103,11 @@ bool insert_ie_bss_max_idle_period(struct byte_stream *bs, bool is_tx, int8_t vi
 bool insert_ie_s1g_header_compression(struct byte_stream *bs, bool is_tx, int8_t vif_id, uint8_t* addr);
 bool insert_ie_edca_parameter_set(struct byte_stream *bs);
 #if defined(INCLUDE_TWT_SUPPORT)
-bool insert_ie_s1g_twt(struct byte_stream *bs, bool is_tx, int8_t vif_id, bool ap_sta);
+bool insert_ie_s1g_twt(struct byte_stream *bs, bool is_tx, int8_t vif_id, bool ap_sta, STAINFO *sta_info);
 #endif /* defined(INCLUDE_TWT_SUPPORT) */
-
+#if defined(INCLUDE_AUTH_CONTROL)
+bool insert_ie_s1g_auth_control(struct byte_stream *bs, bool is_tx, int8_t vif_id);
+#endif
 bool insert_ie_supported_rates(struct byte_stream *bs);
 bool insert_ie_ssid(struct byte_stream *bs, bool is_tx, int8_t vif_id, bool short_beacon);
 bool insert_ie_legacy_supported_rates(struct byte_stream *bs, bool is_tx, int8_t vif_id);
@@ -113,10 +125,13 @@ bool insert_ie_mesh_ch_switch_param(struct byte_stream *bs, bool is_tx, int8_t v
 bool insert_ie_mesh_awake_window(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 bool insert_ie_vendor_specific_wmm(struct byte_stream *bs, bool is_tx, int8_t vif_id, OUI_SUBTYPE oui_stype);
 bool insert_ie_vendor_specific_all_others(struct byte_stream *bs, bool is_tx, int8_t vif_id);
+bool insert_ie_vendor_specific_twt_ie(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 bool insert_ie_extension_all(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 bool insert_ie_vendor_specific_probe_req(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 bool insert_ie_vendor_specific_probe_rsp(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 bool insert_ie_vendor_specific_assoc_req(struct byte_stream *bs, bool is_tx, int8_t vif_id);
+bool insert_ie_saved_s1g_twt_req (struct byte_stream *bs, bool is_tx, int8_t vif_id);
+bool insert_ie_saved_s1g_twt_resp (struct byte_stream *bs, bool is_tx, int8_t vif_id);
 #if defined(INCLUDE_H2E_SUPPORT)
 bool insert_ie_rsn_extension(struct byte_stream *bs, bool is_tx, int8_t vif_id);
 #endif /* defined(INCLUDE_H2E_SUPPORT) */
@@ -139,6 +154,7 @@ bool parse_ie_s1g_header_compression(struct _SYS_BUF *buf, int8_t vif_id, ie_gen
 bool parse_ie_s1g_shortbeaconinterval(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 bool parse_ie_edca_parameter_set(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 bool parse_ie_vendor_specific(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
+bool parse_no_ie_vendor_specific(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 #if defined(INCLUDE_VENDOR_REMOTECMD)
 void parse_ie_vendor_remotecmd(int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 static void remotecmd_callback_enqueue(int v);
@@ -154,10 +170,16 @@ bool parse_ie_mesh_awake_window(struct _SYS_BUF *buf, int8_t vif_id, ie_general 
 bool parse_ie_ext_csa(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 #if defined(INCLUDE_TWT_SUPPORT)
 bool parse_ie_s1g_twt(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
+bool parse_no_ie_s1g_twt(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 #endif /* defined(INCLUDE_TWT_SUPPORT) */
+bool save_ie_s1g_twt_req (struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
+bool save_ie_s1g_twt_resp (struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 #if defined(INCLUDE_H2E_SUPPORT)
 bool parse_ie_rsn_extension(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 #endif /* defined(INCLUDE_H2E_SUPPORT) */
+#if defined(INCLUDE_AUTH_CONTROL) && defined(INCLUDE_STANDALONE)
+bool parse_ie_s1g_auth_control(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
+#endif
 // Functions for parsed information
 bool parse_ie_vendor_specific_probe_req(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);
 bool parse_ie_vendor_specific_probe_rsp(struct _SYS_BUF *buf, int8_t vif_id, ie_general *ie, bool is_tx, bool ap_sta);

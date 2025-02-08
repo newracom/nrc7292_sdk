@@ -110,7 +110,7 @@ nrc_err_t run_sample_gpio(int count, int interval)
 	gpio_conf.gpio_mode = GPIO_PULL_DOWN;
 	gpio_conf.gpio_alt= GPIO_FUNC;
 	nrc_gpio_config(&gpio_conf);
-#if defined(NRC7393)||defined(NRC7394)
+#if defined(NRC7394)
 	/* level & edge triggering, high or low signal interrupt can be */
 	/* configurable on NRC7394 SoC */
 	/* Configure debounce to true to ignore glitch */
@@ -123,7 +123,7 @@ nrc_err_t run_sample_gpio(int count, int interval)
 	gpio_conf.gpio_mode = GPIO_PULL_DOWN;
 	gpio_conf.gpio_alt= GPIO_FUNC;
 	nrc_gpio_config(&gpio_conf);
-#if defined(NRC7393)||defined(NRC7394)
+#if defined(NRC7394)
 	nrc_gpio_trigger_config(INT_VECTOR0, TRIGGER_EDGE, TRIGGER_HIGH, true);
 #endif
 	nrc_gpio_register_interrupt_handler(INT_VECTOR0, GPIO_INT0_PIN , gpio_intr_handler0);

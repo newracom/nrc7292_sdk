@@ -45,8 +45,8 @@
 #include "lwip/opt.h"
 #include "def.h"
 
-#if LWIP_IPV6  /* don't build if not configured for use in lwipopts.h */
-
+//#if LWIP_IPV6  /* don't build if not configured for use in lwipopts.h */
+#if 1 //LWIP_IPV6
 #include "lwip/ip6_zone.h"
 
 #ifdef __cplusplus

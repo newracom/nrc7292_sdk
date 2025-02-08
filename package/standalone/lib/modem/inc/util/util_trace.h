@@ -48,7 +48,7 @@ typedef enum {
 	TT_SBR = 29,
 	/* insert type for MAC below (Max:29)*/
 	TT_SDK_GPIO = 30,
-	TT_SDK_HTTPC,
+	TT_RESERVED1,
 	TT_SDK_HTTPD,
 	TT_SDK_FOTA,
 	TT_SDK_PS,
@@ -97,6 +97,17 @@ extern void oledWriteFlashBlock(uint8_t *s, int iLen);
 
 //#if !defined(RELEASE) && !defined(UCODE)
 #if !defined(UCODE)
+
+//CLI PRINT
+#if !defined(BOOT_LOADER)
+#define CPA(format, ...)	\
+do {						\
+	system_printf(format, ##__VA_ARGS__);\
+} while (0)
+#else
+#define CPA(format, ...) do{}while (0)
+#endif
+
 #if defined(INCLUDE_TRACE_ALWAYS)
 #define A(format, ...)	\
 do {						\

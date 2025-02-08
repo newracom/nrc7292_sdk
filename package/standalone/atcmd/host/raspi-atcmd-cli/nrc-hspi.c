@@ -23,12 +23,14 @@
  *
  */
 
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
 
 #include "nrc-hspi.h"
 
 
-#define _hspi_log(fmt, ...)				log_printf(fmt, ##__VA_ARGS__)
-
+#define _hspi_log(fmt, ...)				if (g_hspi_info.ops.printf) g_hspi_info.ops.printf(fmt, ##__VA_ARGS__)
 #define _hspi_read_debug(fmt, ...)		/* _hspi_log("hspi_read: " fmt, ##__VA_ARGS__) */
 #define _hspi_write_debug(fmt, ...)		/* _hspi_log("hspi_write: " fmt, ##__VA_ARGS__) */
 
@@ -39,7 +41,7 @@
 
 static hspi_info_t g_hspi_info =
 {
-	.active = false,
+	.active = 0,
 };
 
 #define HSPI_QUEUE_STATUS()					&g_hspi_info.queue.status
@@ -56,7 +58,7 @@ static hspi_info_t g_hspi_info =
 
 #define SPI_TRANSFER(tx, rx, len)			g_hspi_info.ops.spi_transfer(tx, rx, len)
 
-static bool HSPI_ACTIVE (void)
+static int HSPI_ACTIVE (void)
 {
 	if (!g_hspi_info.active)
 		_hspi_log("hspi is not opened.\n");
@@ -148,9 +150,13 @@ static void hspi_opcode_print (hspi_opcode_t *opcode)
 	_hspi_log(" - address: 0x%02X\n", opcode->address);
 
 	if (opcode->write && !opcode->burst && opcode->fixed)
+	{
 		_hspi_log(" - data	  : 0x%02X\n", opcode->length & 0xff);
+	}
 	else
+	{
 		_hspi_log(" - length	: %u\n", opcode->length);
+	}
 }
 
 static void hspi_transfer_setup (hspi_xfer_t *xfer, void *tx_buf, void *rx_buf, int len)
@@ -224,8 +230,8 @@ static int hspi_transfer (hspi_opcode_t *opcode, char *buf, int len)
 
 		if (resp.ack == HSPI_ACK_VALUE)
 		{
-			if (retry > 0)
-				_hspi_log("hspi_transfer: retry=%d/%d\n", retry, retry_max);
+/*			if (retry > 0)
+				_hspi_log("hspi_transfer: retry=%d/%d\n", retry, retry_max); */
 
 			if (opcode->burst)
 			{
@@ -247,8 +253,8 @@ static int hspi_transfer (hspi_opcode_t *opcode, char *buf, int len)
 
 	if (ret != 0 || retry >= retry_max)
 	{
-		_hspi_log("hspi_transfer: retry=%d/%d ret=%d\n", retry, retry_max, ret);
-		hspi_opcode_print(opcode);
+/*		_hspi_log("hspi_transfer: retry=%d/%d ret=%d\n", retry, retry_max, ret); */
+/*		hspi_opcode_print(opcode); */
 		ret = -1;
 	}
 
@@ -749,6 +755,11 @@ static int hspi_write (char *buf, int len)
 
 /**********************************************************************************************/
 
+static int hspi_reset (void)
+{
+	return hspi_reg_write(HSPI_REG_DEVICE_STATUS, 0xC8);
+}
+
 static int hspi_ready (hspi_info_t *info)
 {
 	const int timeout = 10; /* sec */
@@ -799,7 +810,8 @@ static int hspi_ready (hspi_info_t *info)
 			return 0;
 		}
 
-		sleep(1);
+		if (info->ops.delay)
+			info->ops.delay(1);
 
 		if (hspi_regs_read_message(regs.msg) != 0)
 			return -1;
@@ -817,7 +829,7 @@ static int hspi_open (hspi_ops_t *ops, enum HSPI_EIRQ_MODE mode)
 	memset(&g_hspi_info, 0, sizeof(hspi_info_t));
 	memcpy(&g_hspi_info.ops, ops, sizeof(hspi_ops_t));
 
-	g_hspi_info.active = true;
+	g_hspi_info.active = 1;
 
 	if (hspi_ready(&g_hspi_info) != 0 || hspi_status_update() != 0)
 	{
@@ -848,13 +860,20 @@ static void hspi_close (void)
 
 /**********************************************************************************************/
 
+int nrc_hspi_reset (void)
+{
+	return hspi_reset();
+}
+
 int nrc_hspi_open (hspi_ops_t *ops, enum HSPI_EIRQ_MODE mode)
 {
 	if (!ops || !ops->spi_transfer)
 	{
-		_hspi_log("hspi_open: !ops || !ops->spi_transfer\n");
+		_hspi_log("hspi_open: ops=%p ops->spi_transfer=%p\n", ops, ops->spi_transfer);
 		return -1;
 	}
+
+/*	printf("delay=%p printf==%p spi_transfer=%p\n", ops->delay, ops->printf, ops->spi_transfer); */
 
 	return hspi_open(ops, mode);
 }

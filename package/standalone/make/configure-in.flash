@@ -1,0 +1,36 @@
+#// --------------------------------------------------
+#// Flash MAP Profile
+#// --------------------------------------------------
+# Extend Flash size to maximize code/data region (only for 2MB Flash)
+# factory :  916KB (FOTA/100KB_USER_DATA)
+# profile1:  968KB (FOTA/8KB_USER_DATA)
+# profile2:  972KB (FOTA/NO_USER_DATA)
+# profile3: 1936KB (NO_FOTA/8KB_USER_DATA)
+# profile4: 1944KB (NO_FOTA/NO_USER_DATA)
+# NOTE: Setting memory map and/or migration should be done as prerequisite to use profile1-4
+
+# Normalize CONFIG_FLASH_SIZE to lowercase
+CONFIG_FLASH_SIZE_LOWER := $(shell echo $(CONFIG_FLASH_SIZE) | tr '[:upper:]' '[:lower:]')
+
+ifeq ($(CONFIG_FLASH_SIZE_LOWER), 4m)
+    FLASH_LEN = 1940K
+else
+    ifeq ($(CONFIG_FLASH_PROFILE), factory)
+        FLASH_LEN = 916K
+    endif
+    ifeq ($(CONFIG_FLASH_PROFILE), profile1)
+        FLASH_LEN = 968K
+    endif
+    ifeq ($(CONFIG_FLASH_PROFILE), profile2)
+        FLASH_LEN = 972K
+    endif
+    ifeq ($(CONFIG_FLASH_PROFILE), profile3)
+        FLASH_LEN = 1936K
+    endif
+    ifeq ($(CONFIG_FLASH_PROFILE), profile4)
+        FLASH_LEN = 1944K
+    endif
+endif
+
+# Change flash len in ld file
+$(shell sed -i "/^FLASH_SIZE =/c\FLASH_SIZE = $(FLASH_LEN);" $(LD_FILE))

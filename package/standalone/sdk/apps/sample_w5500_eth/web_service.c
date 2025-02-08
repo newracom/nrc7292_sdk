@@ -48,6 +48,38 @@ static char* html_orig=NULL;
 #define HTML_BUF_LEN 14 * 1024
 #define COMPRESSED_HTML_BUF_LEN 7 * 1024
 
+static const char rebooting_element[] = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Rebooting...</title>
+</head>
+<body>
+	<h1>Rebooting...</h1>
+	<p>Close the browser and reconnect...</p>
+</body>
+</html>
+)rawliteral";
+
+static const char setup_complete[] = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Configuration complete</title>
+</head>
+<body>
+	<h1>Setup completed!</h1>
+    <p> <button value="submit" type="submit" onclick="reboot()">Reboot</button> </p>
+
+    <script>
+        function reboot() {
+            window.location.href = '/rebooting';
+        }
+    </script>
+</body>
+</html>
+)rawliteral";
+
 /**
  * @brief insert new string in place of old string within destination string
  *
@@ -219,7 +251,7 @@ setup_page_http(httpd_req_t* req)
 	subst_wifi_values(html_buffer, wifi_config);
 
 	ret_httpd_resp = httpd_resp_send(req, html_buffer, strlen(html_buffer));
-	vTaskDelay(pdMS_TO_TICKS(300));
+	_delay_ms(1000);
 
 	if (ret_httpd_resp != ESP_OK) {
 		nrc_usr_print("[%s] Failed to send HTTP response: 0x%04x\n", __func__, ret_httpd_resp);
@@ -234,7 +266,7 @@ httpd_uri_t setup_page = {
 	.uri = "/",
 	.method = HTTP_GET,
 	.handler = setup_page_http,
-	.user_ctx = NULL
+	.user_ctx = (char *) setup_complete
 };
 
 /**
@@ -425,12 +457,10 @@ update_settings_handler(httpd_req_t* req)
 		}
 		wifi_config->network_mode = WIFI_NETWORK_MODE_BRIDGE;
 
+		nrc_usr_print("[%s] Saving configuration...\n", __func__);
 		nrc_save_wifi_config(wifi_config, 1);
 
-		_delay_ms(1000);
-
-		nrc_sw_reset();
-
+		httpd_resp_send(req, setup_complete, strlen(setup_complete));
 		return ESP_OK;
 	}
 
@@ -441,7 +471,24 @@ httpd_uri_t update_settings = {
 	.uri = "/update_settings",
 	.method = HTTP_GET,
 	.handler = update_settings_handler,
-	.user_ctx = NULL,
+	.user_ctx = NULL
+};
+
+static esp_err_t reboot_page_handler(httpd_req_t *req)
+{
+	esp_err_t ret = httpd_resp_send(req, rebooting_element, strlen(rebooting_element));
+
+	_delay_ms(2000);
+	nrc_sw_reset();
+
+	return ESP_OK;
+}
+
+static httpd_uri_t rebooting = {
+	.uri       = "/rebooting",
+	.method    = HTTP_GET,
+	.handler   = reboot_page_handler,
+	.user_ctx  = NULL
 };
 
 /**
@@ -556,6 +603,7 @@ run_http_server(WIFI_CONFIG* wifi_config)
 		httpd_register_uri_handler(http_server, &setup_page);
 		httpd_register_uri_handler(http_server, &update_settings);
 		httpd_register_uri_handler(http_server, &favicon_setup);
+		httpd_register_uri_handler(http_server, &rebooting);
 
 		nrc_usr_print("[%s]: http server started\n", __func__);
 

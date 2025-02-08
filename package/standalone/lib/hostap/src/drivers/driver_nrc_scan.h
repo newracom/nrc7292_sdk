@@ -58,8 +58,7 @@ void scan_start(struct nrc_scan_info *scan);
 void scan_stop(struct nrc_scan_info *scan);
 void scan_cancel(struct nrc_scan_info *scan);
 uint16_t scan_resume_from(struct nrc_scan_info *scan);
-int scan_add(struct nrc_scan_info *scan, uint16_t freq, int8_t rssi,
-		uint8_t* frame, uint16_t len);
+int scan_add(struct nrc_scan_info *scan, struct nrc_wpa_scan_res *res, uint8_t* frame, uint16_t len);
 void scan_config(struct nrc_scan_info *scan, struct wpa_driver_scan_params *p,
 		uint16_t last_freq);
 struct wpa_scan_results* get_scan_results(struct nrc_scan_info *scan);

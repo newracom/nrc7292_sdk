@@ -114,8 +114,9 @@
 #define configUSE_MALLOC_FAILED_HOOK	0
 #define configUSE_APPLICATION_TASK_TAG	0
 #define configUSE_COUNTING_SEMAPHORES	1
-#define configGENERATE_RUN_TIME_STATS	0
+#define configGENERATE_RUN_TIME_STATS	1
 #define configUSE_TASK_NOTIFICATIONS	1
+#define configRECORD_STACK_HIGH_ADDRESS 1
 
 #define configMAX_SYSCALL_INTERRUPT_PRIORITY 	0x10
 
@@ -128,11 +129,7 @@
 #define configUSE_TIMERS				0
 #else
 #define configUSE_TIMERS				1
-#if defined (INCLUDE_NEW_TASK_ARCH) && defined (INCLUDE_STANDALONE)
-#define configTIMER_TASK_PRIORITY		( configMAX_PRIORITIES - 3 )
-#else
 #define configTIMER_TASK_PRIORITY		( 30 )
-#endif
 #define configTIMER_QUEUE_LENGTH		5
 #define configTIMER_TASK_STACK_DEPTH	( 1024 )
 #endif
@@ -151,10 +148,14 @@ to exclude the API function. */
 #define INCLUDE_xTaskGetCurrentTaskHandle 1
 #define INCLUDE_xSemaphoreGetMutexHolder	1
 #define INCLUDE_uxTaskGetStackHighWaterMark 1
+#if (configUSE_TIMERS == 1)
+	#define INCLUDE_xTimerPendFunctionCall	1
+#endif
 
 /* Normal assert() semantics without relying on the provision of an assert.h
 header file. */
-#define configASSERT( x ) if( ( x ) == 0 ) { taskDISABLE_INTERRUPTS(); for( ;; ); }
+extern void util_trace_stack_dump(void*);
+#define configASSERT( x ) if( ( x ) == 0 ) { taskDISABLE_INTERRUPTS(); util_trace_stack_dump(NULL); for( ;; ); }
 
 #if 0
 /* Definitions that map the FreeRTOS port interrupt handlers to their CMSIS

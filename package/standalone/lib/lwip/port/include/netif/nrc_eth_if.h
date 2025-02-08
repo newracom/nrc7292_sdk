@@ -2,6 +2,7 @@
 #define __NRC_ETH_IF_H__
 
 #include "nrc_types.h"
+#include "api_spi.h"
 #include "lwip/prot/ethernet.h"
 
 #ifdef __cplusplus
@@ -31,7 +32,7 @@ nrc_network_mode_t nrc_eth_get_network_mode();
 void nrc_eth_set_ip_mode(nrc_eth_ip_mode_t mode);
 nrc_eth_ip_mode_t nrc_get_ip_mode();
 
-nrc_err_t ethernet_init(uint8_t *mac_addr);
+nrc_err_t ethernet_init(spi_device_t *eth_spi, uint8_t *mac_addr, int gpio_int_pin);
 #if defined(SUPPORT_ETHERNET_ACCESSPOINT)
 void set_peer_mac(const uint8_t *eth);
 struct eth_addr *get_peer_mac(void);

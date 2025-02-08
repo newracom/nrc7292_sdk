@@ -12,9 +12,12 @@
 
 #include "system_type.h"
 #include "system_macro.h"
+#if !(defined(NRC7394)&&defined(UCODE))
 #include "system_constant.h"
-#include "system_freertos.h"
 #include "util_trace.h"
+#endif
+#include "system_freertos.h"
+#include "system_os_api.h"
 
 #if defined(NEW_V_SNPRINTF_SUPPORT)
 #include "system_new_printf.h"
@@ -47,6 +50,7 @@
 
 void system_task_init();
 void background_task_init();
+bool background_task_set_priority(unsigned long priority);
 
 void show_assert(const char *x, const char *file, const char *func, unsigned int line);
 void show_assert_v(const char *x, const char *file, const char *func, unsigned int line, int v);
@@ -70,8 +74,6 @@ bw_t str_to_bw(const char *str);
 #define BUILD_CHIP_ID   0x7292
 #elif defined (NRC7392)
 #define BUILD_CHIP_ID   0x7392
-#elif defined (NRC7393)
-#define BUILD_CHIP_ID   0x7393
 #elif defined (NRC7394)
 #define BUILD_CHIP_ID   0x7394
 #elif defined (NRC5292)
@@ -80,7 +82,7 @@ bw_t str_to_bw(const char *str);
 #error "Please add new chip id"
 #endif
 
-#if defined (NRC7291) || (NRC7292) || (NRC7391) || (NRC7392) || (NRC4791) || (NRC5291) || (NRC5292) || (NRC7393) || (NRC4792) || (NRC7394)
+#if defined (NRC7291) || (NRC7292) || (NRC7391) || (NRC7392) || (NRC4791) || (NRC5291) || (NRC5292) || (NRC4792) || (NRC7394)
 // -- General Include --
 // -- Hal Include --
 #if defined(NRC7291)
@@ -146,11 +148,11 @@ bw_t str_to_bw(const char *str);
 #include     "hal_phy.h"
 #endif /* defined(NRC7391) */
 
-#if defined(NRC7392) || defined(NRC4791) || defined(NRC5291) || defined(NRC5292) || defined(NRC7393) || defined(NRC4792)|| defined(NRC7394)
+#if defined(NRC7392) || defined(NRC4791) || defined(NRC5291) || defined(NRC5292) || defined(NRC4792)|| defined(NRC7394) || defined(NRC5293)
 #include    "hal_uart.h"
 #include    "hal_gpio.h"
 #include   "hal_clock.h"
-#include   "drv_timer.h"
+#include   "drv_timer_.h"
 #include     "hal_i2c.h"
 
 #if defined(INCLUDE_RF_NRC7292RFE)
@@ -170,7 +172,7 @@ bw_t str_to_bw(const char *str);
 #include     "hal_wdt.h"
 #include    "hal_nadc.h"
 #include    "hal_cspi.h"
-#if defined(NRC_ROMLIB) && !defined(NRC7393)
+#if defined(NRC_ROMLIB)
 #include "hal_adc_sfc.h"
 #include  "hal_sflash_lib.h"
 #else
@@ -178,17 +180,20 @@ bw_t str_to_bw(const char *str);
 #include "hal_adc_sfc.h"
 #include  "hal_sflash_legacy.h"
 #else
-#include  "hal_sflash.h"
+//#include  "hal_sflash.h"
+#include  "hal_sfc.h"
 #endif
 
 #endif /* defined(NRC_ROMLIB) */
 #endif /* defined(NRC7392) || defined(NRC4791) || defined(NRC5291) */
 
 // -- UTIL Include --
+#if !(defined(NRC7394)&&defined(UCODE))
 #include "util_trace.h"
 #include "util_cmd.h"
+#endif
 
-#if defined (NRC7292) || defined (NRC7393)|| defined(NRC7394)
+#if defined (NRC7292) || defined(NRC7394)
 #include "util_core_dump.h"
 #endif /* defined(NRC7292) */
 
@@ -322,8 +327,11 @@ void msdelay(unsigned int delay);
 #define NOTIFY_DRIVER_W_DISABLE_ASSERTED	(0xAB000000)
 #define NOTIFY_DRIVER_REQUEST_FW_DOWNLOAD	(0xDC000000)
 #define NOTIFY_DRIVER_FW_READY_FROM_PS		(0xEC000000)
+#define NOTIFY_DRIVER_BEACON_UPDATED		(0xBE000000)
 /* Actually all noti message use upper 16bits of the msg3 reg */
 #define NOTIFY_DRIVER_FAILED_TO_ENTER_PS    (0xED00)
+#define NOTIFY_DRIVER_TWT_SERVICE           (0xEA00)
+#define NOTIFY_DRIVER_TWT_QUIET             (0xEB00)
 
 #if defined(NRC7292)
 #define MAX_SHOWN_RSSI						(-10)
@@ -419,5 +427,7 @@ int get_number_of_buffer(struct _SYS_BUF *packet);
 uint64_t system_get_systick_ms(void);
 uint64_t system_get_time(void);
 void system_time_reset(void);
+void stack_dump (uint32_t *s);
+void vPortStarvationHandler(void *xTaskHandle, unsigned long uxPriority);
 #define TRACE A("%s %d\n", __func__, __LINE__)
 #endif /* SYSTEM_COMMON_H */

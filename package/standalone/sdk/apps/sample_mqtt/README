@@ -16,7 +16,8 @@ On Ubuntu system
 1. sudo apt-get install mosquitto
 2. copy certs/ca.crt to /etc/mosquitto/ca_certificates/
 3. copy certs/broker.crt to /etc/mosquitto/certs/
-4. copy certs/mosquitto-tls.conf to /etc/mosquitto/conf.d/
+4. copy certs/broker.key to /etc/mosquitto/certs/
+5. copy certs/mosquitto-tls.conf to /etc/mosquitto/conf.d/
 5. restart mosquitto by "sudo systemctl restart mosquitto"
 
 -- Once the broker is ready, then build sample_mqtt and update the firmware.

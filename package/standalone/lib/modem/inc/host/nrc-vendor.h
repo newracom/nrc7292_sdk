@@ -33,12 +33,22 @@
  */
 #define NRC_SUBCMD_RM_VENDOR_IE				0xDE
 
+#define NRC_SUBCMD_TWT_VENDOR_IE			0xDF
+
 /**
- * GPIO pin number on Raspberry Pi.
+ * GPIO pin number on the host device(ex. Raspberry Pi).
+ * This is used to do HW reset of the target.
+ * So, the reset pin of the target must be connected to this GPIO physically.
+ * [direction]: OUTPUT
+ */
+#define HOST_GPIO_FOR_TARGET_RST			(4)
+
+/**
+ * GPIO pin number on the host device(ex. Raspberry Pi).
  * This is used to wake up the target in deep-sleep.
  * [direction]: OUTPUT
  */
-#define RPI_GPIO_FOR_PS						(20) //NRC7292 EVB
+#define HOST_GPIO_FOR_TARGET_WAKEUP			(20)
 
 /**
  * GPIO pin number on the target device.
@@ -47,6 +57,13 @@
  * [direction]: INPUT
  */
 #define TARGET_GPIO_FOR_WAKEUP				(11) //NRC7292 EVB
+
+/**
+ * GPIO wakeup polarity.
+ * This is used to wakeup polarity active high or low.
+ * [direction]: INPUT
+ */
+#define TARGET_WAKEUP_ACTIVE_HIGH			(1) //NRC7292 EVB
 
 /**
  * GPIO pin number on the target device.
@@ -67,8 +84,8 @@
 #define TARGET_DEEP_SLEEP_GPIO_DIR_739X		(0xCFEF8D07) // NRC default: 03-07, 09, 12-14, 20, 28-29 => input
 #define TARGET_DEEP_SLEEP_GPIO_OUT			(0x0)
 #define TARGET_DEEP_SLEEP_GPIO_PULLUP		(0x0)
-
-#define RPI_GPIO_FOR_RST					(4)
+#define VIF_MAX								(2)
+#define VCMD_BACKUP_RESOTRE_WORK_DELAY_MS	(300)
 
 enum nrc_vendor_event {
 	NRC_SUBCMD_ANNOUNCE1 = 0,
@@ -98,6 +115,7 @@ enum nrc_vendor_event {
 	NRC_SUBCMD_ANNOUNCE18,	// vendor ie in assoc request (3).
 	NRC_SUBCMD_ANNOUNCE19,	// vendor ie in assoc request (4).
 	NRC_SUBCMD_ANNOUNCE20,	// vendor ie in assoc request (5).  // 26
+	NRC_SUBCMD_UTC,
 	NUM_VENDOR_EVENT,
 	MAX_VENDOR_EVENT = NUM_VENDOR_EVENT - 1
 };
